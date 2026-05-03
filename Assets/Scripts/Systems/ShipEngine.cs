@@ -3,31 +3,51 @@ using UnityEngine;
 public class ShipEngine : MonoBehaviour
 {
     [Header("Настройки двигателя")]
-    public string engineName = "Стандартный паровой";
-    public float maxPower = 1000f;       // Максимальная мощность (л.с. или у.е.)
-    public float responsiveness = 0.5f;   // Насколько быстро движок набирает обороты
-    [Range(0, 1)] public float startingRPM = 0.5f; // Обороты при старте игры
-    
+    public string engineName = "Стандартный двигатель";
+    public float maxPower = 1000f;       // Максимальная мощность
+    public float responsiveness = 0.5f;   // Приемистость (насколько быстро набирает обороты)
+    [Range(0, 1.2f)] public float startingRPM = 0.5f; 
+
+    [Header("Настройки CSU (Constant Speed Unit)")]
+    public float targetRPM = 0.8f;   // Обороты, которые хочет пилот
+    public float currentLoad = 0f;  // Текущая нагрузка на валу (0..1)
+    public bool isClaudium = false; // Клавдиевые системы не задыхаются от нагрузки
+
     [Header("Текущее состояние")]
-    [Range(0, 1)] public float throttle; // Подача топлива (от игрока)
-    public float currentRPM;             // Текущие обороты (0..1)
-    
-    // Итоговая мощность, которую выдает движок в данный момент
-    public float GetPowerOutput()
-    {
-        return currentRPM * maxPower;
-    }
+    public float currentRPM = 0f;
+    [HideInInspector] public float throttle = 0f; // Сохраняем для совместимости
 
     void Start()
     {
-        // Устанавливаем обороты и газ на стартовое значение
         currentRPM = startingRPM;
-        throttle = startingRPM;
+        targetRPM = startingRPM;
     }
 
-    void Update()
+    void FixedUpdate()
     {
-        // Плавный набор и сброс оборотов (инерция двигателя)
-        currentRPM = Mathf.Lerp(currentRPM, throttle, Time.deltaTime * responsiveness);
+        // 1. Считаем крутящий момент мотора
+        // Если обороты падают ниже цели, мотор сопротивляется в 5 раз сильнее
+        float error = targetRPM - currentRPM;
+        float dynamicResponsiveness = error > 0 ? responsiveness * 5f : responsiveness;
+        float torque = error * dynamicResponsiveness;
+
+        // 2. Считаем сопротивление нагрузки
+        // Обычный двигатель теряет обороты от нагрузки. Клавдиевый - в 4 раза меньше.
+        float loadResistance = isClaudium ? (currentLoad * 0.05f) : (currentLoad * 0.2f);
+
+        // 3. Изменяем обороты (инерция)
+        currentRPM += (torque - loadResistance) * Time.fixedDeltaTime;
+        
+        // Обороты не могут быть отрицательными
+        currentRPM = Mathf.Max(currentRPM, 0f);
+        
+        // Для совместимости с другими скриптами
+        throttle = currentRPM;
+    }
+
+    public float GetPowerOutput()
+    {
+        // Мощность = Макс_Мощь * Текущие_Обороты
+        return maxPower * currentRPM;
     }
 }

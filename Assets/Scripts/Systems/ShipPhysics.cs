@@ -31,14 +31,27 @@ public class ShipPhysics : MonoBehaviour
     [Header("Автопилот")]
     public bool altitudeHold = false;
     public float targetAltitude = 0f;
-    public float altStiffness = 0.5f; // Насколько жестко держим высоту (P)
-    public float altDamping = 1.5f;   // Насколько сильно гасим раскачку (D)
+    public float altStiffness = 0.5f; // P
+    public float altDamping = 1.5f;   // D
+
+    public bool cruiseControl = false;
+    public float targetSpeedMS = 0f;
+    public float maxCruiseSpeedMS = 20f;  // Лимит для автопилота (м/с)
+    public float maxManualSpeedMS = 30f;  // Лимит для ручного режима (м/с)
+    
+    [Header("Настройки ВРШ (Шаг винта)")]
+    public float propellerPitch = 0f;    // Текущий шаг (-1..1)
+    public float speedStiffness = 0.8f;  // Насколько активно круиз меняет шаг винта
+    public float speedDamping = 0.3f;    // Демпфирование шага
 
     [Header("Текущее управление (для чтения/записи из UI)")]
     [HideInInspector] public float thrustInput; // -1 назад, 1 вперед
     [HideInInspector] public float turnInput;   // -1 влево, 1 вправо
     [HideInInspector] public float targetTrimMass = 1000f; // Масса для триммирования (кг)
     [HideInInspector] public float liftInput;   // -1 вниз, 1 вверх (Точная доводка +-10%)
+    
+    // Новое: Целевые обороты маршевого двигателя (CSU)
+    [HideInInspector] public float targetMainEngineRPM = 0.8f; 
 
     void Awake()
     {
@@ -81,13 +94,15 @@ public class ShipPhysics : MonoBehaviour
             rb.AddForce(transform.up * forceMagnitude, ForceMode.Force);
         }
 
-        // 2. Тяга маршевого винта
+        // 2. Тяга маршевого винта (ВРШ)
         if (thrustEngine != null)
         {
-            float thrustDir = Mathf.Sign(thrustInput);
-            if (thrustInput == 0) thrustDir = 0;
+            // Нагрузка зависит от реального угла лопастей и оборотов
+            thrustEngine.currentLoad = Mathf.Abs(propellerPitch) * thrustEngine.currentRPM;
 
-            rb.AddForce(transform.forward * (thrustDir * thrustEngine.GetPowerOutput() * thrustEfficiency * g), ForceMode.Force);
+            // Сила = Шаг * Мощность(от оборотов) * Эффективность
+            float thrustForce = propellerPitch * thrustEngine.GetPowerOutput() * thrustEfficiency * g;
+            rb.AddForce(transform.forward * thrustForce, ForceMode.Force);
         }
 
         // 3. Угловой момент для разворота влево/вправо (ось Y / up)
@@ -114,40 +129,37 @@ public class ShipPhysics : MonoBehaviour
     }
 
     private bool wasAltitudeHold = false;
+    private float lastForwardSpeed = 0f; 
 
     private void UpdateEngineThrottles()
     {
         // 1. Управление двигателем подъема
         if (liftEngine != null)
         {
+            // Для клавдиевого двигателя targetRPM - это давление/мощность
             float maxLiftCapacity = liftEngine.maxPower * liftEfficiency;
-            float baseThrottle = 0f;
+            float baseTargetRPM = 0f;
             if (maxLiftCapacity > 0)
             {
                 float clampedTrimMass = Mathf.Clamp(targetTrimMass, 0, maxLiftCapacity * 0.9f);
-                baseThrottle = clampedTrimMass / maxLiftCapacity;
+                baseTargetRPM = clampedTrimMass / maxLiftCapacity;
             }
 
             float inputMod = 0f;
 
             if (altitudeHold)
             {
-                // Если только что включили - запоминаем текущую высоту
                 if (!wasAltitudeHold)
                 {
                     targetAltitude = rb.position.y;
                     wasAltitudeHold = true;
                 }
 
-                // Рычаг подъема теперь меняет целевую высоту (5 метров в секунду)
-                targetAltitude += liftInput * 5.0f * Time.fixedDeltaTime;
-
-                // PID: Ошибка высоты + гашение вертикальной скорости
+                targetAltitude += liftInput * 10.0f * Time.fixedDeltaTime;
                 float altError = targetAltitude - rb.position.y;
                 float vVel = rb.linearVelocity.y;
                 
                 inputMod = (altError * altStiffness) - (vVel * altDamping);
-                // Ограничиваем влияние автопилота (+-20% мощности), чтобы не шел вразнос
                 inputMod = Mathf.Clamp(inputMod, -0.2f, 0.2f);
             }
             else
@@ -155,7 +167,7 @@ public class ShipPhysics : MonoBehaviour
                 wasAltitudeHold = false;
                 inputMod = liftInput * 0.1f;
 
-                // ГУВЕРНЁР (работает только в ручном режиме)
+                // ГУВЕРНЁР (просто ограничиваем целевые обороты)
                 float vVel = rb.linearVelocity.y;
                 float speedExcess = Mathf.Abs(vVel) - maxVerticalSpeed;
                 if (speedExcess > 0)
@@ -167,24 +179,63 @@ public class ShipPhysics : MonoBehaviour
                 }
             }
 
-            float targetLiftThrottle = Mathf.Clamp01(baseThrottle + inputMod);
+            liftEngine.targetRPM = Mathf.Clamp01(baseTargetRPM + inputMod);
+        }
 
-            targetLiftThrottle = Mathf.Clamp01(targetLiftThrottle);
+        // 2. Управление маршевым двигателем (ВРШ)
+        if (thrustEngine != null)
+        {
+            // Мотор всегда стремится к тем оборотам, что выставил пилот
+            thrustEngine.targetRPM = targetMainEngineRPM;
 
-            if (liftEngine == thrustEngine)
+            if (cruiseControl)
             {
-                liftEngine.throttle = Mathf.Max(targetLiftThrottle, Mathf.Abs(thrustInput));
+                // Рычаг тяги меняет целевую скорость
+                targetSpeedMS += thrustInput * 5.0f * Time.fixedDeltaTime;
+                targetSpeedMS = Mathf.Clamp(targetSpeedMS, -maxCruiseSpeedMS, maxCruiseSpeedMS);
+
+                // PD-регулятор для подбора ШАГА ВИНТА
+                float currentForwardSpeedMS = Vector3.Dot(rb.linearVelocity, transform.forward);
+                float speedError = targetSpeedMS - currentForwardSpeedMS;
+                float acceleration = (currentForwardSpeedMS - lastForwardSpeed) / Time.fixedDeltaTime;
+                lastForwardSpeed = currentForwardSpeedMS;
+
+                float idealPitch = (speedError * speedStiffness) - (acceleration * speedDamping);
+                propellerPitch = Mathf.Clamp(idealPitch, -1f, 1f);
             }
             else
             {
-                liftEngine.throttle = targetLiftThrottle;
-            }
-        }
+                lastForwardSpeed = 0f;
+                // В ручном режиме рычаг напрямую задает ШАГ лопастей
+                propellerPitch = thrustInput;
 
-        // 2. Управление двигателем тяги
-        if (thrustEngine != null && thrustEngine != liftEngine)
-        {
-            thrustEngine.throttle = Mathf.Abs(thrustInput);
+                // ЛИНЕЙНЫЙ ГУВЕРНЁР (Ограничиваем шаг, если летим слишком быстро)
+                float currentForwardSpeedMS = Vector3.Dot(rb.linearVelocity, transform.forward);
+                float speedExcess = Mathf.Abs(currentForwardSpeedMS) - maxManualSpeedMS;
+                
+                if (speedExcess > 0)
+                {
+                    float correction = speedExcess * 0.5f; 
+                    if (currentForwardSpeedMS > 0) propellerPitch = Mathf.Max(0, propellerPitch - correction);
+                    else propellerPitch = Mathf.Min(0, propellerPitch + correction);
+                }
+            }
+
+            // ==========================================
+            // ЗАЩИТА ОТ "УДУШЬЯ" (АППАРАТНЫЙ CSU)
+            // ==========================================
+            // Если мотор не справляется и обороты падают ниже целевых:
+            float rpmRatio = thrustEngine.currentRPM / Mathf.Max(thrustEngine.targetRPM, 0.05f);
+            if (rpmRatio < 0.95f)
+            {
+                // Плавно, но жестко уменьшаем максимальный доступный шаг
+                // Если обороты упали до 50% от цели - шаг ограничивается нулем!
+                float maxSafePitch = Mathf.Lerp(0f, 1f, (rpmRatio - 0.5f) / 0.45f);
+                maxSafePitch = Mathf.Clamp01(maxSafePitch);
+                
+                // Принудительно "схлопываем" лопасти
+                propellerPitch = Mathf.Clamp(propellerPitch, -maxSafePitch, maxSafePitch);
+            }
         }
     }
 }

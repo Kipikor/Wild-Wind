@@ -22,6 +22,11 @@ public class ShipPhysicsEditor : Editor
     SerializedProperty liftInputProp;
     SerializedProperty altitudeHoldProp;
     SerializedProperty targetAltitudeProp;
+    SerializedProperty cruiseControlProp;
+    SerializedProperty targetSpeedMSProp;
+    SerializedProperty speedDampingProp;
+    SerializedProperty maxCruiseSpeedMSProp;
+    SerializedProperty maxManualSpeedProp;
     SerializedProperty targetTrimMassProp;
 
     void OnEnable()
@@ -46,6 +51,11 @@ public class ShipPhysicsEditor : Editor
         targetTrimMassProp = serializedObject.FindProperty("targetTrimMass");
         altitudeHoldProp = serializedObject.FindProperty("altitudeHold");
         targetAltitudeProp = serializedObject.FindProperty("targetAltitude");
+        cruiseControlProp = serializedObject.FindProperty("cruiseControl");
+        targetSpeedMSProp = serializedObject.FindProperty("targetSpeedMS");
+        speedDampingProp = serializedObject.FindProperty("speedDamping");
+        maxCruiseSpeedMSProp = serializedObject.FindProperty("maxCruiseSpeedMS");
+        maxManualSpeedProp = serializedObject.FindProperty("maxManualSpeedMS");
     }
 
     public override void OnInspectorGUI()
@@ -94,35 +104,73 @@ public class ShipPhysicsEditor : Editor
         // Расчет и вывод максимальной скорости
         float currentDrag = 0.5f * airDensityProp.floatValue * dragCoefficientProp.floatValue * frontalAreaProp.floatValue;
         
-        // Максимальная тяга = Макс. мощность движка * его эффективность
-        float maxThrustKgf = 0f;
-        if (ship.thrustEngine != null)
+
+        // Расчет максимальной теоретической скорости (когда Тяга = Сопротивлению)
+        float maxSpeedMS = 0f;
+        if (currentDrag > 0 && ship.thrustEngine != null)
         {
-            maxThrustKgf = ship.thrustEngine.maxPower * thrustEfficiencyProp.floatValue;
+            float maxThrustNewtons = ship.thrustEngine.maxPower * thrustEfficiencyProp.floatValue * Mathf.Abs(Physics.gravity.y);
+            maxSpeedMS = Mathf.Sqrt(maxThrustNewtons / currentDrag);
         }
+
+        EditorGUILayout.HelpBox(
+            $"Итоговое сопротивление воздуха: {currentDrag:F2}\n" +
+            $"Верт. лимит: {ship.maxVerticalSpeed} м/с\n" +
+            $"Расчетная макс. скорость: {maxSpeedMS:F1} м/с", 
+            MessageType.Info);
+
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Режим маршевого двигателя (CSU)", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Малый", GUILayout.Height(25))) ship.targetMainEngineRPM = 0.2f;
+        if (GUILayout.Button("Крейсер", GUILayout.Height(25))) ship.targetMainEngineRPM = 0.6f;
+        if (GUILayout.Button("Номинал", GUILayout.Height(25))) ship.targetMainEngineRPM = 0.85f;
+        if (GUILayout.Button("Взлет", GUILayout.Height(25))) ship.targetMainEngineRPM = 1.0f;
+        if (GUILayout.Button("ФОРСАЖ", GUILayout.Height(25))) ship.targetMainEngineRPM = 1.15f;
+        EditorGUILayout.EndHorizontal();
+
+        // Список расчетных скоростей
+        float drag = ship.CurrentAeroDrag;
+        float efficiency = serializedObject.FindProperty("thrustEfficiency").floatValue;
+        float g = Mathf.Abs(Physics.gravity.y);
+        float maxPowerNewtons = ship.thrustEngine != null ? ship.thrustEngine.maxPower * efficiency * g : 0f;
+
+        float CalcSpeed(float rpm) => (drag > 0 && maxPowerNewtons > 0) ? Mathf.Sqrt((maxPowerNewtons * rpm) / drag) : 0f;
+
+        string speedList = 
+            $"• Малый (20%): {CalcSpeed(0.2f):F1} м/с\n" +
+            $"• Крейсер (60%): {CalcSpeed(0.6f):F1} м/с\n" +
+            $"• Номинал (85%): {CalcSpeed(0.85f):F1} м/с\n" +
+            $"• Взлет (100%): {CalcSpeed(1.0f):F1} м/с\n" +
+            $"• ФОРСАЖ (115%): {CalcSpeed(1.15f):F1} м/с";
+
+        EditorGUILayout.HelpBox($"Макс. скорость для режимов:\n{speedList}", MessageType.None);
         
-        float thrustNewtons = maxThrustKgf * Mathf.Abs(Physics.gravity.y);
+        float currentRPM = ship.thrustEngine != null ? ship.thrustEngine.currentRPM : 0f;
+        float currentLoad = ship.thrustEngine != null ? ship.thrustEngine.currentLoad : 0f;
         
-        float maxSpeed = 0f;
-        if (currentDrag > 0 && rb != null)
-        {
-            // На высокой скорости линейный демпфер равен 0, поэтому считаем только воздух
-            maxSpeed = Mathf.Sqrt(thrustNewtons / currentDrag);
-        }
-        else if (currentDrag > 0) // Если Rigidbody вдруг нет
-        {
-            maxSpeed = Mathf.Sqrt(thrustNewtons / currentDrag);
-        }
+        Rect rpmRect = GUILayoutUtility.GetRect(18, 18, "TextField");
+        EditorGUI.ProgressBar(rpmRect, currentRPM / 1.15f, $"Обороты: {(currentRPM * 100):F0}% (Цель: {(ship.targetMainEngineRPM * 100):F0}%)");
         
-        EditorGUILayout.Space(5);
-        EditorGUILayout.HelpBox($"Итоговое сопротивление воздуха: {currentDrag:F2}\nРасчетная макс. скорость: {maxSpeed:F1} м/с ({(maxSpeed * 3.6f):F0} км/ч)", MessageType.Info);
+        Rect loadRect = GUILayoutUtility.GetRect(18, 18, "TextField");
+        EditorGUI.ProgressBar(loadRect, currentLoad, $"Нагрузка на винт: {(currentLoad * 100):F0}%");
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Автопилот", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(altitudeHoldProp, new GUIContent("Удержание высоты"));
-        if (altitudeHoldProp.boolValue)
+        EditorGUILayout.PropertyField(cruiseControlProp, new GUIContent("Круиз-контроль (скорость)"));
+        EditorGUILayout.PropertyField(speedDampingProp, new GUIContent("   Демпфирование (D)"));
+        EditorGUILayout.PropertyField(maxManualSpeedProp, new GUIContent("Лимит ручной скорости (м/с)"));
+        EditorGUILayout.PropertyField(maxCruiseSpeedMSProp, new GUIContent("Лимит круиз-скорости (м/с)"));
+        
+        if (altitudeHoldProp.boolValue || cruiseControlProp.boolValue)
         {
-            EditorGUILayout.LabelField($"Целевая высота: {targetAltitudeProp.floatValue:F1} м");
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            if (altitudeHoldProp.boolValue)
+                EditorGUILayout.PropertyField(targetAltitudeProp, new GUIContent("Целевая высота (м)"));
+            if (cruiseControlProp.boolValue)
+                EditorGUILayout.PropertyField(targetSpeedMSProp, new GUIContent("Целевая скорость (м/с)"));
+            EditorGUILayout.EndVertical();
         }
         
         EditorGUILayout.Space(10);
@@ -175,22 +223,49 @@ public class ShipPhysicsEditor : Editor
         if (rb != null)
         {
             float currentSpeedMS = rb.linearVelocity.magnitude;
-            float currentSpeedKMH = currentSpeedMS * 3.6f;
             
-            EditorGUILayout.LabelField($"Текущая скорость: {currentSpeedMS:F1} м/с ({currentSpeedKMH:F0} км/ч)", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Общая скорость: {currentSpeedMS:F2} м/с", EditorStyles.boldLabel);
             EditorGUILayout.Space(5);
 
             EditorGUI.BeginChangeCheck();
             
-            Vector3 newVelocity = EditorGUILayout.Vector3Field("Скорость (м/с)", rb.linearVelocity);
-            Vector3 newAngularVelocity = EditorGUILayout.Vector3Field("Угловая скорость", rb.angularVelocity);
+            // Линейная скорость
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Линейная (м/с)", GUILayout.Width(100));
+            
+            EditorGUILayout.LabelField("X", GUILayout.Width(12));
+            float vx = EditorGUILayout.FloatField((float)System.Math.Round(rb.linearVelocity.x, 2));
+            
+            EditorGUILayout.LabelField("Y", GUILayout.Width(12));
+            float vy = EditorGUILayout.FloatField((float)System.Math.Round(rb.linearVelocity.y, 2));
+            
+            EditorGUILayout.LabelField("Z", GUILayout.Width(12));
+            float vz = EditorGUILayout.FloatField((float)System.Math.Round(rb.linearVelocity.z, 2));
+            EditorGUILayout.EndHorizontal();
+
+            // Угловая скорость
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Угловая (р/с)", GUILayout.Width(100));
+            
+            EditorGUILayout.LabelField("X", GUILayout.Width(12));
+            float ax = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.x, 2));
+            
+            EditorGUILayout.LabelField("Y", GUILayout.Width(12));
+            float ay = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.y, 2));
+            
+            EditorGUILayout.LabelField("Z", GUILayout.Width(12));
+            float az = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.z, 2));
+            EditorGUILayout.EndHorizontal();
             
             if (EditorGUI.EndChangeCheck())
             {
-                // Если мы ручками поменяли цифры в инспекторе, применяем их к Rigidbody
-                rb.linearVelocity = newVelocity;
-                rb.angularVelocity = newAngularVelocity;
+                rb.linearVelocity = new Vector3(vx, vy, vz);
+                rb.angularVelocity = new Vector3(ax, ay, az);
             }
+
+            EditorGUILayout.Space(5);
+            float currentRPMTelemetry = ship.thrustEngine != null ? ship.thrustEngine.currentRPM * 100f : 0f;
+            EditorGUILayout.LabelField($"Фактические обороты: {currentRPMTelemetry:F2}%", EditorStyles.boldLabel);
         }
         else
         {
