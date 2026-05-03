@@ -5,31 +5,47 @@ using UnityEngine;
 public class ShipPhysicsEditor : Editor
 {
     SerializedProperty baseMassProp;
-    SerializedProperty thrustForceProp;
+    SerializedProperty thrustEngineProp;
+    SerializedProperty liftEngineProp;
+    SerializedProperty thrustEfficiencyProp;
+    SerializedProperty liftEfficiencyProp;
     SerializedProperty turnTorqueProp;
-    SerializedProperty liftForceProp;
     SerializedProperty airDensityProp;
     SerializedProperty dragCoefficientProp;
     SerializedProperty frontalAreaProp;
+    SerializedProperty sideResistanceProp;
+    SerializedProperty verticalAreaFactorProp;
+    SerializedProperty maxVerticalSpeedProp;
     
     SerializedProperty thrustInputProp;
     SerializedProperty turnInputProp;
     SerializedProperty liftInputProp;
+    SerializedProperty altitudeHoldProp;
+    SerializedProperty targetAltitudeProp;
+    SerializedProperty targetTrimMassProp;
 
     void OnEnable()
     {
         baseMassProp = serializedObject.FindProperty("baseMass");
-        thrustForceProp = serializedObject.FindProperty("thrustForce");
+        thrustEngineProp = serializedObject.FindProperty("thrustEngine");
+        liftEngineProp = serializedObject.FindProperty("liftEngine");
+        thrustEfficiencyProp = serializedObject.FindProperty("thrustEfficiency");
+        liftEfficiencyProp = serializedObject.FindProperty("liftEfficiency");
         turnTorqueProp = serializedObject.FindProperty("turnTorque");
-        liftForceProp = serializedObject.FindProperty("liftForce");
         
         airDensityProp = serializedObject.FindProperty("airDensity");
         dragCoefficientProp = serializedObject.FindProperty("dragCoefficient");
         frontalAreaProp = serializedObject.FindProperty("frontalArea");
+        sideResistanceProp = serializedObject.FindProperty("sideResistance");
+        verticalAreaFactorProp = serializedObject.FindProperty("verticalAreaFactor");
+        maxVerticalSpeedProp = serializedObject.FindProperty("maxVerticalSpeed");
         
         thrustInputProp = serializedObject.FindProperty("thrustInput");
         turnInputProp = serializedObject.FindProperty("turnInput");
         liftInputProp = serializedObject.FindProperty("liftInput");
+        targetTrimMassProp = serializedObject.FindProperty("targetTrimMass");
+        altitudeHoldProp = serializedObject.FindProperty("altitudeHold");
+        targetAltitudeProp = serializedObject.FindProperty("targetAltitude");
     }
 
     public override void OnInspectorGUI()
@@ -46,15 +62,26 @@ public class ShipPhysicsEditor : Editor
         
         // Отрисовка базовых параметров с принудительными русскими названиями
         EditorGUILayout.PropertyField(baseMassProp, new GUIContent("Стартовая масса (кг)"));
-        EditorGUILayout.PropertyField(thrustForceProp, new GUIContent("Тяга маршевая (кгс)"));
+        
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Силовые установки", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(thrustEngineProp, new GUIContent("Маршевый двигатель"));
+        EditorGUILayout.PropertyField(liftEngineProp, new GUIContent("Двигатель подъема"));
+        
+        EditorGUILayout.Space(5);
+        EditorGUILayout.LabelField("Эффективность систем", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(thrustEfficiencyProp, new GUIContent("Эфф. винта (кгс/лс)"));
+        EditorGUILayout.PropertyField(liftEfficiencyProp, new GUIContent("Эфф. контура (кгс/лс)"));
         EditorGUILayout.PropertyField(turnTorqueProp, new GUIContent("Сила поворота (кгс*м)"));
-        EditorGUILayout.PropertyField(liftForceProp, new GUIContent("Подъемная сила (кгс)"));
         
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Аэродинамика", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(airDensityProp, new GUIContent("Плотность воздуха"));
         EditorGUILayout.PropertyField(dragCoefficientProp, new GUIContent("Коэф. формы (Cd)"));
         EditorGUILayout.PropertyField(frontalAreaProp, new GUIContent("Лобовая площадь (м²)"));
+        EditorGUILayout.PropertyField(sideResistanceProp, new GUIContent("Сопротивление сносу"));
+        EditorGUILayout.PropertyField(verticalAreaFactorProp, new GUIContent("Коэф. удлинения (вертикаль)"));
+        EditorGUILayout.PropertyField(maxVerticalSpeedProp, new GUIContent("Лимит верт. скорости (м/с)"));
 
         EditorGUILayout.HelpBox(
             "Памятка по коэф. формы (Cd):\n" +
@@ -66,7 +93,15 @@ public class ShipPhysicsEditor : Editor
 
         // Расчет и вывод максимальной скорости
         float currentDrag = 0.5f * airDensityProp.floatValue * dragCoefficientProp.floatValue * frontalAreaProp.floatValue;
-        float thrustNewtons = thrustForceProp.floatValue * Mathf.Abs(Physics.gravity.y);
+        
+        // Максимальная тяга = Макс. мощность движка * его эффективность
+        float maxThrustKgf = 0f;
+        if (ship.thrustEngine != null)
+        {
+            maxThrustKgf = ship.thrustEngine.maxPower * thrustEfficiencyProp.floatValue;
+        }
+        
+        float thrustNewtons = maxThrustKgf * Mathf.Abs(Physics.gravity.y);
         
         float maxSpeed = 0f;
         if (currentDrag > 0 && rb != null)
@@ -82,7 +117,15 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.Space(5);
         EditorGUILayout.HelpBox($"Итоговое сопротивление воздуха: {currentDrag:F2}\nРасчетная макс. скорость: {maxSpeed:F1} м/с ({(maxSpeed * 3.6f):F0} км/ч)", MessageType.Info);
 
-        EditorGUILayout.Space(15);
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Автопилот", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(altitudeHoldProp, new GUIContent("Удержание высоты"));
+        if (altitudeHoldProp.boolValue)
+        {
+            EditorGUILayout.LabelField($"Целевая высота: {targetAltitudeProp.floatValue:F1} м");
+        }
+        
+        EditorGUILayout.Space(10);
         
         // Отрисовка панели управления
         EditorGUILayout.LabelField("Панель управления рычагами", EditorStyles.boldLabel);
@@ -91,7 +134,22 @@ public class ShipPhysicsEditor : Editor
         boxStyle.padding = new RectOffset(10, 10, 10, 10);
         EditorGUILayout.BeginVertical(boxStyle);
 
-        EditorGUILayout.Slider(liftInputProp, -1f, 1f, new GUIContent("Подъем (вниз/вверх)"));
+        float maxLift = 0f;
+        if (ship.liftEngine != null) maxLift = ship.liftEngine.maxPower * ship.liftEfficiency;
+        float maxTrim = maxLift * 0.9f;
+
+        EditorGUILayout.BeginHorizontal();
+        float newTrim = EditorGUILayout.Slider("Триммер (кг)", ship.targetTrimMass, 0f, maxTrim);
+        if (newTrim != ship.targetTrimMass) {
+            Undo.RecordObject(ship, "Change Trim Mass");
+            ship.targetTrimMass = newTrim;
+        }
+        if (GUILayout.Button("Авто", GUILayout.Width(50))) {
+            ship.targetTrimMass = ship.baseMass;
+        }
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Slider(liftInputProp, -1f, 1f, new GUIContent("Подъем точный (+-10%)"));
         EditorGUILayout.Slider(thrustInputProp, -1f, 1f, new GUIContent("Тяга (назад/вперед)"));
         EditorGUILayout.Slider(turnInputProp, -1f, 1f, new GUIContent("Руль (влево/вправо)"));
 
@@ -116,6 +174,12 @@ public class ShipPhysicsEditor : Editor
         
         if (rb != null)
         {
+            float currentSpeedMS = rb.linearVelocity.magnitude;
+            float currentSpeedKMH = currentSpeedMS * 3.6f;
+            
+            EditorGUILayout.LabelField($"Текущая скорость: {currentSpeedMS:F1} м/с ({currentSpeedKMH:F0} км/ч)", EditorStyles.boldLabel);
+            EditorGUILayout.Space(5);
+
             EditorGUI.BeginChangeCheck();
             
             Vector3 newVelocity = EditorGUILayout.Vector3Field("Скорость (м/с)", rb.linearVelocity);
