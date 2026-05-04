@@ -56,6 +56,14 @@ public class ShipPhysics : MonoBehaviour
     public float maxCruiseSpeedMS = 20f;  // Лимит для автопилота (м/с)
     public float maxManualSpeedMS = 30f;  // Лимит для ручного режима (м/с)
     
+    [Header("Автопилот курса (Heading)")]
+    public bool headingHold = false;
+    public float targetHeading = 0f;      // Целевой курс (градусы 0-360)
+    public float headingStiffness = 0.5f; // P-терм (Жесткость реакции на ошибку курса)
+    public float headingDamping = 0.5f;   // D-терм (Демпфирование по угловой скорости)
+    public float maxAutoTurnRateDeg = 5.0f; // Лимит угловой скорости для автопилота (°/сек)
+    public float maxStructuralTurnRateDeg = 15.0f; // Конструкционный лимит угловой скорости (°/сек)
+    
     [Header("Настройки ВРШ (Шаг винта)")]
     public float propellerPitch = 0f;    // Текущий шаг (-1..1)
     public float speedStiffness = 0.8f;  // Насколько активно круиз меняет шаг винта
@@ -155,6 +163,7 @@ public class ShipPhysics : MonoBehaviour
     void FixedUpdate()
     {
         UpdateEngineThrottles();
+        UpdateHeadingAutopilot(); // Автопилот курса
         UpdateClaudium(); // Магия Клавдия
         
         // --- АЭРОДИНАМИКА ---
@@ -286,6 +295,17 @@ public class ShipPhysics : MonoBehaviour
         
         float finalTorque = activeTorque + dampingTorque;
         
+        // ГЛОБАЛЬНЫЙ КОНСТРУКЦИОННЫЙ ОГРАНИЧИТЕЛЬ ВРАЩЕНИЯ
+        float currentTurnRateDeg = rb.angularVelocity.y * Mathf.Rad2Deg;
+        if (Mathf.Abs(currentTurnRateDeg) > maxStructuralTurnRateDeg)
+        {
+            if (Mathf.Sign(finalTorque) == Mathf.Sign(currentTurnRateDeg))
+            {
+                float overspeed = Mathf.Abs(currentTurnRateDeg) - maxStructuralTurnRateDeg;
+                finalTorque *= Mathf.Clamp01(1f - overspeed * 0.2f);
+            }
+        }
+        
         // Ограничиваем суммарный момент для стабильности физического движка
         finalTorque = Mathf.Clamp(finalTorque, -rb.mass * 500f, rb.mass * 500f);
         rb.AddTorque(transform.up * finalTorque, ForceMode.Force);
@@ -294,6 +314,29 @@ public class ShipPhysics : MonoBehaviour
         Vector3 localVel = transform.InverseTransformDirection(rb.linearVelocity);
         Vector3 sideVelocity = transform.right * localVel.x;
         rb.AddForce(-sideVelocity * rb.mass * sideResistance, ForceMode.Force);
+    }
+
+    private void UpdateHeadingAutopilot()
+    {
+        if (headingHold)
+        {
+            float currentHeading = transform.eulerAngles.y;
+            float headingError = Mathf.DeltaAngle(currentHeading, targetHeading);
+            
+            // P-терм: требуемая угловая скорость (градусов в секунду)
+            float targetTurnRate = headingError * headingStiffness;
+            
+            // Ограничение скорости поворота автопилотом
+            targetTurnRate = Mathf.Clamp(targetTurnRate, -maxAutoTurnRateDeg, maxAutoTurnRateDeg);
+            
+            // D-терм: компенсация по текущей угловой скорости
+            float currentTurnRate = rb.angularVelocity.y * Mathf.Rad2Deg;
+            float rateError = targetTurnRate - currentTurnRate;
+            
+            // Вывод на штурвал (turnInput)
+            float turnCommand = rateError * headingDamping;
+            turnInput = Mathf.Clamp(turnCommand, -1f, 1f);
+        }
     }
 
     void UpdateClaudium()

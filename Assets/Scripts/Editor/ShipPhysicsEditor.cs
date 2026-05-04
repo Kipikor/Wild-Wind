@@ -233,6 +233,15 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(altDriftToleranceProp, new GUIContent("Допуск дрейфа (м)"));
 
         EditorGUILayout.Space(5);
+        EditorGUILayout.LabelField("Автопилот курса (Heading)", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("headingHold"), new GUIContent("Удержание курса"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("targetHeading"), new GUIContent("Целевой курс (0-360)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("headingStiffness"), new GUIContent("Курсовая жесткость (P)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("headingDamping"), new GUIContent("Курсовой демпфер (D)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("maxAutoTurnRateDeg"), new GUIContent("Лимит поворота АП (°/с)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("maxStructuralTurnRateDeg"), new GUIContent("Конструкц. лимит вращения (°/с)"));
+
+        EditorGUILayout.Space(5);
         EditorGUILayout.LabelField("Аэродинамика рулей (Поворот)", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderArea"), new GUIContent("Площадь руля (м²)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderDistance"), new GUIContent("Плечо руля (м от ЦМ)"));
