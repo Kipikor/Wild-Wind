@@ -19,7 +19,14 @@ public class ShipPhysics : MonoBehaviour
     
     [Header("Эффективность систем")]
     public float liftEfficiency = 20f;   // Сколько силы дает 1 единица мощности контура
-    public float turnTorque = 500f;      // Сила поворота
+    
+    [Header("Аэродинамика рулей (Поворот)")]
+    public float rudderArea = 4.0f;      // Площадь рулевых поверхностей (кв.м)
+    public float rudderDistance = 10.0f; // Расстояние от центра масс до руля (плечо, м)
+    public float rudderMaxLiftCoeff = 1.5f; // Эффективность профиля руля (Сy) при максимальном отклонении
+    public float maxRudderAngleDeg = 25f; // Максимальный угол отклонения руля (в градусах)
+    public float rudderTurnSpeedDeg = 15f; // Скорость перекладки руля (градусов в секунду)
+    [HideInInspector] public float currentRudderAngleDeg = 0f; // Физический угол поворота руля (в градусах)
     
     [Header("Аэродинамика")]
     public float airDensity = 1.225f; // Плотность воздуха (1.225 на уровне моря)
@@ -257,16 +264,30 @@ public class ShipPhysics : MonoBehaviour
         float effAirspeed = Mathf.Abs(fwdSpeed) + propWash * 0.5f;
 
         // 1. АКТИВНАЯ СИЛА (Рули)
-        float activeTorque = turnInput * turnTorque * effAirspeed * 0.15f;
+        // Плавно поворачиваем физический руль к целевому углу
+        float targetRudderAngle = turnInput * maxRudderAngleDeg;
+        currentRudderAngleDeg = Mathf.MoveTowards(currentRudderAngleDeg, targetRudderAngle, rudderTurnSpeedDeg * Time.fixedDeltaTime);
+        
+        // Линейная интерполяция коэффициента подъемной силы (до maxLiftCoeff при максимальном угле)
+        float currentLiftCoeff = (currentRudderAngleDeg / maxRudderAngleDeg) * rudderMaxLiftCoeff;
+        
+        // Сила = 0.5 * Плотность * Скорость^2 * Площадь * Коэф. подъемной силы
+        float rudderForce = 0.5f * airDensity * (effAirspeed * effAirspeed) * rudderArea * currentLiftCoeff;
+        float activeTorque = rudderForce * rudderDistance; // Крутящий момент = Сила * Плечо
         
         // 2. ФИЗИЧЕСКОЕ ДЕМПФИРОВАНИЕ КОРПУСА (Связано с sideResistance)
-        float rotationResistance = sideResistance * rb.mass * 0.15f; 
+        float rotationResistance = sideResistance * rb.mass * 1.5f; 
         float dampingTorque = -rb.angularVelocity.y * rotationResistance * (effAirspeed + 1.0f);
         
-        float finalTorque = (activeTorque + dampingTorque) * 9.81f;
+        // Математическая защита от осцилляций (чтобы демпфирование не разворачивало корабль в обратную сторону)
+        // Максимальный момент, который полностью остановит вращение за 1 кадр:
+        float maxSafeDamping = Mathf.Abs(rb.angularVelocity.y) * rb.inertiaTensor.y / Time.fixedDeltaTime;
+        dampingTorque = Mathf.Clamp(dampingTorque, -maxSafeDamping, maxSafeDamping);
         
-        // Ограничиваем момент для стабильности
-        finalTorque = Mathf.Clamp(finalTorque, -turnTorque * 50f, turnTorque * 50f);
+        float finalTorque = activeTorque + dampingTorque;
+        
+        // Ограничиваем суммарный момент для стабильности физического движка
+        finalTorque = Mathf.Clamp(finalTorque, -rb.mass * 500f, rb.mass * 500f);
         rb.AddTorque(transform.up * finalTorque, ForceMode.Force);
 
         // 4. Подавление бокового сноса

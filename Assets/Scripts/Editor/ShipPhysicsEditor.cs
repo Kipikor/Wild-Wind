@@ -7,7 +7,6 @@ public class ShipPhysicsEditor : Editor
     private SerializedProperty baseMassProp;
     private SerializedProperty liftEfficiencyProp;
     private SerializedProperty thrustEfficiencyProp;
-    private SerializedProperty turnSpeedProp;
     private SerializedProperty airDensityProp;
     private SerializedProperty dragCoefficientProp;
     private SerializedProperty frontalAreaProp;
@@ -34,7 +33,6 @@ public class ShipPhysicsEditor : Editor
         baseMassProp = serializedObject.FindProperty("baseMass");
         liftEfficiencyProp = serializedObject.FindProperty("liftEfficiency");
         thrustEfficiencyProp = serializedObject.FindProperty("thrustEfficiency");
-        turnSpeedProp = serializedObject.FindProperty("turnTorque"); // Исправлено: turnTorque
         airDensityProp = serializedObject.FindProperty("airDensity");
         dragCoefficientProp = serializedObject.FindProperty("dragCoefficient");
         frontalAreaProp = serializedObject.FindProperty("frontalArea");
@@ -68,7 +66,6 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerDiameter"), new GUIContent("Диаметр винта (м)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerEfficiency"), new GUIContent("КПД винта (0.7-0.85)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerMaxPitchMeters"), new GUIContent("Геометр. шаг (м/об)"));
-        EditorGUILayout.PropertyField(turnSpeedProp, new GUIContent("Сила поворота"));
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Аэродинамика", EditorStyles.boldLabel);
@@ -235,6 +232,15 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(altDampingProp, new GUIContent("Вертикальный демпфер (D)"));
         EditorGUILayout.PropertyField(altDriftToleranceProp, new GUIContent("Допуск дрейфа (м)"));
 
+        EditorGUILayout.Space(5);
+        EditorGUILayout.LabelField("Аэродинамика рулей (Поворот)", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderArea"), new GUIContent("Площадь руля (м²)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderDistance"), new GUIContent("Плечо руля (м от ЦМ)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderMaxLiftCoeff"), new GUIContent("Max Су при полн. отклонении"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("maxRudderAngleDeg"), new GUIContent("Макс. угол руля (градусы)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderTurnSpeedDeg"), new GUIContent("Скорость перекладки (°/сек)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("sideResistance"), new GUIContent("Сопротивление дрейфу (Киль)"));
+
         EditorGUILayout.Space(15);
         EditorGUILayout.LabelField("Панель управления рычагами", EditorStyles.boldLabel);
         
@@ -253,7 +259,20 @@ public class ShipPhysicsEditor : Editor
 
         EditorGUILayout.Slider(liftInputProp, -1f, 1f, new GUIContent("Подъем точный (+-10%)"));
         EditorGUILayout.Slider(thrustInputProp, -1f, 1f, new GUIContent("Тяга (назад/вперед)"));
-        EditorGUILayout.Slider(turnInputProp, -1f, 1f, new GUIContent("Руль (влево/вправо)"));
+        EditorGUILayout.Slider(turnInputProp, -1f, 1f, new GUIContent("Руль (ввод штурвала)"));
+        
+        Rect rudderRect = GUILayoutUtility.GetRect(18, 18, "TextField");
+        float maxAngle = ship.maxRudderAngleDeg > 0 ? ship.maxRudderAngleDeg : 25f;
+        float currentAngle = ship.currentRudderAngleDeg;
+        
+        // Нормализуем для прогресс-бара от 0 до 1 (0.5 = центр)
+        float rudderVisual = (currentAngle / maxAngle + 1f) / 2f; 
+        
+        string dirText = "Центр";
+        if (currentAngle < -0.5f) dirText = "Влево";
+        else if (currentAngle > 0.5f) dirText = "Вправо";
+        
+        EditorGUI.ProgressBar(rudderRect, rudderVisual, $"Реальное положение: {dirText} {Mathf.Abs(currentAngle):F1}°");
 
         EditorGUILayout.Space(10);
 
@@ -300,22 +319,22 @@ public class ShipPhysicsEditor : Editor
 
             // Угловая скорость
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Угловая (р/с)", GUILayout.Width(100));
+            EditorGUILayout.LabelField("Угловая (°/с)", GUILayout.Width(100));
             
             EditorGUILayout.LabelField("X", GUILayout.Width(12));
-            float ax = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.x, 2));
+            float ax_deg = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.x * Mathf.Rad2Deg, 2));
             
             EditorGUILayout.LabelField("Y", GUILayout.Width(12));
-            float ay = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.y, 2));
+            float ay_deg = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.y * Mathf.Rad2Deg, 2));
             
             EditorGUILayout.LabelField("Z", GUILayout.Width(12));
-            float az = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.z, 2));
+            float az_deg = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.z * Mathf.Rad2Deg, 2));
             EditorGUILayout.EndHorizontal();
             
             if (EditorGUI.EndChangeCheck())
             {
                 rb.linearVelocity = new Vector3(vx, vy, vz);
-                rb.angularVelocity = new Vector3(ax, ay, az);
+                rb.angularVelocity = new Vector3(ax_deg * Mathf.Deg2Rad, ay_deg * Mathf.Deg2Rad, az_deg * Mathf.Deg2Rad);
             }
 
             EditorGUILayout.Space(5);
