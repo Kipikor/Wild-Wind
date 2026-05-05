@@ -39,6 +39,9 @@ public class ShipPhysics : MonoBehaviour
     public float maxStructuralVerticalSpeed = 5.0f; // Предел прочности (конструкционный)
     public float maxAutoVerticalSpeed = 1.0f;        // Лимит автопилота
     
+    [Header("Окружающая среда")]
+    public Vector3 windVelocity = Vector3.zero; // Глобальный вектор ветра (м/с)
+
     // Рассчитанный текущий коэффициент сопротивления (используется для физики)
     public float CurrentAeroDrag => 0.5f * airDensity * dragCoefficient * frontalArea;
 
@@ -175,13 +178,18 @@ public class ShipPhysics : MonoBehaviour
         UpdateHeadingAutopilot(); // Автопилот курса
         UpdateClaudium(); // Магия Клавдия
         
-        // --- АЭРОДИНАМИКА ---
+        // --- АЭРОДИНАМИКА (с учетом ветра) ---
+        Vector3 airVelocity = rb.linearVelocity - windVelocity;
+        float airspeed = airVelocity.magnitude;
+        
         float aeroMultiplier = (balloonModule != null && balloonModule.gameObject.activeSelf) ? 5.0f : 1.0f;
         float currentDrag = CurrentAeroDrag * aeroMultiplier;
         
-        float speed = rb.linearVelocity.magnitude;
-        Vector3 dragForce = -rb.linearVelocity * speed * currentDrag;
-        rb.AddForce(dragForce, ForceMode.Force);
+        if (airspeed > 0.01f)
+        {
+            Vector3 dragForce = -airVelocity.normalized * (airspeed * airspeed) * currentDrag;
+            rb.AddForce(dragForce, ForceMode.Force);
+        }
 
         // --- ПОДЪЕМНАЯ СИЛА ---
         float totalLift = 0f;
@@ -272,14 +280,14 @@ public class ShipPhysics : MonoBehaviour
         }
 
         // 3. Угловой момент для разворота (Аэродинамический руль)
-        float fwdSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
+        float fwdAirspeed = Vector3.Dot(airVelocity, transform.forward);
         float propWash = 0f;
         if (thrustEngine != null)
         {
             float propRevPerSec = (thrustEngine.currentRPM * thrustEngine.maxRPM) / 60f;
             propWash = Mathf.Abs(propRevPerSec * propellerPitch * propellerMaxPitchMeters);
         }
-        float effAirspeed = Mathf.Abs(fwdSpeed) + propWash * 0.5f;
+        float effAirspeed = Mathf.Abs(fwdAirspeed) + propWash * 0.5f;
 
         // 1. АКТИВНАЯ СИЛА (Рули)
         // Плавно поворачиваем физический руль к целевому углу
@@ -319,10 +327,10 @@ public class ShipPhysics : MonoBehaviour
         finalTorque = Mathf.Clamp(finalTorque, -rb.mass * 500f, rb.mass * 500f);
         rb.AddTorque(transform.up * finalTorque, ForceMode.Force);
 
-        // 4. Подавление бокового сноса
-        Vector3 localVel = transform.InverseTransformDirection(rb.linearVelocity);
-        Vector3 sideVelocity = transform.right * localVel.x;
-        rb.AddForce(-sideVelocity * rb.mass * sideResistance, ForceMode.Force);
+        // 4. Подавление бокового сноса (Киль сопротивляется воздуху)
+        Vector3 localAirVel = transform.InverseTransformDirection(airVelocity);
+        Vector3 sideAirVelocity = transform.right * localAirVel.x;
+        rb.AddForce(-sideAirVelocity * rb.mass * sideResistance, ForceMode.Force);
     }
 
     private void UpdateHeadingAutopilot()
@@ -401,7 +409,19 @@ public class ShipPhysics : MonoBehaviour
         
         // Проверка достижения точки (сфера радиусом waypointRadius)
         float dist = Vector3.Distance(transform.position, currentTarget);
-        if (dist < waypointRadius)
+        
+        // 1. Умный зачет точки (Fly-by)
+        bool isLastPoint = (currentWaypointIndex == waypoints.Count - 1);
+        bool reached = dist < waypointRadius;
+        
+        // Если пролетели мимо промежуточной точки (двигаемся от нее, находясь рядом)
+        if (!reached && !isLastPoint && dist < waypointRadius * 3f)
+        {
+            Vector3 dir = currentTarget - transform.position;
+            if (Vector3.Dot(rb.linearVelocity, dir) < 0) reached = true; 
+        }
+
+        if (reached)
         {
             currentWaypointIndex++;
             if (currentWaypointIndex >= waypoints.Count)
@@ -411,57 +431,60 @@ public class ShipPhysics : MonoBehaviour
                 return;
             }
             currentTarget = waypoints[currentWaypointIndex];
-            dist = Vector3.Distance(transform.position, currentTarget); // Обновляем дистанцию для новой точки
+            dist = Vector3.Distance(transform.position, currentTarget);
+            isLastPoint = (currentWaypointIndex == waypoints.Count - 1);
         }
 
         // 1. Задаем высоту
         targetAltitude = currentTarget.y;
 
-        // 2. Задаем курс
+        // 2. Задаем курс (с компенсацией ветра - Crabbing)
         Vector3 dirToTarget = currentTarget - transform.position;
         dirToTarget.y = 0; 
-        if (dirToTarget.sqrMagnitude > 0.1f)
+        float horizDist = dirToTarget.magnitude;
+
+        if (horizDist > 0.1f)
         {
-            float angle = Mathf.Atan2(dirToTarget.x, dirToTarget.z) * Mathf.Rad2Deg;
+            // Масштабируем желаемую путевую скорость: если далеко - летим быстро, если в упор - замедляемся
+            // Но не ниже 1 м/с, чтобы всегда иметь вектор направления
+            float targetApproachSpeed = Mathf.Clamp(horizDist * 0.5f, 1f, maxCruiseSpeedMS);
+            Vector3 desiredGroundVelocity = dirToTarget.normalized * targetApproachSpeed;
+            
+            // Требуемая воздушная скорость, чтобы получить желаемую путевую
+            Vector3 requiredAirVelocity = desiredGroundVelocity - windVelocity;
+            requiredAirVelocity.y = 0;
+            
+            // Направляем нос корабля по вектору требуемой воздушной скорости
+            float angle = Mathf.Atan2(requiredAirVelocity.x, requiredAirVelocity.z) * Mathf.Rad2Deg;
             if (angle < 0) angle += 360f;
             targetHeading = angle;
         }
 
         // 3. Задаем скорость
-        float horizDist = Vector2.Distance(
-            new Vector2(transform.position.x, transform.position.z), 
-            new Vector2(currentTarget.x, currentTarget.z)
-        );
-
-        bool isLastPoint = (currentWaypointIndex == waypoints.Count - 1);
         float desiredSpeed = maxCruiseSpeedMS;
         
         if (isLastPoint)
         {
-            // Для самой последней точки тормозим плавно и до полной остановки (по 3D дистанции)
-            // Начинаем тормозить за 100 метров, чтобы плавно подползти к сфере
+            // Для самой последней точки тормозим плавно (по 3D дистанции)
             if (dist < 100f)
             {
-                // Чем ближе к центру, тем медленнее (на границе сферы waypointRadius скорость будет почти ноль)
                 float stopFactor = Mathf.InverseLerp(waypointRadius * 0.5f, 100f, dist);
                 desiredSpeed = Mathf.Lerp(0f, maxCruiseSpeedMS, stopFactor);
             }
         }
         else
         {
-            // Для промежуточных точек сохраняем логику пролета
+            // Для промежуточных точек: замедляемся, но сохраняем напор, чтобы пробить ветер
             if (horizDist < 60f) 
             {
-                desiredSpeed = Mathf.Lerp(0f, maxCruiseSpeedMS, horizDist / 60f);
+                desiredSpeed = Mathf.Lerp(minNavSpeed, maxCruiseSpeedMS, horizDist / 60f);
             }
             
-            if (horizDist > 15f)
+            // Если мы всё еще не в сфере, не сбрасываем скорость до нуля! 
+            // Иначе ветер нас унесет раньше, чем мы коснемся центра.
+            if (dist > waypointRadius * 1.5f)
             {
                 desiredSpeed = Mathf.Max(desiredSpeed, minNavSpeed);
-            }
-            else
-            {
-                desiredSpeed = 0f;
             }
         }
 
@@ -658,6 +681,15 @@ public class ShipPhysics : MonoBehaviour
 
     private void OnDrawGizmos()
     {
+        // Визуализация ветра
+        if (windVelocity.sqrMagnitude > 0.1f)
+        {
+            Gizmos.color = new Color(1f, 0f, 1f, 0.7f); // Пурпурный
+            Vector3 startPos = transform.position + Vector3.up * 10f; // Чуть выше корабля
+            Gizmos.DrawLine(startPos, startPos + windVelocity);
+            Gizmos.DrawWireSphere(startPos + windVelocity, 1f); // Наконечник
+        }
+
         if (waypoints == null || waypoints.Count == 0) return;
 
         Gizmos.color = new Color(0f, 1f, 1f, 0.5f); // Полупрозрачный голубой

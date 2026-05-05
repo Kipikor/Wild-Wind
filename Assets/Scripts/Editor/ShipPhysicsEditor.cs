@@ -76,6 +76,10 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(maxStructuralVerticalSpeedProp, new GUIContent("Конструкц. лимит (м/с)"));
         EditorGUILayout.PropertyField(maxAutoVerticalSpeedProp, new GUIContent("Лимит автопилота (м/с)"));
 
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Окружающая среда", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("windVelocity"), new GUIContent("Ветер (м/с)"));
+
         EditorGUILayout.HelpBox(
             "Коэффициенты формы (Cd):\n" +
             "• 0.04 : Капля (идеально)\n" +
