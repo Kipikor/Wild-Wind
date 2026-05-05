@@ -242,6 +242,32 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("maxStructuralTurnRateDeg"), new GUIContent("Конструкц. лимит вращения (°/с)"));
 
         EditorGUILayout.Space(5);
+        EditorGUILayout.LabelField("Путевая навигация (Waypoints)", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("routeEnabled"), new GUIContent("Включить маршрут"));
+        
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("waypoints"), new GUIContent("Точки маршрута"), true);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("waypointRadius"), new GUIContent("Радиус точки (м)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("minNavSpeed"), new GUIContent("Мин. маршевая скорость (м/с)"));
+        
+        ShipPhysics sp = (ShipPhysics)target;
+        if (GUILayout.Button("Сгенерировать тестовый маршрут", GUILayout.Height(25)))
+        {
+            Undo.RecordObject(sp, "Generate Test Route");
+            Vector3 start = sp.transform.position;
+            sp.waypoints.Clear();
+            sp.waypoints.Add(start + new Vector3(0, 50, 200));   // Набор высоты, вперед
+            sp.waypoints.Add(start + new Vector3(200, 70, 400)); // Направо и вверх
+            sp.waypoints.Add(start + new Vector3(400, 100, 200));// Разворот
+            sp.waypoints.Add(start + new Vector3(200, 50, 0));   // Возврат на базу со снижением
+            EditorUtility.SetDirty(sp);
+        }
+
+        if (Application.isPlaying && serializedObject.FindProperty("routeEnabled").boolValue)
+        {
+            EditorGUILayout.LabelField($"Текущая точка: {sp.currentWaypointIndex + 1} / {sp.waypoints.Count}", EditorStyles.helpBox);
+        }
+
+        EditorGUILayout.Space(5);
         EditorGUILayout.LabelField("Аэродинамика рулей (Поворот)", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderArea"), new GUIContent("Площадь руля (м²)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderDistance"), new GUIContent("Плечо руля (м от ЦМ)"));

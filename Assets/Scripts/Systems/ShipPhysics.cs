@@ -64,6 +64,13 @@ public class ShipPhysics : MonoBehaviour
     public float maxAutoTurnRateDeg = 5.0f; // Лимит угловой скорости для автопилота (°/сек)
     public float maxStructuralTurnRateDeg = 15.0f; // Конструкционный лимит угловой скорости (°/сек)
     
+    [Header("Путевая машина (Waypoints)")]
+    public bool routeEnabled = false;
+    public System.Collections.Generic.List<Vector3> waypoints = new System.Collections.Generic.List<Vector3>();
+    public float waypointRadius = 10f; // Радиус засчитывания точки
+    public float minNavSpeed = 5f; // Минимальная маршевая скорость для сохранения рулежки
+    [HideInInspector] public int currentWaypointIndex = 0;
+    
     [Header("Настройки ВРШ (Шаг винта)")]
     public float propellerPitch = 0f;    // Текущий шаг (-1..1)
     public float speedStiffness = 0.8f;  // Насколько активно круиз меняет шаг винта
@@ -162,6 +169,8 @@ public class ShipPhysics : MonoBehaviour
 
     void FixedUpdate()
     {
+        UpdateWaypointNavigation(); // Мастер-автопилот
+        UpdateCruiseControl();      // Круиз-контроль (скорость)
         UpdateEngineThrottles();
         UpdateHeadingAutopilot(); // Автопилот курса
         UpdateClaudium(); // Магия Клавдия
@@ -337,6 +346,126 @@ public class ShipPhysics : MonoBehaviour
             float turnCommand = rateError * headingDamping;
             turnInput = Mathf.Clamp(turnCommand, -1f, 1f);
         }
+    }
+
+    private void UpdateCruiseControl()
+    {
+        if (cruiseControl)
+        {
+            float currentSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
+            float speedError = targetSpeedMS - currentSpeed;
+            
+            // Жесткость (P-терм)
+            float desiredOutput = speedError * speedStiffness;
+            desiredOutput = Mathf.Clamp(desiredOutput, -1f, 1f);
+            
+            if (hasCSU)
+            {
+                // С CSU мы полностью отдаем шаг винта автомату, просто разрешая ему крутить на максимум вперед/назад
+                float targetPitchLimit = desiredOutput >= 0 ? 1f : -1f;
+                if (Mathf.Abs(desiredOutput) < 0.05f) targetPitchLimit = 0f; // нейтраль если скорость достигнута
+                
+                thrustInput = Mathf.MoveTowards(thrustInput, targetPitchLimit, Time.fixedDeltaTime * speedDamping * 2f);
+                
+                // А скорость регулируем исключительно подачей топлива (RPM)
+                float targetRPM = Mathf.Clamp01(Mathf.Abs(desiredOutput));
+                targetMainEngineRPM = Mathf.Lerp(targetMainEngineRPM, targetRPM, Time.fixedDeltaTime * speedDamping);
+            }
+            else
+            {
+                // Без CSU круиз-контроль "вручную" дергает шаг винта
+                thrustInput = Mathf.Lerp(thrustInput, desiredOutput, Time.fixedDeltaTime * speedDamping);
+                
+                // И поддает газу, чтобы винту было что загребать
+                targetMainEngineRPM = Mathf.Clamp01(Mathf.Abs(thrustInput) * 1.2f);
+            }
+        }
+    }
+
+    private void UpdateWaypointNavigation()
+    {
+        if (!routeEnabled || waypoints == null || waypoints.Count == 0) return;
+
+        if (currentWaypointIndex >= waypoints.Count)
+        {
+            routeEnabled = false; // Маршрут завершен
+            return;
+        }
+
+        // Путевая машина берет на себя все системы
+        altitudeHold = true;
+        cruiseControl = true;
+        headingHold = true;
+
+        Vector3 currentTarget = waypoints[currentWaypointIndex];
+        
+        // Проверка достижения точки (сфера радиусом waypointRadius)
+        float dist = Vector3.Distance(transform.position, currentTarget);
+        if (dist < waypointRadius)
+        {
+            currentWaypointIndex++;
+            if (currentWaypointIndex >= waypoints.Count)
+            {
+                routeEnabled = false;
+                targetSpeedMS = 0f; // Остановка по завершении маршрута
+                return;
+            }
+            currentTarget = waypoints[currentWaypointIndex];
+            dist = Vector3.Distance(transform.position, currentTarget); // Обновляем дистанцию для новой точки
+        }
+
+        // 1. Задаем высоту
+        targetAltitude = currentTarget.y;
+
+        // 2. Задаем курс
+        Vector3 dirToTarget = currentTarget - transform.position;
+        dirToTarget.y = 0; 
+        if (dirToTarget.sqrMagnitude > 0.1f)
+        {
+            float angle = Mathf.Atan2(dirToTarget.x, dirToTarget.z) * Mathf.Rad2Deg;
+            if (angle < 0) angle += 360f;
+            targetHeading = angle;
+        }
+
+        // 3. Задаем скорость
+        float horizDist = Vector2.Distance(
+            new Vector2(transform.position.x, transform.position.z), 
+            new Vector2(currentTarget.x, currentTarget.z)
+        );
+
+        bool isLastPoint = (currentWaypointIndex == waypoints.Count - 1);
+        float desiredSpeed = maxCruiseSpeedMS;
+        
+        if (isLastPoint)
+        {
+            // Для самой последней точки тормозим плавно и до полной остановки (по 3D дистанции)
+            // Начинаем тормозить за 100 метров, чтобы плавно подползти к сфере
+            if (dist < 100f)
+            {
+                // Чем ближе к центру, тем медленнее (на границе сферы waypointRadius скорость будет почти ноль)
+                float stopFactor = Mathf.InverseLerp(waypointRadius * 0.5f, 100f, dist);
+                desiredSpeed = Mathf.Lerp(0f, maxCruiseSpeedMS, stopFactor);
+            }
+        }
+        else
+        {
+            // Для промежуточных точек сохраняем логику пролета
+            if (horizDist < 60f) 
+            {
+                desiredSpeed = Mathf.Lerp(0f, maxCruiseSpeedMS, horizDist / 60f);
+            }
+            
+            if (horizDist > 15f)
+            {
+                desiredSpeed = Mathf.Max(desiredSpeed, minNavSpeed);
+            }
+            else
+            {
+                desiredSpeed = 0f;
+            }
+        }
+
+        targetSpeedMS = Mathf.Clamp(desiredSpeed, 0f, maxCruiseSpeedMS);
     }
 
     void UpdateClaudium()
@@ -524,6 +653,37 @@ public class ShipPhysics : MonoBehaviour
                 thrustEngine.targetRPM = targetMainEngineRPM; 
                 propellerPitch = thrustInput;             // Ручка шага напрямую
             }
+        }
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (waypoints == null || waypoints.Count == 0) return;
+
+        Gizmos.color = new Color(0f, 1f, 1f, 0.5f); // Полупрозрачный голубой
+        for (int i = 0; i < waypoints.Count; i++)
+        {
+            // Рисуем сферу (радиус достижения точки)
+            Gizmos.DrawWireSphere(waypoints[i], waypointRadius);
+            
+            // Соединяем точки линией
+            if (i > 0)
+            {
+                Gizmos.DrawLine(waypoints[i - 1], waypoints[i]);
+            }
+            else
+            {
+                // Линия от текущей позиции корабля к первой точке
+                Gizmos.DrawLine(transform.position, waypoints[i]);
+            }
+        }
+
+        // Подсвечиваем текущую цель желтым, если маршрут активен
+        if (Application.isPlaying && routeEnabled && currentWaypointIndex < waypoints.Count)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(waypoints[currentWaypointIndex], waypointRadius);
+            Gizmos.DrawLine(transform.position, waypoints[currentWaypointIndex]);
         }
     }
 }
