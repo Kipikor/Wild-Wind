@@ -130,6 +130,28 @@ public class ShipPhysics : MonoBehaviour
         if (shipDefinition == null) return;
 
         shipDefinition.ApplyTo(this);
+        RefreshRuntimeShipSettings();
+    }
+
+    public void ApplyShipDefinition(ShipDefinitionSO definition)
+    {
+        if (definition == null) return;
+
+        shipDefinition = definition;
+        ApplyShipDefinition();
+    }
+
+    private void RefreshRuntimeShipSettings()
+    {
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (rb != null)
+        {
+            rb.mass = baseMass;
+        }
     }
 
     void Start()

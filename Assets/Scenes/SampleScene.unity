@@ -587,13 +587,13 @@ MonoBehaviour:
   maxRPM: 800
   responsiveness: 0.5
   startingRPM: 0.448
-  targetRPM: 0.8
+  targetRPM: 0.448
   currentLoad: 0
   isOverloaded: 0
   efficiency: 0.15
   wasteHeatWatts: 0
   isClaudium: 0
-  currentRPM: 0
+  currentRPM: 0.448
   throttle: 0
 --- !u!4 &1417102124
 Transform:
@@ -645,13 +645,13 @@ MonoBehaviour:
   maxRPM: 500
   responsiveness: 0.5
   startingRPM: 0.744
-  targetRPM: 0.8
+  targetRPM: 0.744
   currentLoad: 0
   isOverloaded: 0
   efficiency: 0.15
   wasteHeatWatts: 0
   isClaudium: 0
-  currentRPM: 0
+  currentRPM: 0.744
   throttle: 0
 --- !u!4 &1583410359
 Transform:
@@ -700,10 +700,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39c28ffc5291a3d4db6c8d13cfb709b6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipPhysics
+  shipDefinition: {fileID: 11400000, guid: d4b764bacf45d4341853861354d90461, type: 2}
+  applyDefinitionOnAwake: 0
   baseMass: 1000
   thrustEngine: {fileID: 1417102123}
   liftEngine: {fileID: 1583410358}
-  propellerDiameter: 3.78
+  propellerDiameter: 3
   propellerEfficiency: 0.8
   propellerMaxPitchMeters: 3
   liftEfficiency: 20
@@ -720,6 +722,7 @@ MonoBehaviour:
   verticalAreaFactor: 4
   maxStructuralVerticalSpeed: 9
   maxAutoVerticalSpeed: 5
+  windVelocity: {x: 0, y: 0, z: 0}
   hasCSU: 0
   autoStabilizeAtStart: 1
   altitudeHold: 1
