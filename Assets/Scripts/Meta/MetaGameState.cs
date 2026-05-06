@@ -81,4 +81,10 @@ public class MetaGameState : MonoBehaviour
         progress.UnlockShip(ship.shipId);
         return true;
     }
+
+    public void AddMoney(int amount)
+    {
+        EnsureProgressInitialized();
+        progress.money += Mathf.Max(0, amount);
+    }
 }

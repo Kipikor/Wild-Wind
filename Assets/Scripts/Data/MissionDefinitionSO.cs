@@ -1,0 +1,18 @@
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "NewMissionDefinition", menuName = "Wild Wind/Missions/Mission Definition")]
+public class MissionDefinitionSO : ScriptableObject
+{
+    [Header("Meta")]
+    public string missionId = "first_delivery";
+    public string displayName = "First Delivery";
+    [TextArea] public string description = "";
+
+    [Header("Route")]
+    public Vector3 startPosition = Vector3.zero;
+    public Vector3 destinationPosition = new Vector3(0f, 60f, 300f);
+    public float arrivalRadius = 10f;
+
+    [Header("Reward")]
+    public int rewardMoney = 100;
+}
