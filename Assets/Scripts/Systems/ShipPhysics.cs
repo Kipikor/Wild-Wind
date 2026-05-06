@@ -98,6 +98,10 @@ public class ShipPhysics : MonoBehaviour
     [HideInInspector] public float targetMainEngineRPM = 0.8f; 
     private bool wasAltitudeHold = false;
     private float altIntegral = 0f; // Память автопилота (I-терм)
+    private bool routeWasEnabled = false;
+    private bool routePreviousAltitudeHold = false;
+    private bool routePreviousCruiseControl = false;
+    private bool routePreviousHeadingHold = false;
     
     // Единая ручка управления мощностью (Обороты для CSU / Газ для Manual)
     void Awake()
@@ -172,7 +176,9 @@ public class ShipPhysics : MonoBehaviour
 
     void FixedUpdate()
     {
+        UpdateRouteModeState();
         UpdateWaypointNavigation(); // Мастер-автопилот
+        UpdateRouteModeState();
         UpdateCruiseControl();      // Круиз-контроль (скорость)
         UpdateEngineThrottles();
         UpdateHeadingAutopilot(); // Автопилот курса
@@ -331,6 +337,26 @@ public class ShipPhysics : MonoBehaviour
         Vector3 localAirVel = transform.InverseTransformDirection(airVelocity);
         Vector3 sideAirVelocity = transform.right * localAirVel.x;
         rb.AddForce(-sideAirVelocity * rb.mass * sideResistance, ForceMode.Force);
+    }
+
+    private void UpdateRouteModeState()
+    {
+        if (routeEnabled && !routeWasEnabled)
+        {
+            routePreviousAltitudeHold = altitudeHold;
+            routePreviousCruiseControl = cruiseControl;
+            routePreviousHeadingHold = headingHold;
+            routeWasEnabled = true;
+        }
+        else if (!routeEnabled && routeWasEnabled)
+        {
+            altitudeHold = routePreviousAltitudeHold;
+            cruiseControl = routePreviousCruiseControl;
+            headingHold = routePreviousHeadingHold;
+            targetSpeedMS = 0f;
+            turnInput = 0f;
+            routeWasEnabled = false;
+        }
     }
 
     private void UpdateHeadingAutopilot()
