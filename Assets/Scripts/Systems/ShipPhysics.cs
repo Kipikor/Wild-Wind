@@ -5,6 +5,10 @@ public class ShipPhysics : MonoBehaviour
 {
     private Rigidbody rb;
 
+    [Header("Паспорт корабля")]
+    public ShipDefinitionSO shipDefinition;
+    public bool applyDefinitionOnAwake = false;
+
     [Header("Параметры корабля")]
     public float baseMass = 1000f; // Стартовая масса 1000кг
     
@@ -107,11 +111,25 @@ public class ShipPhysics : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+
+        if (applyDefinitionOnAwake)
+        {
+            ApplyShipDefinition();
+        }
+
         rb.mass = baseMass;
         rb.useGravity = true;
         
         rb.angularDamping = 2f; 
         rb.linearDamping = 0f; 
+    }
+
+    [ContextMenu("Apply Ship Definition")]
+    public void ApplyShipDefinition()
+    {
+        if (shipDefinition == null) return;
+
+        shipDefinition.ApplyTo(this);
     }
 
     void Start()
@@ -343,6 +361,14 @@ public class ShipPhysics : MonoBehaviour
     {
         if (routeEnabled && !routeWasEnabled)
         {
+            if (waypoints != null && waypoints.Count > 0)
+            {
+                if (currentWaypointIndex < 0 || currentWaypointIndex >= waypoints.Count)
+                {
+                    currentWaypointIndex = 0;
+                }
+            }
+
             routePreviousAltitudeHold = altitudeHold;
             routePreviousCruiseControl = cruiseControl;
             routePreviousHeadingHold = headingHold;

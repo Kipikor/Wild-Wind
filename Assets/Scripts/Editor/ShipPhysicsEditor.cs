@@ -60,6 +60,32 @@ public class ShipPhysicsEditor : Editor
         serializedObject.Update();
         ShipPhysics ship = (ShipPhysics)target;
 
+        EditorGUILayout.LabelField("Паспорт корабля", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("shipDefinition"), new GUIContent("Definition Asset"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("applyDefinitionOnAwake"), new GUIContent("Применять при старте"));
+
+        EditorGUILayout.BeginHorizontal();
+        EditorGUI.BeginDisabledGroup(ship.shipDefinition == null);
+        if (GUILayout.Button("Применить паспорт"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.RecordObject(ship, "Apply Ship Definition");
+            ship.ApplyShipDefinition();
+            EditorUtility.SetDirty(ship);
+            serializedObject.Update();
+        }
+        EditorGUI.EndDisabledGroup();
+
+        if (GUILayout.Button("Создать из текущего"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            CreateDefinitionFromCurrentShip(ship);
+            serializedObject.Update();
+        }
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space(10);
+
         EditorGUILayout.LabelField("Базовые настройки", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(baseMassProp, new GUIContent("Базовая масса (кг)"));
         EditorGUILayout.PropertyField(liftEfficiencyProp, new GUIContent("Эфф. подъемной силы"));
@@ -407,6 +433,31 @@ public class ShipPhysicsEditor : Editor
 
         // Применяем изменения
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private void CreateDefinitionFromCurrentShip(ShipPhysics ship)
+    {
+        const string dataFolder = "Assets/Data";
+        const string shipsFolder = "Assets/Data/Ships";
+
+        if (!AssetDatabase.IsValidFolder(shipsFolder))
+        {
+            AssetDatabase.CreateFolder(dataFolder, "Ships");
+        }
+
+        ShipDefinitionSO definition = ScriptableObject.CreateInstance<ShipDefinitionSO>();
+        definition.CaptureFrom(ship);
+
+        string assetName = string.IsNullOrWhiteSpace(ship.gameObject.name) ? "Ship" : ship.gameObject.name.Replace(" ", "");
+        string path = AssetDatabase.GenerateUniqueAssetPath($"{shipsFolder}/{assetName}Definition.asset");
+
+        AssetDatabase.CreateAsset(definition, path);
+        AssetDatabase.SaveAssets();
+
+        Undo.RecordObject(ship, "Assign Ship Definition");
+        ship.shipDefinition = definition;
+        EditorUtility.SetDirty(ship);
+        Selection.activeObject = definition;
     }
 
     public override bool RequiresConstantRepaint()
