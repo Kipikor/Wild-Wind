@@ -1,0 +1,103 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a8a0b7c87ce42b2b0c61b5af746cbce, type: 3}
+  m_Name: WildWindTechTree
+  m_EditorClassIdentifier: Assembly-CSharp::TechTreeDefinitionSO
+  nodes:
+  - nodeId: ship_tier1
+    displayName: Ship I
+    kind: 0
+    tier: 1
+    shipDefinition: {fileID: 11400000, guid: d4b764bacf45d4341853861354d90461, type: 2}
+    shipId: ship
+    isPremium: 0
+    parentShipId: 
+    moduleKind: 5
+    researchCostXp: 0
+    purchasePrice: 0
+    startsResearched: 1
+    startsPurchased: 1
+    prerequisiteNodeIds: []
+    experienceShipIds: []
+    editorPosition: {x: 0, y: 0}
+  - nodeId: ship_engine_1
+    displayName: Engine I
+    kind: 1
+    tier: 1
+    shipDefinition: {fileID: 0}
+    shipId: 
+    isPremium: 0
+    parentShipId: ship
+    moduleKind: 0
+    researchCostXp: 50
+    purchasePrice: 100
+    startsResearched: 0
+    startsPurchased: 0
+    prerequisiteNodeIds:
+    - ship_tier1
+    experienceShipIds:
+    - ship
+    editorPosition: {x: 220, y: -80}
+  - nodeId: ship_loop_1
+    displayName: Claudium Loop I
+    kind: 1
+    tier: 1
+    shipDefinition: {fileID: 0}
+    shipId: 
+    isPremium: 0
+    parentShipId: ship
+    moduleKind: 1
+    researchCostXp: 75
+    purchasePrice: 150
+    startsResearched: 0
+    startsPurchased: 0
+    prerequisiteNodeIds:
+    - ship_tier1
+    experienceShipIds:
+    - ship
+    editorPosition: {x: 220, y: 60}
+  - nodeId: ship_loop_2
+    displayName: Claudium Loop II
+    kind: 1
+    tier: 1
+    shipDefinition: {fileID: 0}
+    shipId: 
+    isPremium: 0
+    parentShipId: ship
+    moduleKind: 1
+    researchCostXp: 120
+    purchasePrice: 250
+    startsResearched: 0
+    startsPurchased: 0
+    prerequisiteNodeIds:
+    - ship_loop_1
+    experienceShipIds:
+    - ship
+    editorPosition: {x: 440, y: 60}
+  - nodeId: ship_tier2_placeholder
+    displayName: Ship II Placeholder
+    kind: 0
+    tier: 2
+    shipDefinition: {fileID: 0}
+    shipId: ship_tier2
+    isPremium: 0
+    parentShipId: 
+    moduleKind: 5
+    researchCostXp: 200
+    purchasePrice: 500
+    startsResearched: 0
+    startsPurchased: 0
+    prerequisiteNodeIds:
+    - ship_loop_2
+    experienceShipIds:
+    - ship
+    editorPosition: {x: 660, y: 60}

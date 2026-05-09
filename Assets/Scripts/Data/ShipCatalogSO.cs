@@ -4,7 +4,9 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "ShipCatalog", menuName = "Wild Wind/Meta/Ship Catalog")]
 public class ShipCatalogSO : ScriptableObject
 {
+    [InspectorName("ID стартового корабля")]
     public string starterShipId = "ship";
+    [InspectorName("Корабли")]
     public List<ShipDefinitionSO> ships = new List<ShipDefinitionSO>();
 
     public ShipDefinitionSO GetShipById(string shipId)

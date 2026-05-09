@@ -35,7 +35,9 @@ public class MissionController : MonoBehaviour
 
     private void Start()
     {
-        if (startMissionOnPlay)
+        if (!startMissionOnPlay) return;
+
+        if (metaGameState == null || metaGameState.CurrentMode == GameSessionMode.Flight)
         {
             BeginMission();
         }
@@ -56,6 +58,11 @@ public class MissionController : MonoBehaviour
     public void BeginMission()
     {
         if (mission == null || targetShip == null) return;
+
+        if (metaGameState != null && !metaGameState.TryBeginFlightSession(mission))
+        {
+            return;
+        }
 
         IsCompleted = false;
         IsActive = true;
@@ -78,8 +85,15 @@ public class MissionController : MonoBehaviour
 
         if (metaGameState != null)
         {
-            metaGameState.AddMoney(mission.rewardMoney);
+            metaGameState.CompleteFlightMission(mission);
         }
+    }
+
+    public void CancelMission()
+    {
+        IsActive = false;
+        IsCompleted = false;
+        DistanceToDestination = 0f;
     }
 
     public Vector3 GetStartPosition()
@@ -100,8 +114,11 @@ public class MissionController : MonoBehaviour
         Rigidbody shipRigidbody = targetShip.GetComponent<Rigidbody>();
         if (shipRigidbody == null) return;
 
+        shipRigidbody.isKinematic = false;
+        shipRigidbody.useGravity = true;
         shipRigidbody.linearVelocity = Vector3.zero;
         shipRigidbody.angularVelocity = Vector3.zero;
+        shipRigidbody.WakeUp();
     }
 
     private void OnDrawGizmosSelected()

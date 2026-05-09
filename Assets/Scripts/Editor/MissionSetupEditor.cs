@@ -40,17 +40,34 @@ public static class MissionSetupEditor
 
         Transform startPoint = FindOrCreatePoint(StartPointName, mission.startPosition);
         Transform destinationPoint = FindOrCreatePoint(DestinationPointName, mission.destinationPosition);
+        MetaGameState metaGameState = Object.FindFirstObjectByType<MetaGameState>();
+        DockingPort destinationDock = destinationPoint.GetComponent<DockingPort>();
+        if (destinationDock == null)
+        {
+            destinationDock = Undo.AddComponent<DockingPort>(destinationPoint.gameObject);
+        }
 
-        Undo.RecordObject(controller, "Setup Mission");
+        Undo.RecordObjects(new Object[] { controller, destinationDock }, "Setup Mission");
         controller.mission = mission;
         controller.targetShip = ship;
-        controller.metaGameState = Object.FindFirstObjectByType<MetaGameState>();
+        controller.metaGameState = metaGameState;
         controller.startPoint = startPoint;
         controller.destinationPoint = destinationPoint;
         controller.startMissionOnPlay = true;
         controller.placeShipAtStart = true;
 
+        destinationDock.metaGameState = metaGameState;
+        destinationDock.targetShip = ship;
+        destinationDock.dockId = string.IsNullOrWhiteSpace(mission.destinationDockId) ? "mission_destination" : mission.destinationDockId;
+        destinationDock.displayName = string.IsNullOrWhiteSpace(mission.displayName) ? "Mission Destination" : mission.displayName;
+        destinationDock.kind = mission.destinationDockKind;
+        destinationDock.dockingRadius = Mathf.Max(mission.arrivalRadius, 1f);
+        destinationDock.canEndSession = true;
+        destinationDock.autoDockWhenInRange = true;
+        destinationDock.snapPoint = destinationPoint;
+
         EditorUtility.SetDirty(controller);
+        EditorUtility.SetDirty(destinationDock);
         Selection.activeGameObject = missionObject;
     }
 

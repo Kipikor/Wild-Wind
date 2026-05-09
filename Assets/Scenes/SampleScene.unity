@@ -552,6 +552,88 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &704420548
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 704420549}
+  m_Layer: 0
+  m_Name: Mission Start
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &704420549
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 704420548}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 20, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &883150468
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 883150470}
+  - component: {fileID: 883150469}
+  m_Layer: 0
+  m_Name: Mission
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &883150469
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 883150468}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 577c3c7629dd40d9a4e2dc734d1d2996, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MissionController
+  mission: {fileID: 11400000, guid: f6d4b324fe9b4ba6aff23dc90e15163a, type: 2}
+  targetShip: {fileID: 1778278284}
+  metaGameState: {fileID: 1497055332}
+  startPoint: {fileID: 704420549}
+  destinationPoint: {fileID: 1579994936}
+  startMissionOnPlay: 1
+  placeShipAtStart: 1
+--- !u!4 &883150470
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 883150468}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1417102122
 GameObject:
   m_ObjectHideFlags: 0
@@ -610,6 +692,166 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1778278289}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1497055331
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1497055334}
+  - component: {fileID: 1497055333}
+  - component: {fileID: 1497055332}
+  m_Layer: 0
+  m_Name: Meta Game
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1497055332
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497055331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abef2b6f61b141a8b3afd5d6a7838f01, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MetaGameState
+  catalog: {fileID: 11400000, guid: 67a70c9cbb9d438398b8a835864d71a1, type: 2}
+  techTree: {fileID: 11400000, guid: 94035a180d6f44a7a934773e0d8e32d4, type: 2}
+  shipLoader: {fileID: 1497055333}
+  missionController: {fileID: 0}
+  startingMoney: 0
+  progress:
+    money: 0
+    selectedShipId: 
+    unlockedShipIds: []
+    researchedNodeIds: []
+    purchasedNodeIds: []
+    shipExperience: []
+    currentMode: 0
+    currentDockKind: 0
+    currentDockId: starter_island
+    hasCurrentDockPosition: 0
+    currentDockPosition: {x: 0, y: 0, z: 0}
+    activeFlightMissionId: 
+    lastSavedUtcTicks: 0
+    lastProcessUtcTicks: 0
+    nextShopRefreshUtcTicks: 0
+    shopSeed: 0
+    receivedStartingInventory: 0
+    inventory: []
+    activeProcesses: []
+    acceptedMissionIds: []
+    completedMissionIds: []
+  startingMode: 0
+  startingDockId: starter_island
+  startingDockKind: 0
+  autoSaveOnDock: 1
+  loadSavedGameOnAwake: 1
+  saveFileName: wild_wind_save.json
+  startingOre: 4
+  startingIron: 0
+  processRealTimeWhilePlaying: 1
+  idleMiningIntervalSeconds: 60
+  idleMiningOrePerCycle: 1
+  ironSmeltingDurationSeconds: 120
+  ironSmeltingOreCost: 2
+  ironSmeltingIronOutput: 1
+  defaultTimedMissionDurationSeconds: 300
+  shopRefreshIntervalSeconds: 3600
+  showDockingDebugUI: 1
+  debugUiWidth: 380
+  autoInstallCrashDetector: 1
+--- !u!114 &1497055333
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497055331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcb3cf2e8c934b20b324bf48b3c44f9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipLoader
+  catalog: {fileID: 11400000, guid: 67a70c9cbb9d438398b8a835864d71a1, type: 2}
+  targetShip: {fileID: 1778278284}
+  fallbackShipId: 
+  applyOnStart: 0
+--- !u!4 &1497055334
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497055331}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1579994935
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1579994936}
+  - component: {fileID: 1579994937}
+  m_Layer: 0
+  m_Name: Mission Destination
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1579994936
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1579994935}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 60, z: 300}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1579994937
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1579994935}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1b5d2e5b8cb14b2ba267ef009e33429a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DockingPort
+  metaGameState: {fileID: 1497055332}
+  targetShip: {fileID: 1778278284}
+  dockId: destination_island
+  displayName: Destination Island
+  kind: 0
+  dockingRadius: 18
+  canEndSession: 1
+  autoDockWhenInRange: 1
+  snapPoint: {fileID: 1579994936}
 --- !u!1 &1583410357
 GameObject:
   m_ObjectHideFlags: 0
@@ -846,3 +1088,7 @@ SceneRoots:
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 1778278289}
+  - {fileID: 1497055334}
+  - {fileID: 883150470}
+  - {fileID: 704420549}
+  - {fileID: 1579994936}

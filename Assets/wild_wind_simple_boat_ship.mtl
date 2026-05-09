@@ -1,0 +1,32 @@
+newmtl hull
+Kd 0.82 0.73 0.55
+
+newmtl deck
+Kd 0.86 0.79 0.62
+
+newmtl underbody
+Kd 0.62 0.10 0.06
+
+newmtl cabin
+Kd 0.88 0.80 0.64
+
+newmtl glass
+Kd 0.08 0.35 0.45
+Ks 0.6 0.7 0.8
+Ns 80
+
+newmtl engine
+Kd 0.18 0.18 0.18
+Ks 0.4 0.4 0.4
+Ns 40
+
+newmtl metal
+Kd 0.55 0.40 0.18
+Ks 0.4 0.3 0.12
+Ns 35
+
+newmtl propeller
+Kd 0.52 0.31 0.13
+
+newmtl red
+Kd 0.75 0.10 0.06

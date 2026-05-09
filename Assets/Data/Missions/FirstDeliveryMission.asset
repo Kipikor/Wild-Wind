@@ -18,4 +18,9 @@ MonoBehaviour:
   startPosition: {x: 0, y: 20, z: 0}
   destinationPosition: {x: 0, y: 60, z: 300}
   arrivalRadius: 10
+  destinationDockId: destination_island
+  destinationDockKind: 0
   rewardMoney: 100
+  rewardExperience: 50
+  canRunAsTimedMission: 1
+  realTimeDurationSeconds: 300

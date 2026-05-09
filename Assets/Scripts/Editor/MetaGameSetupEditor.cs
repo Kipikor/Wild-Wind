@@ -4,6 +4,7 @@ using UnityEngine;
 public static class MetaGameSetupEditor
 {
     private const string CatalogPath = "Assets/Data/ShipCatalog.asset";
+    private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
     private const string MetaGameObjectName = "Meta Game";
 
     [MenuItem("Wild Wind/Meta/Setup Meta Game")]
@@ -22,6 +23,9 @@ public static class MetaGameSetupEditor
             EditorUtility.DisplayDialog("Meta Game Setup", $"Catalog was not found at {CatalogPath}.", "OK");
             return;
         }
+
+        TechTreeDefinitionSO techTree = AssetDatabase.LoadAssetAtPath<TechTreeDefinitionSO>(TechTreePath);
+        MissionController missionController = Object.FindFirstObjectByType<MissionController>();
 
         GameObject metaGameObject = GameObject.Find(MetaGameObjectName);
         if (metaGameObject == null)
@@ -49,7 +53,10 @@ public static class MetaGameSetupEditor
         loader.applyOnStart = false;
 
         metaGameState.catalog = catalog;
+        metaGameState.techTree = techTree;
         metaGameState.shipLoader = loader;
+        metaGameState.missionController = missionController;
+        metaGameState.showDockingDebugUI = true;
 
         EditorUtility.SetDirty(loader);
         EditorUtility.SetDirty(metaGameState);
