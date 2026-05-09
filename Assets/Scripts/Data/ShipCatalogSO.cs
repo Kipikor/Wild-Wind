@@ -1,12 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "ShipCatalog", menuName = "Wild Wind/Meta/Ship Catalog")]
+[CreateAssetMenu(fileName = "КаталогКораблей", menuName = "Wild Wind/Мета/Каталог кораблей")]
 public class ShipCatalogSO : ScriptableObject
 {
-    [InspectorName("ID стартового корабля")]
+    [InspectorName("Идентификатор стартового корабля")]
+    [Tooltip("Идентификатор корабля, который игрок получает при первом запуске новой игры.")]
     public string starterShipId = "ship";
     [InspectorName("Корабли")]
+    [Tooltip("Все корабли, которые могут быть открыты, куплены или выбраны через мета-прогресс.")]
     public List<ShipDefinitionSO> ships = new List<ShipDefinitionSO>();
 
     public ShipDefinitionSO GetShipById(string shipId)

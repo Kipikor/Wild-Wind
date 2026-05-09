@@ -4,21 +4,29 @@ using UnityEngine;
 
 public enum GameSessionMode
 {
+    [InspectorName("Стыковка")]
     Docked,
+    [InspectorName("Вылет")]
     Flight
 }
 
 public enum DockingLocationKind
 {
+    [InspectorName("Остров")]
     Island,
+    [InspectorName("Корабль")]
     Ship
 }
 
 public enum TimedProcessKind
 {
+    [InspectorName("Пассивная добыча")]
     IdleMining,
+    [InspectorName("Производство")]
     Crafting,
+    [InspectorName("Миссия")]
     Mission,
+    [InspectorName("Обновление магазина")]
     StoreRefresh
 }
 

@@ -130,7 +130,7 @@ GameObject:
   - component: {fileID: 87966247}
   - component: {fileID: 87966248}
   m_Layer: 0
-  m_Name: ShipClaudiumLoop
+  m_Name: Клавдиевый контур
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -199,7 +199,7 @@ GameObject:
   - component: {fileID: 519420029}
   - component: {fileID: 519420030}
   m_Layer: 0
-  m_Name: Main Camera
+  m_Name: Главная камера
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -334,7 +334,7 @@ GameObject:
   - component: {fileID: 572840891}
   - component: {fileID: 572840890}
   m_Layer: 0
-  m_Name: ShipBalloon
+  m_Name: Баллон
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -390,7 +390,7 @@ GameObject:
   - component: {fileID: 591957361}
   - component: {fileID: 591957360}
   m_Layer: 0
-  m_Name: Render
+  m_Name: Визуал
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -479,7 +479,7 @@ GameObject:
   - component: {fileID: 619394802}
   - component: {fileID: 619394801}
   m_Layer: 0
-  m_Name: Global Light 2D
+  m_Name: Глобальный свет 2D
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -562,7 +562,7 @@ GameObject:
   m_Component:
   - component: {fileID: 704420549}
   m_Layer: 0
-  m_Name: Mission Start
+  m_Name: Старт миссии
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -594,7 +594,7 @@ GameObject:
   - component: {fileID: 883150470}
   - component: {fileID: 883150469}
   m_Layer: 0
-  m_Name: Mission
+  m_Name: Миссия
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -704,7 +704,7 @@ GameObject:
   - component: {fileID: 1497055333}
   - component: {fileID: 1497055332}
   m_Layer: 0
-  m_Name: Meta Game
+  m_Name: Мета-игра
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -810,7 +810,7 @@ GameObject:
   - component: {fileID: 1579994936}
   - component: {fileID: 1579994937}
   m_Layer: 0
-  m_Name: Mission Destination
+  m_Name: Назначение миссии
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -846,7 +846,7 @@ MonoBehaviour:
   metaGameState: {fileID: 1497055332}
   targetShip: {fileID: 1778278284}
   dockId: destination_island
-  displayName: Destination Island
+  displayName: Остров назначения
   kind: 0
   dockingRadius: 18
   canEndSession: 1
@@ -924,7 +924,7 @@ GameObject:
   - component: {fileID: 1778278285}
   - component: {fileID: 1778278284}
   m_Layer: 0
-  m_Name: Ship
+  m_Name: Корабль
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

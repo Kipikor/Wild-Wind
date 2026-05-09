@@ -5,22 +5,22 @@ public static class MetaGameSetupEditor
 {
     private const string CatalogPath = "Assets/Data/ShipCatalog.asset";
     private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
-    private const string MetaGameObjectName = "Meta Game";
+    private const string MetaGameObjectName = "Мета-игра";
 
-    [MenuItem("Wild Wind/Meta/Setup Meta Game")]
+    [MenuItem("Wild Wind/Мета/Собрать мета-игру")]
     public static void SetupMetaGame()
     {
         ShipPhysics ship = Object.FindFirstObjectByType<ShipPhysics>();
         if (ship == null)
         {
-            EditorUtility.DisplayDialog("Meta Game Setup", "ShipPhysics was not found in the open scene.", "OK");
+            EditorUtility.DisplayDialog("Сборка мета-игры", "В открытой сцене не найден ShipPhysics.", "OK");
             return;
         }
 
         ShipCatalogSO catalog = AssetDatabase.LoadAssetAtPath<ShipCatalogSO>(CatalogPath);
         if (catalog == null)
         {
-            EditorUtility.DisplayDialog("Meta Game Setup", $"Catalog was not found at {CatalogPath}.", "OK");
+            EditorUtility.DisplayDialog("Сборка мета-игры", $"Каталог кораблей не найден по пути {CatalogPath}.", "OK");
             return;
         }
 
@@ -31,7 +31,7 @@ public static class MetaGameSetupEditor
         if (metaGameObject == null)
         {
             metaGameObject = new GameObject(MetaGameObjectName);
-            Undo.RegisterCreatedObjectUndo(metaGameObject, "Create Meta Game");
+            Undo.RegisterCreatedObjectUndo(metaGameObject, "Создать мета-игру");
         }
 
         ShipLoader loader = metaGameObject.GetComponent<ShipLoader>();
@@ -46,7 +46,7 @@ public static class MetaGameSetupEditor
             metaGameState = Undo.AddComponent<MetaGameState>(metaGameObject);
         }
 
-        Undo.RecordObjects(new Object[] { loader, metaGameState }, "Setup Meta Game");
+        Undo.RecordObjects(new Object[] { loader, metaGameState }, "Настроить мета-игру");
 
         loader.catalog = catalog;
         loader.targetShip = ship;
@@ -63,7 +63,7 @@ public static class MetaGameSetupEditor
         Selection.activeGameObject = metaGameObject;
     }
 
-    [MenuItem("Wild Wind/Meta/Setup Meta Game", true)]
+    [MenuItem("Wild Wind/Мета/Собрать мета-игру", true)]
     public static bool ValidateSetupMetaGame()
     {
         return !Application.isPlaying;

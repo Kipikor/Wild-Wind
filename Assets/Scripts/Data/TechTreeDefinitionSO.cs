@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "NewTechTree", menuName = "Wild Wind/Meta/Tech Tree")]
+[CreateAssetMenu(fileName = "НовоеДревоТехники", menuName = "Wild Wind/Мета/Древо техники")]
 public class TechTreeDefinitionSO : ScriptableObject
 {
     [InspectorName("Узлы древа")]
@@ -45,18 +45,18 @@ public class TechTreeDefinitionSO : ScriptableObject
 
             if (string.IsNullOrWhiteSpace(node.nodeId))
             {
-                issues.Add($"Узел #{i}: не заполнен ID узла.");
+                issues.Add($"Узел #{i}: не заполнен идентификатор узла.");
                 continue;
             }
 
             if (!ids.Add(node.nodeId))
             {
-                issues.Add($"Повторяется ID узла: {node.nodeId}.");
+                issues.Add($"Повторяется идентификатор узла: {node.nodeId}.");
             }
 
             if (node.kind == TechTreeNodeKind.Ship && string.IsNullOrWhiteSpace(node.EffectiveShipId))
             {
-                issues.Add($"Корабль {node.nodeId}: нет ID корабля или паспорта корабля.");
+                issues.Add($"Корабль {node.nodeId}: нет идентификатора корабля или паспорта корабля.");
             }
 
             if (node.kind == TechTreeNodeKind.Module && string.IsNullOrWhiteSpace(node.parentShipId))
@@ -106,10 +106,10 @@ public enum TechTreeModuleKind
 public class TechTreeNode
 {
     [Header("Основное")]
-    [InspectorName("ID узла")]
+    [InspectorName("Идентификатор узла")]
     public string nodeId = "node";
     [InspectorName("Название")]
-    public string displayName = "Node";
+    public string displayName = "Узел";
     [InspectorName("Тип узла")]
     public TechTreeNodeKind kind = TechTreeNodeKind.Ship;
     [InspectorName("Уровень техники")]
@@ -118,13 +118,13 @@ public class TechTreeNode
     [Header("Корабль")]
     [InspectorName("Паспорт корабля")]
     public ShipDefinitionSO shipDefinition;
-    [InspectorName("ID корабля")]
+    [InspectorName("Идентификатор корабля")]
     public string shipId = "";
     [InspectorName("Премиумная техника")]
     public bool isPremium;
 
     [Header("Модуль")]
-    [InspectorName("ID корабля-владельца")]
+    [InspectorName("Идентификатор корабля-владельца")]
     public string parentShipId = "";
     [InspectorName("Тип модуля")]
     public TechTreeModuleKind moduleKind = TechTreeModuleKind.Other;
@@ -138,7 +138,7 @@ public class TechTreeNode
     public bool startsResearched;
     [InspectorName("Куплен с начала")]
     public bool startsPurchased;
-    [InspectorName("Условия доступа, любой один ID")]
+    [InspectorName("Условия доступа, любой один идентификатор")]
     public List<string> prerequisiteNodeIds = new List<string>();
     [InspectorName("С каких кораблей можно тратить опыт")]
     public List<string> experienceShipIds = new List<string>();

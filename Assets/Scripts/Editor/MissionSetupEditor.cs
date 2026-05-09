@@ -4,24 +4,24 @@ using UnityEngine;
 public static class MissionSetupEditor
 {
     private const string MissionPath = "Assets/Data/Missions/FirstDeliveryMission.asset";
-    private const string MissionObjectName = "Mission";
-    private const string StartPointName = "Mission Start";
-    private const string DestinationPointName = "Mission Destination";
+    private const string MissionObjectName = "Миссия";
+    private const string StartPointName = "Старт миссии";
+    private const string DestinationPointName = "Назначение миссии";
 
-    [MenuItem("Wild Wind/Missions/Setup Test Mission")]
+    [MenuItem("Wild Wind/Миссии/Собрать тестовую миссию")]
     public static void SetupTestMission()
     {
         MissionDefinitionSO mission = AssetDatabase.LoadAssetAtPath<MissionDefinitionSO>(MissionPath);
         if (mission == null)
         {
-            EditorUtility.DisplayDialog("Mission Setup", $"Mission was not found at {MissionPath}.", "OK");
+            EditorUtility.DisplayDialog("Сборка миссии", $"Миссия не найдена по пути {MissionPath}.", "OK");
             return;
         }
 
         ShipPhysics ship = Object.FindFirstObjectByType<ShipPhysics>();
         if (ship == null)
         {
-            EditorUtility.DisplayDialog("Mission Setup", "ShipPhysics was not found in the open scene.", "OK");
+            EditorUtility.DisplayDialog("Сборка миссии", "В открытой сцене не найден ShipPhysics.", "OK");
             return;
         }
 
@@ -29,7 +29,7 @@ public static class MissionSetupEditor
         if (missionObject == null)
         {
             missionObject = new GameObject(MissionObjectName);
-            Undo.RegisterCreatedObjectUndo(missionObject, "Create Mission");
+            Undo.RegisterCreatedObjectUndo(missionObject, "Создать миссию");
         }
 
         MissionController controller = missionObject.GetComponent<MissionController>();
@@ -47,7 +47,7 @@ public static class MissionSetupEditor
             destinationDock = Undo.AddComponent<DockingPort>(destinationPoint.gameObject);
         }
 
-        Undo.RecordObjects(new Object[] { controller, destinationDock }, "Setup Mission");
+        Undo.RecordObjects(new Object[] { controller, destinationDock }, "Настроить миссию");
         controller.mission = mission;
         controller.targetShip = ship;
         controller.metaGameState = metaGameState;
@@ -59,7 +59,7 @@ public static class MissionSetupEditor
         destinationDock.metaGameState = metaGameState;
         destinationDock.targetShip = ship;
         destinationDock.dockId = string.IsNullOrWhiteSpace(mission.destinationDockId) ? "mission_destination" : mission.destinationDockId;
-        destinationDock.displayName = string.IsNullOrWhiteSpace(mission.displayName) ? "Mission Destination" : mission.displayName;
+        destinationDock.displayName = string.IsNullOrWhiteSpace(mission.displayName) ? "Назначение миссии" : mission.displayName;
         destinationDock.kind = mission.destinationDockKind;
         destinationDock.dockingRadius = Mathf.Max(mission.arrivalRadius, 1f);
         destinationDock.canEndSession = true;
@@ -71,7 +71,7 @@ public static class MissionSetupEditor
         Selection.activeGameObject = missionObject;
     }
 
-    [MenuItem("Wild Wind/Missions/Setup Test Mission", true)]
+    [MenuItem("Wild Wind/Миссии/Собрать тестовую миссию", true)]
     public static bool ValidateSetupTestMission()
     {
         return !Application.isPlaying;

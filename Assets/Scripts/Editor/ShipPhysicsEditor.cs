@@ -61,7 +61,7 @@ public class ShipPhysicsEditor : Editor
         ShipPhysics ship = (ShipPhysics)target;
 
         EditorGUILayout.LabelField("Паспорт корабля", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("shipDefinition"), new GUIContent("Definition Asset"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("shipDefinition"), new GUIContent("Ассет паспорта"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("applyDefinitionOnAwake"), new GUIContent("Применять при старте"));
 
         EditorGUILayout.BeginHorizontal();
@@ -172,7 +172,7 @@ public class ShipPhysicsEditor : Editor
         SerializedProperty hasCSUProp = serializedObject.FindProperty("hasCSU");
         if (hasCSUProp.boolValue)
         {
-            EditorGUILayout.LabelField("Управление оборотами (CSU)", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Управление оборотами", EditorStyles.boldLabel);
             
             string modeName = "Стоп";
             float rpm = ship.targetMainEngineRPM;
@@ -193,7 +193,7 @@ public class ShipPhysicsEditor : Editor
         }
         else
         {
-            EditorGUILayout.LabelField("РУЧНОЕ УПРАВЛЕНИЕ (Нет CSU)", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("РУЧНОЕ УПРАВЛЕНИЕ (без автомата шага)", EditorStyles.boldLabel);
             ship.targetMainEngineRPM = EditorGUILayout.Slider("Газ (Мощность мотора)", ship.targetMainEngineRPM, 0f, 1.2f);
             EditorGUILayout.HelpBox("ВНИМАНИЕ: Балансируйте газ и шаг винта вручную, чтобы не заглушить мотор!", MessageType.Warning);
         }
@@ -229,9 +229,9 @@ public class ShipPhysicsEditor : Editor
             
             if (ship.claudiumLoop != null)
             {
-                EditorGUILayout.LabelField(" Claudium Loop Status", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField($"  Solution Stock: {ship.claudiumLoop.запасРаствораЛ:F2} L ({ship.claudiumLoop.концентрацияКлавдия:F1}%)");
-                EditorGUILayout.LabelField($"  Active Lift: {ship.activeLiftForce / 9.81f:F0} kgf");
+                EditorGUILayout.LabelField("Состояние клавдиевого контура", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField($"Запас раствора: {ship.claudiumLoop.запасРаствораЛ:F2} л ({ship.claudiumLoop.концентрацияКлавдия:F1}%)");
+                EditorGUILayout.LabelField($"Активный подъем: {ship.activeLiftForce / 9.81f:F0} кгс");
             }
             else EditorGUILayout.LabelField("Контур: не установлен", EditorStyles.miniLabel);
 
@@ -249,7 +249,7 @@ public class ShipPhysicsEditor : Editor
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Автопилот и Системы", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("hasCSU"), new GUIContent("Есть CSU (Автомат шага)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("hasCSU"), new GUIContent("Есть автомат шага винта"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("autoStabilizeAtStart"), new GUIContent("Стабилизация при старте"));
         EditorGUILayout.PropertyField(altitudeHoldProp, new GUIContent("Удержание высоты"));
         EditorGUILayout.PropertyField(cruiseControlProp, new GUIContent("Круиз-контроль (скорость)"));
@@ -263,7 +263,7 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(altDriftToleranceProp, new GUIContent("Допуск дрейфа (м)"));
 
         EditorGUILayout.Space(5);
-        EditorGUILayout.LabelField("Автопилот курса (Heading)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Автопилот курса", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("headingHold"), new GUIContent("Удержание курса"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("targetHeading"), new GUIContent("Целевой курс (0-360)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("headingStiffness"), new GUIContent("Курсовая жесткость (P)"));
@@ -272,7 +272,7 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("maxStructuralTurnRateDeg"), new GUIContent("Конструкц. лимит вращения (°/с)"));
 
         EditorGUILayout.Space(5);
-        EditorGUILayout.LabelField("Путевая навигация (Waypoints)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Путевая навигация", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("routeEnabled"), new GUIContent("Включить маршрут"));
         
         EditorGUILayout.PropertyField(serializedObject.FindProperty("waypoints"), new GUIContent("Точки маршрута"), true);
@@ -301,7 +301,7 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.LabelField("Аэродинамика рулей (Поворот)", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderArea"), new GUIContent("Площадь руля (м²)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderDistance"), new GUIContent("Плечо руля (м от ЦМ)"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderMaxLiftCoeff"), new GUIContent("Max Су при полн. отклонении"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderMaxLiftCoeff"), new GUIContent("Макс. Су при полн. отклонении"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("maxRudderAngleDeg"), new GUIContent("Макс. угол руля (градусы)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderTurnSpeedDeg"), new GUIContent("Скорость перекладки (°/сек)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("sideResistance"), new GUIContent("Сопротивление дрейфу (Киль)"));
@@ -421,8 +421,8 @@ public class ShipPhysicsEditor : Editor
             float currentThrustKg = (currentStaticT * Mathf.Clamp(thrustFactor, -1.2f, 1.2f)) / 9.81f;
 
             EditorGUILayout.LabelField($"Текущая тяга винта: {currentThrustKg:F1} кг", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"Фактические обороты: {(curRPM_Normalized * maxRPM_Val):F0} RPM ({(curRPM_Normalized * 100):F1}%)", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"Цель (Газ/CSU): {(targetRPM_Val * 100):F0}%", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField($"Фактические обороты: {(curRPM_Normalized * maxRPM_Val):F0} об/мин ({(curRPM_Normalized * 100):F1}%)", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Цель газа/автомата шага: {(targetRPM_Val * 100):F0}%", EditorStyles.miniLabel);
         }
         else
         {

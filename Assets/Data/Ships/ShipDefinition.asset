@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9d31f1e253764f96b7ac5c3d9e7e2d46, type: 3}
-  m_Name: ShipDefinition
+  m_Name: Паспорт корабля
   m_EditorClassIdentifier: Assembly-CSharp::ShipDefinitionSO
   shipId: ship
-  displayName: Ship
+  displayName: Корабль
   description: 
   tier: 1
   purchasePrice: 0

@@ -35,13 +35,13 @@ public class TechTreeConstructorEditor : Editor
         }
     }
 
-    [MenuItem("Wild Wind/Tech Tree/Open Constructor")]
+    [MenuItem("Wild Wind/Древо техники/Открыть конструктор")]
     public static void OpenConstructor()
     {
         TechTreeGraphWindow.OpenWindow();
     }
 
-    [MenuItem("Wild Wind/Tech Tree/Create Starter Tree")]
+    [MenuItem("Wild Wind/Древо техники/Создать стартовое древо")]
     public static void CreateStarterTree()
     {
         TechTreeDefinitionSO existingTree = AssetDatabase.LoadAssetAtPath<TechTreeDefinitionSO>(TreePath);
@@ -58,7 +58,7 @@ public class TechTreeConstructorEditor : Editor
         TechTreeNode starterNode = new TechTreeNode
         {
             nodeId = "ship_tier1",
-            displayName = "Ship I",
+            displayName = "Корабль I",
             kind = TechTreeNodeKind.Ship,
             tier = 1,
             shipDefinition = starterShip,

@@ -63,7 +63,7 @@ public class ShipPhysics : MonoBehaviour
     public float maxCruiseSpeedMS = 20f;  // Лимит для автопилота (м/с)
     public float maxManualSpeedMS = 30f;  // Лимит для ручного режима (м/с)
     
-    [Header("Автопилот курса (Heading)")]
+    [Header("Автопилот курса")]
     public bool headingHold = false;
     public float targetHeading = 0f;      // Целевой курс (градусы 0-360)
     public float headingStiffness = 0.5f; // P-терм (Жесткость реакции на ошибку курса)
@@ -71,7 +71,7 @@ public class ShipPhysics : MonoBehaviour
     public float maxAutoTurnRateDeg = 5.0f; // Лимит угловой скорости для автопилота (°/сек)
     public float maxStructuralTurnRateDeg = 15.0f; // Конструкционный лимит угловой скорости (°/сек)
     
-    [Header("Путевая машина (Waypoints)")]
+    [Header("Путевая машина")]
     public bool routeEnabled = false;
     public System.Collections.Generic.List<Vector3> waypoints = new System.Collections.Generic.List<Vector3>();
     public float waypointRadius = 10f; // Радиус засчитывания точки
@@ -83,7 +83,7 @@ public class ShipPhysics : MonoBehaviour
     public float speedStiffness = 0.8f;  // Насколько активно круиз меняет шаг винта
     public float speedDamping = 0.3f;    // Демпфирование шага
 
-    [Header("Текущее управление (для чтения/записи из UI)")]
+    [Header("Текущее управление (для чтения/записи из интерфейса)")]
     [HideInInspector] public float thrustInput; // -1 назад, 1 вперед
     [HideInInspector] public float turnInput;   // -1 влево, 1 вправо
     [HideInInspector] public float targetTrimMass = 1000f; // Масса для триммирования (кг)

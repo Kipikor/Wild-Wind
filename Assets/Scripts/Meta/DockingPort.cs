@@ -2,14 +2,29 @@ using UnityEngine;
 
 public class DockingPort : MonoBehaviour
 {
+    [Header("Связи")]
+    [InspectorName("Состояние меты")]
     public MetaGameState metaGameState;
+    [InspectorName("Корабль игрока")]
     public ShipPhysics targetShip;
+
+    [Header("Стыковка")]
+    [InspectorName("Идентификатор дока")]
+    [Tooltip("Технический идентификатор точки стыковки. Используется в сохранениях.")]
     public string dockId = "starter_island";
-    public string displayName = "Starter Island";
+    [InspectorName("Название")]
+    public string displayName = "Стартовый остров";
+    [InspectorName("Тип")]
     public DockingLocationKind kind = DockingLocationKind.Island;
+    [InspectorName("Радиус стыковки")]
+    [Tooltip("Если корабль в полете входит в этот радиус, точка может завершить вылет.")]
     public float dockingRadius = 20f;
+    [InspectorName("Можно завершить сессию")]
     public bool canEndSession = true;
+    [InspectorName("Автостыковка в радиусе")]
+    [Tooltip("Если включено, корабль автоматически перейдет в режим стыковки при входе в радиус.")]
     public bool autoDockWhenInRange = true;
+    [InspectorName("Точка привязки")]
     public Transform snapPoint;
 
     public Vector3 DockPosition => snapPoint != null ? snapPoint.position : transform.position;

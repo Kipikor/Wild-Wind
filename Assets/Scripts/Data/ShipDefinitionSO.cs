@@ -1,23 +1,36 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "NewShipDefinition", menuName = "Wild Wind/Ships/Ship Definition")]
+[CreateAssetMenu(fileName = "НовыйПаспортКорабля", menuName = "Wild Wind/Корабли/Паспорт корабля")]
 public class ShipDefinitionSO : ScriptableObject
 {
-    [Header("Meta")]
+    [Header("Мета")]
+    [InspectorName("Идентификатор корабля")]
+    [Tooltip("Технический идентификатор корабля. Используется в сохранениях и древе техники.")]
     public string shipId = "starter_ship";
-    public string displayName = "Starter Ship";
+    [InspectorName("Название")]
+    public string displayName = "Стартовый корабль";
+    [InspectorName("Описание")]
     [TextArea] public string description = "";
+    [InspectorName("Уровень")]
     public int tier = 1;
+    [InspectorName("Цена покупки")]
     public int purchasePrice = 0;
+    [InspectorName("Стоимость открытия")]
+    [Tooltip("Резервное поле для будущей логики открытия корабля отдельно от покупки.")]
     public int unlockCost = 0;
 
-    [Header("Flight Model")]
+    [Header("Летная модель")]
+    [InspectorName("Настройки полета")]
     public ShipFlightTuning flight = new ShipFlightTuning();
 
-    [Header("Modules")]
+    [Header("Модули")]
+    [InspectorName("Маршевый двигатель")]
     public ShipEngineTuning thrustEngine = new ShipEngineTuning();
+    [InspectorName("Подъемный двигатель")]
     public ShipEngineTuning liftEngine = new ShipEngineTuning();
+    [InspectorName("Баллон")]
     public ShipBalloonTuning balloon = new ShipBalloonTuning();
+    [InspectorName("Клавдиевый контур")]
     public ShipClaudiumLoopTuning claudiumLoop = new ShipClaudiumLoopTuning();
 
     public void CaptureFrom(ShipPhysics ship)
@@ -55,53 +68,92 @@ public class ShipDefinitionSO : ScriptableObject
 [System.Serializable]
 public class ShipFlightTuning
 {
-    [Header("Mass")]
+    [Header("Масса")]
+    [InspectorName("Базовая масса")]
     public float baseMass = 1000f;
+    [InspectorName("Масса триммирования")]
+    [Tooltip("Масса, под которую система подъема старается сбалансировать корабль.")]
     public float targetTrimMass = 1000f;
 
-    [Header("Propeller")]
+    [Header("Винт")]
+    [InspectorName("Диаметр винта")]
     public float propellerDiameter = 4.5f;
+    [InspectorName("КПД винта")]
     public float propellerEfficiency = 0.8f;
+    [InspectorName("Максимальный шаг винта, м")]
     public float propellerMaxPitchMeters = 3.0f;
+    [InspectorName("Стартовые обороты маршевого двигателя")]
     public float initialMainEngineRPM = 0.8f;
+    [InspectorName("Есть автомат шага винта")]
+    [Tooltip("Автомат шага винта управляет шагом сам и удерживает целевые обороты двигателя.")]
     public bool hasCSU = false;
 
-    [Header("Lift")]
+    [Header("Подъем")]
+    [InspectorName("Эффективность подъема")]
     public float liftEfficiency = 20f;
+    [InspectorName("Конструкционный лимит вертикальной скорости")]
     public float maxStructuralVerticalSpeed = 5.0f;
+    [InspectorName("Лимит вертикальной скорости автопилота")]
     public float maxAutoVerticalSpeed = 1.0f;
 
-    [Header("Aerodynamics")]
+    [Header("Аэродинамика")]
+    [InspectorName("Плотность воздуха")]
     public float airDensity = 1.225f;
+    [InspectorName("Коэффициент сопротивления")]
     public float dragCoefficient = 1.1f;
+    [InspectorName("Лобовая площадь")]
     public float frontalArea = 6.3f;
+    [InspectorName("Боковое сопротивление")]
     public float sideResistance = 2.0f;
+    [InspectorName("Множитель вертикальной площади")]
     public float verticalAreaFactor = 4.0f;
 
-    [Header("Rudder")]
+    [Header("Рули")]
+    [InspectorName("Площадь рулей")]
     public float rudderArea = 4.0f;
+    [InspectorName("Плечо рулей")]
     public float rudderDistance = 10.0f;
+    [InspectorName("Макс. коэффициент подъемной силы руля")]
     public float rudderMaxLiftCoeff = 1.5f;
+    [InspectorName("Макс. угол руля")]
     public float maxRudderAngleDeg = 25f;
+    [InspectorName("Скорость перекладки руля")]
     public float rudderTurnSpeedDeg = 15f;
+    [InspectorName("Макс. скорость поворота автопилота")]
     public float maxAutoTurnRateDeg = 5.0f;
+    [InspectorName("Конструкционный лимит поворота")]
     public float maxStructuralTurnRateDeg = 15.0f;
 
-    [Header("Autopilot Defaults")]
+    [Header("Автопилот по умолчанию")]
+    [InspectorName("Автостабилизация при старте")]
     public bool autoStabilizeAtStart = true;
+    [InspectorName("Удержание высоты")]
     public bool altitudeHold = false;
+    [InspectorName("Жесткость высоты")]
     public float altStiffness = 0.2f;
+    [InspectorName("Демпфирование высоты")]
     public float altDamping = 1.2f;
+    [InspectorName("Допуск дрейфа высоты")]
     public float altDriftTolerance = 0.15f;
+    [InspectorName("Круиз-контроль")]
     public bool cruiseControl = false;
+    [InspectorName("Макс. скорость круиза")]
     public float maxCruiseSpeedMS = 20f;
+    [InspectorName("Макс. ручная скорость")]
     public float maxManualSpeedMS = 30f;
+    [InspectorName("Удержание курса")]
     public bool headingHold = false;
+    [InspectorName("Жесткость курса")]
     public float headingStiffness = 0.5f;
+    [InspectorName("Демпфирование курса")]
     public float headingDamping = 0.5f;
+    [InspectorName("Радиус точки маршрута")]
     public float waypointRadius = 10f;
+    [InspectorName("Минимальная скорость навигации")]
     public float minNavSpeed = 5f;
+    [InspectorName("Жесткость скорости")]
     public float speedStiffness = 0.8f;
+    [InspectorName("Демпфирование скорости")]
     public float speedDamping = 0.3f;
 
     public void CaptureFrom(ShipPhysics ship)
@@ -194,12 +246,19 @@ public class ShipFlightTuning
 [System.Serializable]
 public class ShipEngineTuning
 {
-    public string engineName = "Standard Engine";
+    [InspectorName("Название двигателя")]
+    public string engineName = "Стандартный двигатель";
+    [InspectorName("Максимальная мощность")]
     public float maxPower = 60f;
+    [InspectorName("Максимальные обороты")]
     public float maxRPM = 2500f;
+    [InspectorName("Отзывчивость")]
     public float responsiveness = 0.5f;
+    [InspectorName("Стартовые обороты")]
     [Range(0f, 1.2f)] public float startingRPM = 0.5f;
+    [InspectorName("КПД")]
     [Range(0.01f, 0.9f)] public float efficiency = 0.15f;
+    [InspectorName("Клавдиевый двигатель")]
     public bool isClaudium = false;
 
     public void CaptureFrom(ShipEngine engine)
@@ -238,11 +297,17 @@ public class ShipEngineTuning
 [System.Serializable]
 public class ShipBalloonTuning
 {
-    public string balloonName = "Standard Balloon";
+    [InspectorName("Название баллона")]
+    public string balloonName = "Стандартный баллон";
+    [InspectorName("Диаметр, м")]
     public float diameterM = 8.0f;
+    [InspectorName("Длина, м")]
     public float lengthM = 12.0f;
+    [InspectorName("Заполнение, %")]
     [Range(0f, 100f)] public float fillPercent = 0f;
+    [InspectorName("Утечка, м3/час")]
     public float leakM3PerHour = 1.0f;
+    [InspectorName("Скорость клапана")]
     public float valveFlowRate = 0.5f;
 
     public void CaptureFrom(ShipBalloon balloon)
@@ -274,20 +339,35 @@ public class ShipBalloonTuning
 [System.Serializable]
 public class ShipClaudiumLoopTuning
 {
-    public string loopName = "Claudium Loop";
+    [InspectorName("Название контура")]
+    public string loopName = "Клавдиевый контур";
+    [InspectorName("Объем системы, л")]
     public float systemVolumeL = 50f;
+    [InspectorName("Длина контура, м")]
     public float loopLengthM = 25f;
+    [InspectorName("Концентрация, %")]
     [Range(0f, 100f)] public float concentration = 10f;
+    [InspectorName("Целевая концентрация, %")]
     [Range(0f, 100f)] public float targetConcentration = 10f;
+    [InspectorName("Запас раствора, л")]
     public float solutionStockL = 100f;
+    [InspectorName("Плотность раствора")]
     public float solutionDensity = 1.2f;
+    [InspectorName("Запас кристаллов, кг")]
     public float crystalStockKg = 5.0f;
+    [InspectorName("Скорость растворения, кг/мин")]
     public float dissolutionSpeedKgPerMinute = 0.5f;
+    [InspectorName("Начальная температура")]
     public float initialTemperatureC = 20f;
+    [InspectorName("Внешний подогрев, Вт")]
     public float externalHeatWatts = 0f;
+    [InspectorName("Забирать тепло от двигателя")]
     public bool useEngineWasteHeat = true;
+    [InspectorName("Теплопотери")]
     public float heatLoss = 0.05f;
+    [InspectorName("Макс. давление, бар")]
     public float maxPressureBar = 200f;
+    [InspectorName("КПД контура")]
     [Range(0f, 1f)] public float efficiency = 0.85f;
 
     public void CaptureFrom(ShipClaudiumLoop loop)

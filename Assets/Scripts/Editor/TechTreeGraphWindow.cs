@@ -25,7 +25,7 @@ public class TechTreeGraphWindow : EditorWindow
     private GUIStyle premiumNodeStyle;
     private GUIStyle selectedNodeStyle;
 
-    [MenuItem("Wild Wind/Tech Tree/Open Visual Editor")]
+    [MenuItem("Wild Wind/Древо техники/Открыть визуальный редактор")]
     public static void OpenWindow()
     {
         TechTreeGraphWindow window = GetWindow<TechTreeGraphWindow>("Древо техники");
@@ -139,7 +139,7 @@ public class TechTreeGraphWindow : EditorWindow
     private void DrawMissingTreeMessage()
     {
         EditorGUILayout.Space(24f);
-        EditorGUILayout.HelpBox($"Древо не найдено по пути {TreePath}. Создай его через Wild Wind > Tech Tree > Create Starter Tree.", MessageType.Warning);
+        EditorGUILayout.HelpBox($"Древо не найдено по пути {TreePath}. Создай его через Wild Wind > Древо техники > Создать стартовое древо.", MessageType.Warning);
     }
 
     private void DrawCanvas(Rect canvasRect)
@@ -302,7 +302,7 @@ public class TechTreeGraphWindow : EditorWindow
 
         EditorGUI.BeginChangeCheck();
 
-        selectedNode.nodeId = EditorGUILayout.TextField("ID узла", selectedNode.nodeId);
+        selectedNode.nodeId = EditorGUILayout.TextField("Идентификатор узла", selectedNode.nodeId);
         selectedNode.displayName = EditorGUILayout.TextField("Название", selectedNode.displayName);
         selectedNode.kind = (TechTreeNodeKind)EditorGUILayout.EnumPopup("Тип узла", selectedNode.kind);
         selectedNode.tier = EditorGUILayout.IntSlider("Уровень", selectedNode.tier, 1, 10);
@@ -310,12 +310,12 @@ public class TechTreeGraphWindow : EditorWindow
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Корабль", EditorStyles.boldLabel);
         selectedNode.shipDefinition = (ShipDefinitionSO)EditorGUILayout.ObjectField("Паспорт", selectedNode.shipDefinition, typeof(ShipDefinitionSO), false);
-        selectedNode.shipId = EditorGUILayout.TextField("ID корабля", selectedNode.shipId);
+        selectedNode.shipId = EditorGUILayout.TextField("Идентификатор корабля", selectedNode.shipId);
         selectedNode.isPremium = EditorGUILayout.Toggle("Премиум", selectedNode.isPremium);
 
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Модуль", EditorStyles.boldLabel);
-        selectedNode.parentShipId = EditorGUILayout.TextField("ID корабля-владельца", selectedNode.parentShipId);
+        selectedNode.parentShipId = EditorGUILayout.TextField("Идентификатор корабля-владельца", selectedNode.parentShipId);
         selectedNode.moduleKind = (TechTreeModuleKind)EditorGUILayout.EnumPopup("Тип модуля", selectedNode.moduleKind);
 
         EditorGUILayout.Space(8f);

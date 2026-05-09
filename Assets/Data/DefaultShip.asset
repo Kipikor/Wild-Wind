@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: faf2bf1de16d83f4a96a214d6fcd128c, type: 3}
-  m_Name: DefaultShip
+  m_Name: Корабль по умолчанию
   m_EditorClassIdentifier: Assembly-CSharp::ShipData
   maxThrust: 100
   accelerationRate: 0.5

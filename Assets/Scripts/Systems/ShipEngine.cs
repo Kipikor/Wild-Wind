@@ -9,7 +9,7 @@ public class ShipEngine : MonoBehaviour
     public float responsiveness = 0.5f; // Инерция (0 - вялый, 1 - резкий)
     [Range(0, 1.2f)] public float startingRPM = 0.5f; 
 
-    [Header("Настройки CSU (Constant Speed Unit)")]
+    [Header("Настройки автомата шага винта")]
     public float targetRPM = 0.8f;   // Обороты, которые хочет пилот
     public float currentLoad = 0f;  // Текущая нагрузка на валу (0..1)
     public bool isOverloaded = false;

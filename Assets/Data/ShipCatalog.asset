@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c77f0fbd4824468b9c7191f69dd3a1c2, type: 3}
-  m_Name: ShipCatalog
+  m_Name: Каталог кораблей
   m_EditorClassIdentifier: Assembly-CSharp::ShipCatalogSO
   starterShipId: ship
   ships:

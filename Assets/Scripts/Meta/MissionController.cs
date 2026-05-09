@@ -2,12 +2,19 @@ using UnityEngine;
 
 public class MissionController : MonoBehaviour
 {
+    [Tooltip("Описание миссии: маршрут, награды, стыковка назначения и настройки выполнения в реальном времени.")]
     public MissionDefinitionSO mission;
+    [Tooltip("Корабль игрока, который будет поставлен на старт и проверяться на прибытие.")]
     public ShipPhysics targetShip;
+    [Tooltip("Состояние мета-игры. Через него миссия переводит игру в вылет и завершает полет стыковкой.")]
     public MetaGameState metaGameState;
+    [Tooltip("Точка старта в сцене. Если не задана, используется стартовая позиция из описания миссии.")]
     public Transform startPoint;
+    [Tooltip("Точка назначения в сцене. Если не задана, используется позиция назначения из описания миссии.")]
     public Transform destinationPoint;
+    [Tooltip("Если включено, миссия стартует автоматически при запуске сцены.")]
     public bool startMissionOnPlay = true;
+    [Tooltip("Если включено, при старте миссии корабль переносится в стартовую точку.")]
     public bool placeShipAtStart = true;
 
     public bool IsActive { get; private set; }
@@ -54,7 +61,7 @@ public class MissionController : MonoBehaviour
         }
     }
 
-    [ContextMenu("Begin Mission")]
+    [ContextMenu("Начать миссию")]
     public void BeginMission()
     {
         if (mission == null || targetShip == null) return;
@@ -75,7 +82,7 @@ public class MissionController : MonoBehaviour
         DistanceToDestination = Vector3.Distance(targetShip.transform.position, GetDestinationPosition());
     }
 
-    [ContextMenu("Complete Mission")]
+    [ContextMenu("Завершить миссию")]
     public void CompleteMission()
     {
         if (!IsActive || IsCompleted || mission == null) return;

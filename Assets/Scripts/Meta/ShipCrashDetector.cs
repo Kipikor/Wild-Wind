@@ -3,9 +3,15 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody))]
 public class ShipCrashDetector : MonoBehaviour
 {
+    [InspectorName("Состояние меты")]
     public MetaGameState metaGameState;
+    [InspectorName("Скорость удара для крушения")]
+    [Tooltip("Если относительная скорость столкновения выше этого значения, полет считается потерянным.")]
     public float crashRelativeSpeed = 14f;
+    [InspectorName("Высота крушения")]
+    [Tooltip("Если корабль опустится ниже этой высоты в полете, прогресс откатится к последней стыковке.")]
     public float crashBelowAltitude = -10f;
+    [InspectorName("Крушение ниже высоты")]
     public bool crashWhenBelowAltitude = true;
 
     private bool crashReported;
@@ -29,7 +35,7 @@ public class ShipCrashDetector : MonoBehaviour
 
         if (transform.position.y < crashBelowAltitude)
         {
-            ReportCrash("below safe altitude");
+            ReportCrash("ниже безопасной высоты");
         }
     }
 
@@ -38,7 +44,7 @@ public class ShipCrashDetector : MonoBehaviour
         if (crashReported || !IsFlight()) return;
         if (collision.relativeVelocity.magnitude < crashRelativeSpeed) return;
 
-        ReportCrash($"impact at {collision.relativeVelocity.magnitude:0.0} m/s");
+        ReportCrash($"удар на скорости {collision.relativeVelocity.magnitude:0.0} м/с");
     }
 
     public void ResetCrashState()
@@ -54,7 +60,7 @@ public class ShipCrashDetector : MonoBehaviour
     private void ReportCrash(string reason)
     {
         crashReported = true;
-        Debug.LogWarning("Flight crash: " + reason);
+        Debug.LogWarning("Крушение в вылете: " + reason);
 
         if (metaGameState != null)
         {

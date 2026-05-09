@@ -5,46 +5,78 @@ using UnityEngine;
 [Serializable]
 public class MetaGameSaveData
 {
+    [InspectorName("Версия сохранения")]
     public int version = 1;
+    [InspectorName("Прогресс")]
     public PlayerProgress progress = new PlayerProgress();
 }
 
 public class MetaGameState : MonoBehaviour
 {
+    [Header("Связи")]
+    [InspectorName("Каталог кораблей")]
     public ShipCatalogSO catalog;
+    [InspectorName("Древо техники")]
     public TechTreeDefinitionSO techTree;
+    [InspectorName("Загрузчик корабля")]
     public ShipLoader shipLoader;
+    [InspectorName("Контроллер миссии")]
     public MissionController missionController;
+    [InspectorName("Стартовые деньги")]
     public int startingMoney;
+    [InspectorName("Прогресс игрока")]
     public PlayerProgress progress = new PlayerProgress();
 
-    [Header("Session")]
+    [Header("Сессия")]
+    [InspectorName("Стартовый режим")]
     public GameSessionMode startingMode = GameSessionMode.Docked;
+    [InspectorName("Стартовый док")]
     public string startingDockId = "starter_island";
+    [InspectorName("Тип стартового дока")]
     public DockingLocationKind startingDockKind = DockingLocationKind.Island;
+    [InspectorName("Автосохранение при стыковке")]
+    [Tooltip("Сохранение разрешено только в режиме стыковки. Перед вылетом также создается чекпоинт последней стыковки.")]
     public bool autoSaveOnDock = true;
+    [InspectorName("Загружать сохранение при старте")]
+    [Tooltip("Если во время прошлого запуска игра была закрыта в полете, загрузка вернет игрока к последней стыковке.")]
     public bool loadSavedGameOnAwake = true;
+    [InspectorName("Имя файла сохранения")]
     public string saveFileName = "wild_wind_save.json";
 
-    [Header("Starter Resources")]
+    [Header("Стартовые ресурсы")]
+    [InspectorName("Стартовая руда")]
     public int startingOre = 4;
+    [InspectorName("Стартовое железо")]
     public int startingIron = 0;
 
-    [Header("Real Time Processes")]
+    [Header("Процессы реального времени")]
+    [InspectorName("Обновлять процессы во время игры")]
     public bool processRealTimeWhilePlaying = true;
+    [InspectorName("Интервал добычи руды, сек")]
     public int idleMiningIntervalSeconds = 60;
+    [InspectorName("Руды за цикл добычи")]
     public int idleMiningOrePerCycle = 1;
+    [InspectorName("Длительность плавки железа, сек")]
     public int ironSmeltingDurationSeconds = 120;
+    [InspectorName("Цена плавки, руда")]
     public int ironSmeltingOreCost = 2;
+    [InspectorName("Выход плавки, железо")]
     public int ironSmeltingIronOutput = 1;
+    [InspectorName("Длительность миссии по умолчанию, сек")]
     public int defaultTimedMissionDurationSeconds = 300;
+    [InspectorName("Интервал обновления магазина, сек")]
+    [Tooltip("Через этот интервал меняется зерно магазина. Ассортимент можно строить от этого числа.")]
     public int shopRefreshIntervalSeconds = 3600;
 
-    [Header("Debug Dock UI")]
+    [Header("Отладочный интерфейс стыковки")]
+    [InspectorName("Показывать интерфейс")]
     public bool showDockingDebugUI = true;
+    [InspectorName("Ширина интерфейса")]
     public int debugUiWidth = 380;
 
-    [Header("Failure")]
+    [Header("Аварии")]
+    [InspectorName("Автоматически добавить детектор крушений")]
+    [Tooltip("Если включено, на корабль будет добавлен детектор крушений, который откатывает полет при аварии.")]
     public bool autoInstallCrashDetector = true;
 
     public GameSessionMode CurrentMode => progress != null ? progress.currentMode : startingMode;
@@ -309,7 +341,7 @@ public class MetaGameState : MonoBehaviour
         progress.SetFlight(missionId);
         ApplySelectedShip();
         ApplySessionModeToShip();
-        lastSaveMessage = "Flight session started. Saving is locked until docking.";
+        lastSaveMessage = "Вылет начат. Сохранение заблокировано до стыковки.";
         return true;
     }
 
@@ -361,7 +393,7 @@ public class MetaGameState : MonoBehaviour
         TimedProcessState process = new TimedProcessState
         {
             processId = "idle_mining",
-            displayName = "Idle ore mining",
+            displayName = "Пассивная добыча руды",
             kind = TimedProcessKind.IdleMining,
             startedUtcTicks = now.Ticks,
             nextCompletionUtcTicks = now.Ticks + TimeSpan.FromSeconds(Mathf.Max(1, idleMiningIntervalSeconds)).Ticks,
@@ -388,7 +420,7 @@ public class MetaGameState : MonoBehaviour
         TimedProcessState process = new TimedProcessState
         {
             processId = processId,
-            displayName = "Smelt iron",
+            displayName = "Плавка железа",
             kind = TimedProcessKind.Crafting,
             startedUtcTicks = now.Ticks,
             nextCompletionUtcTicks = now.Ticks + TimeSpan.FromSeconds(Mathf.Max(1, ironSmeltingDurationSeconds)).Ticks,
@@ -518,7 +550,7 @@ public class MetaGameState : MonoBehaviour
 
         if (!IsDocked)
         {
-            lastSaveMessage = "Cannot save: dock first.";
+            lastSaveMessage = "Нельзя сохранить: сначала нужна стыковка.";
             return false;
         }
 
@@ -535,12 +567,12 @@ public class MetaGameState : MonoBehaviour
         {
             Directory.CreateDirectory(Application.persistentDataPath);
             File.WriteAllText(SavePath, JsonUtility.ToJson(saveData, true));
-            lastSaveMessage = "Saved: " + SavePath;
+            lastSaveMessage = "Сохранено: " + SavePath;
             return true;
         }
         catch (Exception exception)
         {
-            lastSaveMessage = "Save failed: " + exception.Message;
+            lastSaveMessage = "Ошибка сохранения: " + exception.Message;
             Debug.LogWarning(lastSaveMessage);
             return false;
         }
@@ -551,7 +583,7 @@ public class MetaGameState : MonoBehaviour
         string path = SavePath;
         if (!File.Exists(path))
         {
-            lastSaveMessage = "No save found.";
+            lastSaveMessage = "Сохранение не найдено.";
             return false;
         }
 
@@ -560,7 +592,7 @@ public class MetaGameState : MonoBehaviour
             MetaGameSaveData saveData = JsonUtility.FromJson<MetaGameSaveData>(File.ReadAllText(path));
             if (saveData == null || saveData.progress == null)
             {
-                lastSaveMessage = "Save file is empty.";
+                lastSaveMessage = "Файл сохранения пуст.";
                 return false;
             }
 
@@ -573,12 +605,12 @@ public class MetaGameState : MonoBehaviour
             }
 
             initialized = false;
-            lastSaveMessage = "Loaded: " + path;
+            lastSaveMessage = "Загружено: " + path;
             return true;
         }
         catch (Exception exception)
         {
-            lastSaveMessage = "Load failed: " + exception.Message;
+            lastSaveMessage = "Ошибка загрузки: " + exception.Message;
             Debug.LogWarning(lastSaveMessage);
             return false;
         }
@@ -604,8 +636,8 @@ public class MetaGameState : MonoBehaviour
         ResetCrashDetector();
 
         lastSaveMessage = string.IsNullOrWhiteSpace(reason)
-            ? "Rolled back to last dock."
-            : "Rolled back to last dock. " + reason;
+            ? "Откат к последней стыковке выполнен."
+            : "Откат к последней стыковке выполнен. " + reason;
 
         return loaded;
     }
@@ -623,12 +655,12 @@ public class MetaGameState : MonoBehaviour
             initialized = false;
             EnsureProgressInitialized();
             ApplySessionModeToShip();
-            lastSaveMessage = "Save deleted.";
+            lastSaveMessage = "Сохранение удалено.";
             return true;
         }
         catch (Exception exception)
         {
-            lastSaveMessage = "Delete failed: " + exception.Message;
+            lastSaveMessage = "Ошибка удаления: " + exception.Message;
             Debug.LogWarning(lastSaveMessage);
             return false;
         }
@@ -827,12 +859,12 @@ public class MetaGameState : MonoBehaviour
         GUILayout.BeginArea(area, GUI.skin.box);
         debugScroll = GUILayout.BeginScrollView(debugScroll);
 
-        GUILayout.Label("Wild Wind Meta");
-        GUILayout.Label("Mode: " + CurrentMode);
-        GUILayout.Label("Dock: " + progress.currentDockId + " (" + progress.currentDockKind + ")");
-        GUILayout.Label("Money: " + progress.money);
-        GUILayout.Label("Ore: " + progress.GetResourceAmount("ore") + "  Iron: " + progress.GetResourceAmount("iron"));
-        GUILayout.Label("Shop seed: " + progress.shopSeed + "  refresh in " + FormatRemaining(progress.nextShopRefreshUtcTicks));
+        GUILayout.Label("Мета-игра");
+        GUILayout.Label("Режим: " + GetModeName(CurrentMode));
+        GUILayout.Label("Док: " + progress.currentDockId + " (" + GetDockKindName(progress.currentDockKind) + ")");
+        GUILayout.Label("Деньги: " + progress.money);
+        GUILayout.Label("Руда: " + progress.GetResourceAmount("ore") + "  Железо: " + progress.GetResourceAmount("iron"));
+        GUILayout.Label("Зерно магазина: " + progress.shopSeed + "  обновление через " + FormatRemaining(progress.nextShopRefreshUtcTicks));
 
         if (!string.IsNullOrWhiteSpace(lastSaveMessage))
         {
@@ -856,40 +888,40 @@ public class MetaGameState : MonoBehaviour
 
     private void DrawDockedDebugUi()
     {
-        GUILayout.Label("Docking");
+        GUILayout.Label("Стыковка");
 
-        if (GUILayout.Button("Save at dock"))
+        if (GUILayout.Button(new GUIContent("Сохранить у дока", "Сохраняет прогресс только если корабль находится в режиме стыковки.")))
         {
             TrySaveGame();
         }
 
-        if (GUILayout.Button("Delete save and restart progress"))
+        if (GUILayout.Button(new GUIContent("Удалить сохранение и начать заново", "Удаляет файл сохранения и сбрасывает текущий мета-прогресс.")))
         {
             DeleteSave();
         }
 
-        if (missionController != null && missionController.mission != null && GUILayout.Button("Launch flight mission"))
+        if (missionController != null && missionController.mission != null && GUILayout.Button(new GUIContent("Вылететь на миссию", "Создает чекпоинт стыковки и переводит игру в режим вылета.")))
         {
             missionController.BeginMission();
         }
 
-        if (GUILayout.Button("Launch free flight"))
+        if (GUILayout.Button(new GUIContent("Свободный вылет", "Начинает полет без активной миссии. Прогресс сохранится только после следующей стыковки.")))
         {
             BeginFreeFlight();
         }
 
         GUILayout.Space(8f);
-        GUILayout.Label("Real-time work");
+        GUILayout.Label("Работы в реальном времени");
 
         GUI.enabled = !progress.HasActiveProcess("idle_mining");
-        if (GUILayout.Button("Start idle ore mining"))
+        if (GUILayout.Button(new GUIContent("Запустить добычу руды", "Пассивно добавляет руду через заданный интервал реального времени.")))
         {
             StartIdleMining();
         }
         GUI.enabled = true;
 
         GUI.enabled = progress.GetResourceAmount("ore") >= ironSmeltingOreCost;
-        if (GUILayout.Button("Smelt ore into iron"))
+        if (GUILayout.Button(new GUIContent("Переплавить руду в железо", "Тратит руду и через таймер добавляет железо.")))
         {
             StartIronSmelting();
         }
@@ -898,7 +930,7 @@ public class MetaGameState : MonoBehaviour
         if (missionController != null && missionController.mission != null)
         {
             GUI.enabled = missionController.mission.canRunAsTimedMission;
-            if (GUILayout.Button("Send crew on timed mission"))
+            if (GUILayout.Button(new GUIContent("Отправить команду на миссию", "Миссия выполнится таймером без вылета корабля.")))
             {
                 StartTimedMission(missionController.mission);
             }
@@ -912,28 +944,28 @@ public class MetaGameState : MonoBehaviour
 
     private void DrawFlightDebugUi()
     {
-        GUILayout.Label("Flight");
-        GUILayout.Label("Saving is locked until docking.");
+        GUILayout.Label("Вылет");
+        GUILayout.Label("Сохранение заблокировано до стыковки.");
 
-        if (GUILayout.Button("Dock here"))
+        if (GUILayout.Button(new GUIContent("Состыковаться здесь", "Завершает вылет в текущей точке и сохраняет новый чекпоинт.")))
         {
             DockAt("field_dock", DockingLocationKind.Island);
         }
 
-        if (GUILayout.Button("Rollback to last dock"))
+        if (GUILayout.Button(new GUIContent("Откатиться к последней стыковке", "Отменяет текущий вылет и возвращает сохраненный прогресс последнего дока.")))
         {
-            RollbackToLastDock("Manual rollback.");
+            RollbackToLastDock("Ручной откат.");
         }
     }
 
     private void DrawProcessList()
     {
         GUILayout.Space(8f);
-        GUILayout.Label("Active processes");
+        GUILayout.Label("Активные процессы");
 
         if (progress.activeProcesses.Count == 0)
         {
-            GUILayout.Label("None");
+            GUILayout.Label("Нет");
             return;
         }
 
@@ -942,7 +974,7 @@ public class MetaGameState : MonoBehaviour
             TimedProcessState process = progress.activeProcesses[i];
             if (process == null) continue;
 
-            string repeat = process.repeat ? " repeating" : "";
+            string repeat = process.repeat ? " (повторяется)" : "";
             GUILayout.Label(process.displayName + repeat + " - " + FormatRemaining(process.nextCompletionUtcTicks));
         }
     }
@@ -953,7 +985,7 @@ public class MetaGameState : MonoBehaviour
         if (activeCatalog == null || activeCatalog.ships == null) return;
 
         GUILayout.Space(8f);
-        GUILayout.Label("Ships");
+        GUILayout.Label("Корабли");
 
         for (int i = 0; i < activeCatalog.ships.Count; i++)
         {
@@ -963,16 +995,16 @@ public class MetaGameState : MonoBehaviour
             bool unlocked = progress.IsShipUnlocked(ship.shipId);
             bool selected = progress.selectedShipId == ship.shipId;
             GUILayout.BeginHorizontal();
-            GUILayout.Label(ship.displayName + " $" + ship.purchasePrice);
+            GUILayout.Label(ship.displayName + " " + ship.purchasePrice + " мон.");
 
             GUI.enabled = unlocked && !selected;
-            if (GUILayout.Button("Select", GUILayout.Width(70f)))
+            if (GUILayout.Button("Выбрать", GUILayout.Width(90f)))
             {
                 SelectShip(ship.shipId);
             }
 
             GUI.enabled = !unlocked && progress.money >= ship.purchasePrice;
-            if (GUILayout.Button("Buy", GUILayout.Width(50f)))
+            if (GUILayout.Button("Купить", GUILayout.Width(70f)))
             {
                 TryBuyShip(ship.shipId);
             }
@@ -987,7 +1019,7 @@ public class MetaGameState : MonoBehaviour
         if (techTree == null || techTree.nodes == null) return;
 
         GUILayout.Space(8f);
-        GUILayout.Label("Tech");
+        GUILayout.Label("Техника");
 
         for (int i = 0; i < techTree.nodes.Count; i++)
         {
@@ -998,16 +1030,16 @@ public class MetaGameState : MonoBehaviour
             bool purchased = progress.IsNodePurchased(node.nodeId);
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label(node.displayName + " XP " + node.researchCostXp + " $" + node.purchasePrice);
+            GUILayout.Label(node.displayName + " опыт " + node.researchCostXp + " / " + node.purchasePrice + " мон.");
 
             GUI.enabled = !researched;
-            if (GUILayout.Button("Research", GUILayout.Width(80f)))
+            if (GUILayout.Button("Исслед.", GUILayout.Width(80f)))
             {
                 TryResearchNode(node.nodeId);
             }
 
             GUI.enabled = researched && !purchased;
-            if (GUILayout.Button("Buy", GUILayout.Width(50f)))
+            if (GUILayout.Button("Купить", GUILayout.Width(70f)))
             {
                 TryPurchaseNode(node.nodeId);
             }
@@ -1030,5 +1062,15 @@ public class MetaGameState : MonoBehaviour
         }
 
         return $"{remaining.Minutes:D2}:{remaining.Seconds:D2}";
+    }
+
+    private static string GetModeName(GameSessionMode mode)
+    {
+        return mode == GameSessionMode.Docked ? "Стыковка" : "Вылет";
+    }
+
+    private static string GetDockKindName(DockingLocationKind kind)
+    {
+        return kind == DockingLocationKind.Ship ? "корабль" : "остров";
     }
 }
