@@ -1,0 +1,454 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using UnityEngine;
+
+public class WorldConfigDatabase
+{
+    private readonly Dictionary<string, ItemConfig> itemsById = new Dictionary<string, ItemConfig>();
+    private readonly Dictionary<string, IslandConfig> islandsById = new Dictionary<string, IslandConfig>();
+    private readonly Dictionary<string, IslandProductionConfig> productionsById = new Dictionary<string, IslandProductionConfig>();
+
+    public List<ItemConfig> items = new List<ItemConfig>();
+    public List<IslandConfig> islands = new List<IslandConfig>();
+    public List<IslandProductionConfig> productions = new List<IslandProductionConfig>();
+
+    public bool isLoaded;
+    public string lastError = "";
+
+    public void LoadFromAssetsConfigFolder(string relativeFolder)
+    {
+        string folder = Path.Combine(Application.dataPath, string.IsNullOrWhiteSpace(relativeFolder) ? "Data/Config" : relativeFolder);
+        LoadFromFolder(folder);
+    }
+
+    public void LoadFromFolder(string folder)
+    {
+        Clear();
+
+        try
+        {
+            LoadItems(Path.Combine(folder, "Item.csv"));
+            LoadProductions(Path.Combine(folder, "Island_production.csv"));
+            LoadIslands(Path.Combine(folder, "Island.csv"));
+            isLoaded = true;
+            lastError = "";
+        }
+        catch (Exception exception)
+        {
+            Clear();
+            lastError = "Ошибка загрузки конфигов мира: " + exception.Message;
+            Debug.LogWarning(lastError);
+        }
+    }
+
+    public ItemConfig GetItem(string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return null;
+        itemsById.TryGetValue(itemId, out ItemConfig item);
+        return item;
+    }
+
+    public IslandConfig GetIsland(string islandId)
+    {
+        if (string.IsNullOrWhiteSpace(islandId)) return null;
+        islandsById.TryGetValue(islandId, out IslandConfig island);
+        return island;
+    }
+
+    public IslandProductionConfig GetProduction(string productionId)
+    {
+        if (string.IsNullOrWhiteSpace(productionId)) return null;
+        productionsById.TryGetValue(productionId, out IslandProductionConfig production);
+        return production;
+    }
+
+    public string GetItemNameRu(string itemId)
+    {
+        ItemConfig item = GetItem(itemId);
+        if (item == null) return itemId ?? "";
+        return string.IsNullOrWhiteSpace(item.localNameRu) ? item.id : item.localNameRu;
+    }
+
+    private void Clear()
+    {
+        items.Clear();
+        islands.Clear();
+        productions.Clear();
+        itemsById.Clear();
+        islandsById.Clear();
+        productionsById.Clear();
+        isLoaded = false;
+        lastError = "";
+    }
+
+    private void LoadItems(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            ItemConfig item = new ItemConfig
+            {
+                id = Get(row, "id_item"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                energyKwhPerKg = Mathf.Max(0f, ParseFloat(Get(row, "energy_kwh_per_kg")))
+            };
+
+            if (string.IsNullOrWhiteSpace(item.id)) continue;
+            items.Add(item);
+            itemsById[item.id] = item;
+        }
+    }
+
+    private void LoadIslands(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            IslandConfig island = new IslandConfig
+            {
+                id = Get(row, "id_island"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                position = new Vector3(
+                    ParseFloat(Get(row, "position_x")),
+                    ParseFloat(Get(row, "position_y")),
+                    ParseFloat(Get(row, "position_z"))),
+                productionId = Get(row, "Island_production"),
+                dockingRadius = ParseFloat(Get(row, "docking_radius")),
+                timeForOneItemLoadSeconds = Mathf.Max(0.01f, ParseFloat(Get(row, "time_for_one_item_load"), 1f))
+            };
+
+            if (string.IsNullOrWhiteSpace(island.id)) continue;
+            islands.Add(island);
+            islandsById[island.id] = island;
+        }
+    }
+
+    private void LoadProductions(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            IslandProductionConfig production = new IslandProductionConfig
+            {
+                id = Get(row, "Island_production_id"),
+                productionItemId = Get(row, "production_item"),
+                productionCountBasePerMinute = ParseFloat(Get(row, "production_count_base"))
+            };
+
+            List<string> itemIds = SplitInlineList(Get(row, "consumption_id_item"));
+            List<string> counts = SplitInlineList(Get(row, "consumption_item_count"));
+            List<string> boosts = SplitInlineList(Get(row, "satisfied_consumption_boost_base_production"));
+            int count = Mathf.Min(itemIds.Count, Mathf.Min(counts.Count, boosts.Count));
+
+            for (int i = 0; i < count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(itemIds[i])) continue;
+                production.consumptions.Add(new IslandConsumptionConfig
+                {
+                    itemId = itemIds[i],
+                    countPerMinute = ParseFloat(counts[i]),
+                    satisfiedProductionMultiplier = ParseFloat(boosts[i], 1f)
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(production.id)) continue;
+            productions.Add(production);
+            productionsById[production.id] = production;
+        }
+    }
+
+    private static IEnumerable<Dictionary<string, string>> ReadCsv(string path)
+    {
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Не найден CSV: " + path, path);
+        }
+
+        string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+        if (lines.Length == 0) yield break;
+
+        List<string> headers = ParseCsvLine(lines[0]);
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(lines[i])) continue;
+
+            List<string> values = ParseCsvLine(lines[i]);
+            Dictionary<string, string> row = new Dictionary<string, string>();
+            for (int column = 0; column < headers.Count; column++)
+            {
+                string header = headers[column].Trim('\uFEFF');
+                string value = column < values.Count ? values[column] : "";
+                row[header] = value;
+            }
+
+            yield return row;
+        }
+    }
+
+    private static List<string> ParseCsvLine(string line)
+    {
+        List<string> values = new List<string>();
+        StringBuilder builder = new StringBuilder();
+        bool inQuotes = false;
+
+        for (int i = 0; i < line.Length; i++)
+        {
+            char current = line[i];
+            if (current == '"')
+            {
+                if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                {
+                    builder.Append('"');
+                    i++;
+                }
+                else
+                {
+                    inQuotes = !inQuotes;
+                }
+
+                continue;
+            }
+
+            if (current == ',' && !inQuotes)
+            {
+                values.Add(builder.ToString().Trim());
+                builder.Length = 0;
+                continue;
+            }
+
+            builder.Append(current);
+        }
+
+        values.Add(builder.ToString().Trim());
+        return values;
+    }
+
+    private static List<string> SplitInlineList(string value)
+    {
+        List<string> result = new List<string>();
+        if (string.IsNullOrWhiteSpace(value)) return result;
+
+        string[] parts = value.Split(',');
+        for (int i = 0; i < parts.Length; i++)
+        {
+            result.Add(parts[i].Trim());
+        }
+
+        return result;
+    }
+
+    private static string Get(Dictionary<string, string> row, string key)
+    {
+        return row != null && row.TryGetValue(key, out string value) ? value : "";
+    }
+
+    private static int ParseInt(string value, int fallback = 0)
+    {
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int result) ? result : fallback;
+    }
+
+    private static float ParseFloat(string value, float fallback = 0f)
+    {
+        return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float result) ? result : fallback;
+    }
+}
+
+public class ItemConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public float energyKwhPerKg;
+}
+
+public class IslandConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public Vector3 position;
+    public string productionId = "";
+    public float dockingRadius;
+    public float timeForOneItemLoadSeconds = 1f;
+}
+
+public class IslandProductionConfig
+{
+    public string id = "";
+    public string productionItemId = "";
+    public float productionCountBasePerMinute;
+    public List<IslandConsumptionConfig> consumptions = new List<IslandConsumptionConfig>();
+}
+
+public class IslandConsumptionConfig
+{
+    public string itemId = "";
+    public float countPerMinute;
+    public float satisfiedProductionMultiplier = 1f;
+}
+
+public static class IslandProductionSimulator
+{
+    private const double MaxStepSeconds = 60.0;
+    private const int MaxSteps = 100000;
+
+    public static int Advance(WorldConfigDatabase config, PlayerProgress progress, long fromUtcTicks, long toUtcTicks)
+    {
+        if (config == null || !config.isLoaded || progress == null || toUtcTicks <= fromUtcTicks) return 0;
+
+        double remainingSeconds = new TimeSpan(toUtcTicks - fromUtcTicks).TotalSeconds;
+        if (remainingSeconds <= 0.0) return 0;
+
+        int changedUnits = 0;
+        int steps = 0;
+        while (remainingSeconds > 0.0001 && steps < MaxSteps)
+        {
+            float stepSeconds = (float)Math.Min(MaxStepSeconds, remainingSeconds);
+            changedUnits += AdvanceStep(config, progress, stepSeconds);
+            remainingSeconds -= stepSeconds;
+            steps++;
+        }
+
+        return changedUnits;
+    }
+
+    public static void EnsureIslandStates(WorldConfigDatabase config, PlayerProgress progress)
+    {
+        if (config == null || !config.isLoaded || progress == null) return;
+
+        for (int i = 0; i < config.islands.Count; i++)
+        {
+            IslandConfig island = config.islands[i];
+            if (island == null || string.IsNullOrWhiteSpace(island.id)) continue;
+
+            IslandProductionState state = progress.GetIslandProductionState(island.id, true);
+            IslandProductionConfig production = config.GetProduction(island.productionId);
+            EnsureConsumptionStates(state, production);
+        }
+    }
+
+    private static int AdvanceStep(WorldConfigDatabase config, PlayerProgress progress, float stepSeconds)
+    {
+        float minutes = stepSeconds / 60f;
+        int changedUnits = 0;
+
+        for (int i = 0; i < config.islands.Count; i++)
+        {
+            IslandConfig island = config.islands[i];
+            if (island == null) continue;
+
+            IslandProductionConfig production = config.GetProduction(island.productionId);
+            if (production == null) continue;
+
+            IslandProductionState state = progress.GetIslandProductionState(island.id, true);
+            EnsureConsumptionStates(state, production);
+
+            changedUnits += AdvanceConsumption(state, production, minutes);
+            changedUnits += AdvanceProduction(config, state, production, minutes);
+        }
+
+        return changedUnits;
+    }
+
+    private static int AdvanceConsumption(IslandProductionState state, IslandProductionConfig production, float minutes)
+    {
+        int consumedTotal = 0;
+        for (int i = 0; i < production.consumptions.Count; i++)
+        {
+            IslandConsumptionConfig consumption = production.consumptions[i];
+            if (consumption == null || string.IsNullOrWhiteSpace(consumption.itemId) || consumption.countPerMinute <= 0f) continue;
+
+            IslandConsumptionState consumptionState = state.GetConsumptionState(consumption.itemId, true);
+            int available = state.GetResourceAmount(consumption.itemId);
+            if (!consumptionState.isSatisfied)
+            {
+                consumptionState.consumptionProgress = 0f;
+                if (available <= 0)
+                {
+                    continue;
+                }
+
+                state.TrySpendResource(consumption.itemId, 1);
+                consumedTotal++;
+                consumptionState.isSatisfied = true;
+                continue;
+            }
+
+            consumptionState.consumptionProgress += consumption.countPerMinute * minutes;
+            int dueCycles = Mathf.FloorToInt(consumptionState.consumptionProgress);
+            if (dueCycles <= 0) continue;
+
+            available = state.GetResourceAmount(consumption.itemId);
+            if (available <= 0)
+            {
+                consumptionState.consumptionProgress = 0f;
+                consumptionState.isSatisfied = false;
+                continue;
+            }
+
+            int consumed = Mathf.Min(dueCycles, available);
+            if (consumed > 0)
+            {
+                state.TrySpendResource(consumption.itemId, consumed);
+                consumptionState.consumptionProgress -= consumed;
+                consumedTotal += consumed;
+                consumptionState.isSatisfied = true;
+            }
+
+            if (consumed < dueCycles)
+            {
+                consumptionState.consumptionProgress = 0f;
+                consumptionState.isSatisfied = false;
+            }
+        }
+
+        return consumedTotal;
+    }
+
+    private static int AdvanceProduction(WorldConfigDatabase config, IslandProductionState state, IslandProductionConfig production, float minutes)
+    {
+        if (string.IsNullOrWhiteSpace(production.productionItemId) || production.productionCountBasePerMinute <= 0f) return 0;
+
+        float multiplier = CalculateProductionMultiplier(state, production);
+        state.productionProgress += production.productionCountBasePerMinute * multiplier * minutes;
+
+        int completedUnits = Mathf.FloorToInt(state.productionProgress);
+        if (completedUnits <= 0) return 0;
+
+        int added = state.AddResource(production.productionItemId, completedUnits);
+        state.productionProgress -= added;
+        return added;
+    }
+
+    private static float CalculateProductionMultiplier(IslandProductionState state, IslandProductionConfig production)
+    {
+        float multiplier = 1f;
+        for (int i = 0; i < production.consumptions.Count; i++)
+        {
+            IslandConsumptionConfig consumption = production.consumptions[i];
+            if (consumption == null) continue;
+
+            IslandConsumptionState consumptionState = state.GetConsumptionState(consumption.itemId, false);
+            if (consumptionState != null && consumptionState.isSatisfied)
+            {
+                multiplier *= Mathf.Max(0f, consumption.satisfiedProductionMultiplier);
+            }
+        }
+
+        return multiplier;
+    }
+
+    private static void EnsureConsumptionStates(IslandProductionState state, IslandProductionConfig production)
+    {
+        if (state == null || production == null) return;
+
+        for (int i = 0; i < production.consumptions.Count; i++)
+        {
+            IslandConsumptionConfig consumption = production.consumptions[i];
+            if (consumption == null || string.IsNullOrWhiteSpace(consumption.itemId)) continue;
+            state.GetConsumptionState(consumption.itemId, true);
+        }
+    }
+}

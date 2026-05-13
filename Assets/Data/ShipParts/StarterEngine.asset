@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98cfa7d0b7d347b1a9a4f38cf0d7c112, type: 3}
+  m_Name: StarterEngine
+  m_EditorClassIdentifier: Assembly-CSharp::ShipPartDefinitionSO
+  partId: starter_engine
+  displayName: "\u041F\u0430\u0440\u043E\u0432\u043E\u0439 \u0434\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C
+    I"
+  description: "\u0411\u0430\u0437\u043E\u0432\u044B\u0439 \u043E\u0431\u0449\u0438\u0439
+    \u0434\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C: \u043A\u0440\u0443\u0442\u0438\u0442
+    \u0432\u0438\u043D\u0442 \u0438 \u043F\u0438\u0442\u0430\u0435\u0442 \u043A\u043B\u0430\u0432\u0434\u0438\u0435\u0432\u044B\u0439
+    \u043A\u043E\u043D\u0442\u0443\u0440."
+  kind: 1
+  prefab: {fileID: 8813060335323147231, guid: 2572a882ce728fe43bb38f24547ded82, type: 3}
+  engineFuelId: wood
+  slots: []
+  compatibleSlotTypeIds:
+  - engine_main
+  grantedSlots: []
+  statModifiers:
+  - stat: 0
+    operation: 1
+    value: 380
+  - stat: 6
+    operation: 0
+    value: 190
+  - stat: 10
+    operation: 0
+    value: 0.32

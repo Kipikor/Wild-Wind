@@ -50,8 +50,6 @@ public static class MetaGameSetupEditor
 
         loader.catalog = catalog;
         loader.targetShip = ship;
-        loader.applyOnStart = false;
-
         metaGameState.catalog = catalog;
         metaGameState.techTree = techTree;
         metaGameState.shipLoader = loader;

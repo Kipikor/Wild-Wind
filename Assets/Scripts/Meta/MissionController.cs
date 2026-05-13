@@ -44,9 +44,15 @@ public class MissionController : MonoBehaviour
     {
         if (!startMissionOnPlay) return;
 
-        if (metaGameState == null || metaGameState.CurrentMode == GameSessionMode.Flight)
+        if (metaGameState == null)
         {
             BeginMission();
+            return;
+        }
+
+        if (metaGameState.CurrentMode == GameSessionMode.Flight)
+        {
+            ResumeMissionIfActiveInSave();
         }
     }
 
@@ -111,6 +117,16 @@ public class MissionController : MonoBehaviour
     public Vector3 GetDestinationPosition()
     {
         return destinationPoint != null ? destinationPoint.position : mission != null ? mission.destinationPosition : Vector3.zero;
+    }
+
+    private void ResumeMissionIfActiveInSave()
+    {
+        if (mission == null || targetShip == null || metaGameState == null || metaGameState.progress == null) return;
+        if (metaGameState.progress.activeFlightMissionId != mission.missionId) return;
+
+        IsCompleted = false;
+        IsActive = true;
+        DistanceToDestination = Vector3.Distance(targetShip.transform.position, GetDestinationPosition());
     }
 
     private void PlaceShipAtStart()

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -35,10 +36,10 @@ public class MetaGameState : MonoBehaviour
     [InspectorName("Тип стартового дока")]
     public DockingLocationKind startingDockKind = DockingLocationKind.Island;
     [InspectorName("Автосохранение при стыковке")]
-    [Tooltip("Сохранение разрешено только в режиме стыковки. Перед вылетом также создается чекпоинт последней стыковки.")]
+    [Tooltip("Ручное сохранение разрешено только в режиме стыковки. При выходе из игры текущий вылет сохраняется отдельно.")]
     public bool autoSaveOnDock = true;
     [InspectorName("Загружать сохранение при старте")]
-    [Tooltip("Если во время прошлого запуска игра была закрыта в полете, загрузка вернет игрока к последней стыковке.")]
+    [Tooltip("Если во время прошлого запуска игра была закрыта в полете, загрузка вернет корабль в сохраненную точку вылета.")]
     public bool loadSavedGameOnAwake = true;
     [InspectorName("Имя файла сохранения")]
     public string saveFileName = "wild_wind_save.json";
@@ -48,6 +49,10 @@ public class MetaGameState : MonoBehaviour
     public int startingOre = 4;
     [InspectorName("Стартовое железо")]
     public int startingIron = 0;
+    [InspectorName("Стартовое топливо на борту, кг")]
+    public int startingFuelKg = 50;
+    [InspectorName("Стартовый клавдий на борту, кг")]
+    public int startingClaudiumKg = 25;
 
     [Header("Процессы реального времени")]
     [InspectorName("Обновлять процессы во время игры")]
@@ -68,6 +73,20 @@ public class MetaGameState : MonoBehaviour
     [Tooltip("Через этот интервал меняется зерно магазина. Ассортимент можно строить от этого числа.")]
     public int shopRefreshIntervalSeconds = 3600;
 
+    [Header("Конфиги мира")]
+    [InspectorName("Папка конфигов от Assets")]
+    [Tooltip("CSV-конфиги мира загружаются из этой папки при старте Play Mode.")]
+    public string worldConfigFolder = "Data/Config";
+    [InspectorName("Производство островов")]
+    [Tooltip("Если включено, острова производят и потребляют товары по CSV-конфигам.")]
+    public bool islandProductionEnabled = true;
+    [InspectorName("Создавать острова из конфигов")]
+    [Tooltip("Если включено, при старте Play Mode из Island.csv создаются видимые острова с DockingPort.")]
+    public bool spawnConfigIslandsOnPlay = true;
+    [InspectorName("Визуальный радиус острова")]
+    [Tooltip("Размер простой временной модели острова. Радиус стыковки берется отдельно из Island.csv.")]
+    public float configIslandVisualRadius = 80f;
+
     [Header("Отладочный интерфейс стыковки")]
     [InspectorName("Показывать интерфейс")]
     public bool showDockingDebugUI = true;
@@ -76,7 +95,7 @@ public class MetaGameState : MonoBehaviour
 
     [Header("Аварии")]
     [InspectorName("Автоматически добавить детектор крушений")]
-    [Tooltip("Если включено, на корабль будет добавлен детектор крушений, который откатывает полет при аварии.")]
+    [Tooltip("Если включено, на корабль будет добавлен детектор крушений: при аварии текущий корабль и груз теряются, игрок возвращается в город.")]
     public bool autoInstallCrashDetector = true;
 
     public GameSessionMode CurrentMode => progress != null ? progress.currentMode : startingMode;
@@ -87,8 +106,135 @@ public class MetaGameState : MonoBehaviour
     private bool isAdvancingProcesses;
     private string lastSaveMessage = "";
     private Vector2 debugScroll;
+    private WorldConfigDatabase worldConfig = new WorldConfigDatabase();
+    private Transform spawnedConfigIslandRoot;
+    private readonly List<CargoPlanEntry> cargoPlan = new List<CargoPlanEntry>();
+    private string cargoPlanDockId = "";
+    private string syncedFuelResourceId = "";
+    private string syncedClaudiumResourceId = "";
+    private float pendingFuelConsumedKg;
+    private float pendingClaudiumConsumedKg;
 
     private ShipCatalogSO ActiveCatalog => catalog != null ? catalog : shipLoader != null ? shipLoader.catalog : null;
+
+    private class CargoPlanEntry
+    {
+        public string itemId = "";
+        public int targetShipAmount;
+        public string destroyAmountText = "1";
+    }
+
+    private struct CargoCapacityInfo
+    {
+        public bool assemblyValid;
+        public bool canFly;
+        public string reason;
+        public float emptyMassKg;
+        public float currentCargoKg;
+        public float maxCargoKg;
+        public float allowedTakeoffMassKg;
+        public float engineLiftKg;
+        public float claudiumMaxLiftKg;
+        public float hullLimitKg;
+    }
+
+    private void EnsureWorldConfigLoaded()
+    {
+        if (worldConfig == null)
+        {
+            worldConfig = new WorldConfigDatabase();
+        }
+
+        if (!worldConfig.isLoaded)
+        {
+            worldConfig.LoadFromAssetsConfigFolder(worldConfigFolder);
+        }
+    }
+
+    private void ReloadWorldConfigs()
+    {
+        if (worldConfig == null)
+        {
+            worldConfig = new WorldConfigDatabase();
+        }
+
+        worldConfig.LoadFromAssetsConfigFolder(worldConfigFolder);
+        if (progress != null)
+        {
+            progress.Normalize();
+            IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+        }
+    }
+
+    private void SpawnConfiguredIslands(bool forceRebuild = false)
+    {
+        if (!Application.isPlaying || !spawnConfigIslandsOnPlay) return;
+
+        EnsureWorldConfigLoaded();
+        if (worldConfig == null || !worldConfig.isLoaded) return;
+
+        if (spawnedConfigIslandRoot != null && !forceRebuild)
+        {
+            return;
+        }
+
+        if (spawnedConfigIslandRoot != null)
+        {
+            Destroy(spawnedConfigIslandRoot.gameObject);
+            spawnedConfigIslandRoot = null;
+        }
+
+        GameObject root = new GameObject("Острова из конфигов");
+        spawnedConfigIslandRoot = root.transform;
+
+        ShipPhysics activeShip = GetActiveShip();
+        for (int i = 0; i < worldConfig.islands.Count; i++)
+        {
+            IslandConfig island = worldConfig.islands[i];
+            if (island == null || string.IsNullOrWhiteSpace(island.id)) continue;
+
+            GameObject islandObject = new GameObject(GetIslandDisplayName(island));
+            islandObject.transform.SetParent(spawnedConfigIslandRoot, false);
+            islandObject.transform.position = island.position;
+
+            GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            visual.name = "Визуал острова";
+            visual.transform.SetParent(islandObject.transform, false);
+            float visualRadius = Mathf.Max(1f, configIslandVisualRadius);
+            visual.transform.localScale = new Vector3(visualRadius * 2f, 8f, visualRadius * 2f);
+            visual.transform.localPosition = Vector3.down * 8f;
+
+            Collider visualCollider = visual.GetComponent<Collider>();
+            if (visualCollider != null)
+            {
+                Destroy(visualCollider);
+            }
+
+            Renderer renderer = visual.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.material.color = new Color(0.28f, 0.46f, 0.26f);
+            }
+
+            DockingPort dock = islandObject.AddComponent<DockingPort>();
+            dock.metaGameState = this;
+            dock.targetShip = activeShip;
+            dock.dockId = island.id;
+            dock.displayName = GetIslandDisplayName(island);
+            dock.kind = DockingLocationKind.Island;
+            dock.dockingRadius = Mathf.Max(0.1f, island.dockingRadius);
+            dock.canEndSession = true;
+            dock.autoDockWhenInRange = true;
+            dock.requireLeaveBeforeRedocking = true;
+            dock.snapPoint = islandObject.transform;
+        }
+    }
+
+    private static string GetIslandDisplayName(IslandConfig island)
+    {
+        if (island == null) return "Остров";
+        return string.IsNullOrWhiteSpace(island.localNameRu) ? island.id : island.localNameRu;
+    }
 
     private void Reset()
     {
@@ -98,6 +244,8 @@ public class MetaGameState : MonoBehaviour
 
     private void Awake()
     {
+        ReloadWorldConfigs();
+
         if (shipLoader == null)
         {
             shipLoader = FindFirstObjectByType<ShipLoader>();
@@ -114,34 +262,42 @@ public class MetaGameState : MonoBehaviour
         }
 
         EnsureProgressInitialized();
+        SpawnConfiguredIslands();
         AdvanceRealTimeProcesses(DateTime.UtcNow);
+        ApplySelectedShip();
         ApplySessionModeToShip();
         InstallCrashDetectorIfNeeded();
     }
 
     private void Start()
     {
+        SpawnConfiguredIslands();
         ApplySelectedShip();
         ApplySessionModeToShip();
     }
 
     private void Update()
     {
-        if (!processRealTimeWhilePlaying) return;
+        if (processRealTimeWhilePlaying)
+        {
+            EnsureProgressInitialized();
+            AdvanceRealTimeProcesses(DateTime.UtcNow);
+        }
 
-        EnsureProgressInitialized();
-        AdvanceRealTimeProcesses(DateTime.UtcNow);
+        SyncShipConsumablesWithCargo(false);
     }
 
     private void OnApplicationQuit()
     {
-        TrySaveGame();
+        TrySaveGame(true);
     }
 
     public void EnsureProgressInitialized()
     {
         progress ??= new PlayerProgress();
         progress.Normalize();
+        EnsureWorldConfigLoaded();
+        IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
 
         if (initialized) return;
 
@@ -151,6 +307,7 @@ public class MetaGameState : MonoBehaviour
         }
 
         progress.Normalize();
+        IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
 
         if (progress.lastSavedUtcTicks == 0 && string.IsNullOrWhiteSpace(progress.currentDockId))
         {
@@ -166,10 +323,10 @@ public class MetaGameState : MonoBehaviour
             }
         }
 
-        ShipDefinitionSO starterShip = ActiveCatalog != null ? ActiveCatalog.GetStarterShip() : null;
-        if (starterShip != null)
+        ShipPartDefinitionSO starterHull = ActiveCatalog != null ? ActiveCatalog.GetStarterHull() : null;
+        if (starterHull != null)
         {
-            progress.EnsureStarterShip(starterShip.shipId);
+            progress.EnsureStarterHull(starterHull.partId);
         }
 
         if (progress.money < startingMoney)
@@ -181,6 +338,7 @@ public class MetaGameState : MonoBehaviour
         {
             progress.AddResource("ore", startingOre);
             progress.AddResource("iron", startingIron);
+            AddStartingShipConsumables();
             progress.receivedStartingInventory = true;
         }
 
@@ -197,6 +355,7 @@ public class MetaGameState : MonoBehaviour
         }
 
         ApplyStartingTechTreeNodes();
+        ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out _);
         initialized = true;
     }
 
@@ -214,9 +373,9 @@ public class MetaGameState : MonoBehaviour
         ApplySelectedShip();
     }
 
-    public ShipDefinitionSO ApplySelectedShip()
+    public bool ApplySelectedShip()
     {
-        if (shipLoader == null) return null;
+        if (shipLoader == null) return false;
 
         EnsureProgressInitialized();
         if (shipLoader.catalog == null)
@@ -224,33 +383,69 @@ public class MetaGameState : MonoBehaviour
             shipLoader.catalog = ActiveCatalog;
         }
 
-        return shipLoader.ApplyShip(progress.selectedShipId);
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog != null && activeCatalog.HasAssemblyParts())
+        {
+            if (!shipLoader.ApplyAssembly(progress, techTree, out string message))
+            {
+                lastSaveMessage = message;
+                return false;
+            }
+            else
+            {
+                RefreshSceneShipReferences(shipLoader.targetShip);
+                ApplyFuelConfigToShip(shipLoader.targetShip);
+                ApplyCargoMassToShip(shipLoader.targetShip);
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
-    public bool SelectShip(string shipId)
+    public bool CanAssembleCurrentShip(out string reason)
     {
         EnsureProgressInitialized();
-        if (!progress.SelectShip(shipId)) return false;
+        reason = "";
+
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog == null || !activeCatalog.HasAssemblyParts())
+        {
+            return true;
+        }
+
+        if (ShipAssemblyBuilder.TryBuild(activeCatalog, techTree, progress, out ShipAssemblyResult result))
+        {
+            reason = result.message;
+            return true;
+        }
+
+        reason = result.message;
+        return false;
+    }
+
+    public bool SelectHull(string hullId)
+    {
+        EnsureProgressInitialized();
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        ShipPartDefinitionSO hull = activeCatalog != null ? activeCatalog.GetPartById(hullId) : null;
+        if (hull == null || !hull.IsHull || !ShipAssemblyBuilder.IsPartUsable(hull, techTree, progress)) return false;
+
+        if (!progress.SelectHull(hullId)) return false;
 
         ApplySelectedShip();
         AutoSaveIfDocked();
         return true;
     }
 
-    public bool TryBuyShip(string shipId)
+    public bool InstallModule(string slotId, string moduleId)
     {
-        ShipCatalogSO activeCatalog = ActiveCatalog;
-        if (activeCatalog == null) return false;
-
         EnsureProgressInitialized();
+        if (!IsDocked) return false;
 
-        ShipDefinitionSO ship = activeCatalog.GetShipById(shipId);
-        if (ship == null) return false;
-        if (progress.IsShipUnlocked(ship.shipId)) return false;
-        if (progress.money < ship.purchasePrice) return false;
-
-        progress.money -= ship.purchasePrice;
-        progress.UnlockShip(ship.shipId);
+        progress.InstallModule(slotId, moduleId);
+        ApplySelectedShip();
         AutoSaveIfDocked();
         return true;
     }
@@ -270,7 +465,7 @@ public class MetaGameState : MonoBehaviour
     public void AddExperienceToSelectedShip(int amount)
     {
         EnsureProgressInitialized();
-        AddExperienceToShip(progress.selectedShipId, amount);
+        AddExperienceToShip(GetSelectedExperienceTargetId(), amount);
     }
 
     public void AddExperienceToShip(string shipId, int amount)
@@ -291,6 +486,11 @@ public class MetaGameState : MonoBehaviour
         if (!progress.TrySpendShipExperience(experienceShipId, node.researchCostXp)) return false;
 
         progress.ResearchNode(node.nodeId);
+        if (!node.RequiresPurchase)
+        {
+            progress.PurchaseNode(node.nodeId);
+        }
+
         AutoSaveIfDocked();
         return true;
     }
@@ -307,9 +507,9 @@ public class MetaGameState : MonoBehaviour
         progress.money -= Mathf.Max(0, node.purchasePrice);
         progress.PurchaseNode(node.nodeId);
 
-        if (node.kind == TechTreeNodeKind.Ship)
+        if (node.kind == TechTreeNodeKind.Hull && string.IsNullOrWhiteSpace(progress.selectedHullId))
         {
-            progress.UnlockShip(node.EffectiveShipId);
+            progress.SelectHull(node.EffectivePartId);
         }
 
         AutoSaveIfDocked();
@@ -330,6 +530,31 @@ public class MetaGameState : MonoBehaviour
             return false;
         }
 
+        if (!AutoInstallRequiredModules(false, out string autoInstallReason))
+        {
+            lastSaveMessage = "Нельзя вылететь: " + autoInstallReason;
+            return false;
+        }
+
+        if (!CanAssembleCurrentShip(out string assemblyReason))
+        {
+            lastSaveMessage = "Нельзя вылететь: " + assemblyReason;
+            return false;
+        }
+
+        if (progress.cargoTransfer != null && progress.cargoTransfer.active)
+        {
+            lastSaveMessage = "Нельзя вылететь: погрузка еще идет.";
+            return false;
+        }
+
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        if (!capacity.canFly)
+        {
+            lastSaveMessage = "Нельзя вылететь: " + capacity.reason;
+            return false;
+        }
+
         string missionId = mission != null ? mission.missionId : "";
         progress.AcceptMission(missionId);
 
@@ -341,13 +566,32 @@ public class MetaGameState : MonoBehaviour
         progress.SetFlight(missionId);
         ApplySelectedShip();
         ApplySessionModeToShip();
-        lastSaveMessage = "Вылет начат. Сохранение заблокировано до стыковки.";
+        lastSaveMessage = "Вылет начат. Ручное сохранение доступно у дока, выход из игры сохранит текущий полет.";
         return true;
     }
 
     public bool BeginFreeFlight()
     {
         return TryBeginFlightSession(null);
+    }
+
+    public bool AutoInstallRequiredModules(bool applyAndSave, out string message)
+    {
+        EnsureProgressInitialized();
+
+        if (!ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out message))
+        {
+            return false;
+        }
+
+        if (applyAndSave)
+        {
+            ApplySelectedShip();
+            AutoSaveIfDocked();
+            lastSaveMessage = message;
+        }
+
+        return true;
     }
 
     public bool DockAt(string dockId, DockingLocationKind dockKind)
@@ -381,6 +625,60 @@ public class MetaGameState : MonoBehaviour
         }
 
         DockAt("unknown_dock", DockingLocationKind.Island);
+    }
+
+    public bool LoseShipAndReturnToCity(string reason = "")
+    {
+        EnsureProgressInitialized();
+
+        if (missionController != null)
+        {
+            missionController.CancelMission();
+        }
+
+        ShipPartDefinitionSO starterHull = ActiveCatalog != null ? ActiveCatalog.GetStarterHull() : null;
+        if (starterHull != null)
+        {
+            progress.ReplaceShipAssembly(starterHull.partId);
+        }
+        else
+        {
+            progress.ClearInstalledModules();
+        }
+
+        progress.ClearShipCargo();
+        AddStartingShipConsumables();
+        progress.StopCargoTransfer();
+        ApplyStartingTechTreeNodes();
+
+        string assemblyMessage = "";
+        bool assemblyReady = ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out assemblyMessage);
+        string recoveryDockId = string.IsNullOrWhiteSpace(startingDockId) ? "starter_island" : startingDockId;
+        DockingLocationKind recoveryDockKind = startingDockKind;
+        Vector3 recoveryPosition = GetDockPositionOrFallback(recoveryDockId, recoveryDockKind);
+
+        progress.SetDocked(recoveryDockId, recoveryDockKind, recoveryPosition);
+        ApplySelectedShip();
+        ApplySessionModeToShip();
+        ResetCrashDetector();
+
+        if (autoSaveOnDock)
+        {
+            TrySaveGame();
+        }
+
+        lastSaveMessage = "Корабль потерян. Возврат в город, выдан стартовый корабль.";
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            lastSaveMessage += " Причина: " + reason + ".";
+        }
+
+        if (!assemblyReady && !string.IsNullOrWhiteSpace(assemblyMessage))
+        {
+            lastSaveMessage += " " + assemblyMessage;
+        }
+
+        return assemblyReady;
     }
 
     public bool StartIdleMining()
@@ -467,7 +765,7 @@ public class MetaGameState : MonoBehaviour
             missionId = mission.missionId,
             rewardMoney = mission.rewardMoney,
             rewardExperience = mission.rewardExperience,
-            experienceShipId = progress.selectedShipId
+            experienceShipId = GetSelectedExperienceTargetId()
         };
 
         progress.AcceptMission(mission.missionId);
@@ -486,7 +784,18 @@ public class MetaGameState : MonoBehaviour
         try
         {
             progress.Normalize();
+            EnsureWorldConfigLoaded();
+            IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+
+            long previousProcessTicks = progress.lastProcessUtcTicks > 0 ? progress.lastProcessUtcTicks : utcNow.Ticks;
             AdvanceShopRefresh(utcNow);
+
+            if (islandProductionEnabled)
+            {
+                completedCycles += IslandProductionSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
+            }
+
+            completedCycles += AdvanceCargoTransfer(utcNow);
 
             for (int i = progress.activeProcesses.Count - 1; i >= 0; i--)
             {
@@ -546,9 +855,14 @@ public class MetaGameState : MonoBehaviour
 
     public bool TrySaveGame()
     {
+        return TrySaveGame(false);
+    }
+
+    private bool TrySaveGame(bool allowFlightSave)
+    {
         EnsureProgressInitialized();
 
-        if (!IsDocked)
+        if (!IsDocked && !allowFlightSave)
         {
             lastSaveMessage = "Нельзя сохранить: сначала нужна стыковка.";
             return false;
@@ -556,7 +870,16 @@ public class MetaGameState : MonoBehaviour
 
         DateTime now = DateTime.UtcNow;
         AdvanceRealTimeProcesses(now);
-        RememberCurrentDockPosition();
+        SyncShipConsumablesWithCargo(false);
+        if (IsDocked)
+        {
+            RememberCurrentDockPosition();
+        }
+        else
+        {
+            RememberCurrentFlightPose();
+        }
+
         progress.lastSavedUtcTicks = now.Ticks;
         progress.lastProcessUtcTicks = now.Ticks;
         progress.Normalize();
@@ -567,7 +890,7 @@ public class MetaGameState : MonoBehaviour
         {
             Directory.CreateDirectory(Application.persistentDataPath);
             File.WriteAllText(SavePath, JsonUtility.ToJson(saveData, true));
-            lastSaveMessage = "Сохранено: " + SavePath;
+            lastSaveMessage = IsDocked ? "Сохранено: " + SavePath : "Полет сохранен: " + SavePath;
             return true;
         }
         catch (Exception exception)
@@ -599,11 +922,6 @@ public class MetaGameState : MonoBehaviour
             progress = saveData.progress;
             progress.Normalize();
 
-            if (progress.currentMode != GameSessionMode.Docked)
-            {
-                progress.SetDocked(startingDockId, startingDockKind);
-            }
-
             initialized = false;
             lastSaveMessage = "Загружено: " + path;
             return true;
@@ -614,32 +932,6 @@ public class MetaGameState : MonoBehaviour
             Debug.LogWarning(lastSaveMessage);
             return false;
         }
-    }
-
-    public bool RollbackToLastDock(string reason = "")
-    {
-        bool loaded = LoadGame();
-        if (!loaded)
-        {
-            progress = new PlayerProgress();
-            initialized = false;
-            EnsureProgressInitialized();
-        }
-
-        if (missionController != null)
-        {
-            missionController.CancelMission();
-        }
-
-        ApplySelectedShip();
-        ApplySessionModeToShip();
-        ResetCrashDetector();
-
-        lastSaveMessage = string.IsNullOrWhiteSpace(reason)
-            ? "Откат к последней стыковке выполнен."
-            : "Откат к последней стыковке выполнен. " + reason;
-
-        return loaded;
     }
 
     public bool DeleteSave()
@@ -654,6 +946,7 @@ public class MetaGameState : MonoBehaviour
             progress = new PlayerProgress();
             initialized = false;
             EnsureProgressInitialized();
+            ApplySelectedShip();
             ApplySessionModeToShip();
             lastSaveMessage = "Сохранение удалено.";
             return true;
@@ -685,7 +978,7 @@ public class MetaGameState : MonoBehaviour
 
             if (process.rewardExperience > 0)
             {
-                string shipId = string.IsNullOrWhiteSpace(process.experienceShipId) ? progress.selectedShipId : process.experienceShipId;
+                string shipId = string.IsNullOrWhiteSpace(process.experienceShipId) ? GetSelectedExperienceTargetId() : process.experienceShipId;
                 progress.AddShipExperience(shipId, process.rewardExperience);
             }
 
@@ -715,6 +1008,298 @@ public class MetaGameState : MonoBehaviour
         }
     }
 
+    private int AdvanceCargoTransfer(DateTime utcNow)
+    {
+        if (progress == null || progress.cargoTransfer == null) return 0;
+
+        CargoTransferState transfer = progress.cargoTransfer;
+        transfer.Normalize();
+        if (!transfer.active || !transfer.HasWork) return 0;
+
+        IslandProductionState islandStorage = progress.GetIslandProductionState(transfer.islandId, true);
+        if (islandStorage == null)
+        {
+            StopCargoTransfer("Погрузка остановлена: остров не найден.");
+            return 0;
+        }
+
+        if (transfer.nextOperationUtcTicks <= 0)
+        {
+            transfer.nextOperationUtcTicks = utcNow.Ticks + TimeSpan.FromSeconds(Mathf.Max(0.01f, transfer.secondsPerItem)).Ticks;
+        }
+
+        int movedUnits = 0;
+        int guard = 0;
+        long intervalTicks = TimeSpan.FromSeconds(Mathf.Max(0.01f, transfer.secondsPerItem)).Ticks;
+        while (transfer.active && transfer.HasWork && utcNow.Ticks >= transfer.nextOperationUtcTicks && guard < 10000)
+        {
+            CargoTransferOperation operation = transfer.operations[transfer.currentOperationIndex];
+            if (operation == null || operation.remainingAmount <= 0)
+            {
+                transfer.currentOperationIndex++;
+                continue;
+            }
+
+            if (!ApplyOneCargoTransferUnit(operation, islandStorage))
+            {
+                StopCargoTransfer("Погрузка остановлена: не хватает товара или грузоподъемности.");
+                break;
+            }
+
+            operation.remainingAmount--;
+            movedUnits++;
+            transfer.nextOperationUtcTicks += intervalTicks;
+            ApplyCargoMassToShip(GetActiveShip());
+
+            if (operation.remainingAmount <= 0)
+            {
+                transfer.currentOperationIndex++;
+            }
+
+            guard++;
+        }
+
+        if (transfer.active && !transfer.HasWork)
+        {
+            StopCargoTransfer("Погрузка завершена.");
+        }
+
+        return movedUnits;
+    }
+
+    private bool ApplyOneCargoTransferUnit(CargoTransferOperation operation, IslandProductionState islandStorage)
+    {
+        if (operation == null || islandStorage == null || string.IsNullOrWhiteSpace(operation.itemId)) return false;
+
+        if (operation.loadToShip)
+        {
+            CargoCapacityInfo capacity = CalculateCargoCapacity();
+            if (capacity.currentCargoKg + 1f > capacity.maxCargoKg + 0.001f) return false;
+            if (!islandStorage.TrySpendResource(operation.itemId, 1)) return false;
+
+            progress.AddShipCargo(operation.itemId, 1);
+            return true;
+        }
+
+        if (!progress.TrySpendShipCargo(operation.itemId, 1)) return false;
+        islandStorage.AddResource(operation.itemId, 1);
+        return true;
+    }
+
+    private void StopCargoTransfer(string message)
+    {
+        if (progress?.cargoTransfer != null)
+        {
+            progress.cargoTransfer.active = false;
+            progress.cargoTransfer.currentOperationIndex = 0;
+            progress.cargoTransfer.operations.Clear();
+        }
+
+        lastSaveMessage = message;
+    }
+
+    private CargoCapacityInfo CalculateCargoCapacity()
+    {
+        CargoCapacityInfo info = new CargoCapacityInfo
+        {
+            assemblyValid = false,
+            canFly = false,
+            reason = "сборка корабля не проверена.",
+            currentCargoKg = progress != null ? progress.GetShipCargoMassKg() : 0f
+        };
+
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog == null || !activeCatalog.HasAssemblyParts())
+        {
+            ShipPhysics ship = GetActiveShip();
+            if (ship == null)
+            {
+                info.reason = "корабль не найден.";
+                return info;
+            }
+
+            info.assemblyValid = true;
+            info.emptyMassKg = ship.baseMass;
+            info.engineLiftKg = ship.enginePowerKwAt100 * 0.9f * ship.claudiumLiftEfficiency;
+            info.claudiumMaxLiftKg = ship.claudiumMaxLiftKg;
+            info.hullLimitKg = ship.hullMaxTakeoffMassKg;
+            return CompleteCargoCapacity(info);
+        }
+
+        if (!ShipAssemblyBuilder.TryBuild(activeCatalog, techTree, progress, out ShipAssemblyResult result))
+        {
+            info.reason = result != null ? result.message : "сборка корабля неверная.";
+            return info;
+        }
+
+        ShipStatBlock stats = result.stats;
+        ShipPhysics activeShip = GetActiveShip();
+        float hullLimitFallback = activeShip != null ? activeShip.hullMaxTakeoffMassKg : 2000f;
+        info.assemblyValid = true;
+        info.emptyMassKg = stats.Get(ShipStatId.BaseMass, 0f);
+        info.engineLiftKg = stats.Get(ShipStatId.EngineMaxPower, 0f) * 0.9f * stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f);
+        info.claudiumMaxLiftKg = stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f);
+        info.hullLimitKg = stats.Get(ShipStatId.HullMaxTakeoffMassKg, hullLimitFallback);
+        return CompleteCargoCapacity(info);
+    }
+
+    private static CargoCapacityInfo CompleteCargoCapacity(CargoCapacityInfo info)
+    {
+        info.allowedTakeoffMassKg = Mathf.Min(info.engineLiftKg, Mathf.Min(info.claudiumMaxLiftKg, info.hullLimitKg));
+        info.maxCargoKg = Mathf.Max(0f, info.allowedTakeoffMassKg - info.emptyMassKg);
+
+        if (!info.assemblyValid)
+        {
+            return info;
+        }
+
+        if (info.engineLiftKg <= 0f)
+        {
+            info.reason = "двигатель и контур не дают подъемной силы.";
+            return info;
+        }
+
+        if (info.claudiumMaxLiftKg <= 0f)
+        {
+            info.reason = "у клавдиевого контура нет максимальной подъемной силы.";
+            return info;
+        }
+
+        if (info.hullLimitKg <= 0f)
+        {
+            info.reason = "у корпуса не задана максимальная взлетная масса.";
+            return info;
+        }
+
+        if (info.emptyMassKg > info.allowedTakeoffMassKg + 0.001f)
+        {
+            info.reason = $"сухая масса {info.emptyMassKg:F0} кг больше разрешенной взлетной массы {info.allowedTakeoffMassKg:F0} кг.";
+            return info;
+        }
+
+        if (info.currentCargoKg > info.maxCargoKg + 0.001f)
+        {
+            info.reason = $"груз {info.currentCargoKg:F0} кг больше доступной грузоподъемности {info.maxCargoKg:F0} кг.";
+            return info;
+        }
+
+        info.canFly = true;
+        info.reason = "масса в норме.";
+        return info;
+    }
+
+    private void ApplyCargoMassToShip(ShipPhysics ship)
+    {
+        if (ship == null || progress == null) return;
+
+        ship.cargoMassKg = Mathf.Max(0, progress.GetShipCargoMassKg());
+        RefreshShipConsumablesFromCargo(ship, true);
+        ship.RefreshRuntimeShipSettings();
+    }
+
+    private void RefreshShipConsumablesFromCargo(ShipPhysics ship, bool resetPendingConsumption)
+    {
+        if (ship == null || progress == null) return;
+
+        ApplyFuelConfigToShip(ship);
+        if (resetPendingConsumption || syncedFuelResourceId != ship.engineFuelId)
+        {
+            syncedFuelResourceId = ship.engineFuelId;
+            pendingFuelConsumedKg = 0f;
+        }
+
+        string claudiumResourceId = GetClaudiumResourceId(ship);
+        if (resetPendingConsumption || syncedClaudiumResourceId != claudiumResourceId)
+        {
+            syncedClaudiumResourceId = claudiumResourceId;
+            pendingClaudiumConsumedKg = 0f;
+        }
+
+        ship.engineFuelStockKg = GetAvailableCargoResourceKg(ship.engineFuelId, pendingFuelConsumedKg);
+        ship.claudiumStock = GetAvailableCargoResourceKg(claudiumResourceId, pendingClaudiumConsumedKg);
+    }
+
+    private void SyncShipConsumablesWithCargo(bool resetPendingConsumption)
+    {
+        ShipPhysics ship = GetActiveShip();
+        if (ship == null || progress == null) return;
+
+        if (resetPendingConsumption)
+        {
+            RefreshShipConsumablesFromCargo(ship, true);
+            ship.cargoMassKg = Mathf.Max(0, progress.GetShipCargoMassKg());
+            ship.RefreshRuntimeShipSettings();
+            return;
+        }
+
+        ApplyFuelConfigToShip(ship);
+        SyncCargoResourceFromRuntime(ship.engineFuelId, ref syncedFuelResourceId, ref pendingFuelConsumedKg, ref ship.engineFuelStockKg);
+        string claudiumResourceId = GetClaudiumResourceId(ship);
+        SyncCargoResourceFromRuntime(claudiumResourceId, ref syncedClaudiumResourceId, ref pendingClaudiumConsumedKg, ref ship.claudiumStock);
+
+        ship.cargoMassKg = Mathf.Max(0, progress.GetShipCargoMassKg());
+        ship.RefreshRuntimeShipSettings();
+    }
+
+    private void SyncCargoResourceFromRuntime(string resourceId, ref string syncedResourceId, ref float pendingConsumedKg, ref float runtimeStockKg)
+    {
+        if (string.IsNullOrWhiteSpace(resourceId) || progress == null)
+        {
+            syncedResourceId = resourceId ?? "";
+            pendingConsumedKg = 0f;
+            runtimeStockKg = 0f;
+            return;
+        }
+
+        if (syncedResourceId != resourceId)
+        {
+            syncedResourceId = resourceId;
+            pendingConsumedKg = 0f;
+            runtimeStockKg = progress.GetShipCargoAmount(resourceId);
+            return;
+        }
+
+        int cargoAmount = progress.GetShipCargoAmount(resourceId);
+        pendingConsumedKg = Mathf.Clamp(pendingConsumedKg, 0f, Mathf.Max(0, cargoAmount));
+        float expectedRuntimeStock = GetAvailableCargoResourceKg(resourceId, pendingConsumedKg);
+        float consumedSinceLastSync = Mathf.Max(0f, expectedRuntimeStock - Mathf.Max(0f, runtimeStockKg));
+        pendingConsumedKg += consumedSinceLastSync;
+
+        int wholeKgToSpend = Mathf.Min(cargoAmount, Mathf.FloorToInt(pendingConsumedKg + 0.0001f));
+        if (wholeKgToSpend > 0 && progress.TrySpendShipCargo(resourceId, wholeKgToSpend))
+        {
+            pendingConsumedKg -= wholeKgToSpend;
+            cargoAmount = progress.GetShipCargoAmount(resourceId);
+        }
+
+        pendingConsumedKg = Mathf.Clamp(pendingConsumedKg, 0f, Mathf.Max(0, cargoAmount));
+        runtimeStockKg = GetAvailableCargoResourceKg(resourceId, pendingConsumedKg);
+    }
+
+    private float GetAvailableCargoResourceKg(string resourceId, float pendingConsumedKg)
+    {
+        if (progress == null || string.IsNullOrWhiteSpace(resourceId)) return 0f;
+        return Mathf.Max(0f, progress.GetShipCargoAmount(resourceId) - Mathf.Max(0f, pendingConsumedKg));
+    }
+
+    private static string GetClaudiumResourceId(ShipPhysics ship)
+    {
+        if (ship == null || string.IsNullOrWhiteSpace(ship.claudiumResourceId)) return "claudium";
+        return ship.claudiumResourceId;
+    }
+
+    private void ApplyFuelConfigToShip(ShipPhysics ship)
+    {
+        if (ship == null || string.IsNullOrWhiteSpace(ship.engineFuelId)) return;
+
+        EnsureWorldConfigLoaded();
+        ItemConfig fuel = worldConfig != null ? worldConfig.GetItem(ship.engineFuelId) : null;
+        if (fuel != null)
+        {
+            ship.engineFuelEnergyKwhPerKg = Mathf.Max(0f, fuel.energyKwhPerKg);
+        }
+    }
+
     private void ApplyStartingTechTreeNodes()
     {
         if (techTree == null) return;
@@ -733,17 +1318,82 @@ public class MetaGameState : MonoBehaviour
             {
                 progress.PurchaseNode(node.nodeId);
 
-                if (node.kind == TechTreeNodeKind.Ship)
+                if (node.kind == TechTreeNodeKind.Hull)
                 {
-                    progress.UnlockShip(node.EffectiveShipId);
+                    progress.EnsureStarterHull(node.EffectivePartId);
                 }
             }
         }
     }
 
+    private void AddStartingShipConsumables()
+    {
+        if (progress == null) return;
+
+        if (startingFuelKg > 0)
+        {
+            progress.AddShipCargo("wood", startingFuelKg);
+        }
+
+        if (startingClaudiumKg > 0)
+        {
+            progress.AddShipCargo("claudium", startingClaudiumKg);
+        }
+    }
+
+    private string GetSelectedExperienceTargetId()
+    {
+        if (progress == null) return "";
+        return progress.selectedHullId;
+    }
+
+    private ShipPhysics GetActiveShip()
+    {
+        if (shipLoader != null)
+        {
+            if (shipLoader.targetShip == null)
+            {
+                shipLoader.targetShip = FindFirstObjectByType<ShipPhysics>();
+            }
+
+            return shipLoader.targetShip;
+        }
+
+        return FindFirstObjectByType<ShipPhysics>();
+    }
+
+    private void RefreshSceneShipReferences(ShipPhysics ship)
+    {
+        if (ship == null) return;
+
+        if (missionController != null)
+        {
+            missionController.targetShip = ship;
+            if (missionController.metaGameState == null)
+            {
+                missionController.metaGameState = this;
+            }
+        }
+
+        DockingPort[] dockingPorts = FindObjectsByType<DockingPort>(FindObjectsSortMode.None);
+        for (int i = 0; i < dockingPorts.Length; i++)
+        {
+            DockingPort dock = dockingPorts[i];
+            if (dock == null) continue;
+
+            dock.targetShip = ship;
+            if (dock.metaGameState == null)
+            {
+                dock.metaGameState = this;
+            }
+        }
+
+        InstallCrashDetectorIfNeeded(ship);
+    }
+
     private void ApplySessionModeToShip()
     {
-        ShipPhysics ship = shipLoader != null ? shipLoader.targetShip : FindFirstObjectByType<ShipPhysics>();
+        ShipPhysics ship = GetActiveShip();
         if (ship == null) return;
 
         InstallCrashDetectorIfNeeded(ship);
@@ -762,6 +1412,7 @@ public class MetaGameState : MonoBehaviour
             ship.cruiseControl = false;
             ship.altitudeHold = false;
             ship.headingHold = false;
+            ship.positionHold = false;
         }
 
         if (body == null) return;
@@ -773,6 +1424,7 @@ public class MetaGameState : MonoBehaviour
                 ship.transform.position = progress.currentDockPosition;
             }
 
+            body.isKinematic = false;
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
             body.useGravity = false;
@@ -781,9 +1433,17 @@ public class MetaGameState : MonoBehaviour
         }
         else
         {
+            if (progress.hasCurrentFlightPose)
+            {
+                ship.transform.SetPositionAndRotation(progress.currentFlightPosition, progress.currentFlightRotation);
+            }
+
             body.isKinematic = false;
             body.useGravity = true;
+            body.linearVelocity = Vector3.zero;
+            body.angularVelocity = Vector3.zero;
             body.WakeUp();
+            ship.StabilizeForFlightStart(true);
         }
     }
 
@@ -795,15 +1455,55 @@ public class MetaGameState : MonoBehaviour
         progress.hasCurrentDockPosition = true;
     }
 
+    private void RememberCurrentFlightPose()
+    {
+        if (CurrentMode != GameSessionMode.Flight || progress == null) return;
+
+        ShipPhysics ship = GetActiveShip();
+        if (ship == null) return;
+
+        progress.SetFlightPose(ship.transform.position, ship.transform.rotation);
+    }
+
     private Vector3 GetCurrentShipPosition()
     {
-        ShipPhysics ship = shipLoader != null ? shipLoader.targetShip : FindFirstObjectByType<ShipPhysics>();
+        ShipPhysics ship = GetActiveShip();
         return ship != null ? ship.transform.position : Vector3.zero;
+    }
+
+    private Vector3 GetDockPositionOrFallback(string dockId, DockingLocationKind dockKind)
+    {
+        DockingPort[] dockingPorts = FindObjectsByType<DockingPort>(FindObjectsSortMode.None);
+        for (int i = 0; i < dockingPorts.Length; i++)
+        {
+            DockingPort dock = dockingPorts[i];
+            if (dock != null && dock.dockId == dockId)
+            {
+                return dock.DockPosition;
+            }
+        }
+
+        EnsureWorldConfigLoaded();
+        if (dockKind == DockingLocationKind.Island && worldConfig != null)
+        {
+            IslandConfig island = worldConfig.GetIsland(dockId);
+            if (island != null)
+            {
+                return island.position;
+            }
+        }
+
+        if (shipLoader != null && shipLoader.spawnPoint != null)
+        {
+            return shipLoader.spawnPoint.position;
+        }
+
+        return Vector3.zero;
     }
 
     private void InstallCrashDetectorIfNeeded()
     {
-        ShipPhysics ship = shipLoader != null ? shipLoader.targetShip : FindFirstObjectByType<ShipPhysics>();
+        ShipPhysics ship = GetActiveShip();
         if (ship != null)
         {
             InstallCrashDetectorIfNeeded(ship);
@@ -825,7 +1525,7 @@ public class MetaGameState : MonoBehaviour
 
     private void ResetCrashDetector()
     {
-        ShipPhysics ship = shipLoader != null ? shipLoader.targetShip : FindFirstObjectByType<ShipPhysics>();
+        ShipPhysics ship = GetActiveShip();
         if (ship != null)
         {
             ResetCrashDetector(ship);
@@ -889,6 +1589,9 @@ public class MetaGameState : MonoBehaviour
     private void DrawDockedDebugUi()
     {
         GUILayout.Label("Стыковка");
+        DrawAssemblyUi();
+        DrawCargoTransferUi();
+        GUILayout.Space(8f);
 
         if (GUILayout.Button(new GUIContent("Сохранить у дока", "Сохраняет прогресс только если корабль находится в режиме стыковки.")))
         {
@@ -900,7 +1603,7 @@ public class MetaGameState : MonoBehaviour
             DeleteSave();
         }
 
-        if (missionController != null && missionController.mission != null && GUILayout.Button(new GUIContent("Вылететь на миссию", "Создает чекпоинт стыковки и переводит игру в режим вылета.")))
+        if (missionController != null && missionController.mission != null && GUILayout.Button(new GUIContent("Вылететь на миссию", "Переводит игру в режим вылета. Прогресс сохранится после стыковки или аварийного возврата.")))
         {
             missionController.BeginMission();
         }
@@ -938,24 +1641,374 @@ public class MetaGameState : MonoBehaviour
         }
 
         DrawProcessList();
-        DrawShipList();
+        DrawIslandProductionList();
         DrawTechTreeList();
     }
 
     private void DrawFlightDebugUi()
     {
         GUILayout.Label("Вылет");
-        GUILayout.Label("Сохранение заблокировано до стыковки.");
+        GUILayout.Label("Ручное сохранение у дока. При выходе из игры текущий вылет сохранится.");
 
-        if (GUILayout.Button(new GUIContent("Состыковаться здесь", "Завершает вылет в текущей точке и сохраняет новый чекпоинт.")))
+        ShipPhysics ship = GetActiveShip();
+        if (ship != null)
+        {
+            DrawRouteEtaFlightInfo(ship);
+            GUILayout.Label($"Топливо на борту: {progress.GetShipCargoAmount(ship.engineFuelId)} кг ({ship.engineFuelStockKg:F1} доступно)");
+            string claudiumResourceId = GetClaudiumResourceId(ship);
+            GUILayout.Label($"Клавдий на борту: {progress.GetShipCargoAmount(claudiumResourceId)} кг ({ship.claudiumStock:F1} доступно)");
+
+            bool requestedPositionHold = GUILayout.Toggle(
+                ship.positionHold,
+                new GUIContent("Удерживать на месте", "Корабль запоминает текущую позицию и тягой сопротивляется ветру или дрейфу."));
+            if (requestedPositionHold != ship.positionHold)
+            {
+                ship.positionHold = requestedPositionHold;
+                if (requestedPositionHold)
+                {
+                    ship.targetHoldPosition = ship.transform.position;
+                }
+            }
+
+            if (ship.positionHold)
+            {
+                GUILayout.Label($"Цель удержания: X {ship.targetHoldPosition.x:F1}  Z {ship.targetHoldPosition.z:F1}");
+                if (GUILayout.Button(new GUIContent("Запомнить текущую позицию", "Переносит точку удержания туда, где корабль находится сейчас.")))
+                {
+                    ship.targetHoldPosition = ship.transform.position;
+                }
+            }
+        }
+
+        if (GUILayout.Button(new GUIContent("Состыковаться здесь", "Завершает вылет в текущей точке и сохраняет новый док.")))
         {
             DockAt("field_dock", DockingLocationKind.Island);
         }
 
-        if (GUILayout.Button(new GUIContent("Откатиться к последней стыковке", "Отменяет текущий вылет и возвращает сохраненный прогресс последнего дока.")))
+        if (GUILayout.Button(new GUIContent("Потерять корабль", "Завершает вылет аварией: груз и текущая сборка теряются, игрок возвращается в город на стартовом корабле.")))
         {
-            RollbackToLastDock("Ручной откат.");
+            LoseShipAndReturnToCity("Ручной аварийный возврат");
         }
+    }
+
+    private void DrawRouteEtaFlightInfo(ShipPhysics ship)
+    {
+        if (ship == null || ship.waypoints == null || ship.waypoints.Count == 0) return;
+
+        RouteEtaInfo eta = ship.GetCurrentRouteEta();
+        GUILayout.Space(4f);
+        GUILayout.Label("Путевая машина");
+
+        if (!eta.hasTarget)
+        {
+            GUILayout.Label(eta.status);
+            return;
+        }
+
+        string etaText = eta.canEstimate ? FormatDurationSeconds(eta.etaSeconds) : "нет оценки";
+        GUILayout.Label($"Точка {eta.waypointIndex + 1}/{eta.waypointCount}: ETA {etaText}");
+        GUILayout.Label($"До радиуса: {eta.horizontalRemaining:F0} м, высота {eta.verticalRemaining:F0} м");
+        GUILayout.Label($"Скорость к точке: {eta.horizontalClosingSpeed:F1} м/с, вертикально {eta.verticalClosingSpeed:F1} м/с");
+
+        if (!eta.routeEnabled || !eta.canEstimate || eta.etaSeconds <= 0f)
+        {
+            GUILayout.Label(eta.status);
+        }
+    }
+
+    private void DrawCargoTransferUi()
+    {
+        GUILayout.Space(8f);
+        GUILayout.Label("Груз и погрузка");
+
+        EnsureWorldConfigLoaded();
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        GUILayout.Label($"Взлетная масса: {capacity.allowedTakeoffMassKg:F0} кг  Сухая: {capacity.emptyMassKg:F0} кг");
+        GUILayout.Label($"Груз: {capacity.currentCargoKg:F0}/{capacity.maxCargoKg:F0} кг");
+        GUILayout.Label($"Ограничения: двигатель+контур {capacity.engineLiftKg:F0} кг, контур {capacity.claudiumMaxLiftKg:F0} кг, корпус {capacity.hullLimitKg:F0} кг");
+
+        if (!capacity.canFly)
+        {
+            GUILayout.Label("Вылет заблокирован: " + capacity.reason);
+        }
+
+        if (progress.cargoTransfer != null && progress.cargoTransfer.active)
+        {
+            int remaining = progress.cargoTransfer.GetRemainingUnits();
+            GUILayout.Label($"Идет погрузка: осталось {remaining} кг, следующая операция через {FormatRemaining(progress.cargoTransfer.nextOperationUtcTicks)}");
+            return;
+        }
+
+        if (worldConfig == null || !worldConfig.isLoaded)
+        {
+            GUILayout.Label("Конфиги мира не загружены.");
+            return;
+        }
+
+        if (progress.currentDockKind != DockingLocationKind.Island)
+        {
+            GUILayout.Label("Погрузка доступна только на острове.");
+            return;
+        }
+
+        IslandConfig island = worldConfig.GetIsland(progress.currentDockId);
+        if (island == null)
+        {
+            GUILayout.Label("Для текущего дока нет острова в Island.csv.");
+            return;
+        }
+
+        IslandProductionState storage = progress.GetIslandProductionState(island.id, true);
+        EnsureCargoPlan(island.id);
+
+        int plannedCargoMass = GetPlannedCargoMassKg();
+        int operationCount = GetCargoPlanOperationCount();
+        bool overload = plannedCargoMass > capacity.maxCargoKg + 0.001f;
+
+        GUILayout.Label($"План: {plannedCargoMass}/{capacity.maxCargoKg:F0} кг, операций: {operationCount}, время: {operationCount * island.timeForOneItemLoadSeconds:F1} сек");
+        if (overload)
+        {
+            GUILayout.Label("План перегружает корабль.");
+        }
+
+        for (int i = 0; i < worldConfig.items.Count; i++)
+        {
+            ItemConfig item = worldConfig.items[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.id)) continue;
+            DrawCargoPlanRow(item, storage);
+        }
+
+        GUI.enabled = operationCount > 0 && !overload && capacity.emptyMassKg <= capacity.allowedTakeoffMassKg + 0.001f;
+        if (GUILayout.Button(new GUIContent("Подтвердить погрузку", "Сначала выполняется выгрузка с борта на склад, затем загрузка со склада на борт. Каждая единица товара занимает время из Island.csv.")))
+        {
+            StartCargoTransfer(island, storage);
+        }
+        GUI.enabled = true;
+    }
+
+    private void DrawCargoPlanRow(ItemConfig item, IslandProductionState storage)
+    {
+        int shipAmount = progress.GetShipCargoAmount(item.id);
+        int storageAmount = storage != null ? storage.GetResourceAmount(item.id) : 0;
+        CargoPlanEntry entry = GetCargoPlanEntry(item.id, shipAmount);
+        entry.targetShipAmount = Mathf.Clamp(entry.targetShipAmount, 0, shipAmount + storageAmount);
+
+        string itemName = worldConfig.GetItemNameRu(item.id);
+        GUILayout.Label($"{itemName}: склад {storageAmount} кг, борт {shipAmount} кг, цель {entry.targetShipAmount} кг");
+
+        GUILayout.BeginHorizontal();
+        GUI.enabled = entry.targetShipAmount > 0;
+        if (GUILayout.Button("-10")) entry.targetShipAmount = Mathf.Max(0, entry.targetShipAmount - 10);
+        if (GUILayout.Button("-1")) entry.targetShipAmount = Mathf.Max(0, entry.targetShipAmount - 1);
+        GUI.enabled = entry.targetShipAmount < shipAmount + storageAmount;
+        if (GUILayout.Button("+1")) entry.targetShipAmount = Mathf.Min(shipAmount + storageAmount, entry.targetShipAmount + 1);
+        if (GUILayout.Button("+10")) entry.targetShipAmount = Mathf.Min(shipAmount + storageAmount, entry.targetShipAmount + 10);
+        GUI.enabled = true;
+        GUILayout.EndHorizontal();
+
+        GUILayout.BeginHorizontal();
+        GUI.enabled = shipAmount > 0;
+        if (GUILayout.Button(new GUIContent("Унич. 1 борт", "Мгновенно уничтожает 1 кг этого товара на корабле.")))
+        {
+            progress.TrySpendShipCargo(item.id, 1);
+            ApplyCargoMassToShip(GetActiveShip());
+            ResetCargoPlan();
+            AutoSaveIfDocked();
+        }
+
+        if (GUILayout.Button(new GUIContent("Унич. борт", "Мгновенно уничтожает весь этот товар на корабле.")))
+        {
+            progress.TrySpendShipCargo(item.id, shipAmount);
+            ApplyCargoMassToShip(GetActiveShip());
+            ResetCargoPlan();
+            AutoSaveIfDocked();
+        }
+
+        GUI.enabled = storageAmount > 0;
+        if (GUILayout.Button(new GUIContent("Унич. 1 склад", "Мгновенно уничтожает 1 кг этого товара на складе острова.")))
+        {
+            storage.TrySpendResource(item.id, 1);
+            ResetCargoPlan();
+            AutoSaveIfDocked();
+        }
+
+        if (GUILayout.Button(new GUIContent("Унич. склад", "Мгновенно уничтожает весь этот товар на складе острова.")))
+        {
+            storage.TrySpendResource(item.id, storageAmount);
+            ResetCargoPlan();
+            AutoSaveIfDocked();
+        }
+        GUI.enabled = true;
+        GUILayout.EndHorizontal();
+
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Уничтожить, кг", GUILayout.Width(110f));
+        entry.destroyAmountText = GUILayout.TextField(entry.destroyAmountText ?? "1", GUILayout.Width(60f));
+        int destroyAmount = ParseCargoAmount(entry.destroyAmountText, Mathf.Max(shipAmount, storageAmount));
+
+        GUI.enabled = destroyAmount > 0 && shipAmount >= destroyAmount;
+        if (GUILayout.Button(new GUIContent("с борта", "Мгновенно уничтожает указанное количество товара на корабле.")))
+        {
+            progress.TrySpendShipCargo(item.id, destroyAmount);
+            ApplyCargoMassToShip(GetActiveShip());
+            ResetCargoPlan();
+            AutoSaveIfDocked();
+        }
+
+        GUI.enabled = destroyAmount > 0 && storageAmount >= destroyAmount;
+        if (GUILayout.Button(new GUIContent("со склада", "Мгновенно уничтожает указанное количество товара на складе острова.")))
+        {
+            storage.TrySpendResource(item.id, destroyAmount);
+            ResetCargoPlan();
+            AutoSaveIfDocked();
+        }
+
+        GUI.enabled = true;
+        GUILayout.EndHorizontal();
+    }
+
+    private void EnsureCargoPlan(string islandId)
+    {
+        if (cargoPlanDockId == islandId && cargoPlan.Count > 0) return;
+
+        cargoPlanDockId = islandId ?? "";
+        cargoPlan.Clear();
+
+        if (worldConfig == null || worldConfig.items == null) return;
+        for (int i = 0; i < worldConfig.items.Count; i++)
+        {
+            ItemConfig item = worldConfig.items[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.id)) continue;
+            cargoPlan.Add(new CargoPlanEntry
+            {
+                itemId = item.id,
+                targetShipAmount = progress.GetShipCargoAmount(item.id)
+            });
+        }
+    }
+
+    private CargoPlanEntry GetCargoPlanEntry(string itemId, int fallbackTarget)
+    {
+        for (int i = 0; i < cargoPlan.Count; i++)
+        {
+            CargoPlanEntry entry = cargoPlan[i];
+            if (entry != null && entry.itemId == itemId)
+            {
+                return entry;
+            }
+        }
+
+        CargoPlanEntry newEntry = new CargoPlanEntry { itemId = itemId, targetShipAmount = fallbackTarget };
+        cargoPlan.Add(newEntry);
+        return newEntry;
+    }
+
+    private void ResetCargoPlan()
+    {
+        cargoPlanDockId = "";
+        cargoPlan.Clear();
+    }
+
+    private static int ParseCargoAmount(string text, int max)
+    {
+        if (!int.TryParse(text, out int amount)) return 0;
+        return Mathf.Clamp(amount, 0, Mathf.Max(0, max));
+    }
+
+    private int GetPlannedCargoMassKg()
+    {
+        int total = 0;
+        for (int i = 0; i < cargoPlan.Count; i++)
+        {
+            CargoPlanEntry entry = cargoPlan[i];
+            if (entry == null) continue;
+            total += Mathf.Max(0, entry.targetShipAmount);
+        }
+
+        return total;
+    }
+
+    private int GetCargoPlanOperationCount()
+    {
+        int total = 0;
+        for (int i = 0; i < cargoPlan.Count; i++)
+        {
+            CargoPlanEntry entry = cargoPlan[i];
+            if (entry == null || string.IsNullOrWhiteSpace(entry.itemId)) continue;
+            total += Mathf.Abs(entry.targetShipAmount - progress.GetShipCargoAmount(entry.itemId));
+        }
+
+        return total;
+    }
+
+    private void StartCargoTransfer(IslandConfig island, IslandProductionState storage)
+    {
+        if (island == null || storage == null || progress == null) return;
+
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        if (GetPlannedCargoMassKg() > capacity.maxCargoKg + 0.001f)
+        {
+            lastSaveMessage = "Нельзя начать погрузку: план перегружает корабль.";
+            return;
+        }
+
+        List<CargoTransferOperation> operations = new List<CargoTransferOperation>();
+        for (int i = 0; i < worldConfig.items.Count; i++)
+        {
+            ItemConfig item = worldConfig.items[i];
+            if (item == null) continue;
+
+            CargoPlanEntry entry = GetCargoPlanEntry(item.id, progress.GetShipCargoAmount(item.id));
+            int current = progress.GetShipCargoAmount(item.id);
+            if (entry.targetShipAmount < current)
+            {
+                operations.Add(new CargoTransferOperation
+                {
+                    itemId = item.id,
+                    loadToShip = false,
+                    remainingAmount = current - entry.targetShipAmount
+                });
+            }
+        }
+
+        for (int i = 0; i < worldConfig.items.Count; i++)
+        {
+            ItemConfig item = worldConfig.items[i];
+            if (item == null) continue;
+
+            CargoPlanEntry entry = GetCargoPlanEntry(item.id, progress.GetShipCargoAmount(item.id));
+            int current = progress.GetShipCargoAmount(item.id);
+            if (entry.targetShipAmount > current)
+            {
+                int loadAmount = entry.targetShipAmount - current;
+                if (storage.GetResourceAmount(item.id) < loadAmount)
+                {
+                    lastSaveMessage = "Нельзя начать погрузку: на складе не хватает " + worldConfig.GetItemNameRu(item.id) + ".";
+                    return;
+                }
+
+                operations.Add(new CargoTransferOperation
+                {
+                    itemId = item.id,
+                    loadToShip = true,
+                    remainingAmount = loadAmount
+                });
+            }
+        }
+
+        if (operations.Count == 0) return;
+
+        progress.cargoTransfer ??= new CargoTransferState();
+        progress.cargoTransfer.active = true;
+        progress.cargoTransfer.islandId = island.id;
+        progress.cargoTransfer.startedUtcTicks = DateTime.UtcNow.Ticks;
+        progress.cargoTransfer.secondsPerItem = Mathf.Max(0.01f, island.timeForOneItemLoadSeconds);
+        progress.cargoTransfer.nextOperationUtcTicks = progress.cargoTransfer.startedUtcTicks + TimeSpan.FromSeconds(progress.cargoTransfer.secondsPerItem).Ticks;
+        progress.cargoTransfer.currentOperationIndex = 0;
+        progress.cargoTransfer.operations = operations;
+        ResetCargoPlan();
+        AutoSaveIfDocked();
+        lastSaveMessage = "Погрузка начата.";
     }
 
     private void DrawProcessList()
@@ -979,39 +2032,305 @@ public class MetaGameState : MonoBehaviour
         }
     }
 
-    private void DrawShipList()
+    private void DrawIslandProductionList()
+    {
+        GUILayout.Space(8f);
+        GUILayout.Label("Производство текущего острова");
+
+        EnsureWorldConfigLoaded();
+        if (GUILayout.Button(new GUIContent("Перезагрузить конфиги мира", "Повторно читает CSV из Assets/Data/Config без перезапуска Play Mode.")))
+        {
+            ReloadWorldConfigs();
+            SpawnConfiguredIslands(true);
+        }
+
+        if (worldConfig == null || !worldConfig.isLoaded)
+        {
+            GUILayout.Label(string.IsNullOrWhiteSpace(worldConfig?.lastError) ? "Конфиги мира не загружены." : worldConfig.lastError);
+            return;
+        }
+
+        if (progress.currentDockKind != DockingLocationKind.Island)
+        {
+            GUILayout.Label("Сейчас док не является островом.");
+            return;
+        }
+
+        IslandConfig island = worldConfig.GetIsland(progress.currentDockId);
+        if (island == null)
+        {
+            GUILayout.Label("Текущий док не найден в Island.csv: " + progress.currentDockId);
+            return;
+        }
+
+        IslandProductionConfig production = worldConfig.GetProduction(island.productionId);
+        IslandProductionState state = progress.GetIslandProductionState(island.id, true);
+        if (production == null || state == null)
+        {
+            GUILayout.Label(GetIslandDisplayName(island) + ": производство не задано.");
+            return;
+        }
+
+        string producedName = worldConfig.GetItemNameRu(production.productionItemId);
+        int producedStored = state.GetResourceAmount(production.productionItemId);
+        float multiplier = GetCurrentIslandProductionMultiplier(state, production);
+        float currentRate = production.productionCountBasePerMinute * multiplier;
+
+        GUILayout.Label(GetIslandDisplayName(island));
+        GUILayout.Label($"Производит: {producedName}");
+        GUILayout.Label($"Склад: {producedStored} кг");
+        GUILayout.Label($"База: {production.productionCountBasePerMinute:F2} кг/мин");
+        GUILayout.Label($"Бонусы: x{multiplier:F2}, сейчас {currentRate:F2} кг/мин");
+        GUILayout.Label($"Коорд.: X {island.position.x:F0}  Y {island.position.y:F0}  Z {island.position.z:F0}");
+        GUILayout.Label($"Док: {island.dockingRadius:F0} м, погрузка {island.timeForOneItemLoadSeconds:F1} сек/кг");
+
+        DrawCurrentIslandConsumption(state, production);
+    }
+
+    private float GetCurrentIslandProductionRate(IslandProductionState state, IslandProductionConfig production)
+    {
+        return production != null ? production.productionCountBasePerMinute * GetCurrentIslandProductionMultiplier(state, production) : 0f;
+    }
+
+    private float GetCurrentIslandProductionMultiplier(IslandProductionState state, IslandProductionConfig production)
+    {
+        if (state == null || production == null) return 1f;
+
+        float multiplier = 1f;
+        for (int i = 0; i < production.consumptions.Count; i++)
+        {
+            IslandConsumptionConfig consumption = production.consumptions[i];
+            if (consumption == null) continue;
+
+            IslandConsumptionState consumptionState = state.GetConsumptionState(consumption.itemId, false);
+            if (consumptionState != null && consumptionState.isSatisfied)
+            {
+                multiplier *= Mathf.Max(0f, consumption.satisfiedProductionMultiplier);
+            }
+        }
+
+        return multiplier;
+    }
+
+    private void DrawCurrentIslandConsumption(IslandProductionState state, IslandProductionConfig production)
+    {
+        if (state == null || production == null || production.consumptions == null || production.consumptions.Count == 0)
+        {
+            GUILayout.Label("Потребление: нет.");
+            return;
+        }
+
+        GUILayout.Space(4f);
+        GUILayout.Label("Что нужно привозить:");
+        for (int i = 0; i < production.consumptions.Count; i++)
+        {
+            IslandConsumptionConfig consumption = production.consumptions[i];
+            if (consumption == null || string.IsNullOrWhiteSpace(consumption.itemId)) continue;
+
+            IslandConsumptionState consumptionState = state.GetConsumptionState(consumption.itemId, false);
+            bool satisfied = consumptionState != null && consumptionState.isSatisfied;
+            int stored = state.GetResourceAmount(consumption.itemId);
+            string itemName = worldConfig.GetItemNameRu(consumption.itemId);
+            string interval = FormatDurationSeconds(60f / Mathf.Max(0.0001f, consumption.countPerMinute));
+            string nextConsumption = FormatNextConsumptionTime(consumptionState, consumption, stored);
+
+            GUILayout.Label($"{itemName}: есть {stored} кг");
+            GUILayout.Label($"Нужно: {consumption.countPerMinute:F2} кг/мин, 1 кг каждые {interval}");
+            GUILayout.Label($"Следующее списание: {nextConsumption}");
+            GUILayout.Label($"Бонус: x{consumption.satisfiedProductionMultiplier:F2} - {(satisfied ? "активен" : "не активен")}");
+        }
+    }
+
+    private static string FormatNextConsumptionTime(IslandConsumptionState state, IslandConsumptionConfig consumption, int stored)
+    {
+        if (consumption == null || consumption.countPerMinute <= 0f) return "-";
+        if (state == null || !state.isSatisfied)
+        {
+            return stored > 0 ? "сейчас: активация за 1 кг" : "ожидает товар";
+        }
+
+        if (state.consumptionProgress >= 1f) return "сейчас, как только будет 1 кг";
+
+        float remainingProgress = Mathf.Max(0f, 1f - state.consumptionProgress);
+        float remainingSeconds = remainingProgress / consumption.countPerMinute * 60f;
+        string suffix = stored > 0 ? "" : " (нет товара для продления)";
+        return FormatDurationSeconds(remainingSeconds) + suffix;
+    }
+
+    private static string FormatDurationSeconds(float seconds)
+    {
+        if (float.IsNaN(seconds) || float.IsInfinity(seconds) || seconds < 0f) return "-";
+
+        int totalSeconds = Mathf.CeilToInt(seconds);
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        int restSeconds = totalSeconds % 60;
+
+        if (hours > 0)
+        {
+            return $"{hours}ч {minutes:D2}м";
+        }
+
+        if (minutes > 0)
+        {
+            return $"{minutes}м {restSeconds:D2}с";
+        }
+
+        return $"{restSeconds}с";
+    }
+
+    private void DrawAssemblyUi()
     {
         ShipCatalogSO activeCatalog = ActiveCatalog;
-        if (activeCatalog == null || activeCatalog.ships == null) return;
+        if (activeCatalog == null || !activeCatalog.HasAssemblyParts())
+        {
+            GUILayout.Label("В каталоге нет корпусов и модулей для сборки.");
+            return;
+        }
 
         GUILayout.Space(8f);
-        GUILayout.Label("Корабли");
+        GUILayout.Label("Сборка корабля");
 
-        for (int i = 0; i < activeCatalog.ships.Count; i++)
+        bool assembled = ShipAssemblyBuilder.TryBuild(activeCatalog, techTree, progress, out ShipAssemblyResult result);
+        GUILayout.Label((assembled ? "Готов к вылету: " : "Нельзя вылететь: ") + result.message);
+        if (assembled)
         {
-            ShipDefinitionSO ship = activeCatalog.ships[i];
-            if (ship == null) continue;
+            DrawAssemblySummary(result);
+        }
 
-            bool unlocked = progress.IsShipUnlocked(ship.shipId);
-            bool selected = progress.selectedShipId == ship.shipId;
+        if (GUILayout.Button(new GUIContent("Заполнить обязательные слоты", "Поставит первый купленный подходящий модуль во все пустые обязательные слоты.")))
+        {
+            AutoInstallRequiredModules(true, out _);
+        }
+
+        GUILayout.Space(4f);
+        GUILayout.Label("Корпус");
+        for (int i = 0; i < activeCatalog.parts.Count; i++)
+        {
+            ShipPartDefinitionSO hull = activeCatalog.parts[i];
+            if (hull == null || !hull.IsHull) continue;
+
+            bool usable = ShipAssemblyBuilder.IsPartUsable(hull, techTree, progress);
+            bool selected = progress.selectedHullId == hull.partId;
             GUILayout.BeginHorizontal();
-            GUILayout.Label(ship.displayName + " " + ship.purchasePrice + " мон.");
-
-            GUI.enabled = unlocked && !selected;
-            if (GUILayout.Button("Выбрать", GUILayout.Width(90f)))
+            GUILayout.Label(GetPartName(hull) + (usable ? "" : " (не куплен)"));
+            GUI.enabled = usable && !selected;
+            if (GUILayout.Button(selected ? "Выбран" : "Выбрать", GUILayout.Width(90f)))
             {
-                SelectShip(ship.shipId);
+                SelectHull(hull.partId);
             }
-
-            GUI.enabled = !unlocked && progress.money >= ship.purchasePrice;
-            if (GUILayout.Button("Купить", GUILayout.Width(70f)))
-            {
-                TryBuyShip(ship.shipId);
-            }
-
             GUI.enabled = true;
             GUILayout.EndHorizontal();
         }
+
+        GUILayout.Space(4f);
+        GUILayout.Label("Слоты");
+        List<ShipSlotDefinition> slots = GetAssemblySlotsForUi(activeCatalog);
+        for (int i = 0; i < slots.Count; i++)
+        {
+            DrawAssemblySlot(activeCatalog, slots[i]);
+        }
+    }
+
+    private void DrawAssemblySlot(ShipCatalogSO activeCatalog, ShipSlotDefinition slot)
+    {
+        if (activeCatalog == null || slot == null) return;
+
+        string currentModuleId = progress.GetInstalledModule(slot.slotId);
+        ShipPartDefinitionSO currentModule = activeCatalog.GetPartById(currentModuleId);
+        string required = slot.required ? "обязательный" : "необязательный";
+        GUILayout.Label(slot.displayName + " [" + slot.slotTypeId + ", " + required + "]");
+
+        GUILayout.BeginHorizontal();
+        GUILayout.Label(currentModule != null ? GetPartName(currentModule) : "Пусто");
+        GUI.enabled = currentModule != null;
+        if (GUILayout.Button("Снять", GUILayout.Width(70f)))
+        {
+            InstallModule(slot.slotId, "");
+        }
+        GUI.enabled = true;
+        GUILayout.EndHorizontal();
+
+        bool hasAvailableModule = false;
+        for (int i = 0; i < activeCatalog.parts.Count; i++)
+        {
+            ShipPartDefinitionSO module = activeCatalog.parts[i];
+            if (module == null || !module.IsModule || !module.CanFitSlot(slot)) continue;
+            if (!ShipAssemblyBuilder.IsPartUsable(module, techTree, progress)) continue;
+
+            hasAvailableModule = true;
+            GUI.enabled = currentModule == null || currentModule.partId != module.partId;
+            if (GUILayout.Button("Поставить: " + GetPartName(module)))
+            {
+                InstallModule(slot.slotId, module.partId);
+            }
+            GUI.enabled = true;
+        }
+
+        if (!hasAvailableModule)
+        {
+            GUILayout.Label(slot.required ? "Нет купленных подходящих модулей. Вылет невозможен." : "Нет купленных подходящих модулей.");
+        }
+    }
+
+    private void DrawAssemblySummary(ShipAssemblyResult result)
+    {
+        if (result == null || result.stats == null) return;
+
+        ShipStatBlock stats = result.stats;
+        GUILayout.Label("Итог сборки:");
+        GUILayout.Label("Масса: " + stats.Get(ShipStatId.BaseMass, 0f).ToString("F0") + " кг");
+        GUILayout.Label("Лимит корпуса: " + stats.Get(ShipStatId.HullMaxTakeoffMassKg, 0f).ToString("F0") + " кг взлетной массы");
+        GUILayout.Label("Двигатель: " + stats.Get(ShipStatId.EngineMaxPower, 0f).ToString("F0") + " кВт на 100%");
+        GUILayout.Label("Винт: " + stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f).ToString("F1") + " м/с, тяга " + stats.Get(ShipStatId.PropellerMaxThrustKgf, 0f).ToString("F0") + " кгс");
+        GUILayout.Label("Клавдий: макс. подъем " + stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f).ToString("F0") + " кг");
+    }
+
+    private List<ShipSlotDefinition> GetAssemblySlotsForUi(ShipCatalogSO activeCatalog)
+    {
+        List<ShipSlotDefinition> slots = new List<ShipSlotDefinition>();
+        if (activeCatalog == null) return slots;
+
+        ShipPartDefinitionSO hull = activeCatalog.GetPartById(progress.selectedHullId);
+        if (hull == null || !hull.IsHull)
+        {
+            hull = activeCatalog.GetStarterHull();
+        }
+
+        if (hull == null) return slots;
+
+        AddAssemblySlotsForUi(slots, hull.slots, "");
+        for (int i = 0; i < slots.Count; i++)
+        {
+            ShipSlotDefinition slot = slots[i];
+            ShipPartDefinitionSO module = activeCatalog.GetPartById(progress.GetInstalledModule(slot.slotId));
+            if (module != null && module.IsModule && module.CanFitSlot(slot))
+            {
+                AddAssemblySlotsForUi(slots, module.grantedSlots, slot.slotId + ":" + module.partId + ":");
+            }
+        }
+
+        return slots;
+    }
+
+    private static void AddAssemblySlotsForUi(List<ShipSlotDefinition> target, List<ShipSlotDefinition> source, string prefix)
+    {
+        if (target == null || source == null) return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            ShipSlotDefinition slot = source[i];
+            if (slot == null) continue;
+
+            string slotId = string.IsNullOrWhiteSpace(slot.slotId) ? "slot_" + i : slot.slotId;
+            target.Add(slot.CloneWithId(prefix + slotId));
+        }
+    }
+
+    private static string GetPartName(ShipPartDefinitionSO part)
+    {
+        if (part == null) return "";
+        return string.IsNullOrWhiteSpace(part.displayName) ? part.partId : part.displayName;
     }
 
     private void DrawTechTreeList()
@@ -1030,7 +2349,8 @@ public class MetaGameState : MonoBehaviour
             bool purchased = progress.IsNodePurchased(node.nodeId);
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label(node.displayName + " опыт " + node.researchCostXp + " / " + node.purchasePrice + " мон.");
+            string priceText = node.RequiresPurchase ? " / " + node.purchasePrice + " мон." : " / без покупки";
+            GUILayout.Label(node.displayName + " опыт " + node.researchCostXp + priceText);
 
             GUI.enabled = !researched;
             if (GUILayout.Button("Исслед.", GUILayout.Width(80f)))
@@ -1038,7 +2358,7 @@ public class MetaGameState : MonoBehaviour
                 TryResearchNode(node.nodeId);
             }
 
-            GUI.enabled = researched && !purchased;
+            GUI.enabled = node.RequiresPurchase && researched && !purchased;
             if (GUILayout.Button("Купить", GUILayout.Width(70f)))
             {
                 TryPurchaseNode(node.nodeId);

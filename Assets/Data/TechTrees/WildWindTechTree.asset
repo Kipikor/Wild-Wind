@@ -10,94 +10,112 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5a8a0b7c87ce42b2b0c61b5af746cbce, type: 3}
-  m_Name: Древо техники
+  m_Name: WildWindTechTree
   m_EditorClassIdentifier: Assembly-CSharp::TechTreeDefinitionSO
   nodes:
-  - nodeId: ship_tier1
-    displayName: Корабль I
+  - nodeId: fundamentals_airship
+    displayName: "\u041E\u0441\u043D\u043E\u0432\u044B \u0432\u043E\u0437\u0434\u0443\u0448\u043D\u043E\u0433\u043E
+      \u0441\u0443\u0434\u043D\u0430"
+    kind: 2
+    tier: 1
+    partDefinition: {fileID: 0}
+    partId: ""
+    isPremium: 0
+    moduleKind: 5
+    researchCostXp: 0
+    purchasePrice: 0
+    startsResearched: 1
+    startsPurchased: 0
+    prerequisiteNodeIds: []
+    experienceShipIds: []
+    editorPosition: {x: 0, y: 0}
+  - nodeId: starter_hull_node
+    displayName: "\u0421\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u043A\u043E\u0440\u043F\u0443\u0441"
     kind: 0
     tier: 1
-    shipDefinition: {fileID: 11400000, guid: d4b764bacf45d4341853861354d90461, type: 2}
-    shipId: ship
+    partDefinition: {fileID: 11400000, guid: 00c4f8202fe82c442b27e5955c986fdf, type: 2}
+    partId: starter_hull
     isPremium: 0
-    parentShipId: 
     moduleKind: 5
     researchCostXp: 0
     purchasePrice: 0
     startsResearched: 1
     startsPurchased: 1
-    prerequisiteNodeIds: []
-    experienceShipIds: []
-    editorPosition: {x: 0, y: 0}
-  - nodeId: ship_engine_1
-    displayName: Двигатель I
+    prerequisiteNodeIds:
+    - fundamentals_airship
+    experienceShipIds:
+    - starter_hull
+    editorPosition: {x: 243.58977, y: -339.48712}
+  - nodeId: starter_engine_node
+    displayName: "\u041F\u0430\u0440\u043E\u0432\u043E\u0439 \u0434\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C
+      I"
     kind: 1
     tier: 1
-    shipDefinition: {fileID: 0}
-    shipId: 
+    partDefinition: {fileID: 11400000, guid: 5b60b2ba6b06d364a99b6ef6d1c3c784, type: 2}
+    partId: starter_engine
     isPremium: 0
-    parentShipId: ship
-    moduleKind: 0
-    researchCostXp: 50
-    purchasePrice: 100
-    startsResearched: 0
-    startsPurchased: 0
-    prerequisiteNodeIds:
-    - ship_tier1
-    experienceShipIds:
-    - ship
-    editorPosition: {x: 220, y: -80}
-  - nodeId: ship_loop_1
-    displayName: Клавдиевый контур I
-    kind: 1
-    tier: 1
-    shipDefinition: {fileID: 0}
-    shipId: 
-    isPremium: 0
-    parentShipId: ship
-    moduleKind: 1
-    researchCostXp: 75
-    purchasePrice: 150
-    startsResearched: 0
-    startsPurchased: 0
-    prerequisiteNodeIds:
-    - ship_tier1
-    experienceShipIds:
-    - ship
-    editorPosition: {x: 220, y: 60}
-  - nodeId: ship_loop_2
-    displayName: Клавдиевый контур II
-    kind: 1
-    tier: 1
-    shipDefinition: {fileID: 0}
-    shipId: 
-    isPremium: 0
-    parentShipId: ship
-    moduleKind: 1
-    researchCostXp: 120
-    purchasePrice: 250
-    startsResearched: 0
-    startsPurchased: 0
-    prerequisiteNodeIds:
-    - ship_loop_1
-    experienceShipIds:
-    - ship
-    editorPosition: {x: 440, y: 60}
-  - nodeId: ship_tier2_placeholder
-    displayName: Корабль II (заготовка)
-    kind: 0
-    tier: 2
-    shipDefinition: {fileID: 0}
-    shipId: ship_tier2
-    isPremium: 0
-    parentShipId: 
     moduleKind: 5
-    researchCostXp: 200
-    purchasePrice: 500
+    researchCostXp: 0
+    purchasePrice: 0
+    startsResearched: 1
+    startsPurchased: 1
+    prerequisiteNodeIds:
+    - fundamentals_airship
+    experienceShipIds:
+    - starter_hull
+    editorPosition: {x: 440, y: -120}
+  - nodeId: starter_propeller_node
+    displayName: "\u0414\u0435\u0440\u0435\u0432\u044F\u043D\u043D\u044B\u0439 \u0432\u0438\u043D\u0442
+      2.8 \u043C"
+    kind: 1
+    tier: 1
+    partDefinition: {fileID: 11400000, guid: ce50a9bd67030b2479fd5f6c1b18e908, type: 2}
+    partId: starter_propeller
+    isPremium: 0
+    moduleKind: 5
+    researchCostXp: 0
+    purchasePrice: 0
+    startsResearched: 1
+    startsPurchased: 1
+    prerequisiteNodeIds:
+    - fundamentals_airship
+    experienceShipIds:
+    - starter_hull
+    editorPosition: {x: 440, y: 0}
+  - nodeId: starter_claudium_loop_node
+    displayName: "\u041A\u043B\u0430\u0432\u0434\u0438\u0435\u0432\u044B\u0439 \u043A\u043E\u043D\u0442\u0443\u0440
+      I"
+    kind: 1
+    tier: 1
+    partDefinition: {fileID: 11400000, guid: 1e2a0c92e4d793341acca2bcf81c26b4, type: 2}
+    partId: starter_claudium_loop
+    isPremium: 0
+    moduleKind: 5
+    researchCostXp: 0
+    purchasePrice: 0
+    startsResearched: 1
+    startsPurchased: 1
+    prerequisiteNodeIds:
+    - fundamentals_airship
+    experienceShipIds:
+    - starter_hull
+    editorPosition: {x: 440, y: 120}
+  - nodeId: starter_cargo_rack_node
+    displayName: "\u0413\u0440\u0443\u0437\u043E\u0432\u0430\u044F \u043F\u043E\u043B\u043A\u0430"
+    kind: 1
+    tier: 1
+    partDefinition: {fileID: 11400000, guid: 271215ec9b0b4eb42926162bea18be9c, type: 2}
+    partId: starter_cargo_rack
+    isPremium: 0
+    moduleKind: 5
+    researchCostXp: 40
+    purchasePrice: 75
     startsResearched: 0
     startsPurchased: 0
     prerequisiteNodeIds:
-    - ship_loop_2
+    - fundamentals_airship
+    - fundamentals_airship
     experienceShipIds:
-    - ship
-    editorPosition: {x: 660, y: 60}
+    - starter_hull
+    - starter_hull
+    editorPosition: {x: 660, y: 120}

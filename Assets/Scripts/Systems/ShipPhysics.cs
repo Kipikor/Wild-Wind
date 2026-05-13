@@ -1,37 +1,77 @@
 using UnityEngine;
+using UnityEngine.Serialization;
+
+public struct RouteEtaInfo
+{
+    public bool hasTarget;
+    public bool routeEnabled;
+    public bool canEstimate;
+    public int waypointIndex;
+    public int waypointCount;
+    public Vector3 targetPosition;
+    public float horizontalDistance;
+    public float horizontalRemaining;
+    public float verticalError;
+    public float verticalRemaining;
+    public float horizontalSpeed;
+    public float horizontalClosingSpeed;
+    public float verticalSpeed;
+    public float verticalClosingSpeed;
+    public float etaSeconds;
+    public string status;
+}
 
 [RequireComponent(typeof(Rigidbody))]
 public class ShipPhysics : MonoBehaviour
 {
     private Rigidbody rb;
 
-    [Header("Паспорт корабля")]
-    public ShipDefinitionSO shipDefinition;
-    public bool applyDefinitionOnAwake = false;
-
     [Header("Параметры корабля")]
     public float baseMass = 1000f; // Стартовая масса 1000кг
+    [Tooltip("Максимальная взлетная масса, которую допускает корпус, в килограммах.")]
+    public float hullMaxTakeoffMassKg = 2000f;
+    [HideInInspector] public float cargoMassKg;
     
-    [Header("Силовые установки")]
-    public ShipEngine thrustEngine; // Двигатель для винта
-    public ShipEngine liftEngine;   // Двигатель для подъема (контура)
+    [Header("Двигатель")]
+    [Tooltip("Мощность, которую двигатель выдает на ручке 100%, в киловаттах.")]
+    public float enginePowerKwAt100 = 80f;
+    [Tooltip("Тип топлива. Энергоемкость берется из Item.csv по этому id.")]
+    public string engineFuelId = "wood";
+    [Tooltip("Доля энергии топлива, которая превращается в полезную мощность двигателя.")]
+    public float engineFuelEfficiency = 0.32f;
+    [HideInInspector] public float engineFuelEnergyKwhPerKg = 4f;
+    [HideInInspector] public float engineFuelStockKg = 0f;
     
     [Header("Параметры винта")]
-    public float propellerDiameter = 4.5f; // Диаметр винта в метрах
-    public float propellerEfficiency = 0.8f; // КПД винта (0.7 - 0.85)
-    public float propellerMaxPitchMeters = 3.0f; // На сколько метров вкручивается винт за 1 оборот при 100% шаге
+    [Tooltip("Скорость, после которой винт больше не может разгонять корабль, м/с.")]
+    public float propellerMaxSpeedMS = 30f;
+    [Tooltip("Доля мощности двигателя, которая превращается в полезную тягу винта.")]
+    public float propellerEfficiency = 0.8f;
+    [Tooltip("Максимальная статическая тяга винта, кгс.")]
+    public float propellerMaxThrustKgf = 220f;
     
-    [Header("Эффективность систем")]
-    public float liftEfficiency = 20f;   // Сколько силы дает 1 единица мощности контура
+    [Header("Клавдиевый контур")]
+    [Tooltip("Ресурс клавдия в грузовом списке корабля.")]
+    public string claudiumResourceId = "claudium";
+    [HideInInspector] public float claudiumStock = 0f;
+    [Tooltip("Расход клавдия в секунду на одну тонну поддерживаемой массы.")]
+    public float claudiumConsumptionPerTonSecond = 0.05f;
+    [Tooltip("Сколько килограммов подъема дает один киловатт мощности двигателя.")]
+    public float claudiumLiftEfficiency = 10f;
+    [Tooltip("Максимальная масса в килограммах, которую контур способен поддерживать.")]
+    public float claudiumMaxLiftKg = 1000f;
+    [Tooltip("Скорость сглаживания подъемной силы. Чем больше значение, тем быстрее контур выходит на нужную силу.")]
+    public float claudiumLiftSmoothing = 2f;
+    [HideInInspector] public float claudiumCurrentLiftN;
+    [HideInInspector] public float claudiumPowerDrawWatts;
+    [HideInInspector] public float claudiumPowerDrawKw;
+    [HideInInspector] public float claudiumRequestedLiftKg;
     
-    [Header("Аэродинамика рулей (Поворот)")]
-    public float rudderArea = 4.0f;      // Площадь рулевых поверхностей (кв.м)
-    public float rudderDistance = 10.0f; // Расстояние от центра масс до руля (плечо, м)
-    public float rudderMaxLiftCoeff = 1.5f; // Эффективность профиля руля (Сy) при максимальном отклонении
-    public float maxRudderAngleDeg = 25f; // Максимальный угол отклонения руля (в градусах)
-    public float rudderTurnSpeedDeg = 15f; // Скорость перекладки руля (градусов в секунду)
-    [HideInInspector] public float currentRudderAngleDeg = 0f; // Физический угол поворота руля (в градусах)
-    
+    [Header("Гироскопический поворот")]
+    public float gyroTurnTorque = 12000f; // Максимальный внутренний момент поворота корпуса, Н*м
+    public float gyroTurnDamping = 0.8f; // Демпфирование, которое гасит лишнюю угловую скорость
+    [HideInInspector] public float currentGyroTurnTorque = 0f;
+
     [Header("Аэродинамика")]
     public float airDensity = 1.225f; // Плотность воздуха (1.225 на уровне моря)
     public float dragCoefficient = 1.1f; // Коэффициент формы Cd (1.1 для контейнера)
@@ -50,7 +90,6 @@ public class ShipPhysics : MonoBehaviour
     public float CurrentAeroDrag => 0.5f * airDensity * dragCoefficient * frontalArea;
 
     [Header("Автопилот и Системы")]
-    public bool hasCSU = false;       // Есть ли автомат шага винта (Governor)
     public bool autoStabilizeAtStart = true; // Новая галочка
     public bool altitudeHold = false;
     public float targetAltitude = 0f;
@@ -60,9 +99,6 @@ public class ShipPhysics : MonoBehaviour
 
     public bool cruiseControl = false;
     public float targetSpeedMS = 0f;
-    public float maxCruiseSpeedMS = 20f;  // Лимит для автопилота (м/с)
-    public float maxManualSpeedMS = 30f;  // Лимит для ручного режима (м/с)
-    
     [Header("Автопилот курса")]
     public bool headingHold = false;
     public float targetHeading = 0f;      // Целевой курс (градусы 0-360)
@@ -75,16 +111,25 @@ public class ShipPhysics : MonoBehaviour
     public bool routeEnabled = false;
     public System.Collections.Generic.List<Vector3> waypoints = new System.Collections.Generic.List<Vector3>();
     public float waypointRadius = 10f; // Радиус засчитывания точки
-    public float minNavSpeed = 5f; // Минимальная маршевая скорость для сохранения рулежки
+    public float routeArrivalSpeedMS = 1f; // Точка засчитывается только если горизонтальная скорость ниже этого порога
+    public float routeBrakeAccelerationMS2 = 2.5f; // Расчетное торможение для раннего сброса скорости перед точкой
     [HideInInspector] public int currentWaypointIndex = 0;
+
+    [Header("Удержание позиции")]
+    public bool positionHold = false;
+    public Vector3 targetHoldPosition = Vector3.zero;
+    public float positionHoldRadius = 5f;
+    public float positionHoldMaxSpeedMS = 8f;
+    public float positionHoldStiffness = 0.35f;
+    public float positionHoldDamping = 0.9f;
     
-    [Header("Настройки ВРШ (Шаг винта)")]
-    public float propellerPitch = 0f;    // Текущий шаг (-1..1)
-    public float speedStiffness = 0.8f;  // Насколько активно круиз меняет шаг винта
-    public float speedDamping = 0.3f;    // Демпфирование шага
+    [Header("Настройки тяги винта")]
+    public float propellerPitch = 0f;    // Текущее задание тяги (-1..1)
+    public float speedStiffness = 0.8f;  // Насколько активно круиз меняет тягу
+    public float speedDamping = 0.3f;    // Демпфирование тяги
 
     [Header("Текущее управление (для чтения/записи из интерфейса)")]
-    [HideInInspector] public float thrustInput; // -1 назад, 1 вперед
+    [HideInInspector] public float thrustInput; // -1 полный реверс, 0 нет тяги, 1 полный ход вперед
     [HideInInspector] public float turnInput;   // -1 влево, 1 вправо
     [HideInInspector] public float targetTrimMass = 1000f; // Масса для триммирования (кг)
     [HideInInspector] public float liftInput;   // -1 вниз, 1 вверх (Точная доводка +-10%)
@@ -93,55 +138,43 @@ public class ShipPhysics : MonoBehaviour
     // МОДУЛИ (Дочерние объекты)
     // ==========================================
     [Header("Установленные модули")]
-    public ShipBalloon balloonModule;      // Ссылка на шар
-    public ShipClaudiumLoop claudiumLoop;  // Ссылка на контур
     
     [HideInInspector] public float currentGasLift; 
     [HideInInspector] public float activeLiftForce; 
     
-    [HideInInspector] public float targetMainEngineRPM = 0.8f; 
+    [FormerlySerializedAs("targetMainEngineRPM")]
+    [HideInInspector] public float enginePowerLever = 0.88f;
+    [HideInInspector] public float engineEfficiencyCurrent;
+    [HideInInspector] public float engineGeneratedPowerKw;
+    [HideInInspector] public float engineFuelConsumptionKgPerSecond;
+    [HideInInspector] public float engineMinimumPowerLever;
+    [HideInInspector] public bool engineHasFuel = true;
+    [HideInInspector] public float propellerInputPowerKw;
+    [HideInInspector] public float propellerUsefulPowerKw;
+    [HideInInspector] public float propellerCalculatedEfficiency;
+    [HideInInspector] public float propellerThrustKgf;
     private bool wasAltitudeHold = false;
     private float altIntegral = 0f; // Память автопилота (I-терм)
     private bool routeWasEnabled = false;
     private bool routePreviousAltitudeHold = false;
     private bool routePreviousCruiseControl = false;
     private bool routePreviousHeadingHold = false;
+    private bool routePreviousPositionHold = false;
+    private bool positionHoldWasEnabled = false;
     
     // Единая ручка управления мощностью (Обороты для CSU / Газ для Manual)
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
 
-        if (applyDefinitionOnAwake)
-        {
-            ApplyShipDefinition();
-        }
-
-        rb.mass = baseMass;
+        rb.mass = GetTotalMassKg();
         rb.useGravity = true;
         
         rb.angularDamping = 2f; 
         rb.linearDamping = 0f; 
     }
 
-    [ContextMenu("Apply Ship Definition")]
-    public void ApplyShipDefinition()
-    {
-        if (shipDefinition == null) return;
-
-        shipDefinition.ApplyTo(this);
-        RefreshRuntimeShipSettings();
-    }
-
-    public void ApplyShipDefinition(ShipDefinitionSO definition)
-    {
-        if (definition == null) return;
-
-        shipDefinition = definition;
-        ApplyShipDefinition();
-    }
-
-    private void RefreshRuntimeShipSettings()
+    public void RefreshRuntimeShipSettings()
     {
         if (rb == null)
         {
@@ -150,8 +183,104 @@ public class ShipPhysics : MonoBehaviour
 
         if (rb != null)
         {
-            rb.mass = baseMass;
+            rb.mass = GetTotalMassKg();
         }
+    }
+
+    public float GetTotalMassKg()
+    {
+        return Mathf.Max(1f, baseMass + Mathf.Max(0f, cargoMassKg));
+    }
+
+    public RouteEtaInfo GetCurrentRouteEta()
+    {
+        RouteEtaInfo info = new RouteEtaInfo
+        {
+            routeEnabled = routeEnabled,
+            etaSeconds = float.PositiveInfinity,
+            status = routeEnabled ? "Путевая машина активна." : "Путевая машина выключена, оценка по текущей скорости."
+        };
+
+        if (waypoints == null || waypoints.Count == 0)
+        {
+            info.status = "Точки маршрута не заданы.";
+            return info;
+        }
+
+        info.waypointCount = waypoints.Count;
+        if (currentWaypointIndex >= waypoints.Count)
+        {
+            info.status = "Маршрут завершен.";
+            return info;
+        }
+
+        int targetIndex = Mathf.Clamp(currentWaypointIndex, 0, waypoints.Count - 1);
+        Rigidbody body = rb != null ? rb : GetComponent<Rigidbody>();
+        if (body == null)
+        {
+            info.status = "Нет Rigidbody для расчета ETA.";
+            return info;
+        }
+
+        Vector3 target = waypoints[targetIndex];
+        Vector3 toTarget = target - transform.position;
+        Vector3 horizontalToTarget = FlattenHorizontal(toTarget);
+        Vector3 horizontalVelocity = FlattenHorizontal(body.linearVelocity);
+        float horizontalDistance = horizontalToTarget.magnitude;
+        float verticalError = toTarget.y;
+        float verticalTolerance = Mathf.Max(1f, waypointRadius * 0.5f);
+
+        info.hasTarget = true;
+        info.waypointIndex = targetIndex;
+        info.targetPosition = target;
+        info.horizontalDistance = horizontalDistance;
+        info.horizontalRemaining = Mathf.Max(0f, horizontalDistance - Mathf.Max(0.1f, waypointRadius));
+        info.verticalError = verticalError;
+        info.verticalRemaining = Mathf.Max(0f, Mathf.Abs(verticalError) - verticalTolerance);
+        info.horizontalSpeed = horizontalVelocity.magnitude;
+        info.verticalSpeed = body.linearVelocity.y;
+
+        if (horizontalDistance > 0.001f)
+        {
+            info.horizontalClosingSpeed = Vector3.Dot(horizontalVelocity, horizontalToTarget / horizontalDistance);
+        }
+
+        if (info.verticalRemaining > 0f)
+        {
+            info.verticalClosingSpeed = body.linearVelocity.y * Mathf.Sign(verticalError);
+        }
+
+        float horizontalEta = 0f;
+        if (info.horizontalRemaining > 0f)
+        {
+            horizontalEta = info.horizontalClosingSpeed > 0.05f
+                ? info.horizontalRemaining / info.horizontalClosingSpeed
+                : float.PositiveInfinity;
+        }
+
+        float verticalEta = 0f;
+        if (info.verticalRemaining > 0f)
+        {
+            verticalEta = info.verticalClosingSpeed > 0.05f
+                ? info.verticalRemaining / info.verticalClosingSpeed
+                : float.PositiveInfinity;
+        }
+
+        info.etaSeconds = Mathf.Max(horizontalEta, verticalEta);
+        info.canEstimate = !float.IsInfinity(info.etaSeconds) && !float.IsNaN(info.etaSeconds);
+
+        if (info.horizontalRemaining <= 0f && info.verticalRemaining <= 0f)
+        {
+            info.canEstimate = true;
+            info.etaSeconds = 0f;
+            info.status = "Корабль уже в зоне текущей точки; осталось погасить скорость для засчитывания.";
+        }
+        else if (!info.canEstimate)
+        {
+            info.status = "Нет устойчивой оценки: текущая скорость не ведет к точке по одной из осей.";
+        }
+
+        return info;
     }
 
     void Start()
@@ -169,49 +298,32 @@ public class ShipPhysics : MonoBehaviour
     private void PerformAutoStabilization()
     {
         if (rb == null) rb = GetComponent<Rigidbody>();
-        
-        // 1. Устанавливаем триммер по текущей массе
-        targetTrimMass = rb.mass;
-        
-        // 2. Рассчитываем, сколько силы нам не хватает (Масса - Баллон)
-        float balloonLiftN = (balloonModule != null && balloonModule.gameObject.activeSelf) ? balloonModule.GetStaticLiftNewtons() : 0f;
-        float neededLiftN = (rb.mass * 9.81f) - balloonLiftN;
-        
-        if (neededLiftN > 0 && claudiumLoop != null && liftEngine != null)
+
+        targetTrimMass = rb != null ? rb.mass : baseMass;
+        if (altitudeHold && rb != null)
         {
-            // 3. Какая скорость потока v нужна для этой силы?
-            // Сила = АктивКлавдий * v * Длина * 17
-            float массаВКонтуре = claudiumLoop.объемСистемыЛ * claudiumLoop.плотностьРаствора;
-            float активныйКлавдийКг = массаВКонтуре * (claudiumLoop.концентрацияКлавдия / 100f);
-            float kLift = активныйКлавдийКг * claudiumLoop.длинаКонтураМ * 17.0f;
-            
-            float targetV = neededLiftN / Mathf.Max(kLift, 1f);
-            claudiumLoop.скоростьПотока_мс = targetV;
-            
-            // 4. Какие обороты двигателя нужны, чтобы поддерживать эту скорость (F_friction = F_pump)
-            // Friction_Power = Friction_Force * v
-            float трениеОСпейсН = 2.6f * активныйКлавдийКг * (targetV * targetV) * claudiumLoop.длинаКонтураМ;
-            float трениеГидроН = 0.5f * массаВКонтуре * (targetV * targetV) * (1f / claudiumLoop.длинаКонтураМ);
-            float totalFrictionN = трениеОСпейсН + трениеГидроН;
-            
-            float requiredPowerWatts = (totalFrictionN * targetV) / claudiumLoop.кпдКонтура;
-            
-            // P_engine = maxPower * 735.5 * RPM^3 => RPM = (P / P_max)^(1/3)
-            float maxPowerWatts = liftEngine.maxPower * 735.5f;
-            float targetRPM = Mathf.Pow(requiredPowerWatts / Mathf.Max(maxPowerWatts, 1f), 1f/3f);
-            
-            liftEngine.startingRPM = targetRPM;
-            liftEngine.currentRPM = targetRPM;
-            liftEngine.targetRPM = targetRPM;
-        }
-        else if (liftEngine != null)
-        {
-            liftEngine.startingRPM = 0.1f;
-            liftEngine.currentRPM = 0.1f;
-            liftEngine.targetRPM = 0.1f;
+            targetAltitude = rb.position.y;
         }
 
+        currentGasLift = 0f;
+        activeLiftForce = claudiumCurrentLiftN;
         UpdateEngineThrottles();
+    }
+
+    public void StabilizeForFlightStart(bool holdCurrentAltitude)
+    {
+        if (rb == null) rb = GetComponent<Rigidbody>();
+
+        if (holdCurrentAltitude && rb != null)
+        {
+            altitudeHold = true;
+            targetAltitude = rb.position.y;
+        }
+
+        thrustInput = 0f;
+        turnInput = 0f;
+        liftInput = 0f;
+        PerformAutoStabilization();
     }
 
     void FixedUpdate()
@@ -219,6 +331,7 @@ public class ShipPhysics : MonoBehaviour
         UpdateRouteModeState();
         UpdateWaypointNavigation(); // Мастер-автопилот
         UpdateRouteModeState();
+        UpdatePositionHold();       // Удержание координат, если маршрут не активен
         UpdateCruiseControl();      // Круиз-контроль (скорость)
         UpdateEngineThrottles();
         UpdateHeadingAutopilot(); // Автопилот курса
@@ -228,7 +341,7 @@ public class ShipPhysics : MonoBehaviour
         Vector3 airVelocity = rb.linearVelocity - windVelocity;
         float airspeed = airVelocity.magnitude;
         
-        float aeroMultiplier = (balloonModule != null && balloonModule.gameObject.activeSelf) ? 5.0f : 1.0f;
+        float aeroMultiplier = 1.0f;
         float currentDrag = CurrentAeroDrag * aeroMultiplier;
         
         if (airspeed > 0.01f)
@@ -238,129 +351,33 @@ public class ShipPhysics : MonoBehaviour
         }
 
         // --- ПОДЪЕМНАЯ СИЛА ---
-        float totalLift = 0f;
-        if (balloonModule != null && balloonModule.gameObject.activeSelf) 
-            totalLift += balloonModule.GetStaticLiftNewtons();
-        
-        // НОВАЯ ЛОГИКА: Сила от Клавдия теперь берется напрямую из контура
-        if (claudiumLoop != null && claudiumLoop.gameObject.activeSelf)
-        {
-            totalLift += claudiumLoop.создаваемаяСилаН;
-        }
-        
+        float totalLift = claudiumCurrentLiftN;
+        activeLiftForce = totalLift;
+        currentGasLift = 0f;
         rb.AddForce(Vector3.up * totalLift, ForceMode.Force);
 
-        // 2. Тяга маршевого винта (ВРШ) - ИМПУЛЬСНАЯ ТЕОРИЯ
-        if (thrustEngine != null)
-        {
-            float pWatts = thrustEngine.maxPower * 735.5f * thrustEngine.currentRPM;
-            float discArea = Mathf.PI * Mathf.Pow(propellerDiameter * 0.5f, 2);
-            
-            float rpm = thrustEngine.currentRPM;
-            // Нормализуем нагрузку винта (0..1), чтобы автомат шага (CSU) работал корректно. 
-            // При шаге 1.0 и RPM 1.0 винт должен потреблять 100% мощности.
-            float normalizedLoad = Mathf.Abs(propellerPitch) * (rpm * rpm);
+        ApplyPropellerThrust();
 
-            float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
-            
-            float propRevPerSec = (thrustEngine.currentRPM * thrustEngine.maxRPM) / 60f;
-            float screwSpeed = propRevPerSec * (propellerPitch * propellerMaxPitchMeters);
-            
-            float speedUnloading = 0f;
-            if (Mathf.Abs(screwSpeed) > 0.1f) {
-                speedUnloading = Mathf.Clamp01(forwardSpeed / screwSpeed);
-            }
-            
-            // Нагрузка падает при наборе скорости (винт разгружается)
-            thrustEngine.currentLoad = normalizedLoad * (1f - speedUnloading * 0.5f) + 0.05f;
+        ApplyGyroTurn();
 
-            // --- УМНЫЙ АВТОМАТ ШАГА (CSU / Governor) ---
-            if (hasCSU)
-            {
-                // Регулятор теперь следит за НАГРУЗКОЙ
-                // Задача: держать двигатель на 100% мощности (Load = 1.0)
-                float loadError = thrustEngine.currentLoad - 1.0f;
-                float governorSpeed = 0.5f * Time.fixedDeltaTime * 15f; 
-                
-                if (loadError > 0.02f) // Перегруз - облегчаем винт
-                    propellerPitch -= governorSpeed;
-                else if (loadError < -0.01f) // Есть запас мощи - увеличиваем шаг
-                    propellerPitch += governorSpeed;
+        // 4. Подавление бокового сноса (Киль сопротивляется воздуху)
+        Vector3 localAirVel = transform.InverseTransformDirection(airVelocity);
+        Vector3 sideAirVelocity = transform.right * localAirVel.x;
+        rb.AddForce(-sideAirVelocity * rb.mass * sideResistance, ForceMode.Force);
+    }
 
-                // Ограничиваем шаг направлением ввода игрока
-                if (thrustInput >= 0)
-                    propellerPitch = Mathf.Clamp(propellerPitch, 0f, thrustInput);
-                else
-                    propellerPitch = Mathf.Clamp(propellerPitch, thrustInput, 0f);
-            }
-            else
-            {
-                propellerPitch = thrustInput;
-            }
+    private void ApplyGyroTurn()
+    {
+        float maxTorque = Mathf.Max(0f, gyroTurnTorque);
+        float currentTurnRateDeg = rb.angularVelocity.y * Mathf.Rad2Deg;
+        float activeTorque = Mathf.Clamp(turnInput, -1f, 1f) * maxTorque;
+        float dampingTorque = -rb.angularVelocity.y * maxTorque * Mathf.Max(0f, gyroTurnDamping);
 
-            float pWattsNominal = thrustEngine.maxPower * 735.5f;
-            float maxStaticT = Mathf.Pow(2f * airDensity * discArea * (pWattsNominal * pWattsNominal), 1f/3f) * propellerEfficiency;
-
-            float currentStaticT = maxStaticT * (thrustEngine.currentRPM * thrustEngine.currentRPM);
-            
-            // Доступная мощность маршевого двигателя (для сохранения энергии P = F * v)
-            float availableThrustPower = pWattsNominal * propellerEfficiency * thrustEngine.currentRPM;
-
-            float thrustFactor = 0f;
-            if (Mathf.Abs(screwSpeed) > 0.01f) {
-                thrustFactor = (screwSpeed > 0) ? (1f - forwardSpeed / screwSpeed) : (-1f + forwardSpeed / screwSpeed);
-            }
-            
-            // Рассчитываем идеальную тягу из ограничения по мощности
-            float powerLimitedThrust = currentStaticT;
-            if (Mathf.Abs(forwardSpeed) > 0.5f)
-            {
-                powerLimitedThrust = availableThrustPower / Mathf.Abs(forwardSpeed);
-            }
-
-            // Итоговая тяга - минимум из статической и мощностной. 
-            // Умножаем на thrustFactor для учета вырождения винта (шаг).
-            float thrustForce = Mathf.Min(currentStaticT, powerLimitedThrust) * Mathf.Clamp(thrustFactor, -1.2f, 1.2f);
-            
-            rb.AddForce(transform.forward * thrustForce, ForceMode.Force);
-        }
-
-        // 3. Угловой момент для разворота (Аэродинамический руль)
-        float fwdAirspeed = Vector3.Dot(airVelocity, transform.forward);
-        float propWash = 0f;
-        if (thrustEngine != null)
-        {
-            float propRevPerSec = (thrustEngine.currentRPM * thrustEngine.maxRPM) / 60f;
-            propWash = Mathf.Abs(propRevPerSec * propellerPitch * propellerMaxPitchMeters);
-        }
-        float effAirspeed = Mathf.Abs(fwdAirspeed) + propWash * 0.5f;
-
-        // 1. АКТИВНАЯ СИЛА (Рули)
-        // Плавно поворачиваем физический руль к целевому углу
-        float targetRudderAngle = turnInput * maxRudderAngleDeg;
-        currentRudderAngleDeg = Mathf.MoveTowards(currentRudderAngleDeg, targetRudderAngle, rudderTurnSpeedDeg * Time.fixedDeltaTime);
-        
-        // Линейная интерполяция коэффициента подъемной силы (до maxLiftCoeff при максимальном угле)
-        float currentLiftCoeff = (currentRudderAngleDeg / maxRudderAngleDeg) * rudderMaxLiftCoeff;
-        
-        // Сила = 0.5 * Плотность * Скорость^2 * Площадь * Коэф. подъемной силы
-        float rudderForce = 0.5f * airDensity * (effAirspeed * effAirspeed) * rudderArea * currentLiftCoeff;
-        float activeTorque = rudderForce * rudderDistance; // Крутящий момент = Сила * Плечо
-        
-        // 2. ФИЗИЧЕСКОЕ ДЕМПФИРОВАНИЕ КОРПУСА (Связано с sideResistance)
-        float rotationResistance = sideResistance * rb.mass * 1.5f; 
-        float dampingTorque = -rb.angularVelocity.y * rotationResistance * (effAirspeed + 1.0f);
-        
-        // Математическая защита от осцилляций (чтобы демпфирование не разворачивало корабль в обратную сторону)
-        // Максимальный момент, который полностью остановит вращение за 1 кадр:
         float maxSafeDamping = Mathf.Abs(rb.angularVelocity.y) * rb.inertiaTensor.y / Time.fixedDeltaTime;
         dampingTorque = Mathf.Clamp(dampingTorque, -maxSafeDamping, maxSafeDamping);
-        
+
         float finalTorque = activeTorque + dampingTorque;
-        
-        // ГЛОБАЛЬНЫЙ КОНСТРУКЦИОННЫЙ ОГРАНИЧИТЕЛЬ ВРАЩЕНИЯ
-        float currentTurnRateDeg = rb.angularVelocity.y * Mathf.Rad2Deg;
-        if (Mathf.Abs(currentTurnRateDeg) > maxStructuralTurnRateDeg)
+        if (maxStructuralTurnRateDeg > 0f && Mathf.Abs(currentTurnRateDeg) > maxStructuralTurnRateDeg)
         {
             if (Mathf.Sign(finalTorque) == Mathf.Sign(currentTurnRateDeg))
             {
@@ -368,15 +385,48 @@ public class ShipPhysics : MonoBehaviour
                 finalTorque *= Mathf.Clamp01(1f - overspeed * 0.2f);
             }
         }
-        
-        // Ограничиваем суммарный момент для стабильности физического движка
-        finalTorque = Mathf.Clamp(finalTorque, -rb.mass * 500f, rb.mass * 500f);
-        rb.AddTorque(transform.up * finalTorque, ForceMode.Force);
 
-        // 4. Подавление бокового сноса (Киль сопротивляется воздуху)
-        Vector3 localAirVel = transform.InverseTransformDirection(airVelocity);
-        Vector3 sideAirVelocity = transform.right * localAirVel.x;
-        rb.AddForce(-sideAirVelocity * rb.mass * sideResistance, ForceMode.Force);
+        currentGyroTurnTorque = finalTorque;
+        rb.AddTorque(transform.up * finalTorque, ForceMode.Force);
+    }
+
+    private void ApplyPropellerThrust()
+    {
+        float residualPowerKw = Mathf.Max(0f, engineGeneratedPowerKw - claudiumPowerDrawKw);
+        float thrustDirection = Mathf.Sign(thrustInput);
+        float propellerEngagement = Mathf.Clamp01(Mathf.Abs(thrustInput));
+
+        propellerInputPowerKw = residualPowerKw * propellerEngagement;
+        propellerCalculatedEfficiency = Mathf.Clamp01(propellerEfficiency);
+        propellerUsefulPowerKw = propellerInputPowerKw * propellerCalculatedEfficiency;
+        if (propellerMaxSpeedMS <= 0f
+            || propellerMaxThrustKgf <= 0f
+            || propellerUsefulPowerKw <= 0f
+            || Mathf.Approximately(thrustDirection, 0f))
+        {
+            propellerCalculatedEfficiency = 0f;
+            propellerUsefulPowerKw = 0f;
+            propellerThrustKgf = 0f;
+            return;
+        }
+
+        Vector3 thrustAxis = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+        if (thrustAxis.sqrMagnitude < 0.001f)
+        {
+            thrustAxis = Quaternion.Euler(0f, transform.eulerAngles.y, 0f) * Vector3.forward;
+        }
+
+        thrustAxis.Normalize();
+        Vector3 horizontalAirVelocity = Vector3.ProjectOnPlane(rb.linearVelocity - windVelocity, Vector3.up);
+        float signedAirspeedWithThrust = Vector3.Dot(horizontalAirVelocity, thrustAxis) * thrustDirection;
+        float speedFactor = signedAirspeedWithThrust >= propellerMaxSpeedMS ? 0f : 1f;
+        float maxThrustKgf = propellerMaxThrustKgf * propellerEngagement * speedFactor;
+        float powerLimitedThrustN = propellerUsefulPowerKw * 1000f / Mathf.Max(1f, Mathf.Abs(signedAirspeedWithThrust));
+        float powerLimitedThrustKgf = powerLimitedThrustN / 9.81f;
+        float thrustKgf = Mathf.Min(maxThrustKgf, powerLimitedThrustKgf);
+
+        propellerThrustKgf = thrustKgf * thrustDirection;
+        rb.AddForce(thrustAxis * (propellerThrustKgf * 9.81f), ForceMode.Force);
     }
 
     private void UpdateRouteModeState()
@@ -394,6 +444,8 @@ public class ShipPhysics : MonoBehaviour
             routePreviousAltitudeHold = altitudeHold;
             routePreviousCruiseControl = cruiseControl;
             routePreviousHeadingHold = headingHold;
+            routePreviousPositionHold = positionHold;
+            positionHold = false;
             routeWasEnabled = true;
         }
         else if (!routeEnabled && routeWasEnabled)
@@ -401,6 +453,8 @@ public class ShipPhysics : MonoBehaviour
             altitudeHold = routePreviousAltitudeHold;
             cruiseControl = routePreviousCruiseControl;
             headingHold = routePreviousHeadingHold;
+            positionHold = routePreviousPositionHold;
+            positionHoldWasEnabled = false;
             targetSpeedMS = 0f;
             turnInput = 0f;
             routeWasEnabled = false;
@@ -434,33 +488,24 @@ public class ShipPhysics : MonoBehaviour
     {
         if (cruiseControl)
         {
-            float currentSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
+            Vector3 forward = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+            if (forward.sqrMagnitude < 0.001f)
+            {
+                forward = Quaternion.Euler(0f, transform.eulerAngles.y, 0f) * Vector3.forward;
+            }
+
+            Vector3 horizontalVelocity = rb.linearVelocity;
+            horizontalVelocity.y = 0f;
+            float currentSpeed = Vector3.Dot(horizontalVelocity, forward.normalized);
             float speedError = targetSpeedMS - currentSpeed;
             
             // Жесткость (P-терм)
             float desiredOutput = speedError * speedStiffness;
             desiredOutput = Mathf.Clamp(desiredOutput, -1f, 1f);
             
-            if (hasCSU)
-            {
-                // С CSU мы полностью отдаем шаг винта автомату, просто разрешая ему крутить на максимум вперед/назад
-                float targetPitchLimit = desiredOutput >= 0 ? 1f : -1f;
-                if (Mathf.Abs(desiredOutput) < 0.05f) targetPitchLimit = 0f; // нейтраль если скорость достигнута
-                
-                thrustInput = Mathf.MoveTowards(thrustInput, targetPitchLimit, Time.fixedDeltaTime * speedDamping * 2f);
-                
-                // А скорость регулируем исключительно подачей топлива (RPM)
-                float targetRPM = Mathf.Clamp01(Mathf.Abs(desiredOutput));
-                targetMainEngineRPM = Mathf.Lerp(targetMainEngineRPM, targetRPM, Time.fixedDeltaTime * speedDamping);
-            }
-            else
-            {
-                // Без CSU круиз-контроль "вручную" дергает шаг винта
-                thrustInput = Mathf.Lerp(thrustInput, desiredOutput, Time.fixedDeltaTime * speedDamping);
-                
-                // И поддает газу, чтобы винту было что загребать
-                targetMainEngineRPM = Mathf.Clamp01(Mathf.Abs(thrustInput) * 1.2f);
-            }
+            float response = 1f - Mathf.Exp(-Mathf.Max(0.01f, speedDamping) * 6f * Time.fixedDeltaTime);
+            thrustInput = Mathf.Lerp(thrustInput, desiredOutput, response);
+            enginePowerLever = Mathf.Lerp(enginePowerLever, Mathf.Clamp01(Mathf.Abs(desiredOutput)), response);
         }
     }
 
@@ -474,26 +519,24 @@ public class ShipPhysics : MonoBehaviour
             return;
         }
 
-        // Путевая машина берет на себя все системы
+        // Путевая машина берет на себя все системы.
         altitudeHold = true;
         cruiseControl = true;
         headingHold = true;
 
         Vector3 currentTarget = waypoints[currentWaypointIndex];
-        
-        // Проверка достижения точки (сфера радиусом waypointRadius)
-        float dist = Vector3.Distance(transform.position, currentTarget);
-        
-        // 1. Умный зачет точки (Fly-by)
-        bool isLastPoint = (currentWaypointIndex == waypoints.Count - 1);
-        bool reached = dist < waypointRadius;
-        
-        // Если пролетели мимо промежуточной точки (двигаемся от нее, находясь рядом)
-        if (!reached && !isLastPoint && dist < waypointRadius * 3f)
-        {
-            Vector3 dir = currentTarget - transform.position;
-            if (Vector3.Dot(rb.linearVelocity, dir) < 0) reached = true; 
-        }
+        float verticalError = currentTarget.y - transform.position.y;
+        Vector3 horizontalError = FlattenHorizontal(currentTarget - transform.position);
+        Vector3 horizontalVelocity = FlattenHorizontal(rb.linearVelocity);
+        float horizDist = horizontalError.magnitude;
+        float horizontalSpeed = horizontalVelocity.magnitude;
+        float verticalTolerance = Mathf.Max(1f, waypointRadius * 0.5f);
+        float arrivalSpeed = Mathf.Max(0.25f, routeArrivalSpeedMS);
+        float arrivalVerticalSpeed = Mathf.Max(0.5f, maxAutoVerticalSpeed);
+
+        bool horizontalStable = horizDist <= waypointRadius && horizontalSpeed <= arrivalSpeed;
+        bool verticalStable = Mathf.Abs(verticalError) <= verticalTolerance && Mathf.Abs(rb.linearVelocity.y) <= arrivalVerticalSpeed;
+        bool reached = horizontalStable && verticalStable;
 
         if (reached)
         {
@@ -505,252 +548,305 @@ public class ShipPhysics : MonoBehaviour
                 return;
             }
             currentTarget = waypoints[currentWaypointIndex];
-            dist = Vector3.Distance(transform.position, currentTarget);
-            isLastPoint = (currentWaypointIndex == waypoints.Count - 1);
+            verticalError = currentTarget.y - transform.position.y;
+            horizontalError = FlattenHorizontal(currentTarget - transform.position);
+            horizDist = horizontalError.magnitude;
         }
 
-        // 1. Задаем высоту
+        // 1. Задаем высоту.
         targetAltitude = currentTarget.y;
 
-        // 2. Задаем курс (с компенсацией ветра - Crabbing)
-        Vector3 dirToTarget = currentTarget - transform.position;
-        dirToTarget.y = 0; 
-        float horizDist = dirToTarget.magnitude;
-
-        if (horizDist > 0.1f)
+        if (horizDist <= waypointRadius)
         {
-            // Масштабируем желаемую путевую скорость: если далеко - летим быстро, если в упор - замедляемся
-            // Но не ниже 1 м/с, чтобы всегда иметь вектор направления
-            float targetApproachSpeed = Mathf.Clamp(horizDist * 0.5f, 1f, maxCruiseSpeedMS);
-            Vector3 desiredGroundVelocity = dirToTarget.normalized * targetApproachSpeed;
-            
-            // Требуемая воздушная скорость, чтобы получить желаемую путевую
-            Vector3 requiredAirVelocity = desiredGroundVelocity - windVelocity;
-            requiredAirVelocity.y = 0;
-            
-            // Направляем нос корабля по вектору требуемой воздушной скорости
-            float angle = Mathf.Atan2(requiredAirVelocity.x, requiredAirVelocity.z) * Mathf.Rad2Deg;
-            if (angle < 0) angle += 360f;
-            targetHeading = angle;
+            ApplyPositionHoldHorizontalControl(currentTarget, waypointRadius, Mathf.Min(propellerMaxSpeedMS, positionHoldMaxSpeedMS));
+            return;
         }
 
-        // 3. Задаем скорость
-        float desiredSpeed = maxCruiseSpeedMS;
-        
-        if (isLastPoint)
+        ApplyRouteHorizontalControl(currentTarget);
+    }
+
+    private void UpdatePositionHold()
+    {
+        if (routeEnabled) return;
+
+        if (!positionHold)
         {
-            // Для самой последней точки тормозим плавно (по 3D дистанции)
-            if (dist < 100f)
+            positionHoldWasEnabled = false;
+            return;
+        }
+
+        if (!positionHoldWasEnabled)
+        {
+            targetHoldPosition = transform.position;
+            positionHoldWasEnabled = true;
+        }
+
+        cruiseControl = true;
+        headingHold = true;
+        ApplyPositionHoldHorizontalControl(targetHoldPosition, positionHoldRadius, positionHoldMaxSpeedMS);
+    }
+
+    private void ApplyRouteHorizontalControl(Vector3 target)
+    {
+        Vector3 horizontalError = FlattenHorizontal(target - transform.position);
+        float distance = horizontalError.magnitude;
+        if (distance <= 0.1f)
+        {
+            ApplyPositionHoldHorizontalControl(target, waypointRadius, positionHoldMaxSpeedMS);
+            return;
+        }
+
+        Vector3 directionToTarget = horizontalError / distance;
+        float maxSpeed = Mathf.Max(0f, propellerMaxSpeedMS);
+        float stopDistance = Mathf.Max(0f, distance - waypointRadius);
+        float brakeAcceleration = Mathf.Max(0.25f, routeBrakeAccelerationMS2);
+        float desiredSpeed = Mathf.Min(maxSpeed, Mathf.Sqrt(2f * brakeAcceleration * stopDistance));
+
+        Vector3 desiredGroundVelocity = directionToTarget * desiredSpeed;
+        Vector3 requiredAirVelocity = desiredGroundVelocity - FlattenHorizontal(windVelocity);
+        Vector3 headingVector = requiredAirVelocity.sqrMagnitude > 0.04f ? requiredAirVelocity : directionToTarget;
+
+        targetHeading = HeadingFromVector(headingVector);
+
+        float headingError = Mathf.Abs(Mathf.DeltaAngle(transform.eulerAngles.y, targetHeading));
+        desiredSpeed *= CalculateRouteHeadingSpeedFactor(headingError);
+        targetSpeedMS = Mathf.Clamp(desiredSpeed, 0f, maxSpeed);
+    }
+
+    private void ApplyPositionHoldHorizontalControl(Vector3 target, float radius, float maxSpeed)
+    {
+        Vector3 horizontalError = FlattenHorizontal(target - transform.position);
+        Vector3 horizontalVelocity = FlattenHorizontal(rb.linearVelocity);
+        Vector3 correctionVelocity = horizontalError * Mathf.Max(0f, positionHoldStiffness)
+            - horizontalVelocity * Mathf.Max(0f, positionHoldDamping);
+
+        correctionVelocity = Vector3.ClampMagnitude(correctionVelocity, Mathf.Max(0f, maxSpeed));
+
+        Vector3 headingVector = correctionVelocity;
+        if (headingVector.sqrMagnitude < 0.04f)
+        {
+            if (horizontalVelocity.sqrMagnitude > 0.04f)
             {
-                float stopFactor = Mathf.InverseLerp(waypointRadius * 0.5f, 100f, dist);
-                desiredSpeed = Mathf.Lerp(0f, maxCruiseSpeedMS, stopFactor);
+                headingVector = -horizontalVelocity;
             }
+            else
+            {
+                Vector3 windHorizontal = FlattenHorizontal(windVelocity);
+                if (windHorizontal.sqrMagnitude > 0.04f)
+                {
+                    headingVector = -windHorizontal;
+                }
+            }
+        }
+
+        if (headingVector.sqrMagnitude > 0.04f)
+        {
+            targetHeading = HeadingFromVector(headingVector);
+        }
+
+        float desiredSpeed = correctionVelocity.magnitude;
+        if (horizontalError.magnitude <= Mathf.Max(0.1f, radius) && correctionVelocity.sqrMagnitude < 0.25f)
+        {
+            desiredSpeed = 0f;
+        }
+
+        float headingError = Mathf.Abs(Mathf.DeltaAngle(transform.eulerAngles.y, targetHeading));
+        desiredSpeed *= CalculateRouteHeadingSpeedFactor(headingError);
+        targetSpeedMS = Mathf.Clamp(desiredSpeed, 0f, Mathf.Max(0f, maxSpeed));
+    }
+
+    private static Vector3 FlattenHorizontal(Vector3 value)
+    {
+        value.y = 0f;
+        return value;
+    }
+
+    private static float HeadingFromVector(Vector3 value)
+    {
+        float angle = Mathf.Atan2(value.x, value.z) * Mathf.Rad2Deg;
+        return angle < 0f ? angle + 360f : angle;
+    }
+
+    private float CalculateRouteHeadingSpeedFactor(float headingErrorDeg)
+    {
+        float normalized = 1f - Mathf.Clamp01(Mathf.Abs(headingErrorDeg) / 45f);
+        return Mathf.SmoothStep(0f, 1f, normalized);
+    }
+
+    private void UpdateSimplifiedClaudium()
+    {
+        if (rb == null) rb = GetComponent<Rigidbody>();
+
+        currentGasLift = 0f;
+        float dt = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+        float requestedLiftKg = CalculateDesiredClaudiumLiftKg();
+        if (claudiumMaxLiftKg > 0f)
+        {
+            requestedLiftKg = Mathf.Min(requestedLiftKg, claudiumMaxLiftKg);
         }
         else
         {
-            // Для промежуточных точек: замедляемся, но сохраняем напор, чтобы пробить ветер
-            if (horizDist < 60f) 
+            requestedLiftKg = 0f;
+        }
+
+        bool hasClaudium = claudiumStock > 0f;
+        bool canLift = enginePowerKwAt100 > 0f
+            && hasClaudium
+            && claudiumLiftEfficiency > 0f;
+
+        float requestedPowerKw = canLift ? CalculateClaudiumPowerKwForLift(requestedLiftKg) : 0f;
+        UpdateEnginePowerOutput(requestedPowerKw);
+
+        float targetLiftN = 0f;
+        if (!hasClaudium)
+        {
+            claudiumCurrentLiftN = 0f;
+            claudiumPowerDrawWatts = 0f;
+            claudiumPowerDrawKw = 0f;
+            claudiumRequestedLiftKg = requestedLiftKg;
+            activeLiftForce = 0f;
+            return;
+        }
+
+        if (canLift)
+        {
+            float powerForLiftKw = Mathf.Min(requestedPowerKw, engineGeneratedPowerKw);
+            targetLiftN = powerForLiftKw * claudiumLiftEfficiency * 9.81f;
+        }
+
+        float smoothing = claudiumLiftSmoothing <= 0f ? 1f : 1f - Mathf.Exp(-claudiumLiftSmoothing * dt);
+        claudiumCurrentLiftN = Mathf.Lerp(claudiumCurrentLiftN, targetLiftN, smoothing);
+        if (claudiumCurrentLiftN < 0.001f)
+        {
+            claudiumCurrentLiftN = 0f;
+        }
+
+        claudiumRequestedLiftKg = requestedLiftKg;
+        claudiumPowerDrawKw = claudiumLiftEfficiency > 0f ? CalculateClaudiumPowerKwForLift(claudiumCurrentLiftN / 9.81f) : 0f;
+        claudiumPowerDrawWatts = claudiumPowerDrawKw * 1000f;
+
+        float supportedTons = Mathf.Max(0f, claudiumCurrentLiftN / 9.81f) / 1000f;
+        float consumption = claudiumConsumptionPerTonSecond * supportedTons * dt;
+        if (consumption > 0f)
+        {
+            if (claudiumStock >= consumption)
             {
-                desiredSpeed = Mathf.Lerp(minNavSpeed, maxCruiseSpeedMS, horizDist / 60f);
+                claudiumStock -= consumption;
             }
-            
-            // Если мы всё еще не в сфере, не сбрасываем скорость до нуля! 
-            // Иначе ветер нас унесет раньше, чем мы коснемся центра.
-            if (dist > waypointRadius * 1.5f)
+            else
             {
-                desiredSpeed = Mathf.Max(desiredSpeed, minNavSpeed);
+                float availableFraction = Mathf.Clamp01(claudiumStock / consumption);
+                claudiumStock = 0f;
+                claudiumCurrentLiftN *= availableFraction;
+                claudiumPowerDrawKw *= availableFraction;
+                claudiumPowerDrawWatts = claudiumPowerDrawKw * 1000f;
             }
         }
 
-        targetSpeedMS = Mathf.Clamp(desiredSpeed, 0f, maxCruiseSpeedMS);
+        activeLiftForce = claudiumCurrentLiftN;
+    }
+
+    private float CalculateClaudiumPowerKwForLift(float liftKg)
+    {
+        if (claudiumLiftEfficiency <= 0f) return 0f;
+        return Mathf.Max(0f, liftKg) / claudiumLiftEfficiency;
+    }
+
+    private void UpdateEnginePowerOutput(float minimumPowerKw)
+    {
+        float maxLever = 1.2f;
+        engineMinimumPowerLever = enginePowerKwAt100 > 0f ? Mathf.Clamp(minimumPowerKw / enginePowerKwAt100, 0f, maxLever) : 0f;
+        enginePowerLever = Mathf.Clamp(enginePowerLever, engineMinimumPowerLever, maxLever);
+
+        engineGeneratedPowerKw = Mathf.Max(0f, enginePowerKwAt100) * enginePowerLever;
+        engineEfficiencyCurrent = Mathf.Clamp01(engineFuelEfficiency);
+        engineHasFuel = engineFuelStockKg > 0f;
+        engineFuelConsumptionKgPerSecond = 0f;
+
+        if (engineGeneratedPowerKw <= 0f || engineEfficiencyCurrent <= 0f || engineFuelEnergyKwhPerKg <= 0f)
+        {
+            engineGeneratedPowerKw = 0f;
+            return;
+        }
+
+        engineFuelConsumptionKgPerSecond = engineGeneratedPowerKw / engineEfficiencyCurrent / engineFuelEnergyKwhPerKg / 3600f;
+        float requestedFuel = engineFuelConsumptionKgPerSecond * Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+        if (engineFuelStockKg >= requestedFuel)
+        {
+            engineFuelStockKg -= requestedFuel;
+            return;
+        }
+
+        float availableFraction = requestedFuel > 0f ? Mathf.Clamp01(engineFuelStockKg / requestedFuel) : 0f;
+        engineFuelStockKg = 0f;
+        engineGeneratedPowerKw *= availableFraction;
+        engineFuelConsumptionKgPerSecond *= availableFraction;
+        engineHasFuel = false;
+    }
+
+    private float CalculateDesiredClaudiumLiftKg()
+    {
+        if (rb == null) rb = GetComponent<Rigidbody>();
+
+        float mass = rb != null ? rb.mass : baseMass;
+        float trimMass = Mathf.Max(1f, targetTrimMass > 0f ? targetTrimMass : mass);
+
+        if (altitudeHold && rb != null)
+        {
+            if (!wasAltitudeHold)
+            {
+                targetAltitude = rb.position.y;
+                wasAltitudeHold = true;
+                altIntegral = 0f;
+            }
+
+            targetAltitude += liftInput * 8.0f * Time.fixedDeltaTime;
+
+            float currentAcceleration = (claudiumCurrentLiftN / Mathf.Max(mass, 1f)) - 9.81f;
+            float lookAheadTime = 1.2f;
+            float predictedHeight = rb.position.y + rb.linearVelocity.y * lookAheadTime + 0.5f * currentAcceleration * lookAheadTime * lookAheadTime;
+            float altitudeError = targetAltitude - predictedHeight;
+
+            if (Mathf.Abs(altitudeError) > altDriftTolerance)
+            {
+                altIntegral += (targetAltitude - rb.position.y) * Time.fixedDeltaTime * 0.05f;
+                altIntegral = Mathf.Clamp(altIntegral, -0.25f, 0.25f);
+            }
+
+            float targetVerticalSpeed = 0f;
+            if (Mathf.Abs(altitudeError) > 0.001f)
+            {
+                targetVerticalSpeed = Mathf.Sqrt(2f * 0.25f * Mathf.Abs(altitudeError)) * Mathf.Sign(altitudeError);
+                targetVerticalSpeed = Mathf.Clamp(targetVerticalSpeed, -maxAutoVerticalSpeed, maxAutoVerticalSpeed);
+            }
+
+            float velocityError = targetVerticalSpeed - rb.linearVelocity.y;
+            float desiredAcceleration = velocityError * altDamping - currentAcceleration * 1.5f + altIntegral + liftInput * 0.1f;
+            float requestedKg = mass * Mathf.Max(0f, 9.81f + desiredAcceleration) / 9.81f;
+
+            if (rb.linearVelocity.y > maxStructuralVerticalSpeed * 0.9f)
+            {
+                float speedFactor = Mathf.InverseLerp(maxStructuralVerticalSpeed, maxStructuralVerticalSpeed * 0.9f, rb.linearVelocity.y);
+                requestedKg *= speedFactor;
+            }
+
+            return requestedKg;
+        }
+
+        wasAltitudeHold = false;
+        altIntegral = 0f;
+        return Mathf.Max(0f, trimMass * (1f + liftInput * 0.1f));
     }
 
     void UpdateClaudium()
     {
-        // 1. Статика от баллона (для телеметрии)
-        bool isBalloonActive = (balloonModule != null && balloonModule.gameObject.activeSelf);
-        currentGasLift = isBalloonActive ? balloonModule.GetStaticLiftNewtons() : 0f;
-        
-        // 2. Работа контура
-        bool isLoopActive = (claudiumLoop != null && claudiumLoop.gameObject.activeSelf);
-        if (isLoopActive && liftEngine != null)
-        {
-            // Теперь мощность передается не линейно, а КУБИЧЕСКИ (как в реальных насосах)
-            // P = P_max * (RPM/RPM_max)^3
-            float rpmFactor = liftEngine.currentRPM;
-            float engineOutputWatts = liftEngine.maxPower * 735.5f * (rpmFactor * rpmFactor * rpmFactor);
-            
-            // Передаем тепло от двигателя в контур
-            claudiumLoop.теплоОтДвигателяВт = liftEngine.wasteHeatWatts;
-            
-            // Рассчитываем физику внутри контура (силы, трение, расход)
-            claudiumLoop.UpdatePhysics(engineOutputWatts, Time.fixedDeltaTime);
-            
-            // Нагрузка на двигатель определяется тем, сколько мощности "съедает" трение в контуре
-            float frictionPowerHP = claudiumLoop.GetRequiredPowerWatts() / 735.5f;
-            liftEngine.currentLoad = frictionPowerHP / liftEngine.maxPower;
-            
-            activeLiftForce = claudiumLoop.создаваемаяСилаН;
-        }
-        else if (liftEngine != null)
-        {
-            liftEngine.currentLoad = 0f;
-            activeLiftForce = 0f;
-            
-            // Если двигатель выключен, контур все равно должен обновлять физику (для инерции затухания)
-            if (isLoopActive) claudiumLoop.UpdatePhysics(0, Time.fixedDeltaTime);
-        }
+        UpdateSimplifiedClaudium();
     }
 
     private void UpdateEngineThrottles()
     {
-        bool isLoopActive = (claudiumLoop != null && claudiumLoop.gameObject.activeSelf);
-
-        // 1. Управление подъемной системой (Иерархическое)
-        if (liftEngine != null)
-        {
-            float maxLiftCapacity = liftEngine.maxPower * liftEfficiency;
-            float baseTargetRPM = 0f;
-            if (maxLiftCapacity > 0)
-            {
-                // Триммирование только в плюс (никакой прижимной силы)
-                float requiredActiveLiftKg = targetTrimMass - (currentGasLift / 9.81f);
-                float clampedRequiredLift = Mathf.Clamp(requiredActiveLiftKg, 0, maxLiftCapacity * 0.9f);
-                
-                baseTargetRPM = clampedRequiredLift / maxLiftCapacity;
-            }
-
-            float inputMod = 0f;
-            bool forceVenting = false;
-
-            if (altitudeHold)
-            {
-                if (!wasAltitudeHold)
-                {
-                    targetAltitude = rb.position.y;
-                    wasAltitudeHold = true;
-                    altIntegral = 0f; // Сбрасываем память при включении
-                }
-
-                // 1. Плавное движение цели
-                targetAltitude += liftInput * 8.0f * Time.fixedDeltaTime; 
-                
-                // 1.1 ПРОГНОЗ: Где мы будем через 1.2 сек?
-                // Учитываем текущую скорость и ускорение, чтобы "увидеть будущее"
-                float currentA = (activeLiftForce + currentGasLift) / rb.mass - 9.81f;
-                float lookAheadTime = 1.2f; // Секунд прогноза
-                float predictedHeight = rb.position.y + rb.linearVelocity.y * lookAheadTime + 0.5f * currentA * (lookAheadTime * lookAheadTime);
-                
-                float altError = targetAltitude - predictedHeight;
-                float currentVVel = rb.linearVelocity.y;
-                
-                // 1.2 Интегратор (I-терм): Накапливаем ошибку, чтобы идеально выровнять вес
-                if (Mathf.Abs(altError) > altDriftTolerance)
-                {
-                    altIntegral += (targetAltitude - rb.position.y) * Time.fixedDeltaTime * 0.05f;
-                    altIntegral = Mathf.Clamp(altIntegral, -0.2f, 0.2f);
-                }
-
-                // 2. АЛГОРИТМ БЕЗ ПРОМАХА (На прогнозируемую высоту)
-                float maxDecel = 0.25f; // Еще более осторожное торможение
-                float targetVVel = 0f;
-                if (Mathf.Abs(altError) > 0)
-                {
-                    targetVVel = Mathf.Sqrt(2f * maxDecel * Mathf.Abs(altError)) * Mathf.Sign(altError);
-                    targetVVel = Mathf.Clamp(targetVVel, -maxAutoVerticalSpeed, maxAutoVerticalSpeed);
-                }
-                
-                // 4. ИТОГОВЫЙ КОНТРОЛЬ
-                float velocityError = targetVVel - currentVVel;
-                float accelerationDamping = currentA * 2.0f; // Усилил гашение рывков
-                
-                inputMod = (velocityError * altDamping) - accelerationDamping + altIntegral + (liftInput * 0.1f);
-                
-                // Сброс газа при перелете
-                if (velocityError < -0.2f && liftEngine.currentRPM < 0.2f) forceVenting = true;
-
-                inputMod = Mathf.Clamp(inputMod, -0.6f, 0.6f);
-            }
-            else
-            {
-                wasAltitudeHold = false;
-                altIntegral = 0f;
-                inputMod = liftInput * 0.4f;
-                if (liftInput < -0.9f) forceVenting = true;
-            }
-
-            // --- ГЛОБАЛЬНЫЙ КОНСТРУКЦИОННЫЙ ОГРАНИЧИТЕЛЬ ---
-            // Если скорость уже выше предела, режем любой положительный ввод
-            float vVel = rb.linearVelocity.y;
-            float finalTargetRPM = baseTargetRPM + inputMod;
-            
-            if (vVel > maxStructuralVerticalSpeed * 0.9f)
-            {
-                // Плавное снижение тяги при приближении к физическому пределу
-                float speedFactor = Mathf.InverseLerp(maxStructuralVerticalSpeed, maxStructuralVerticalSpeed * 0.9f, vVel);
-                finalTargetRPM *= speedFactor;
-            }
-
-            // Устанавливаем обороты двигателя (минимум 10% в самом двигателе)
-            liftEngine.targetRPM = Mathf.Clamp01(finalTargetRPM);
-
-            if (isLoopActive)
-            {
-                // ЛОГИКА МУФТЫ СЦЕПЛЕНИЯ
-                float requestedRPM = baseTargetRPM + inputMod;
-                float clutchEngagement = 1.0f;
-                
-                // Если мы хотим меньше тяги, чем дает холостой ход (0.1), проскальзываем муфтой
-                if (requestedRPM < 0.1f)
-                {
-                    clutchEngagement = Mathf.Clamp01(requestedRPM / 0.1f);
-                }
-                
-                float rpmFactor = liftEngine.currentRPM;
-                float enginePowerWatts = liftEngine.maxPower * 735.5f * (rpmFactor * rpmFactor * rpmFactor);
-                
-                // Насос получает мощность через муфту (проскальзывание)
-                float pumpPowerWatts = enginePowerWatts * clutchEngagement;
-                
-                claudiumLoop.UpdatePhysics(pumpPowerWatts, Time.fixedDeltaTime);
-                claudiumLoop.теплоОтДвигателяВт = liftEngine.wasteHeatWatts;
-            }
-
-            if (balloonModule != null)
-            {
-                // ТЕПЕРЬ УЧИТЫВАЕМ ИНЕРЦИЮ ЖИДКОСТИ:
-                // Не сбрасываем газ, пока жидкость в трубах еще крутится и дает подъемную силу.
-                bool flowStopped = (claudiumLoop == null) || (claudiumLoop.скоростьПотока_мс < 0.5f);
-                
-                // УМНЫЙ СБРОС: Газ сбрасываем ТОЛЬКО если:
-                // 1. Двигатель на холостых.
-                // 2. Жидкость в трубах ПОЧТИ ОСТАНОВИЛАСЬ.
-                // 3. Баллон все еще перекачан выше веса корабля.
-                bool balloonTooStrong = currentGasLift > (targetTrimMass * 9.81f * 1.02f);
-                
-                bool shouldVent = forceVenting && (liftEngine.currentRPM < 0.15f) && flowStopped && balloonTooStrong;
-                balloonModule.valveOpen = shouldVent;
-            }
-        }
-
-        // 2. Управление маршевым двигателем
-        if (thrustEngine != null)
-        {
-            if (hasCSU)
-            {
-                // УМНЫЙ РЕЖИМ (CSU): Игрок задает целевые обороты
-                thrustEngine.targetRPM = targetMainEngineRPM;
-                
-                // Автомат шага (CSU) сам управляет propellerPitch в FixedUpdate, 
-                // опираясь на нагрузку (currentLoad). Здесь больше не нужно жестко его перезаписывать.
-            }
-            else
-            {
-                // РУЧНОЙ РЕЖИМ: Газ и Шаг раздельно (Газом управляет та же ручка, что и оборотами в CSU)
-                thrustEngine.targetRPM = targetMainEngineRPM; 
-                propellerPitch = thrustInput;             // Ручка шага напрямую
-            }
-        }
+        enginePowerLever = Mathf.Clamp(enginePowerLever, 0f, 1.2f);
+        propellerPitch = Mathf.Clamp(thrustInput, -1f, 1f);
     }
 
     private void OnDrawGizmos()
@@ -762,6 +858,12 @@ public class ShipPhysics : MonoBehaviour
             Vector3 startPos = transform.position + Vector3.up * 10f; // Чуть выше корабля
             Gizmos.DrawLine(startPos, startPos + windVelocity);
             Gizmos.DrawWireSphere(startPos + windVelocity, 1f); // Наконечник
+        }
+
+        if (positionHold)
+        {
+            Gizmos.color = new Color(1f, 0.85f, 0f, 0.6f);
+            Gizmos.DrawWireSphere(targetHoldPosition, Mathf.Max(0.1f, positionHoldRadius));
         }
 
         if (waypoints == null || waypoints.Count == 0) return;

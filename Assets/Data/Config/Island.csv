@@ -1,0 +1,27 @@
+﻿id_island,local_name_ru,local_name_en,position_x,position_y,position_z,Island_production,docking_radius,time_for_one_item_load
+Island1,Остров Еда 1,Island Food 1,34974,8812,52512,Island_production_food,10,1.5
+Island2,Остров Уголь 1,Island Charcoal 1,48436,7722,-51008,Island_production_charcoal,10,1.5
+Island3,Остров Сера 1,Island Sulfur 1,78708,2075,16539,Island_production_sulfur,10,1.5
+Island4,Остров Металл 1,Island Metal 1,81144,5902,9405,Island_production_metal,10,1.5
+Island5,Остров Инструменты 1,Island Tools 1,15582,1091,-94442,Island_production_tools,10,1.5
+Island6,Остров Древесина 1,Island Wood 1,-68566,2542,-24291,Island_production_wood,10,1.5
+Island7,Остров Медикаменты 1,Island Medicines 1,93560,3409,-61957,Island_production_medicines,10,1.5
+Island8,Остров Спирт 1,Island Alcohol 1,89106,7449,99486,Island_production_alcohol,10,1.5
+Island9,Остров Порох 1,Island Gunpowder 1,43973,2416,-1091,Island_production_gunpowder,10,1.5
+Island10,Остров Механизмы 1,Island Mechanisms 1,20332,517,-89820,Island_production_mechanisms,10,1.5
+Island11,Остров Жир 1,Island Fat 1,-35400,5023,63277,Island_production_fat,10,1.5
+Island12,Остров Вода 1,Island Water 1,51235,4163,-28353,Island_production_water,10,1.5
+Island13,Остров Ткань 1,Island Cloth 1,48105,937,71137,Island_production_cloth,10,1.5
+Island14,Остров Еда 2,Island Food 2,71109,5865,72237,Island_production_food,10,1.5
+Island15,Остров Уголь 2,Island Charcoal 2,8241,9396,-93567,Island_production_charcoal,10,1.5
+Island16,Остров Сера 2,Island Sulfur 2,86359,4761,-61786,Island_production_sulfur,10,1.5
+Island17,Остров Металл 2,Island Metal 2,76912,7004,59746,Island_production_metal,10,1.5
+Island18,Остров Инструменты 2,Island Tools 2,53148,6479,-74644,Island_production_tools,10,1.5
+Island19,Остров Древесина 2,Island Wood 2,81710,7548,82509,Island_production_wood,10,1.5
+Island20,Остров Медикаменты 2,Island Medicines 2,67611,6939,9090,Island_production_medicines,10,1.5
+Island21,Остров Спирт 2,Island Alcohol 2,42836,6788,42957,Island_production_alcohol,10,1.5
+Island22,Остров Порох 2,Island Gunpowder 2,56813,2986,-37306,Island_production_gunpowder,10,1.5
+Island23,Остров Механизмы 2,Island Mechanisms 2,5104,8816,-81528,Island_production_mechanisms,10,1.5
+Island24,Остров Жир 2,Island Fat 2,54202,7499,92503,Island_production_fat,10,1.5
+Island25,Остров Вода 2,Island Water 2,-71844,1502,-17628,Island_production_water,10,1.5
+Island26,Остров Ткань 2,Island Cloth 2,-24212,796,-51893,Island_production_cloth,10,1.5

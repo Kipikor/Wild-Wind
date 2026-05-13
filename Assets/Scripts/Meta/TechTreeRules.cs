@@ -26,31 +26,31 @@ public static class TechTreeRules
 
         if (node == null)
         {
-            reason = "Node is missing.";
+            reason = "Узел не найден.";
             return false;
         }
 
         if (progress == null)
         {
-            reason = "Progress is missing.";
+            reason = "Прогресс игрока не найден.";
             return false;
         }
 
         if (node.isPremium)
         {
-            reason = "Premium nodes do not need research.";
+            reason = "Премиум-узлы не требуют исследования.";
             return false;
         }
 
         if (progress.IsNodeResearched(node.nodeId))
         {
-            reason = "Node is already researched.";
+            reason = "Узел уже исследован.";
             return false;
         }
 
         if (!HasAccess(node, progress))
         {
-            reason = "No prerequisite path is researched.";
+            reason = "Не исследовано ни одно условие доступа.";
             return false;
         }
 
@@ -61,7 +61,7 @@ public static class TechTreeRules
 
         if (!TryFindExperienceShip(node, progress, node.researchCostXp, out experienceShipId))
         {
-            reason = "Not enough experience on an allowed ship.";
+            reason = "Недостаточно опыта на подходящем корабле или корпусе.";
             return false;
         }
 
@@ -74,38 +74,44 @@ public static class TechTreeRules
 
         if (node == null)
         {
-            reason = "Node is missing.";
+            reason = "Узел не найден.";
             return false;
         }
 
         if (progress == null)
         {
-            reason = "Progress is missing.";
+            reason = "Прогресс игрока не найден.";
+            return false;
+        }
+
+        if (!node.RequiresPurchase)
+        {
+            reason = "Фундаментальные исследования не покупаются за деньги.";
             return false;
         }
 
         if (progress.IsNodePurchased(node.nodeId))
         {
-            reason = "Node is already purchased.";
+            reason = "Узел уже куплен.";
             return false;
         }
 
         bool researchSatisfied = node.isPremium || progress.IsNodeResearched(node.nodeId) || node.startsResearched;
         if (!researchSatisfied)
         {
-            reason = "Node is not researched.";
+            reason = "Узел еще не исследован.";
             return false;
         }
 
         if (!HasAccess(node, progress) && !node.isPremium)
         {
-            reason = "No prerequisite path is researched.";
+            reason = "Не исследовано ни одно условие доступа.";
             return false;
         }
 
         if (progress.money < node.purchasePrice)
         {
-            reason = "Not enough money.";
+            reason = "Недостаточно денег.";
             return false;
         }
 
@@ -115,7 +121,7 @@ public static class TechTreeRules
     private static bool TryFindExperienceShip(TechTreeNode node, PlayerProgress progress, int requiredXp, out string shipId)
     {
         shipId = "";
-        List<string> sourceIds = node.experienceShipIds;
+        List<string> sourceIds = node.experienceShipIds ?? new List<string>();
 
         for (int i = 0; i < sourceIds.Count; i++)
         {
@@ -127,10 +133,18 @@ public static class TechTreeRules
             }
         }
 
-        string fallbackShipId = node.kind == TechTreeNodeKind.Module ? node.parentShipId : node.EffectiveShipId;
-        if (!string.IsNullOrWhiteSpace(fallbackShipId) && progress.GetShipExperience(fallbackShipId) >= requiredXp)
+        if (TryUseExperienceSource(progress.selectedHullId, progress, requiredXp, out shipId)) return true;
+        if (TryUseExperienceSource(node.EffectivePartId, progress, requiredXp, out shipId)) return true;
+
+        return false;
+    }
+
+    private static bool TryUseExperienceSource(string sourceId, PlayerProgress progress, int requiredXp, out string shipId)
+    {
+        shipId = "";
+        if (!string.IsNullOrWhiteSpace(sourceId) && progress.GetShipExperience(sourceId) >= requiredXp)
         {
-            shipId = fallbackShipId;
+            shipId = sourceId;
             return true;
         }
 

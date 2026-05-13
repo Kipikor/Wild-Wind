@@ -24,10 +24,16 @@ public class DockingPort : MonoBehaviour
     [InspectorName("Автостыковка в радиусе")]
     [Tooltip("Если включено, корабль автоматически перейдет в режим стыковки при входе в радиус.")]
     public bool autoDockWhenInRange = true;
+    [InspectorName("Ждать выхода из текущего дока")]
+    [Tooltip("Если корабль начал вылет из этого дока, автостыковка сработает только после того, как корабль сначала покинет радиус. Это не дает свободному вылету сразу вернуться в стыковку.")]
+    public bool requireLeaveBeforeRedocking = true;
     [InspectorName("Точка привязки")]
     public Transform snapPoint;
 
     public Vector3 DockPosition => snapPoint != null ? snapPoint.position : transform.position;
+
+    private bool leftRadiusSinceFlightStart;
+    private GameSessionMode lastObservedMode;
 
     private void Reset()
     {
@@ -51,11 +57,40 @@ public class DockingPort : MonoBehaviour
     private void Update()
     {
         if (!autoDockWhenInRange || !canEndSession || metaGameState == null || targetShip == null) return;
-        if (metaGameState.CurrentMode != GameSessionMode.Flight) return;
-        if (!Contains(targetShip.transform.position)) return;
+
+        GameSessionMode currentMode = metaGameState.CurrentMode;
+        bool inside = Contains(targetShip.transform.position);
+
+        if (currentMode != lastObservedMode)
+        {
+            lastObservedMode = currentMode;
+            leftRadiusSinceFlightStart = currentMode == GameSessionMode.Flight && !inside;
+        }
+
+        if (currentMode != GameSessionMode.Flight) return;
+
+        if (requireLeaveBeforeRedocking && IsCurrentDock() && !leftRadiusSinceFlightStart)
+        {
+            if (!inside)
+            {
+                leftRadiusSinceFlightStart = true;
+            }
+
+            return;
+        }
+
+        if (!inside) return;
 
         targetShip.transform.position = DockPosition;
         metaGameState.DockAt(dockId, kind);
+    }
+
+    private bool IsCurrentDock()
+    {
+        return metaGameState != null
+            && metaGameState.progress != null
+            && !string.IsNullOrWhiteSpace(dockId)
+            && metaGameState.progress.currentDockId == dockId;
     }
 
     public bool Contains(Vector3 position)

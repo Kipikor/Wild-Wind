@@ -5,7 +5,7 @@ using UnityEditor;
 public class ShipPhysicsEditor : Editor
 {
     private SerializedProperty baseMassProp;
-    private SerializedProperty liftEfficiencyProp;
+    private SerializedProperty hullMaxTakeoffMassKgProp;
     private SerializedProperty thrustEfficiencyProp;
     private SerializedProperty airDensityProp;
     private SerializedProperty dragCoefficientProp;
@@ -17,8 +17,6 @@ public class ShipPhysicsEditor : Editor
     private SerializedProperty cruiseControlProp;
     private SerializedProperty speedStiffnessProp;
     private SerializedProperty speedDampingProp;
-    private SerializedProperty maxManualSpeedMSProp;
-    private SerializedProperty maxCruiseSpeedMSProp;
     private SerializedProperty targetAltitudeProp;
     private SerializedProperty altStiffnessProp;
     private SerializedProperty altDampingProp;
@@ -27,11 +25,16 @@ public class ShipPhysicsEditor : Editor
     private SerializedProperty thrustInputProp;
     private SerializedProperty turnInputProp;
     private SerializedProperty targetTrimMassProp;
+    private bool resourceCheatsExpanded = true;
+    private WorldConfigDatabase resourceCheatConfig;
+    private string resourceCheatConfigFolder = "";
+    private string customCheatResourceId = "";
+    private int customCheatAmount = 1;
 
     private void OnEnable()
     {
         baseMassProp = serializedObject.FindProperty("baseMass");
-        liftEfficiencyProp = serializedObject.FindProperty("liftEfficiency");
+        hullMaxTakeoffMassKgProp = serializedObject.FindProperty("hullMaxTakeoffMassKg");
         thrustEfficiencyProp = serializedObject.FindProperty("thrustEfficiency");
         airDensityProp = serializedObject.FindProperty("airDensity");
         dragCoefficientProp = serializedObject.FindProperty("dragCoefficient");
@@ -43,8 +46,6 @@ public class ShipPhysicsEditor : Editor
         cruiseControlProp = serializedObject.FindProperty("cruiseControl");
         speedStiffnessProp = serializedObject.FindProperty("speedStiffness");
         speedDampingProp = serializedObject.FindProperty("speedDamping");
-        maxManualSpeedMSProp = serializedObject.FindProperty("maxManualSpeedMS");
-        maxCruiseSpeedMSProp = serializedObject.FindProperty("maxCruiseSpeedMS");
         targetAltitudeProp = serializedObject.FindProperty("targetAltitude");
         altStiffnessProp = serializedObject.FindProperty("altStiffness");
         altDampingProp = serializedObject.FindProperty("altDamping");
@@ -60,38 +61,28 @@ public class ShipPhysicsEditor : Editor
         serializedObject.Update();
         ShipPhysics ship = (ShipPhysics)target;
 
-        EditorGUILayout.LabelField("Паспорт корабля", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("shipDefinition"), new GUIContent("Ассет паспорта"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("applyDefinitionOnAwake"), new GUIContent("Применять при старте"));
-
-        EditorGUILayout.BeginHorizontal();
-        EditorGUI.BeginDisabledGroup(ship.shipDefinition == null);
-        if (GUILayout.Button("Применить паспорт"))
-        {
-            serializedObject.ApplyModifiedProperties();
-            Undo.RecordObject(ship, "Apply Ship Definition");
-            ship.ApplyShipDefinition();
-            EditorUtility.SetDirty(ship);
-            serializedObject.Update();
-        }
-        EditorGUI.EndDisabledGroup();
-
-        if (GUILayout.Button("Создать из текущего"))
-        {
-            serializedObject.ApplyModifiedProperties();
-            CreateDefinitionFromCurrentShip(ship);
-            serializedObject.Update();
-        }
-        EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.Space(10);
-
         EditorGUILayout.LabelField("Базовые настройки", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(baseMassProp, new GUIContent("Базовая масса (кг)"));
-        EditorGUILayout.PropertyField(liftEfficiencyProp, new GUIContent("Эфф. подъемной силы"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerDiameter"), new GUIContent("Диаметр винта (м)"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerEfficiency"), new GUIContent("КПД винта (0.7-0.85)"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerMaxPitchMeters"), new GUIContent("Геометр. шаг (м/об)"));
+        EditorGUILayout.PropertyField(hullMaxTakeoffMassKgProp, new GUIContent("Макс. взлетная масса корпуса (кг)", "Предельная полная масса корабля вместе с грузом, которую разрешает корпус."));
+        EditorGUILayout.LabelField("Текущая масса с грузом", ship.GetTotalMassKg().ToString("F0") + " кг");
+        DrawResourceCheats(ship);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerMaxSpeedMS"), new GUIContent("Макс. скорость винта (м/с)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerEfficiency"), new GUIContent("КПД мощности винта"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerMaxThrustKgf"), new GUIContent("Макс. тяга винта (кгс)"));
+
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Двигатель", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("enginePowerKwAt100"), new GUIContent("Мощность на 100%, кВт"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("engineFuelId"), new GUIContent("Топливо"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("engineFuelEfficiency"), new GUIContent("КПД топлива"));
+
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Клавдиевый контур", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumResourceId"), new GUIContent("Ресурс клавдия"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumConsumptionPerTonSecond"), new GUIContent("Расход на тонну в секунду", "Сколько клавдия тратится в секунду на одну тонну поддерживаемой массы."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumLiftEfficiency"), new GUIContent("КПД подъема", "Сколько килограммов подъема дает один киловатт мощности двигателя."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumMaxLiftKg"), new GUIContent("Макс. подъем, кг", "Максимальная масса, которую контур может поддерживать."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumLiftSmoothing"), new GUIContent("Сглаживание подъема", "Как быстро контур выходит на запрошенную подъемную силу."));
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Аэродинамика", EditorStyles.boldLabel);
@@ -114,153 +105,109 @@ public class ShipPhysicsEditor : Editor
             "• 2.00+ : Раскрытый парашют или ковш", 
             MessageType.None);
 
-        // Расчет и вывод максимальной скорости (л.с. + физика винта)
+        // Расчет и вывод максимальной скорости по новой кВт-модели винта
         float currentAirDensity = airDensityProp.floatValue;
         float currentDrag = 0.5f * currentAirDensity * dragCoefficientProp.floatValue * frontalAreaProp.floatValue;
         
-        // Учитываем множитель баллона, как в ShipPhysics.cs
-        float aeroMultiplier = (ship.balloonModule != null && ship.balloonModule.gameObject.activeSelf) ? 5.0f : 1.0f;
-        float totalDrag = currentDrag * aeroMultiplier;
+        float totalDrag = currentDrag;
 
         float maxSpeedMS = 0f;
         
-        if (totalDrag > 0 && ship.thrustEngine != null)
+        if (totalDrag > 0 && ship.propellerMaxThrustKgf > 0f)
         {
-            float pWattsMax = ship.thrustEngine.maxPower * 735.5f;
-            float maxRPM_Val = ship.thrustEngine.maxRPM;
-            float discArea = Mathf.PI * Mathf.Pow(ship.propellerDiameter * 0.5f, 2);
-            
-            // Идеальная тяга в статике
-            float maxStaticT = Mathf.Pow(2f * currentAirDensity * discArea * (pWattsMax * pWattsMax), 1f/3f) * ship.propellerEfficiency;
-            
-            // Шаговая скорость винта (при максимальных оборотах и максимальном шаге 1.0)
-            float screwSpeed = (maxRPM_Val / 60f) * ship.propellerMaxPitchMeters; 
-            
-            // Итеративный поиск реальной максимальной скорости (точка пересечения графиков Тяги и Сопротивления)
-            float v = 0f;
-            for (int i = 0; i < 200; i++)
+            float thrustN = ship.propellerMaxThrustKgf * 9.81f;
+            maxSpeedMS = Mathf.Sqrt(Mathf.Max(0f, thrustN) / Mathf.Max(0.001f, totalDrag));
+            if (ship.propellerMaxSpeedMS > 0f)
             {
-                v += 0.2f; 
-                float thrustFactor = 1f - (v / screwSpeed);
-                if (thrustFactor < 0) thrustFactor = 0;
-                
-                // Мощностная тяга
-                float powerThrust = (pWattsMax * ship.propellerEfficiency) / Mathf.Max(v, 0.1f);
-                // Итоговая расчетная тяга винта с учетом вырождения
-                float thrust = Mathf.Min(maxStaticT, powerThrust) * thrustFactor;
-                float drag = totalDrag * v * v;
-                
-                if (thrust < drag)
-                {
-                    maxSpeedMS = v - 0.2f;
-                    break;
-                }
+                maxSpeedMS = Mathf.Min(maxSpeedMS, ship.propellerMaxSpeedMS);
             }
         }
 
-        float balloonArea = (ship.balloonModule != null) ? ship.balloonModule.лобоваяПроекцияМ2 : 0f;
-
         EditorGUILayout.HelpBox(
             $"Итоговое сопротивление воздуха: {totalDrag:F2}\n" +
-            $"Площадь баллона: {balloonArea:F1} м²\n" +
             $"Верт. лимит (Констр / Авто): {ship.maxStructuralVerticalSpeed} / {ship.maxAutoVerticalSpeed} м/с\n" +
-            $"Реальный макс. потенциал: {maxSpeedMS:F1} м/с", 
+            $"Грубый потенциал скорости: {maxSpeedMS:F1} м/с",
             MessageType.Info);
 
         EditorGUILayout.Space(10);
         
-        SerializedProperty hasCSUProp = serializedObject.FindProperty("hasCSU");
-        if (hasCSUProp.boolValue)
-        {
-            EditorGUILayout.LabelField("Управление оборотами", EditorStyles.boldLabel);
-            
-            string modeName = "Стоп";
-            float rpm = ship.targetMainEngineRPM;
-            if (rpm <= 0.1f) modeName = "Холостой ход";
-            else if (rpm <= 0.3f) modeName = "Малый ход";
-            else if (rpm <= 0.7f) modeName = "Крейсерский";
-            else if (rpm <= 0.9f) modeName = "Номинал";
-            else if (rpm <= 1.05f) modeName = "Взлетный";
-            else modeName = "ФОРСАЖ";
+        EditorGUILayout.LabelField("Управление двигателем", EditorStyles.boldLabel);
+        string modeName = "Стоп";
+        float lever = ship.enginePowerLever;
+        if (lever <= 0.1f) modeName = "минимум";
+        else if (lever <= 0.5f) modeName = "малый ход";
+        else if (lever <= 0.9f) modeName = "рабочий ход";
+        else if (lever <= 1.0f) modeName = "номинал";
+        else modeName = "перегруз";
 
-            ship.targetMainEngineRPM = EditorGUILayout.Slider($"Целевые обороты: {modeName}", ship.targetMainEngineRPM, 0f, 1.2f);
-            
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Минимум", EditorStyles.miniButtonLeft)) ship.targetMainEngineRPM = 0.2f;
-            if (GUILayout.Button("Крейсер", EditorStyles.miniButtonMid)) ship.targetMainEngineRPM = 0.6f;
-            if (GUILayout.Button("Максимум", EditorStyles.miniButtonRight)) ship.targetMainEngineRPM = 1.0f;
-            EditorGUILayout.EndHorizontal();
-        }
-        else
-        {
-            EditorGUILayout.LabelField("РУЧНОЕ УПРАВЛЕНИЕ (без автомата шага)", EditorStyles.boldLabel);
-            ship.targetMainEngineRPM = EditorGUILayout.Slider("Газ (Мощность мотора)", ship.targetMainEngineRPM, 0f, 1.2f);
-            EditorGUILayout.HelpBox("ВНИМАНИЕ: Балансируйте газ и шаг винта вручную, чтобы не заглушить мотор!", MessageType.Warning);
-        }
+        ship.enginePowerLever = EditorGUILayout.Slider($"Ручка мощности: {modeName}", ship.enginePowerLever, 0f, 1.2f);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Только контур", EditorStyles.miniButtonLeft)) ship.enginePowerLever = ship.engineMinimumPowerLever;
+        if (GUILayout.Button("88%", EditorStyles.miniButtonMid)) ship.enginePowerLever = 0.88f;
+        if (GUILayout.Button("100%", EditorStyles.miniButtonMid)) ship.enginePowerLever = 1.0f;
+        if (GUILayout.Button("120%", EditorStyles.miniButtonRight)) ship.enginePowerLever = 1.2f;
+        EditorGUILayout.EndHorizontal();
         
         EditorGUILayout.Space(5);
-        float currentRPM = ship.thrustEngine != null ? ship.thrustEngine.currentRPM : 0f;
-        float targetVal = ship.targetMainEngineRPM;
-        bool isOverloaded = ship.thrustEngine != null && ship.thrustEngine.isOverloaded;
+        float targetVal = ship.enginePowerLever;
+        bool isOverloaded = false;
         
         Rect rpmRect = GUILayoutUtility.GetRect(18, 18, "TextField");
         Color oldGuiColor = GUI.color;
-        if (isOverloaded) GUI.color = new Color(1f, 0.4f, 0.4f); // Красный фон при перегрузке
+        if (isOverloaded) GUI.color = new Color(1f, 0.4f, 0.4f);
         
-        string overloadText = isOverloaded ? " [ ENGINE OVERLOAD ]" : "";
-        EditorGUI.ProgressBar(rpmRect, currentRPM / 1.15f, $"Обороты: {(currentRPM * 100):F1}% (Цель: {(targetVal * 100):F0}%){overloadText}");
+        string overloadText = "";
+        EditorGUI.ProgressBar(rpmRect, targetVal / 1.2f, $"Ручка: {(targetVal * 100):F0}%  Мощность: {ship.engineGeneratedPowerKw:F1} кВт  КПД: {ship.engineEfficiencyCurrent:P0}{overloadText}");
         
         GUI.color = oldGuiColor;
         
         Rect pitchRect = GUILayoutUtility.GetRect(18, 18, "TextField");
         float pitchVisual = (ship.propellerPitch + 1f) / 2f; 
-        EditorGUI.ProgressBar(pitchRect, pitchVisual, $"Реальный шаг винта: {ship.propellerPitch:F2}");
-        
-        EditorGUILayout.Space(10);
-        EditorGUILayout.LabelField("Установленные модули", EditorStyles.boldLabel);
-        ship.balloonModule = (ShipBalloon)EditorGUILayout.ObjectField("Модуль: Баллон", ship.balloonModule, typeof(ShipBalloon), true);
-        ship.claudiumLoop = (ShipClaudiumLoop)EditorGUILayout.ObjectField("Модуль: Контур", ship.claudiumLoop, typeof(ShipClaudiumLoop), true);
+        EditorGUI.ProgressBar(pitchRect, pitchVisual, $"Задание тяги винта: {ship.propellerPitch:F2}");
         
         EditorGUILayout.Space(5);
-        // Телеметрия Клавдия
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
-            EditorGUILayout.LabelField("Состояние систем подъема", EditorStyles.miniBoldLabel);
-            
-            if (ship.claudiumLoop != null)
-            {
-                EditorGUILayout.LabelField("Состояние клавдиевого контура", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField($"Запас раствора: {ship.claudiumLoop.запасРаствораЛ:F2} л ({ship.claudiumLoop.концентрацияКлавдия:F1}%)");
-                EditorGUILayout.LabelField($"Активный подъем: {ship.activeLiftForce / 9.81f:F0} кгс");
-            }
-            else EditorGUILayout.LabelField("Контур: не установлен", EditorStyles.miniLabel);
-
-            if (ship.balloonModule != null)
-            {
-                float gasGrams = ship.balloonModule.текущийГазКг * 1000f;
-                EditorGUILayout.LabelField($"Газ в баллонах: {gasGrams:F1} г ({ship.balloonModule.процентЗаполнения:F1}%)", EditorStyles.label);
-                EditorGUILayout.LabelField($"Подъемная сила газа: {ship.currentGasLift/9.81f:F0} кг", EditorStyles.label);
-            }
-            else EditorGUILayout.LabelField("Баллон: не установлен", EditorStyles.miniLabel);
-            
-            float activeLiftKg = ship.activeLiftForce / 9.81f;
-            EditorGUILayout.LabelField($"Активный подъем (насос): {activeLiftKg:F0} кг", EditorStyles.label);
+            EditorGUILayout.LabelField("Состояние клавдиевого контура", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField($"Запас клавдия: {ship.claudiumStock:F2}", EditorStyles.label);
+            EditorGUILayout.LabelField($"Запрошенный подъем: {ship.claudiumRequestedLiftKg:F0} кг", EditorStyles.label);
+            EditorGUILayout.LabelField($"Фактический подъем: {ship.activeLiftForce / 9.81f:F0} кг", EditorStyles.label);
+            EditorGUILayout.LabelField($"Забор мощности: {ship.claudiumPowerDrawKw:F1} кВт", EditorStyles.label);
+            EditorGUILayout.LabelField($"Остаток на винт: {Mathf.Max(0f, ship.engineGeneratedPowerKw - ship.claudiumPowerDrawKw):F1} кВт", EditorStyles.label);
+            EditorGUILayout.LabelField($"Топливо: {ship.engineFuelStockKg:F2} кг, энергоемкость {ship.engineFuelEnergyKwhPerKg:F1} кВт·ч/кг", EditorStyles.label);
+            EditorGUILayout.LabelField($"Расход топлива: {ship.engineFuelConsumptionKgPerSecond:F4} кг/с", EditorStyles.label);
         }
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Автопилот и Системы", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("hasCSU"), new GUIContent("Есть автомат шага винта"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("autoStabilizeAtStart"), new GUIContent("Стабилизация при старте"));
         EditorGUILayout.PropertyField(altitudeHoldProp, new GUIContent("Удержание высоты"));
         EditorGUILayout.PropertyField(cruiseControlProp, new GUIContent("Круиз-контроль (скорость)"));
         EditorGUILayout.PropertyField(speedStiffnessProp, new GUIContent("Жесткость (P)"));
         EditorGUILayout.PropertyField(speedDampingProp, new GUIContent("Демпфирование (D)"));
-        EditorGUILayout.PropertyField(maxManualSpeedMSProp, new GUIContent("Лимит ручной скорости (м/с)"));
-        EditorGUILayout.PropertyField(maxCruiseSpeedMSProp, new GUIContent("Лимит круиз-скорости (м/с)"));
         EditorGUILayout.PropertyField(targetAltitudeProp, new GUIContent("Целевая высота (м)"));
         EditorGUILayout.PropertyField(altStiffnessProp, new GUIContent("Вертикальная жесткость (P)"));
         EditorGUILayout.PropertyField(altDampingProp, new GUIContent("Вертикальный демпфер (D)"));
         EditorGUILayout.PropertyField(altDriftToleranceProp, new GUIContent("Допуск дрейфа (м)"));
+
+        EditorGUILayout.Space(5);
+        EditorGUILayout.LabelField("Удержание позиции", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("positionHold"), new GUIContent("Удерживать на месте", "Корабль запоминает текущие координаты при включении и разворачивается тягой против ветра или дрейфа."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("targetHoldPosition"), new GUIContent("Цель удержания", "Координата, около которой автопилот держит корабль по горизонтали."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("positionHoldRadius"), new GUIContent("Радиус удержания (м)", "Внутри этого радиуса автопилот старается гасить скорость и сопротивляться ветру."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("positionHoldMaxSpeedMS"), new GUIContent("Макс. скорость удержания (м/с)", "Предел скорости, которую удержание позиции может запросить для возврата к точке."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("positionHoldStiffness"), new GUIContent("Жесткость позиции", "Как сильно ошибка координат превращается в команду возврата."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("positionHoldDamping"), new GUIContent("Демпфирование дрейфа", "Как сильно текущая горизонтальная скорость гасится при удержании позиции."));
+        if (GUILayout.Button("Запомнить текущую позицию", GUILayout.Height(22)))
+        {
+            foreach (Object selectedTarget in targets)
+            {
+                ShipPhysics selectedShip = (ShipPhysics)selectedTarget;
+                Undo.RecordObject(selectedShip, "Remember Hold Position");
+                selectedShip.targetHoldPosition = selectedShip.transform.position;
+                EditorUtility.SetDirty(selectedShip);
+            }
+        }
 
         EditorGUILayout.Space(5);
         EditorGUILayout.LabelField("Автопилот курса", EditorStyles.boldLabel);
@@ -277,7 +224,8 @@ public class ShipPhysicsEditor : Editor
         
         EditorGUILayout.PropertyField(serializedObject.FindProperty("waypoints"), new GUIContent("Точки маршрута"), true);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("waypointRadius"), new GUIContent("Радиус точки (м)"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("minNavSpeed"), new GUIContent("Мин. маршевая скорость (м/с)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("routeArrivalSpeedMS"), new GUIContent("Скорость прибытия (м/с)", "Точка засчитывается только если корабль находится рядом и горизонтальная скорость ниже этого значения."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("routeBrakeAccelerationMS2"), new GUIContent("Расчетное торможение (м/с²)", "Путевая машина заранее снижает скорость так, будто сможет тормозить с этим ускорением."));
         
         ShipPhysics sp = (ShipPhysics)target;
         if (GUILayout.Button("Сгенерировать тестовый маршрут", GUILayout.Height(25)))
@@ -294,17 +242,21 @@ public class ShipPhysicsEditor : Editor
 
         if (Application.isPlaying && serializedObject.FindProperty("routeEnabled").boolValue)
         {
-            EditorGUILayout.LabelField($"Текущая точка: {sp.currentWaypointIndex + 1} / {sp.waypoints.Count}", EditorStyles.helpBox);
+            if (sp.waypoints != null && sp.waypoints.Count > 0)
+            {
+                EditorGUILayout.LabelField($"Текущая точка: {sp.currentWaypointIndex + 1} / {sp.waypoints.Count}", EditorStyles.helpBox);
+            }
+
+            DrawRouteEtaInfo(sp);
         }
 
         EditorGUILayout.Space(5);
-        EditorGUILayout.LabelField("Аэродинамика рулей (Поворот)", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderArea"), new GUIContent("Площадь руля (м²)"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderDistance"), new GUIContent("Плечо руля (м от ЦМ)"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderMaxLiftCoeff"), new GUIContent("Макс. Су при полн. отклонении"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("maxRudderAngleDeg"), new GUIContent("Макс. угол руля (градусы)"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("rudderTurnSpeedDeg"), new GUIContent("Скорость перекладки (°/сек)"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("sideResistance"), new GUIContent("Сопротивление дрейфу (Киль)"));
+        EditorGUILayout.LabelField("Гироскопический поворот", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("gyroTurnTorque"), new GUIContent("Макс. усилие поворота (Н*м)", "Внутренний момент поворота корпуса в ньютон-метрах. Работает даже на месте и не тратит мощность двигателя."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("gyroTurnDamping"), new GUIContent("Демпфирование поворота", "Как сильно корпус гасит лишнюю угловую скорость."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("maxAutoTurnRateDeg"), new GUIContent("Лимит автопилота (°/с)", "Максимальная угловая скорость, которую может запросить автопилот курса."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("maxStructuralTurnRateDeg"), new GUIContent("Конструкционный лимит (°/с)", "Если корабль вращается быстрее, поворот в ту же сторону ослабляется."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("sideResistance"), new GUIContent("Сопротивление дрейфу", "Боковое сопротивление корпуса. Это не поворачивает корабль, а только гасит снос боком."));
 
         EditorGUILayout.Space(15);
         EditorGUILayout.LabelField("Панель управления рычагами", EditorStyles.boldLabel);
@@ -324,20 +276,18 @@ public class ShipPhysicsEditor : Editor
 
         EditorGUILayout.Slider(liftInputProp, -1f, 1f, new GUIContent("Подъем точный (+-10%)"));
         EditorGUILayout.Slider(thrustInputProp, -1f, 1f, new GUIContent("Тяга (назад/вперед)"));
-        EditorGUILayout.Slider(turnInputProp, -1f, 1f, new GUIContent("Руль (ввод штурвала)"));
+        EditorGUILayout.Slider(turnInputProp, -1f, 1f, new GUIContent("Поворот (ввод штурвала)"));
         
-        Rect rudderRect = GUILayoutUtility.GetRect(18, 18, "TextField");
-        float maxAngle = ship.maxRudderAngleDeg > 0 ? ship.maxRudderAngleDeg : 25f;
-        float currentAngle = ship.currentRudderAngleDeg;
-        
-        // Нормализуем для прогресс-бара от 0 до 1 (0.5 = центр)
-        float rudderVisual = (currentAngle / maxAngle + 1f) / 2f; 
-        
+        Rect turnRect = GUILayoutUtility.GetRect(18, 18, "TextField");
+        Rigidbody turnRb = ship.GetComponent<Rigidbody>();
+        float turnRate = turnRb != null ? turnRb.angularVelocity.y * Mathf.Rad2Deg : 0f;
+        float maxTurnRate = ship.maxStructuralTurnRateDeg > 0f ? ship.maxStructuralTurnRateDeg : 1f;
+        float turnVisual = Mathf.Clamp01((turnRate / maxTurnRate + 1f) / 2f);
         string dirText = "Центр";
-        if (currentAngle < -0.5f) dirText = "Влево";
-        else if (currentAngle > 0.5f) dirText = "Вправо";
-        
-        EditorGUI.ProgressBar(rudderRect, rudderVisual, $"Реальное положение: {dirText} {Mathf.Abs(currentAngle):F1}°");
+        if (turnRate < -0.05f) dirText = "Влево";
+        else if (turnRate > 0.05f) dirText = "Вправо";
+
+        EditorGUI.ProgressBar(turnRect, turnVisual, $"Скорость поворота: {dirText} {Mathf.Abs(turnRate):F1}°/с, момент {ship.currentGyroTurnTorque:F0} Н*м");
 
         EditorGUILayout.Space(10);
 
@@ -403,26 +353,12 @@ public class ShipPhysicsEditor : Editor
             }
 
             EditorGUILayout.Space(5);
-            float curRPM_Normalized = ship.thrustEngine != null ? ship.thrustEngine.currentRPM : 0f;
-            float maxRPM_Val = ship.thrustEngine != null ? ship.thrustEngine.maxRPM : 2500f;
-            
-            // Определяем актуальную цель в зависимости от режима
-            float targetRPM_Val = ship.targetMainEngineRPM;
-            
-            // Расчет текущей тяги для вывода
-            float pWattsNominal = (ship.thrustEngine != null ? ship.thrustEngine.maxPower : 0f) * 735.5f;
-            float discArea = Mathf.PI * Mathf.Pow(ship.propellerDiameter * 0.5f, 2);
-            float maxStaticT = Mathf.Pow(2f * currentAirDensity * discArea * (pWattsNominal * pWattsNominal), 1f/3f) * ship.propellerEfficiency;
-            float currentStaticT = maxStaticT * (curRPM_Normalized * curRPM_Normalized);
-            
-            float forwardSpeed = Vector3.Dot(ship.GetComponent<Rigidbody>().linearVelocity, ship.transform.forward);
-            float screwSpeed = (curRPM_Normalized * maxRPM_Val / 60f) * ship.propellerPitch * ship.propellerMaxPitchMeters;
-            float thrustFactor = (Mathf.Abs(screwSpeed) > 0.01f) ? ((screwSpeed > 0) ? (1f - forwardSpeed / screwSpeed) : (-1f + forwardSpeed / screwSpeed)) : 0f;
-            float currentThrustKg = (currentStaticT * Mathf.Clamp(thrustFactor, -1.2f, 1.2f)) / 9.81f;
-
-            EditorGUILayout.LabelField($"Текущая тяга винта: {currentThrustKg:F1} кг", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"Фактические обороты: {(curRPM_Normalized * maxRPM_Val):F0} об/мин ({(curRPM_Normalized * 100):F1}%)", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"Цель газа/автомата шага: {(targetRPM_Val * 100):F0}%", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField($"Мощность двигателя: {ship.engineGeneratedPowerKw:F1} кВт", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Контур забрал: {ship.claudiumPowerDrawKw:F1} кВт", EditorStyles.label);
+            EditorGUILayout.LabelField($"Винт получил: {ship.propellerInputPowerKw:F1} кВт, полезно {ship.propellerUsefulPowerKw:F1} кВт", EditorStyles.label);
+            EditorGUILayout.LabelField($"КПД винта: {ship.propellerCalculatedEfficiency:P0}, лимит скорости: {ship.propellerMaxSpeedMS:F1} м/с", EditorStyles.label);
+            EditorGUILayout.LabelField($"Текущая тяга винта: {ship.propellerThrustKgf:F1} кгс", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Ручка мощности: {(ship.enginePowerLever * 100):F0}%, минимум контура: {(ship.engineMinimumPowerLever * 100):F0}%", EditorStyles.miniLabel);
         }
         else
         {
@@ -435,29 +371,230 @@ public class ShipPhysicsEditor : Editor
         serializedObject.ApplyModifiedProperties();
     }
 
-    private void CreateDefinitionFromCurrentShip(ShipPhysics ship)
+    private static void DrawRouteEtaInfo(ShipPhysics ship)
     {
-        const string dataFolder = "Assets/Data";
-        const string shipsFolder = "Assets/Data/Ships";
+        if (ship == null) return;
 
-        if (!AssetDatabase.IsValidFolder(shipsFolder))
+        RouteEtaInfo eta = ship.GetCurrentRouteEta();
+        MessageType messageType = eta.canEstimate ? MessageType.Info : MessageType.Warning;
+        EditorGUILayout.HelpBox(BuildRouteEtaText(eta), messageType);
+    }
+
+    private static string BuildRouteEtaText(RouteEtaInfo eta)
+    {
+        if (!eta.hasTarget)
         {
-            AssetDatabase.CreateFolder(dataFolder, "Ships");
+            return "ETA путевой машины: " + eta.status;
         }
 
-        ShipDefinitionSO definition = ScriptableObject.CreateInstance<ShipDefinitionSO>();
-        definition.CaptureFrom(ship);
+        string etaText = eta.canEstimate ? FormatEtaSeconds(eta.etaSeconds) : "нет устойчивой оценки";
+        return
+            $"ETA до текущей точки: {etaText}\n" +
+            $"Точка: {eta.waypointIndex + 1} / {eta.waypointCount}  X {eta.targetPosition.x:F0}  Y {eta.targetPosition.y:F0}  Z {eta.targetPosition.z:F0}\n" +
+            $"До радиуса: {eta.horizontalRemaining:F0} м по горизонту, {eta.verticalRemaining:F0} м по высоте\n" +
+            $"Скорость к точке: {eta.horizontalClosingSpeed:F1} м/с, вертикально: {eta.verticalClosingSpeed:F1} м/с\n" +
+            eta.status;
+    }
 
-        string assetName = string.IsNullOrWhiteSpace(ship.gameObject.name) ? "Ship" : ship.gameObject.name.Replace(" ", "");
-        string path = AssetDatabase.GenerateUniqueAssetPath($"{shipsFolder}/{assetName}Definition.asset");
+    private static string FormatEtaSeconds(float seconds)
+    {
+        if (float.IsNaN(seconds) || float.IsInfinity(seconds) || seconds < 0f) return "-";
 
-        AssetDatabase.CreateAsset(definition, path);
-        AssetDatabase.SaveAssets();
+        int totalSeconds = Mathf.CeilToInt(seconds);
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        int restSeconds = totalSeconds % 60;
 
-        Undo.RecordObject(ship, "Assign Ship Definition");
-        ship.shipDefinition = definition;
+        if (hours > 0)
+        {
+            return $"{hours:D2}:{minutes:D2}:{restSeconds:D2}";
+        }
+
+        return $"{minutes:D2}:{restSeconds:D2}";
+    }
+
+    private void DrawResourceCheats(ShipPhysics ship)
+    {
+        EditorGUILayout.Space(8);
+        resourceCheatsExpanded = EditorGUILayout.Foldout(
+            resourceCheatsExpanded,
+            new GUIContent("Читы ресурсов", "Позволяет в Play Mode поставить точное количество ресурсов в инвентаре, грузе корабля и складе текущего острова."),
+            true);
+
+        if (!resourceCheatsExpanded) return;
+
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            if (!Application.isPlaying)
+            {
+                EditorGUILayout.HelpBox("Читы ресурсов работают в Play Mode, чтобы значения менялись прямо в текущей сессии.", MessageType.Info);
+                return;
+            }
+
+            MetaGameState meta = FindFirstObjectByType<MetaGameState>();
+            if (meta == null)
+            {
+                EditorGUILayout.HelpBox("В сцене не найден MetaGameState.", MessageType.Warning);
+                return;
+            }
+
+            meta.EnsureProgressInitialized();
+            EnsureResourceCheatConfig(meta);
+
+            if (resourceCheatConfig == null || !resourceCheatConfig.isLoaded)
+            {
+                EditorGUILayout.HelpBox(string.IsNullOrWhiteSpace(resourceCheatConfig?.lastError) ? "Конфиг Item.csv не загружен." : resourceCheatConfig.lastError, MessageType.Warning);
+                if (GUILayout.Button("Перезагрузить конфиг ресурсов"))
+                {
+                    ReloadResourceCheatConfig(meta);
+                }
+
+                return;
+            }
+
+            IslandProductionState dockStorage = GetCurrentDockStorage(meta, out string dockName);
+            EditorGUILayout.LabelField("Текущий склад", dockStorage != null ? dockName : "нет текущего острова из Island.csv");
+            if (GUILayout.Button("Перезагрузить конфиг ресурсов", EditorStyles.miniButton))
+            {
+                ReloadResourceCheatConfig(meta);
+            }
+
+            for (int i = 0; i < resourceCheatConfig.items.Count; i++)
+            {
+                ItemConfig item = resourceCheatConfig.items[i];
+                if (item == null || string.IsNullOrWhiteSpace(item.id)) continue;
+                DrawResourceCheatRow(meta, ship, dockStorage, item.id, resourceCheatConfig.GetItemNameRu(item.id));
+            }
+
+            DrawCustomResourceCheat(meta, ship, dockStorage);
+        }
+    }
+
+    private void DrawResourceCheatRow(MetaGameState meta, ShipPhysics ship, IslandProductionState dockStorage, string resourceId, string displayName)
+    {
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField(displayName + " (" + resourceId + ")", EditorStyles.boldLabel);
+            DrawResourceAmountField("Инвентарь", meta, ship, null, resourceId, meta.progress.GetResourceAmount(resourceId), ResourceCheatTarget.Inventory);
+            DrawResourceAmountField("Борт корабля", meta, ship, null, resourceId, meta.progress.GetShipCargoAmount(resourceId), ResourceCheatTarget.ShipCargo);
+
+            if (dockStorage != null)
+            {
+                DrawResourceAmountField("Склад острова", meta, ship, dockStorage, resourceId, dockStorage.GetResourceAmount(resourceId), ResourceCheatTarget.DockStorage);
+            }
+        }
+    }
+
+    private void DrawCustomResourceCheat(MetaGameState meta, ShipPhysics ship, IslandProductionState dockStorage)
+    {
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Любой ресурс по ID", EditorStyles.boldLabel);
+        customCheatResourceId = EditorGUILayout.TextField(new GUIContent("ID ресурса", "Можно вписать любой технический ID, даже если его еще нет в Item.csv."), customCheatResourceId);
+        customCheatAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent("Количество, кг", "Точное значение, которое будет записано."), customCheatAmount));
+
+        EditorGUILayout.BeginHorizontal();
+        GUI.enabled = !string.IsNullOrWhiteSpace(customCheatResourceId);
+        if (GUILayout.Button("В инвентарь"))
+        {
+            SetResourceCheat(meta, ship, null, customCheatResourceId.Trim(), customCheatAmount, ResourceCheatTarget.Inventory);
+        }
+
+        if (GUILayout.Button("На борт"))
+        {
+            SetResourceCheat(meta, ship, null, customCheatResourceId.Trim(), customCheatAmount, ResourceCheatTarget.ShipCargo);
+        }
+
+        GUI.enabled = GUI.enabled && dockStorage != null;
+        if (GUILayout.Button("На склад"))
+        {
+            SetResourceCheat(meta, ship, dockStorage, customCheatResourceId.Trim(), customCheatAmount, ResourceCheatTarget.DockStorage);
+        }
+
+        GUI.enabled = true;
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private void DrawResourceAmountField(string label, MetaGameState meta, ShipPhysics ship, IslandProductionState dockStorage, string resourceId, int currentAmount, ResourceCheatTarget target)
+    {
+        EditorGUI.BeginChangeCheck();
+        int newAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent(label, "Точное количество в килограммах. 0 удаляет ресурс из списка."), currentAmount));
+        if (EditorGUI.EndChangeCheck())
+        {
+            SetResourceCheat(meta, ship, dockStorage, resourceId, newAmount, target);
+        }
+    }
+
+    private void SetResourceCheat(MetaGameState meta, ShipPhysics ship, IslandProductionState dockStorage, string resourceId, int amount, ResourceCheatTarget target)
+    {
+        if (meta == null || meta.progress == null || string.IsNullOrWhiteSpace(resourceId)) return;
+
+        Undo.RecordObject(meta, "Cheat Resource Amount");
+        amount = Mathf.Max(0, amount);
+
+        if (target == ResourceCheatTarget.Inventory)
+        {
+            meta.progress.SetResourceAmount(resourceId, amount);
+        }
+        else if (target == ResourceCheatTarget.ShipCargo)
+        {
+            meta.progress.SetShipCargoAmount(resourceId, amount);
+            ApplyCargoCheatMass(ship, meta);
+        }
+        else if (target == ResourceCheatTarget.DockStorage && dockStorage != null)
+        {
+            dockStorage.SetResourceAmount(resourceId, amount);
+        }
+
+        meta.progress.Normalize();
+        EditorUtility.SetDirty(meta);
+        Repaint();
+    }
+
+    private static void ApplyCargoCheatMass(ShipPhysics ship, MetaGameState meta)
+    {
+        if (ship == null || meta == null || meta.progress == null) return;
+
+        Undo.RecordObject(ship, "Apply Cargo Cheat Mass");
+        ship.cargoMassKg = meta.progress.GetShipCargoMassKg();
+        ship.engineFuelStockKg = string.IsNullOrWhiteSpace(ship.engineFuelId) ? 0f : meta.progress.GetShipCargoAmount(ship.engineFuelId);
+        string claudiumResourceId = string.IsNullOrWhiteSpace(ship.claudiumResourceId) ? "claudium" : ship.claudiumResourceId;
+        ship.claudiumStock = meta.progress.GetShipCargoAmount(claudiumResourceId);
+        ship.RefreshRuntimeShipSettings();
         EditorUtility.SetDirty(ship);
-        Selection.activeObject = definition;
+    }
+
+    private IslandProductionState GetCurrentDockStorage(MetaGameState meta, out string dockName)
+    {
+        dockName = "";
+        if (meta == null || meta.progress == null || resourceCheatConfig == null) return null;
+        if (meta.progress.currentDockKind != DockingLocationKind.Island) return null;
+
+        IslandConfig island = resourceCheatConfig.GetIsland(meta.progress.currentDockId);
+        if (island == null) return null;
+
+        dockName = string.IsNullOrWhiteSpace(island.localNameRu) ? island.id : island.localNameRu;
+        return meta.progress.GetIslandProductionState(island.id, true);
+    }
+
+    private void EnsureResourceCheatConfig(MetaGameState meta)
+    {
+        string folder = meta != null && !string.IsNullOrWhiteSpace(meta.worldConfigFolder) ? meta.worldConfigFolder : "Data/Config";
+        if (resourceCheatConfig != null && resourceCheatConfig.isLoaded && resourceCheatConfigFolder == folder) return;
+        ReloadResourceCheatConfig(meta);
+    }
+
+    private void ReloadResourceCheatConfig(MetaGameState meta)
+    {
+        resourceCheatConfigFolder = meta != null && !string.IsNullOrWhiteSpace(meta.worldConfigFolder) ? meta.worldConfigFolder : "Data/Config";
+        resourceCheatConfig = new WorldConfigDatabase();
+        resourceCheatConfig.LoadFromAssetsConfigFolder(resourceCheatConfigFolder);
+    }
+
+    private enum ResourceCheatTarget
+    {
+        Inventory,
+        ShipCargo,
+        DockStorage
     }
 
     public override bool RequiresConstantRepaint()

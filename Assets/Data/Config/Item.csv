@@ -1,0 +1,15 @@
+﻿id_item,local_name_ru,local_name_en,energy_kwh_per_kg
+food,Еда,Food,0
+charcoal,Уголь,Charcoal,8
+sulfur,Сера,Sulfur,0
+metal,Металл,Metal,0
+tools,Инструменты,Tools,0
+wood,Древесина,Wood,4
+claudium,Клавдий,Claudium,0
+medicines,Медикаменты,Medicines,0
+alcohol,Спирт,Alcohol,7.5
+gunpowder,Порох,Gunpowder,0
+mechanisms,Механизмы,Mechanisms,0
+fat,Жир,Fat,12.1
+water,Вода,Water,0
+cloth,Ткань,Cloth,0

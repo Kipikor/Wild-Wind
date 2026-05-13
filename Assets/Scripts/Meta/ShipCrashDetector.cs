@@ -9,7 +9,7 @@ public class ShipCrashDetector : MonoBehaviour
     [Tooltip("Если относительная скорость столкновения выше этого значения, полет считается потерянным.")]
     public float crashRelativeSpeed = 14f;
     [InspectorName("Высота крушения")]
-    [Tooltip("Если корабль опустится ниже этой высоты в полете, прогресс откатится к последней стыковке.")]
+    [Tooltip("Если корабль опустится ниже этой высоты в полете, корабль теряется, а игрок возвращается в город на стартовом корабле.")]
     public float crashBelowAltitude = -10f;
     [InspectorName("Крушение ниже высоты")]
     public bool crashWhenBelowAltitude = true;
@@ -64,7 +64,7 @@ public class ShipCrashDetector : MonoBehaviour
 
         if (metaGameState != null)
         {
-            metaGameState.DockAt("crash_recovery", DockingLocationKind.Island);
+            metaGameState.LoseShipAndReturnToCity(reason);
         }
     }
 }

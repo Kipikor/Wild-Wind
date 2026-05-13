@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &87966246
+--- !u!1 &40584891
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,65 +127,30 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 87966247}
-  - component: {fileID: 87966248}
+  - component: {fileID: 40584892}
   m_Layer: 0
-  m_Name: Клавдиевый контур
+  m_Name: "\u0422\u043E\u0447\u043A\u0430 \u0441\u043E\u0437\u0434\u0430\u043D\u0438\u044F
+    \u043A\u043E\u0440\u0430\u0431\u043B\u044F"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &87966247
+--- !u!4 &40584892
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 87966246}
+  m_GameObject: {fileID: 40584891}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 100, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1778278289}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &87966248
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 87966246}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 94a6afea35dcc004eb0a3f4322695f8c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShipClaudiumLoop
-  "\u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435\u041A\u043E\u043D\u0442\u0443\u0440\u0430": "\u041A\u043B\u0430\u0432\u0434\u0438\u0435\u0432\u044B\u0439
-    \u043A\u043E\u043D\u0442\u0443\u0440"
-  "\u043E\u0431\u044A\u0435\u043C\u0421\u0438\u0441\u0442\u0435\u043C\u044B\u041B": 100
-  "\u0434\u043B\u0438\u043D\u0430\u041A\u043E\u043D\u0442\u0443\u0440\u0430\u041C": 12
-  "\u043A\u043E\u043D\u0446\u0435\u043D\u0442\u0440\u0430\u0446\u0438\u044F\u041A\u043B\u0430\u0432\u0434\u0438\u044F": 10
-  "\u0446\u0435\u043B\u0435\u0432\u0430\u044F\u041A\u043E\u043D\u0446\u0435\u043D\u0442\u0440\u0430\u0446\u0438\u044F": 10
-  "\u0437\u0430\u043F\u0430\u0441\u0420\u0430\u0441\u0442\u0432\u043E\u0440\u0430\u041B": 100
-  "\u043F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C\u0420\u0430\u0441\u0442\u0432\u043E\u0440\u0430": 1.2
-  "\u0437\u0430\u043F\u0430\u0441\u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432\u041A\u0433": 5
-  "\u0441\u043A\u043E\u0440\u043E\u0441\u0442\u044C\u0420\u0430\u0441\u0442\u0432\u043E\u0440\u0435\u043D\u0438\u044F": 0.5
-  "\u0442\u0435\u043A\u0443\u0449\u0430\u044F\u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430": 20
-  "\u0432\u043D\u0435\u0448\u043D\u0438\u0439\u041F\u043E\u0434\u043E\u0433\u0440\u0435\u0432\u0412\u0442": 0
-  "\u0437\u0430\u0431\u0438\u0440\u0430\u0442\u044C\u0422\u0435\u043F\u043B\u043E\u041E\u0442\u0414\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044F": 1
-  "\u0442\u0435\u043F\u043B\u043E\u041E\u0442\u0414\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044F\u0412\u0442": 0
-  "\u043A\u043E\u044D\u0444\u0422\u0435\u043F\u043B\u043E\u043F\u043E\u0442\u0435\u0440\u0438": 0.05
-  "\u0437\u0430\u043C\u0435\u0440\u0437": 0
-  "\u0441\u043A\u043E\u0440\u043E\u0441\u0442\u044C\u041F\u043E\u0442\u043E\u043A\u0430_\u043C\u0441": 0
-  "\u0442\u0435\u043A\u0443\u0449\u0435\u0435\u0414\u0430\u0432\u043B\u0435\u043D\u0438\u0435\u0411\u0430\u0440": 0
-  "\u043C\u0430\u043A\u0441\u0414\u0430\u0432\u043B\u0435\u043D\u0438\u0435\u0411\u0430\u0440": 10
-  "\u043A\u043F\u0434\u041A\u043E\u043D\u0442\u0443\u0440\u0430": 0.8
-  "\u0432\u044B\u0445\u043E\u0434\u043D\u043E\u0439\u0411\u0430\u043B\u043B\u043E\u043D": {fileID: 572840890}
-  "\u0441\u043E\u0437\u0434\u0430\u0432\u0430\u0435\u043C\u0430\u044F\u0421\u0438\u043B\u0430\u041D": 0
-  "\u0442\u0440\u0435\u043D\u0438\u0435\u041E\u041F\u0440\u043E\u0441\u0442\u0440\u0430\u043D\u0441\u0442\u0432\u043E\u041D": 0
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -199,7 +164,7 @@ GameObject:
   - component: {fileID: 519420029}
   - component: {fileID: 519420030}
   m_Layer: 0
-  m_Name: Главная камера
+  m_Name: "\u0413\u043B\u0430\u0432\u043D\u0430\u044F \u043A\u0430\u043C\u0435\u0440\u0430"
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -323,151 +288,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &572840889
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 572840891}
-  - component: {fileID: 572840890}
-  m_Layer: 0
-  m_Name: Баллон
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &572840890
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 572840889}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 297649f9689399548be76cf66ac7ad5d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShipBalloon
-  "\u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435\u0411\u0430\u043B\u043B\u043E\u043D\u0430": "\u0421\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0439
-    \u0431\u0430\u043B\u043B\u043E\u043D"
-  "\u0434\u0438\u0430\u043C\u0435\u0442\u0440\u041C": 5
-  "\u0434\u043B\u0438\u043D\u0430\u041C": 10
-  "\u043B\u043E\u0431\u043E\u0432\u0430\u044F\u041F\u0440\u043E\u0435\u043A\u0446\u0438\u044F\u041C2": 19.634954
-  "\u043E\u0431\u044A\u0435\u043C\u041C3": 163.62463
-  "\u0442\u0435\u043A\u0443\u0449\u0438\u0439\u0413\u0430\u0437\u041A\u0433": 0.81812316
-  "\u043F\u0440\u043E\u0446\u0435\u043D\u0442\u0417\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F": 100
-  "\u0443\u0442\u0435\u0447\u043A\u0430\u041C3\u0432\u0427\u0430\u0441": 1
-  valveOpen: 0
-  valveFlowRate: 0.5
---- !u!4 &572840891
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 572840889}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1778278289}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &591957358
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 591957359}
-  - component: {fileID: 591957361}
-  - component: {fileID: 591957360}
-  m_Layer: 0
-  m_Name: Визуал
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &591957359
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 591957358}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 2.4, y: 4, z: 2.4}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1778278289}
-  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
---- !u!23 &591957360
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 591957358}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 9452ae1262a74094f8a68013fbcd1834, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!33 &591957361
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 591957358}
-  m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -479,7 +299,8 @@ GameObject:
   - component: {fileID: 619394802}
   - component: {fileID: 619394801}
   m_Layer: 0
-  m_Name: Глобальный свет 2D
+  m_Name: "\u0413\u043B\u043E\u0431\u0430\u043B\u044C\u043D\u044B\u0439 \u0441\u0432\u0435\u0442
+    2D"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -562,7 +383,7 @@ GameObject:
   m_Component:
   - component: {fileID: 704420549}
   m_Layer: 0
-  m_Name: Старт миссии
+  m_Name: "\u0421\u0442\u0430\u0440\u0442 \u043C\u0438\u0441\u0441\u0438\u0438"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -594,7 +415,7 @@ GameObject:
   - component: {fileID: 883150470}
   - component: {fileID: 883150469}
   m_Layer: 0
-  m_Name: Миссия
+  m_Name: "\u041C\u0438\u0441\u0441\u0438\u044F"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -613,7 +434,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionController
   mission: {fileID: 11400000, guid: f6d4b324fe9b4ba6aff23dc90e15163a, type: 2}
-  targetShip: {fileID: 1778278284}
+  targetShip: {fileID: 0}
   metaGameState: {fileID: 1497055332}
   startPoint: {fileID: 704420549}
   destinationPoint: {fileID: 1579994936}
@@ -634,64 +455,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1417102122
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1417102124}
-  - component: {fileID: 1417102123}
-  m_Layer: 0
-  m_Name: "\u041C\u0430\u0440\u0448\u0435\u0432\u044B\u0439 \u0434\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C"
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1417102123
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1417102122}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d9447844d0c955c42b8193f878a3986f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShipEngine
-  engineName: "\u0421\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0439
-    \u043F\u0430\u0440\u043E\u0432\u043E\u0439"
-  maxPower: 188.86
-  maxRPM: 800
-  responsiveness: 0.5
-  startingRPM: 0.448
-  targetRPM: 0.448
-  currentLoad: 0
-  isOverloaded: 0
-  efficiency: 0.15
-  wasteHeatWatts: 0
-  isClaudium: 0
-  currentRPM: 0.448
-  throttle: 0
---- !u!4 &1417102124
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1417102122}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1778278289}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1497055331
 GameObject:
   m_ObjectHideFlags: 0
@@ -704,7 +467,7 @@ GameObject:
   - component: {fileID: 1497055333}
   - component: {fileID: 1497055332}
   m_Layer: 0
-  m_Name: Мета-игра
+  m_Name: "\u041C\u0435\u0442\u0430-\u0438\u0433\u0440\u0430"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -725,15 +488,15 @@ MonoBehaviour:
   catalog: {fileID: 11400000, guid: 67a70c9cbb9d438398b8a835864d71a1, type: 2}
   techTree: {fileID: 11400000, guid: 94035a180d6f44a7a934773e0d8e32d4, type: 2}
   shipLoader: {fileID: 1497055333}
-  missionController: {fileID: 0}
+  missionController: {fileID: 883150469}
   startingMoney: 0
   progress:
     money: 0
-    selectedShipId: 
-    unlockedShipIds: []
+    selectedHullId: ""
     researchedNodeIds: []
     purchasedNodeIds: []
     shipExperience: []
+    installedModules: []
     currentMode: 0
     currentDockKind: 0
     currentDockId: starter_island
@@ -781,9 +544,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipLoader
   catalog: {fileID: 11400000, guid: 67a70c9cbb9d438398b8a835864d71a1, type: 2}
-  targetShip: {fileID: 1778278284}
-  fallbackShipId: 
-  applyOnStart: 0
+  targetShip: {fileID: 0}
+  spawnPoint: {fileID: 40584892}
+  spawnedParent: {fileID: 0}
+  destroySpawnedShipOnRebuild: 1
+  disableSceneShipWhenSpawning: 1
+  spawnedHullId: ""
+  spawnedShipObject: {fileID: 0}
 --- !u!4 &1497055334
 Transform:
   m_ObjectHideFlags: 0
@@ -810,7 +577,7 @@ GameObject:
   - component: {fileID: 1579994936}
   - component: {fileID: 1579994937}
   m_Layer: 0
-  m_Name: Назначение миссии
+  m_Name: "\u041D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u043C\u0438\u0441\u0441\u0438\u0438"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -844,251 +611,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DockingPort
   metaGameState: {fileID: 1497055332}
-  targetShip: {fileID: 1778278284}
+  targetShip: {fileID: 0}
   dockId: destination_island
-  displayName: Остров назначения
+  displayName: "\u041E\u0441\u0442\u0440\u043E\u0432 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F"
   kind: 0
   dockingRadius: 18
   canEndSession: 1
   autoDockWhenInRange: 1
+  requireLeaveBeforeRedocking: 1
   snapPoint: {fileID: 1579994936}
---- !u!1 &1583410357
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1583410359}
-  - component: {fileID: 1583410358}
-  m_Layer: 0
-  m_Name: "\u041A\u043E\u043D\u0442\u0443\u0440\u043D\u044B\u0439 \u0434\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C"
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1583410358
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1583410357}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d9447844d0c955c42b8193f878a3986f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShipEngine
-  engineName: "\u0421\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0439
-    \u043F\u0430\u0440\u043E\u0432\u043E\u0439"
-  maxPower: 60
-  maxRPM: 500
-  responsiveness: 0.5
-  startingRPM: 0.744
-  targetRPM: 0.744
-  currentLoad: 0
-  isOverloaded: 0
-  efficiency: 0.15
-  wasteHeatWatts: 0
-  isClaudium: 0
-  currentRPM: 0.744
-  throttle: 0
---- !u!4 &1583410359
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1583410357}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1778278289}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1778278283
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1778278289}
-  - component: {fileID: 1778278288}
-  - component: {fileID: 1778278286}
-  - component: {fileID: 1778278285}
-  - component: {fileID: 1778278284}
-  m_Layer: 0
-  m_Name: Корабль
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1778278284
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1778278283}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 39c28ffc5291a3d4db6c8d13cfb709b6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShipPhysics
-  shipDefinition: {fileID: 11400000, guid: d4b764bacf45d4341853861354d90461, type: 2}
-  applyDefinitionOnAwake: 0
-  baseMass: 1000
-  thrustEngine: {fileID: 1417102123}
-  liftEngine: {fileID: 1583410358}
-  propellerDiameter: 3
-  propellerEfficiency: 0.8
-  propellerMaxPitchMeters: 3
-  liftEfficiency: 20
-  rudderArea: 4
-  rudderDistance: 10
-  rudderMaxLiftCoeff: 1.5
-  maxRudderAngleDeg: 25
-  rudderTurnSpeedDeg: 3
-  currentRudderAngleDeg: 0
-  airDensity: 1.225
-  dragCoefficient: 0.89
-  frontalArea: 6
-  sideResistance: 2
-  verticalAreaFactor: 4
-  maxStructuralVerticalSpeed: 9
-  maxAutoVerticalSpeed: 5
-  windVelocity: {x: 0, y: 0, z: 0}
-  hasCSU: 0
-  autoStabilizeAtStart: 1
-  altitudeHold: 1
-  targetAltitude: 0
-  altStiffness: 0.5
-  altDamping: 1.5
-  altDriftTolerance: 0.15
-  cruiseControl: 0
-  targetSpeedMS: 0
-  maxCruiseSpeedMS: 20
-  maxManualSpeedMS: 30
-  headingHold: 0
-  targetHeading: 0
-  headingStiffness: 0.5
-  headingDamping: 0.5
-  maxAutoTurnRateDeg: 10
-  maxStructuralTurnRateDeg: 15
-  routeEnabled: 0
-  waypoints:
-  - {x: 0, y: 50, z: 200}
-  - {x: 200, y: 70, z: 400}
-  - {x: 400, y: 100, z: 200}
-  - {x: 200, y: 50, z: 0}
-  waypointRadius: 10
-  minNavSpeed: 5
-  currentWaypointIndex: 0
-  propellerPitch: 0
-  speedStiffness: 0.2
-  speedDamping: 1
-  thrustInput: 0
-  turnInput: 0
-  targetTrimMass: 1000
-  liftInput: 0
-  balloonModule: {fileID: 572840890}
-  claudiumLoop: {fileID: 87966248}
-  currentGasLift: 0
-  activeLiftForce: 0
-  targetMainEngineRPM: 0.2
---- !u!54 &1778278285
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1778278283}
-  serializedVersion: 5
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
---- !u!136 &1778278286
-CapsuleCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1778278283}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 1.2
-  m_Height: 8
-  m_Direction: 2
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!33 &1778278288
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1778278283}
-  m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
---- !u!4 &1778278289
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1778278283}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1417102124}
-  - {fileID: 1583410359}
-  - {fileID: 572840891}
-  - {fileID: 87966247}
-  - {fileID: 591957359}
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 519420032}
   - {fileID: 619394802}
-  - {fileID: 1778278289}
   - {fileID: 1497055334}
   - {fileID: 883150470}
   - {fileID: 704420549}
   - {fileID: 1579994936}
+  - {fileID: 40584892}

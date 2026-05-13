@@ -5,12 +5,30 @@ using UnityEngine;
 [CustomEditor(typeof(TechTreeDefinitionSO))]
 public class TechTreeConstructorEditor : Editor
 {
-    private const string TreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
-    private const string StarterShipPath = "Assets/Data/Ships/ShipDefinition.asset";
+    private const string SelectedNodeSessionKeyPrefix = "WildWind.TechTree.SelectedNode.";
 
     public override void OnInspectorGUI()
     {
-        DrawDefaultInspector();
+        serializedObject.Update();
+
+        LocalizedInspector.Section("Древо техники");
+        SerializedProperty nodes = serializedObject.FindProperty("nodes");
+        int selectedNodeIndex = GetSelectedNodeIndex((TechTreeDefinitionSO)target);
+        bool hasSelectedNode = selectedNodeIndex >= 0 && selectedNodeIndex < nodes.arraySize;
+
+        if (hasSelectedNode)
+        {
+            DrawSelectedNode(nodes, selectedNodeIndex);
+        }
+        else
+        {
+            EditorGUILayout.HelpBox("Выбери ноду в визуальном редакторе, чтобы открыть ее поля здесь.", MessageType.Info);
+        }
+
+        EditorGUILayout.Space(8f);
+        LocalizedInspector.DrawTechTreeNodeList(nodes, "Все узлы древа");
+
+        serializedObject.ApplyModifiedProperties();
 
         TechTreeDefinitionSO tree = (TechTreeDefinitionSO)target;
 
@@ -18,9 +36,9 @@ public class TechTreeConstructorEditor : Editor
         EditorGUILayout.LabelField("Конструктор", EditorStyles.boldLabel);
 
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Добавить корабль"))
+        if (GUILayout.Button("Добавить корпус"))
         {
-            AddShipNode(tree);
+            AddHullNode(tree);
         }
 
         if (GUILayout.Button("Добавить модуль"))
@@ -35,6 +53,21 @@ public class TechTreeConstructorEditor : Editor
         }
     }
 
+    public static void SetSelectedNode(TechTreeDefinitionSO tree, int nodeIndex)
+    {
+        if (tree == null) return;
+
+        SessionState.SetInt(GetSelectedNodeSessionKey(tree), nodeIndex);
+        Selection.activeObject = tree;
+        UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+    }
+
+    public static int GetSelectedNodeIndex(TechTreeDefinitionSO tree)
+    {
+        if (tree == null) return -1;
+        return SessionState.GetInt(GetSelectedNodeSessionKey(tree), -1);
+    }
+
     [MenuItem("Wild Wind/Древо техники/Открыть конструктор")]
     public static void OpenConstructor()
     {
@@ -44,53 +77,26 @@ public class TechTreeConstructorEditor : Editor
     [MenuItem("Wild Wind/Древо техники/Создать стартовое древо")]
     public static void CreateStarterTree()
     {
-        TechTreeDefinitionSO existingTree = AssetDatabase.LoadAssetAtPath<TechTreeDefinitionSO>(TreePath);
-        if (existingTree != null)
-        {
-            Selection.activeObject = existingTree;
-            EditorGUIUtility.PingObject(existingTree);
-            return;
-        }
-
-        TechTreeDefinitionSO tree = CreateInstance<TechTreeDefinitionSO>();
-        ShipDefinitionSO starterShip = AssetDatabase.LoadAssetAtPath<ShipDefinitionSO>(StarterShipPath);
-
-        TechTreeNode starterNode = new TechTreeNode
-        {
-            nodeId = "ship_tier1",
-            displayName = "Корабль I",
-            kind = TechTreeNodeKind.Ship,
-            tier = 1,
-            shipDefinition = starterShip,
-            shipId = starterShip != null ? starterShip.shipId : "ship",
-            startsResearched = true,
-            startsPurchased = true
-        };
-
-        tree.nodes.Add(starterNode);
-        AssetDatabase.CreateAsset(tree, TreePath);
-        AssetDatabase.SaveAssets();
-
-        Selection.activeObject = tree;
-        EditorGUIUtility.PingObject(tree);
+        ShipAssemblySetupEditor.BuildStarterAssemblySetup();
     }
 
-    private static void AddShipNode(TechTreeDefinitionSO tree)
+    private static void AddHullNode(TechTreeDefinitionSO tree)
     {
-        Undo.RecordObject(tree, "Добавить корабль в древо техники");
+        Undo.RecordObject(tree, "Добавить корпус в древо техники");
 
         int index = tree.nodes.Count + 1;
         tree.nodes.Add(new TechTreeNode
         {
-            nodeId = $"ship_node_{index}",
-            displayName = $"Корабль {index}",
-            kind = TechTreeNodeKind.Ship,
+            nodeId = $"hull_node_{index}",
+            displayName = $"Корпус {index}",
+            kind = TechTreeNodeKind.Hull,
             tier = Mathf.Clamp(index, 1, 10),
             researchCostXp = 100 * index,
             purchasePrice = 250 * index,
             editorPosition = new Vector2(index * 220f, 0f)
         });
 
+        SetSelectedNode(tree, tree.nodes.Count - 1);
         EditorUtility.SetDirty(tree);
     }
 
@@ -111,7 +117,59 @@ public class TechTreeConstructorEditor : Editor
             editorPosition = new Vector2(index * 220f, 120f)
         });
 
+        SetSelectedNode(tree, tree.nodes.Count - 1);
         EditorUtility.SetDirty(tree);
+    }
+
+    private void DrawSelectedNode(SerializedProperty nodes, int selectedNodeIndex)
+    {
+        TechTreeDefinitionSO tree = (TechTreeDefinitionSO)target;
+        SerializedProperty node = nodes.GetArrayElementAtIndex(selectedNodeIndex);
+        SerializedProperty nodeId = node.FindPropertyRelative("nodeId");
+        SerializedProperty displayName = node.FindPropertyRelative("displayName");
+        string title = !string.IsNullOrWhiteSpace(displayName.stringValue) ? displayName.stringValue : nodeId.stringValue;
+
+        EditorGUILayout.LabelField("Выбранная нода", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox($"Редактируется: {title}", MessageType.None);
+        LocalizedInspector.DrawTechTreeNodeProperties(node);
+
+        EditorGUILayout.Space(8f);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button(new GUIContent("Начать связь из ноды", "После нажатия кликни другую ноду в визуальном редакторе, чтобы добавить условие доступа.")))
+            {
+                TechTreeGraphWindow.StartConnectionFromInspector(tree, nodeId.stringValue);
+            }
+
+            if (GUILayout.Button(new GUIContent("Удалить ноду", "Удаляет выбранную ноду и убирает ссылки на нее из условий доступа.")))
+            {
+                DeleteNode(nodes, selectedNodeIndex);
+            }
+        }
+    }
+
+    private void DeleteNode(SerializedProperty nodes, int selectedNodeIndex)
+    {
+        TechTreeDefinitionSO tree = (TechTreeDefinitionSO)target;
+        string deletedNodeId = nodes.GetArrayElementAtIndex(selectedNodeIndex).FindPropertyRelative("nodeId").stringValue;
+
+        Undo.RecordObject(tree, "Удалить узел древа техники");
+        nodes.DeleteArrayElementAtIndex(selectedNodeIndex);
+        serializedObject.ApplyModifiedProperties();
+
+        for (int i = 0; i < tree.nodes.Count; i++)
+        {
+            tree.nodes[i].prerequisiteNodeIds.Remove(deletedNodeId);
+        }
+
+        SetSelectedNode(tree, -1);
+        EditorUtility.SetDirty(tree);
+        GUIUtility.ExitGUI();
+    }
+
+    private static string GetSelectedNodeSessionKey(TechTreeDefinitionSO tree)
+    {
+        return SelectedNodeSessionKeyPrefix + tree.GetInstanceID();
     }
 
     private static void ShowValidation(TechTreeDefinitionSO tree)

@@ -8,7 +8,6 @@ public class TechTreeGraphWindow : EditorWindow
     private const float NodeWidth = 190f;
     private const float NodeHeight = 92f;
     private const float ToolbarHeight = 28f;
-    private const float InspectorWidth = 320f;
     private const float MinZoom = 0.35f;
     private const float MaxZoom = 1.8f;
 
@@ -81,11 +80,9 @@ public class TechTreeGraphWindow : EditorWindow
             return;
         }
 
-        Rect canvasRect = new Rect(0f, ToolbarHeight, position.width - InspectorWidth, position.height - ToolbarHeight);
-        Rect inspectorRect = new Rect(position.width - InspectorWidth, ToolbarHeight, InspectorWidth, position.height - ToolbarHeight);
+        Rect canvasRect = new Rect(0f, ToolbarHeight, position.width, position.height - ToolbarHeight);
 
         DrawCanvas(canvasRect);
-        DrawInspector(inspectorRect);
         HandleCanvasEvents(canvasRect);
     }
 
@@ -93,7 +90,14 @@ public class TechTreeGraphWindow : EditorWindow
     {
         using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar, GUILayout.Height(ToolbarHeight)))
         {
-            tree = (TechTreeDefinitionSO)EditorGUILayout.ObjectField(tree, typeof(TechTreeDefinitionSO), false, GUILayout.Width(320f));
+            EditorGUI.BeginChangeCheck();
+            TechTreeDefinitionSO selectedTree = (TechTreeDefinitionSO)EditorGUILayout.ObjectField(tree, typeof(TechTreeDefinitionSO), false, GUILayout.Width(320f));
+            if (EditorGUI.EndChangeCheck())
+            {
+                tree = selectedTree;
+                SelectNode(-1);
+                Selection.activeObject = tree;
+            }
 
             if (GUILayout.Button("Открыть стандартное", EditorStyles.toolbarButton, GUILayout.Width(140f)))
             {
@@ -101,9 +105,9 @@ public class TechTreeGraphWindow : EditorWindow
                 Selection.activeObject = tree;
             }
 
-            if (GUILayout.Button("Добавить корабль", EditorStyles.toolbarButton, GUILayout.Width(130f)))
+            if (GUILayout.Button("Добавить корпус", EditorStyles.toolbarButton, GUILayout.Width(130f)))
             {
-                AddNode(TechTreeNodeKind.Ship);
+                AddNode(TechTreeNodeKind.Hull);
             }
 
             if (GUILayout.Button("Добавить модуль", EditorStyles.toolbarButton, GUILayout.Width(130f)))
@@ -255,18 +259,23 @@ public class TechTreeGraphWindow : EditorWindow
     {
         if (selected) return selectedNodeStyle;
         if (node.isPremium) return premiumNodeStyle;
-        return node.kind == TechTreeNodeKind.Ship ? shipNodeStyle : moduleNodeStyle;
+        return node.kind == TechTreeNodeKind.Hull ? shipNodeStyle : moduleNodeStyle;
     }
 
     private string GetNodeSubtitle(TechTreeNode node)
     {
-        if (node.kind == TechTreeNodeKind.Ship)
+        if (node.kind == TechTreeNodeKind.Hull)
         {
             string premium = node.isPremium ? " | премиум" : "";
-            return $"Корабль | уровень {node.tier}{premium}";
+            return $"Корпус | уровень {node.tier}{premium}";
         }
 
-        return $"Модуль | {GetModuleName(node.moduleKind)} | {node.parentShipId}";
+        if (node.kind == TechTreeNodeKind.Fundamental)
+        {
+            return $"Исследование | уровень {node.tier}";
+        }
+
+        return $"Модуль | {GetModuleName(node.moduleKind)}";
     }
 
     private static string GetModuleName(TechTreeModuleKind moduleKind)
@@ -275,7 +284,7 @@ public class TechTreeGraphWindow : EditorWindow
         {
             case TechTreeModuleKind.Engine: return "двигатель";
             case TechTreeModuleKind.ClaudiumLoop: return "контур";
-            case TechTreeModuleKind.Balloon: return "баллон";
+            case TechTreeModuleKind.DeprecatedBalloon: return "не используется";
             case TechTreeModuleKind.Hull: return "корпус";
             case TechTreeModuleKind.Utility: return "вспом.";
             default: return "другое";
@@ -285,124 +294,6 @@ public class TechTreeGraphWindow : EditorWindow
     private Rect GetNodeRect(TechTreeNode node)
     {
         return new Rect(WorldToCanvas(node.editorPosition), new Vector2(NodeWidth * zoom, NodeHeight * zoom));
-    }
-
-    private void DrawInspector(Rect inspectorRect)
-    {
-        GUILayout.BeginArea(inspectorRect, EditorStyles.helpBox);
-        EditorGUILayout.LabelField("Свойства узла", EditorStyles.boldLabel);
-
-        TechTreeNode selectedNode = GetSelectedNode();
-        if (selectedNode == null)
-        {
-            EditorGUILayout.HelpBox("Выбери узел на холсте.", MessageType.Info);
-            GUILayout.EndArea();
-            return;
-        }
-
-        EditorGUI.BeginChangeCheck();
-
-        selectedNode.nodeId = EditorGUILayout.TextField("Идентификатор узла", selectedNode.nodeId);
-        selectedNode.displayName = EditorGUILayout.TextField("Название", selectedNode.displayName);
-        selectedNode.kind = (TechTreeNodeKind)EditorGUILayout.EnumPopup("Тип узла", selectedNode.kind);
-        selectedNode.tier = EditorGUILayout.IntSlider("Уровень", selectedNode.tier, 1, 10);
-
-        EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Корабль", EditorStyles.boldLabel);
-        selectedNode.shipDefinition = (ShipDefinitionSO)EditorGUILayout.ObjectField("Паспорт", selectedNode.shipDefinition, typeof(ShipDefinitionSO), false);
-        selectedNode.shipId = EditorGUILayout.TextField("Идентификатор корабля", selectedNode.shipId);
-        selectedNode.isPremium = EditorGUILayout.Toggle("Премиум", selectedNode.isPremium);
-
-        EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Модуль", EditorStyles.boldLabel);
-        selectedNode.parentShipId = EditorGUILayout.TextField("Идентификатор корабля-владельца", selectedNode.parentShipId);
-        selectedNode.moduleKind = (TechTreeModuleKind)EditorGUILayout.EnumPopup("Тип модуля", selectedNode.moduleKind);
-
-        EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Прогрессия", EditorStyles.boldLabel);
-        selectedNode.researchCostXp = EditorGUILayout.IntField("Опыт на исследование", selectedNode.researchCostXp);
-        selectedNode.purchasePrice = EditorGUILayout.IntField("Цена покупки", selectedNode.purchasePrice);
-        selectedNode.startsResearched = EditorGUILayout.Toggle("Исследован с начала", selectedNode.startsResearched);
-        selectedNode.startsPurchased = EditorGUILayout.Toggle("Куплен с начала", selectedNode.startsPurchased);
-
-        EditorGUILayout.Space(8f);
-        DrawPrerequisites(selectedNode);
-        DrawExperienceSources(selectedNode);
-
-        if (EditorGUI.EndChangeCheck())
-        {
-            Undo.RecordObject(tree, "Изменить узел древа техники");
-            EditorUtility.SetDirty(tree);
-        }
-
-        EditorGUILayout.Space(12f);
-        if (GUILayout.Button("Начать связь из этого узла"))
-        {
-            pendingConnectionSourceId = selectedNode.nodeId;
-        }
-
-        if (GUILayout.Button("Удалить узел"))
-        {
-            DeleteSelectedNode();
-        }
-
-        GUILayout.EndArea();
-    }
-
-    private void DrawPrerequisites(TechTreeNode node)
-    {
-        EditorGUILayout.LabelField("Условия доступа", EditorStyles.boldLabel);
-        EditorGUILayout.HelpBox("Если условий несколько, доступ откроется по любому одному исследованному узлу.", MessageType.None);
-
-        for (int i = 0; i < node.prerequisiteNodeIds.Count; i++)
-        {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                node.prerequisiteNodeIds[i] = EditorGUILayout.TextField(node.prerequisiteNodeIds[i]);
-                if (GUILayout.Button("X", GUILayout.Width(26f)))
-                {
-                    Undo.RecordObject(tree, "Удалить условие доступа");
-                    node.prerequisiteNodeIds.RemoveAt(i);
-                    EditorUtility.SetDirty(tree);
-                    break;
-                }
-            }
-        }
-
-        if (GUILayout.Button("Добавить условие"))
-        {
-            Undo.RecordObject(tree, "Добавить условие доступа");
-            node.prerequisiteNodeIds.Add("");
-            EditorUtility.SetDirty(tree);
-        }
-    }
-
-    private void DrawExperienceSources(TechTreeNode node)
-    {
-        EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Источники опыта", EditorStyles.boldLabel);
-
-        for (int i = 0; i < node.experienceShipIds.Count; i++)
-        {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                node.experienceShipIds[i] = EditorGUILayout.TextField(node.experienceShipIds[i]);
-                if (GUILayout.Button("X", GUILayout.Width(26f)))
-                {
-                    Undo.RecordObject(tree, "Удалить источник опыта");
-                    node.experienceShipIds.RemoveAt(i);
-                    EditorUtility.SetDirty(tree);
-                    break;
-                }
-            }
-        }
-
-        if (GUILayout.Button("Добавить источник опыта"))
-        {
-            Undo.RecordObject(tree, "Добавить источник опыта");
-            node.experienceShipIds.Add("");
-            EditorUtility.SetDirty(tree);
-        }
     }
 
     private void HandleCanvasEvents(Rect canvasRect)
@@ -424,7 +315,7 @@ public class TechTreeGraphWindow : EditorWindow
                 }
                 else
                 {
-                    selectedNodeIndex = clickedNode;
+                    SelectNode(clickedNode);
                     draggedNodeIndex = clickedNode;
                 }
 
@@ -432,7 +323,7 @@ public class TechTreeGraphWindow : EditorWindow
             }
             else
             {
-                selectedNodeIndex = -1;
+                SelectNode(-1);
                 draggedNodeIndex = -1;
             }
         }
@@ -497,13 +388,6 @@ public class TechTreeGraphWindow : EditorWindow
         return -1;
     }
 
-    private TechTreeNode GetSelectedNode()
-    {
-        if (tree == null) return null;
-        if (selectedNodeIndex < 0 || selectedNodeIndex >= tree.nodes.Count) return null;
-        return tree.nodes[selectedNodeIndex];
-    }
-
     private void AddNode(TechTreeNodeKind kind)
     {
         if (tree == null) return;
@@ -513,17 +397,17 @@ public class TechTreeGraphWindow : EditorWindow
         int index = tree.nodes.Count + 1;
         TechTreeNode node = new TechTreeNode
         {
-            nodeId = kind == TechTreeNodeKind.Ship ? $"ship_node_{index}" : $"module_node_{index}",
-            displayName = kind == TechTreeNodeKind.Ship ? $"Корабль {index}" : $"Модуль {index}",
+            nodeId = kind == TechTreeNodeKind.Hull ? $"hull_node_{index}" : $"module_node_{index}",
+            displayName = kind == TechTreeNodeKind.Hull ? $"Корпус {index}" : $"Модуль {index}",
             kind = kind,
             tier = 1,
-            researchCostXp = kind == TechTreeNodeKind.Ship ? 100 * index : 50,
-            purchasePrice = kind == TechTreeNodeKind.Ship ? 250 * index : 100,
+            researchCostXp = kind == TechTreeNodeKind.Hull ? 100 * index : 50,
+            purchasePrice = kind == TechTreeNodeKind.Hull ? 250 * index : 100,
             editorPosition = CanvasToWorld(new Vector2(80f, 80f))
         };
 
         tree.nodes.Add(node);
-        selectedNodeIndex = tree.nodes.Count - 1;
+        SelectNode(tree.nodes.Count - 1);
         EditorUtility.SetDirty(tree);
     }
 
@@ -553,20 +437,42 @@ public class TechTreeGraphWindow : EditorWindow
             tree.nodes[i].prerequisiteNodeIds.Remove(deletedNodeId);
         }
 
-        selectedNodeIndex = -1;
+        SelectNode(-1);
         pendingConnectionSourceId = "";
         EditorUtility.SetDirty(tree);
     }
 
     private void ShowNodeContextMenu(int nodeIndex)
     {
-        selectedNodeIndex = nodeIndex;
+        SelectNode(nodeIndex);
         TechTreeNode node = tree.nodes[nodeIndex];
 
         GenericMenu menu = new GenericMenu();
         menu.AddItem(new GUIContent("Начать связь из этого узла"), false, () => pendingConnectionSourceId = node.nodeId);
         menu.AddItem(new GUIContent("Удалить узел"), false, DeleteSelectedNode);
         menu.ShowAsContext();
+    }
+
+    public static void StartConnectionFromInspector(TechTreeDefinitionSO targetTree, string sourceNodeId)
+    {
+        if (targetTree == null || string.IsNullOrWhiteSpace(sourceNodeId)) return;
+
+        TechTreeGraphWindow[] windows = Resources.FindObjectsOfTypeAll<TechTreeGraphWindow>();
+        for (int i = 0; i < windows.Length; i++)
+        {
+            TechTreeGraphWindow window = windows[i];
+            if (window == null || window.tree != targetTree) continue;
+
+            window.pendingConnectionSourceId = sourceNodeId;
+            window.Repaint();
+        }
+    }
+
+    private void SelectNode(int nodeIndex)
+    {
+        selectedNodeIndex = nodeIndex;
+        TechTreeConstructorEditor.SetSelectedNode(tree, nodeIndex);
+        Repaint();
     }
 
     private void ValidateTree()
