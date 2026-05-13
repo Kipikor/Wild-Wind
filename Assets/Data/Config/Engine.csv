@@ -1,0 +1,5 @@
+id_engine,local_name_ru,local_name_en,complited_tech,base_mass_kg,fuel_id,max_power_kw,fuel_efficiency
+starter_engine,Паровой двигатель I,Steam Engine I,,380,wood,190,0.32
+charcoal_engine,Угольный двигатель,Charcoal Engine,combustion_engines,450,charcoal,260,0.35
+alcohol_engine,Спиртовой двигатель,Alcohol Engine,combustion_engines,340,alcohol,230,0.38
+heavy_boiler,Тяжёлый котёл,Heavy Boiler,heavy_lift,700,charcoal,420,0.34

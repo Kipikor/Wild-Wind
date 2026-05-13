@@ -1,4 +1,5 @@
-﻿id_island,local_name_ru,local_name_en,position_x,position_y,position_z,Island_production,docking_radius,time_for_one_item_load
+id_island,local_name_ru,local_name_en,position_x,position_y,position_z,Island_production,docking_radius,time_for_one_item_load
+capital,Столица,Capital,0,0,0,,80,1
 Island1,Остров Еда 1,Island Food 1,34974,8812,52512,Island_production_food,10,1.5
 Island2,Остров Уголь 1,Island Charcoal 1,48436,7722,-51008,Island_production_charcoal,10,1.5
 Island3,Остров Сера 1,Island Sulfur 1,78708,2075,16539,Island_production_sulfur,10,1.5

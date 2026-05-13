@@ -10,13 +10,18 @@ public static class TechTreeRules
         for (int i = 0; i < node.prerequisiteNodeIds.Count; i++)
         {
             string prerequisiteId = node.prerequisiteNodeIds[i];
-            if (progress.IsNodeResearched(prerequisiteId) || progress.IsNodePurchased(prerequisiteId))
+            if (string.IsNullOrWhiteSpace(prerequisiteId))
             {
-                return true;
+                continue;
+            }
+
+            if (!progress.IsNodeResearched(prerequisiteId) && !progress.IsNodePurchased(prerequisiteId))
+            {
+                return false;
             }
         }
 
-        return false;
+        return true;
     }
 
     public static bool CanResearch(TechTreeNode node, PlayerProgress progress, out string experienceShipId, out string reason)

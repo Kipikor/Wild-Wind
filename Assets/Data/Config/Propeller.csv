@@ -1,0 +1,5 @@
+id_propeller,local_name_ru,local_name_en,complited_tech,base_mass_kg,max_speed_ms,efficiency,max_thrust_kgf
+starter_propeller,Деревянный винт,Wooden Propeller,,90,30,0.78,220
+cargo_propeller,Грузовой винт,Cargo Propeller,heavy_lift,140,24,0.82,320
+speed_propeller,Скоростной винт,Speed Propeller,advanced_propellers,110,38,0.76,190
+heavy_propeller,Тяжёлый винт,Heavy Propeller,heavy_lift,220,28,0.84,430

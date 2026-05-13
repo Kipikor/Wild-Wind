@@ -1,0 +1,7 @@
+id_technology,local_name_ru,local_name_en,cycle_time_seconds,required_cycles,required_technology,cycle_cost_item,cycle_cost_amount
+basic_airship,Основы воздушного судна,Airship Basics,0,1,"","",
+improved_frames,Усиленные корпуса,Improved Frames,20,2,"basic_airship","wood,metal","2,1"
+combustion_engines,Тяговые двигатели,Combustion Engines,25,2,"basic_airship","charcoal,mechanisms","2,1"
+advanced_propellers,Винтовая школа,Propeller School,20,2,"improved_frames","wood,tools","2,2"
+claudium_control,Клавдиевые контуры,Claudium Control,30,3,"basic_airship","claudium,mechanisms","1,1"
+heavy_lift,Тяжелый подъем,Heavy Lift,35,3,"improved_frames,claudium_control","metal,claudium,mechanisms","2,2,1"

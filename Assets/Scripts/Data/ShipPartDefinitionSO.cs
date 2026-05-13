@@ -13,6 +13,9 @@ public class ShipPartDefinitionSO : ScriptableObject
     public string displayName = "Деталь";
     [InspectorName("Описание")]
     [TextArea] public string description = "";
+    [InspectorName("Технология доступа")]
+    [Tooltip("Если заполнено, деталь можно ставить только после завершения этой технологии. В CSV колонка называется complited_tech.")]
+    public string completedTechId = "";
     [InspectorName("Тип детали")]
     public ShipPartKind kind = ShipPartKind.Module;
     [InspectorName("Префаб")]

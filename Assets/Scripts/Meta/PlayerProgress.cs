@@ -37,12 +37,14 @@ public class PlayerProgress
     public string selectedHullId = "";
     public List<string> researchedNodeIds = new List<string>();
     public List<string> purchasedNodeIds = new List<string>();
+    public string activeResearchTechnologyId = "";
+    public List<TechnologyResearchProgress> technologyResearchProgress = new List<TechnologyResearchProgress>();
     public List<ShipExperienceWallet> shipExperience = new List<ShipExperienceWallet>();
     public List<InstalledModuleState> installedModules = new List<InstalledModuleState>();
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
     public DockingLocationKind currentDockKind = DockingLocationKind.Island;
-    public string currentDockId = "starter_island";
+    public string currentDockId = "capital";
     public bool hasCurrentDockPosition;
     public Vector3 currentDockPosition;
     public bool hasCurrentFlightPose;
@@ -66,6 +68,7 @@ public class PlayerProgress
     public void Normalize()
     {
         selectedHullId ??= "";
+        activeResearchTechnologyId ??= "";
         currentDockId ??= "";
         activeFlightMissionId ??= "";
         if (currentFlightRotation.x == 0f
@@ -78,6 +81,7 @@ public class PlayerProgress
 
         researchedNodeIds ??= new List<string>();
         purchasedNodeIds ??= new List<string>();
+        technologyResearchProgress ??= new List<TechnologyResearchProgress>();
         shipExperience ??= new List<ShipExperienceWallet>();
         installedModules ??= new List<InstalledModuleState>();
         inventory ??= new List<ResourceStack>();
@@ -115,6 +119,18 @@ public class PlayerProgress
                     installedModules.RemoveAt(i);
                 }
             }
+        }
+
+        for (int i = technologyResearchProgress.Count - 1; i >= 0; i--)
+        {
+            TechnologyResearchProgress state = technologyResearchProgress[i];
+            if (state == null || string.IsNullOrWhiteSpace(state.technologyId))
+            {
+                technologyResearchProgress.RemoveAt(i);
+                continue;
+            }
+
+            state.Normalize();
         }
 
         for (int i = activeProcesses.Count - 1; i >= 0; i--)
@@ -235,6 +251,37 @@ public class PlayerProgress
 
         researchedNodeIds.Add(nodeId);
         return true;
+    }
+
+    public bool IsTechnologyCompleted(string technologyId)
+    {
+        return IsNodeResearched(technologyId);
+    }
+
+    public bool CompleteTechnology(string technologyId)
+    {
+        return ResearchNode(technologyId);
+    }
+
+    public TechnologyResearchProgress GetTechnologyProgress(string technologyId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(technologyId)) return null;
+        technologyResearchProgress ??= new List<TechnologyResearchProgress>();
+
+        for (int i = 0; i < technologyResearchProgress.Count; i++)
+        {
+            TechnologyResearchProgress state = technologyResearchProgress[i];
+            if (state != null && state.technologyId == technologyId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        TechnologyResearchProgress newState = new TechnologyResearchProgress { technologyId = technologyId };
+        technologyResearchProgress.Add(newState);
+        return newState;
     }
 
     public bool PurchaseNode(string nodeId)
@@ -859,6 +906,26 @@ public class ShipExperienceWallet
 {
     public string shipId = "";
     public int experience;
+}
+
+[Serializable]
+public class TechnologyResearchProgress
+{
+    public string technologyId = "";
+    public int completedCycles;
+    public long activeCycleStartUtcTicks;
+    public long activeCycleEndUtcTicks;
+
+    public bool HasActiveCycle => activeCycleEndUtcTicks > 0;
+
+    public void Normalize()
+    {
+        technologyId ??= "";
+        completedCycles = Mathf.Max(0, completedCycles);
+        if (activeCycleEndUtcTicks < 0) activeCycleEndUtcTicks = 0;
+        if (activeCycleStartUtcTicks < 0) activeCycleStartUtcTicks = 0;
+        if (activeCycleEndUtcTicks == 0) activeCycleStartUtcTicks = 0;
+    }
 }
 
 [Serializable]

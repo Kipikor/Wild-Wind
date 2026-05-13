@@ -499,7 +499,7 @@ MonoBehaviour:
     installedModules: []
     currentMode: 0
     currentDockKind: 0
-    currentDockId: starter_island
+    currentDockId: capital
     hasCurrentDockPosition: 0
     currentDockPosition: {x: 0, y: 0, z: 0}
     activeFlightMissionId: 
@@ -513,7 +513,7 @@ MonoBehaviour:
     acceptedMissionIds: []
     completedMissionIds: []
   startingMode: 0
-  startingDockId: starter_island
+  startingDockId: capital
   startingDockKind: 0
   autoSaveOnDock: 1
   loadSavedGameOnAwake: 1

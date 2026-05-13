@@ -10,10 +10,12 @@ public class WorldConfigDatabase
     private readonly Dictionary<string, ItemConfig> itemsById = new Dictionary<string, ItemConfig>();
     private readonly Dictionary<string, IslandConfig> islandsById = new Dictionary<string, IslandConfig>();
     private readonly Dictionary<string, IslandProductionConfig> productionsById = new Dictionary<string, IslandProductionConfig>();
+    private readonly Dictionary<string, TechnologyConfig> technologiesById = new Dictionary<string, TechnologyConfig>();
 
     public List<ItemConfig> items = new List<ItemConfig>();
     public List<IslandConfig> islands = new List<IslandConfig>();
     public List<IslandProductionConfig> productions = new List<IslandProductionConfig>();
+    public List<TechnologyConfig> technologies = new List<TechnologyConfig>();
 
     public bool isLoaded;
     public string lastError = "";
@@ -33,6 +35,7 @@ public class WorldConfigDatabase
             LoadItems(Path.Combine(folder, "Item.csv"));
             LoadProductions(Path.Combine(folder, "Island_production.csv"));
             LoadIslands(Path.Combine(folder, "Island.csv"));
+            LoadTechnologies(Path.Combine(folder, "Technology.csv"));
             isLoaded = true;
             lastError = "";
         }
@@ -65,6 +68,13 @@ public class WorldConfigDatabase
         return production;
     }
 
+    public TechnologyConfig GetTechnology(string technologyId)
+    {
+        if (string.IsNullOrWhiteSpace(technologyId)) return null;
+        technologiesById.TryGetValue(technologyId, out TechnologyConfig technology);
+        return technology;
+    }
+
     public string GetItemNameRu(string itemId)
     {
         ItemConfig item = GetItem(itemId);
@@ -72,14 +82,23 @@ public class WorldConfigDatabase
         return string.IsNullOrWhiteSpace(item.localNameRu) ? item.id : item.localNameRu;
     }
 
+    public string GetTechnologyNameRu(string technologyId)
+    {
+        TechnologyConfig technology = GetTechnology(technologyId);
+        if (technology == null) return technologyId ?? "";
+        return string.IsNullOrWhiteSpace(technology.localNameRu) ? technology.id : technology.localNameRu;
+    }
+
     private void Clear()
     {
         items.Clear();
         islands.Clear();
         productions.Clear();
+        technologies.Clear();
         itemsById.Clear();
         islandsById.Clear();
         productionsById.Clear();
+        technologiesById.Clear();
         isLoaded = false;
         lastError = "";
     }
@@ -156,6 +175,44 @@ public class WorldConfigDatabase
             if (string.IsNullOrWhiteSpace(production.id)) continue;
             productions.Add(production);
             productionsById[production.id] = production;
+        }
+    }
+
+    private void LoadTechnologies(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            TechnologyConfig technology = new TechnologyConfig
+            {
+                id = Get(row, "id_technology"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                cycleTimeSeconds = Mathf.Max(0, ParseInt(Get(row, "cycle_time_seconds"), 1)),
+                requiredCycles = Mathf.Max(1, ParseInt(Get(row, "required_cycles"), 1))
+            };
+
+            technology.prerequisiteTechnologyIds.AddRange(SplitInlineList(Get(row, "required_technology")));
+
+            List<string> itemIds = SplitInlineList(Get(row, "cycle_cost_item"));
+            List<string> amounts = SplitInlineList(Get(row, "cycle_cost_amount"));
+            int count = Mathf.Min(itemIds.Count, amounts.Count);
+            for (int i = 0; i < count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(itemIds[i])) continue;
+
+                int amount = Mathf.Max(0, ParseInt(amounts[i]));
+                if (amount <= 0) continue;
+
+                technology.cycleCost.Add(new TechnologyCostConfig
+                {
+                    itemId = itemIds[i],
+                    amount = amount
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(technology.id)) continue;
+            technologies.Add(technology);
+            technologiesById[technology.id] = technology;
         }
     }
 
@@ -287,6 +344,23 @@ public class IslandConsumptionConfig
     public string itemId = "";
     public float countPerMinute;
     public float satisfiedProductionMultiplier = 1f;
+}
+
+public class TechnologyConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public int cycleTimeSeconds = 1;
+    public int requiredCycles = 1;
+    public List<string> prerequisiteTechnologyIds = new List<string>();
+    public List<TechnologyCostConfig> cycleCost = new List<TechnologyCostConfig>();
+}
+
+public class TechnologyCostConfig
+{
+    public string itemId = "";
+    public int amount;
 }
 
 public static class IslandProductionSimulator

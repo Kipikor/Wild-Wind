@@ -1,0 +1,5 @@
+id_claudium_loop,local_name_ru,local_name_en,complited_tech,base_mass_kg,claudium_consumption_per_ton_second,lift_kg_per_kw,max_lift_kg,lift_smoothing
+starter_claudium_loop,Клавдиевый контур I,Claudium Loop I,,160,0.005,10,2600,2.5
+light_claudium_loop,Лёгкий контур,Light Claudium Loop,claudium_control,110,0.0045,9,1800,3
+efficient_claudium_loop,Экономичный контур,Efficient Claudium Loop,claudium_control,210,0.0035,12,3000,2
+heavy_claudium_loop,Грузовой контур,Heavy Claudium Loop,heavy_lift,320,0.006,11,4200,1.8

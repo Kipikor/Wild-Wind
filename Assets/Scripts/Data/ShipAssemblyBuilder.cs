@@ -177,12 +177,13 @@ public static class ShipAssemblyBuilder
     public static bool IsPartUsable(ShipPartDefinitionSO part, TechTreeDefinitionSO techTree, PlayerProgress progress)
     {
         if (part == null || progress == null) return false;
-        if (techTree == null) return true;
 
-        TechTreeNode node = techTree.GetNodeForPart(part.partId);
-        if (node == null) return true;
-        if (node.kind == TechTreeNodeKind.Fundamental) return node.startsResearched || progress.IsNodeResearched(node.nodeId);
-        return node.startsPurchased || progress.IsNodePurchased(node.nodeId);
+        if (!string.IsNullOrWhiteSpace(part.completedTechId))
+        {
+            return progress.IsTechnologyCompleted(part.completedTechId);
+        }
+
+        return true;
     }
 
     public static ShipPartDefinitionSO FindFirstAvailableModule(ShipCatalogSO catalog, TechTreeDefinitionSO techTree, PlayerProgress progress, ShipSlotDefinition slot)

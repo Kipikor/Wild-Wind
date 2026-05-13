@@ -96,6 +96,7 @@ public class MetaGameStateEditor : Editor
 
         LocalizedInspector.Section("Конфиги мира");
         LocalizedInspector.Property(serializedObject, "worldConfigFolder", "Папка конфигов от Assets", "CSV-конфиги ресурсов, островов и производств. По умолчанию Data/Config.");
+        LocalizedInspector.Property(serializedObject, "capitalIslandId", "Остров столицы", "Идентификатор острова-лаборатории из Island.csv. Новая игра стартует здесь.");
         LocalizedInspector.Property(serializedObject, "islandProductionEnabled", "Производство островов", "Если включено, склады островов обновляются по CSV-конфигам в реальном времени.");
         LocalizedInspector.Property(serializedObject, "spawnConfigIslandsOnPlay", "Создавать острова из конфигов", "Если включено, при запуске Play Mode острова из Island.csv появляются в сцене как DockingPort.");
         LocalizedInspector.Property(serializedObject, "configIslandVisualRadius", "Визуальный радиус острова", "Размер временной модели острова. Радиус стыковки берется из Island.csv.");
@@ -205,6 +206,7 @@ public class ShipPartDefinitionSOEditor : Editor
         LocalizedInspector.Property(serializedObject, "partId", "Идентификатор детали", "Технический идентификатор корпуса или модуля. Используется в сохранении, древе техники и сборке корабля.");
         LocalizedInspector.Property(serializedObject, "displayName", "Название", "Название детали для интерфейса стыковки и списков сборки.");
         LocalizedInspector.Property(serializedObject, "description", "Описание", "Короткое описание детали для будущего интерфейса дока, магазина или подсказок.");
+        LocalizedInspector.Property(serializedObject, "completedTechId", "Технология доступа", "Если заполнено, деталь можно ставить после завершения этой технологии.");
         LocalizedInspector.Property(serializedObject, "kind", "Тип детали", "Корпус задает основу корабля и слоты. Модуль ставится в слот корпуса или другого модуля.");
         LocalizedInspector.Property(serializedObject, "prefab", "Префаб", "Для корпуса это основной префаб с физикой, коллайдерами и сокетами. Для модуля это визуальный префаб, который вставляется в сокет.");
 
@@ -342,6 +344,8 @@ public static class LocalizedInspector
         DrawInstalledModuleList(progress.FindPropertyRelative("installedModules"), "Установленные модули");
         DrawStringList(progress.FindPropertyRelative("researchedNodeIds"), "Исследованные узлы", "Идентификаторы уже исследованных узлов древа техники.");
         DrawStringList(progress.FindPropertyRelative("purchasedNodeIds"), "Купленные узлы", "Идентификаторы купленных узлов древа техники.");
+        Property(progress, "activeResearchTechnologyId", "Активная технология", "Технология, выбранная в лаборатории столицы.");
+        EditorGUILayout.PropertyField(progress.FindPropertyRelative("technologyResearchProgress"), new GUIContent("Прогресс технологий", "Сколько циклов завершено и идет ли текущий цикл."), true);
         DrawShipExperienceList(progress.FindPropertyRelative("shipExperience"), "Опыт корпусов");
 
         Property(progress, "currentMode", "Текущий режим", "Стыковка разрешает ручное сохранение. Выход из игры в вылете сохраняет позицию корабля.");

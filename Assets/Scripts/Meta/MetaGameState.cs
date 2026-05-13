@@ -32,7 +32,7 @@ public class MetaGameState : MonoBehaviour
     [InspectorName("Стартовый режим")]
     public GameSessionMode startingMode = GameSessionMode.Docked;
     [InspectorName("Стартовый док")]
-    public string startingDockId = "starter_island";
+    public string startingDockId = "capital";
     [InspectorName("Тип стартового дока")]
     public DockingLocationKind startingDockKind = DockingLocationKind.Island;
     [InspectorName("Автосохранение при стыковке")]
@@ -77,6 +77,9 @@ public class MetaGameState : MonoBehaviour
     [InspectorName("Папка конфигов от Assets")]
     [Tooltip("CSV-конфиги мира загружаются из этой папки при старте Play Mode.")]
     public string worldConfigFolder = "Data/Config";
+    [InspectorName("Остров столицы")]
+    [Tooltip("Остров, на котором находится лаборатория технологий и стартует новая игра.")]
+    public string capitalIslandId = "capital";
     [InspectorName("Производство островов")]
     [Tooltip("Если включено, острова производят и потребляют товары по CSV-конфигам.")]
     public bool islandProductionEnabled = true;
@@ -227,7 +230,21 @@ public class MetaGameState : MonoBehaviour
             dock.autoDockWhenInRange = true;
             dock.requireLeaveBeforeRedocking = true;
             dock.snapPoint = islandObject.transform;
+
+            if (IsCapitalIsland(island.id))
+            {
+                CapitalResearchStation station = islandObject.AddComponent<CapitalResearchStation>();
+                station.metaGameState = this;
+                station.islandId = island.id;
+                station.displayName = GetIslandDisplayName(island);
+            }
         }
+    }
+
+    public bool IsCapitalIsland(string islandId)
+    {
+        string expectedId = string.IsNullOrWhiteSpace(capitalIslandId) ? "capital" : capitalIslandId;
+        return !string.IsNullOrWhiteSpace(islandId) && islandId == expectedId;
     }
 
     private static string GetIslandDisplayName(IslandConfig island)
@@ -355,6 +372,7 @@ public class MetaGameState : MonoBehaviour
         }
 
         ApplyStartingTechTreeNodes();
+        ApplyStartingTechnologies();
         ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out _);
         initialized = true;
     }
@@ -516,6 +534,166 @@ public class MetaGameState : MonoBehaviour
         return true;
     }
 
+    public IReadOnlyList<TechnologyConfig> GetTechnologyConfigs()
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return worldConfig != null ? worldConfig.technologies : null;
+    }
+
+    public IslandProductionState GetCapitalStorageState()
+    {
+        EnsureProgressInitialized();
+        return progress.GetIslandProductionState(GetCapitalIslandId(), true);
+    }
+
+    public TechnologyResearchProgress GetTechnologyResearchProgress(string technologyId)
+    {
+        EnsureProgressInitialized();
+        return progress.GetTechnologyProgress(technologyId, false);
+    }
+
+    public bool IsTechnologyCompleted(string technologyId)
+    {
+        EnsureProgressInitialized();
+        return progress.IsTechnologyCompleted(technologyId);
+    }
+
+    public bool IsDockedAtCapital()
+    {
+        EnsureProgressInitialized();
+        return IsDocked
+            && progress.currentDockKind == DockingLocationKind.Island
+            && IsCapitalIsland(progress.currentDockId);
+    }
+
+    public string GetCapitalIslandId()
+    {
+        return string.IsNullOrWhiteSpace(capitalIslandId) ? "capital" : capitalIslandId;
+    }
+
+    public bool TrySelectResearchTechnology(string technologyId)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        TechnologyConfig technology = worldConfig != null ? worldConfig.GetTechnology(technologyId) : null;
+        if (!CanSelectResearchTechnology(technology, out string reason))
+        {
+            lastSaveMessage = reason;
+            return false;
+        }
+
+        progress.activeResearchTechnologyId = technology.id;
+        TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
+        state.completedCycles = Mathf.Clamp(state.completedCycles, 0, Mathf.Max(1, technology.requiredCycles));
+
+        TryStartOrContinueResearchCycle(technology, state, DateTime.UtcNow.Ticks, out reason);
+        lastSaveMessage = string.IsNullOrWhiteSpace(reason) ? "Исследование выбрано: " + GetTechnologyDisplayName(technology) : reason;
+        AutoSaveIfDocked();
+        return true;
+    }
+
+    public bool CanSelectResearchTechnology(TechnologyConfig technology, out string reason)
+    {
+        reason = "";
+        if (technology == null)
+        {
+            reason = "Технология не найдена.";
+            return false;
+        }
+
+        if (!IsDockedAtCapital())
+        {
+            reason = "Исследования можно выбирать только в столице.";
+            return false;
+        }
+
+        if (progress.IsTechnologyCompleted(technology.id))
+        {
+            reason = "Технология уже завершена.";
+            return false;
+        }
+
+        if (!AreTechnologyPrerequisitesCompleted(technology, out reason))
+        {
+            return false;
+        }
+
+        string activeId = progress.activeResearchTechnologyId;
+        if (!string.IsNullOrWhiteSpace(activeId) && activeId != technology.id)
+        {
+            TechnologyResearchProgress activeState = progress.GetTechnologyProgress(activeId, false);
+            if (activeState != null && activeState.HasActiveCycle)
+            {
+                reason = "Сначала завершится текущий цикл исследования.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public bool HasCapitalResourcesForCycle(TechnologyConfig technology)
+    {
+        if (technology == null) return false;
+        IslandProductionState storage = GetCapitalStorageState();
+        return HasTechnologyCycleCost(storage, technology);
+    }
+
+    public string GetTechnologyDisplayName(TechnologyConfig technology)
+    {
+        if (technology == null) return "";
+        return string.IsNullOrWhiteSpace(technology.localNameRu) ? technology.id : technology.localNameRu;
+    }
+
+    public string FormatTechnologyCycleCost(TechnologyConfig technology)
+    {
+        if (technology == null || technology.cycleCost == null || technology.cycleCost.Count == 0)
+        {
+            return "без ресурсов";
+        }
+
+        List<string> parts = new List<string>();
+        for (int i = 0; i < technology.cycleCost.Count; i++)
+        {
+            TechnologyCostConfig cost = technology.cycleCost[i];
+            if (cost == null || string.IsNullOrWhiteSpace(cost.itemId) || cost.amount <= 0) continue;
+            parts.Add(worldConfig.GetItemNameRu(cost.itemId) + " x" + cost.amount);
+        }
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "без ресурсов";
+    }
+
+    public string GetTechnologyStatusText(TechnologyConfig technology)
+    {
+        if (technology == null) return "";
+        EnsureProgressInitialized();
+
+        if (progress.IsTechnologyCompleted(technology.id))
+        {
+            return "завершена";
+        }
+
+        TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, false);
+        int completedCycles = state != null ? state.completedCycles : 0;
+        string cycleText = completedCycles + "/" + Mathf.Max(1, technology.requiredCycles);
+
+        if (progress.activeResearchTechnologyId != technology.id)
+        {
+            return "не выбрана, циклы " + cycleText;
+        }
+
+        if (state != null && state.HasActiveCycle)
+        {
+            return "идет цикл, осталось " + FormatRemaining(state.activeCycleEndUtcTicks) + ", циклы " + cycleText;
+        }
+
+        return HasCapitalResourcesForCycle(technology)
+            ? "ждет запуска цикла, циклы " + cycleText
+            : "ждет ресурсы, циклы " + cycleText;
+    }
+
     public bool TryBeginFlightSession(MissionDefinitionSO mission)
     {
         EnsureProgressInitialized();
@@ -650,10 +828,11 @@ public class MetaGameState : MonoBehaviour
         AddStartingShipConsumables();
         progress.StopCargoTransfer();
         ApplyStartingTechTreeNodes();
+        ApplyStartingTechnologies();
 
         string assemblyMessage = "";
         bool assemblyReady = ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out assemblyMessage);
-        string recoveryDockId = string.IsNullOrWhiteSpace(startingDockId) ? "starter_island" : startingDockId;
+        string recoveryDockId = string.IsNullOrWhiteSpace(startingDockId) ? GetCapitalIslandId() : startingDockId;
         DockingLocationKind recoveryDockKind = startingDockKind;
         Vector3 recoveryPosition = GetDockPositionOrFallback(recoveryDockId, recoveryDockKind);
 
@@ -796,6 +975,7 @@ public class MetaGameState : MonoBehaviour
             }
 
             completedCycles += AdvanceCargoTransfer(utcNow);
+            completedCycles += AdvanceTechnologyResearch(utcNow);
 
             for (int i = progress.activeProcesses.Count - 1; i >= 0; i--)
             {
@@ -1098,6 +1278,201 @@ public class MetaGameState : MonoBehaviour
         lastSaveMessage = message;
     }
 
+    private int AdvanceTechnologyResearch(DateTime utcNow)
+    {
+        if (progress == null || worldConfig == null || !worldConfig.isLoaded) return 0;
+        if (string.IsNullOrWhiteSpace(progress.activeResearchTechnologyId)) return 0;
+
+        TechnologyConfig technology = worldConfig.GetTechnology(progress.activeResearchTechnologyId);
+        if (technology == null)
+        {
+            progress.activeResearchTechnologyId = "";
+            return 0;
+        }
+
+        if (progress.IsTechnologyCompleted(technology.id))
+        {
+            progress.activeResearchTechnologyId = "";
+            return 0;
+        }
+
+        if (!AreTechnologyPrerequisitesCompleted(technology, out _))
+        {
+            return 0;
+        }
+
+        TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
+        IslandProductionState storage = progress.GetIslandProductionState(GetCapitalIslandId(), true);
+        int changedCycles = 0;
+        int guard = 0;
+
+        while (guard < 10000)
+        {
+            guard++;
+
+            if (state.completedCycles >= Mathf.Max(1, technology.requiredCycles))
+            {
+                CompleteTechnologyResearch(technology);
+                changedCycles++;
+                break;
+            }
+
+            if (!state.HasActiveCycle)
+            {
+                if (!TryStartTechnologyCycle(technology, state, storage, utcNow.Ticks, out _))
+                {
+                    break;
+                }
+
+                changedCycles++;
+                if (state.activeCycleEndUtcTicks > utcNow.Ticks)
+                {
+                    break;
+                }
+            }
+
+            if (!state.HasActiveCycle || utcNow.Ticks < state.activeCycleEndUtcTicks)
+            {
+                break;
+            }
+
+            long nextStartTicks = state.activeCycleEndUtcTicks;
+            state.completedCycles++;
+            state.activeCycleStartUtcTicks = 0;
+            state.activeCycleEndUtcTicks = 0;
+            changedCycles++;
+
+            if (state.completedCycles >= Mathf.Max(1, technology.requiredCycles))
+            {
+                CompleteTechnologyResearch(technology);
+                break;
+            }
+
+            if (!TryStartTechnologyCycle(technology, state, storage, nextStartTicks, out _))
+            {
+                break;
+            }
+        }
+
+        return changedCycles;
+    }
+
+    private void CompleteTechnologyResearch(TechnologyConfig technology)
+    {
+        if (technology == null || progress == null) return;
+
+        progress.CompleteTechnology(technology.id);
+        progress.PurchaseNode(technology.id);
+
+        TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
+        state.completedCycles = Mathf.Max(state.completedCycles, Mathf.Max(1, technology.requiredCycles));
+        state.activeCycleStartUtcTicks = 0;
+        state.activeCycleEndUtcTicks = 0;
+
+        if (progress.activeResearchTechnologyId == technology.id)
+        {
+            progress.activeResearchTechnologyId = "";
+        }
+
+        ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out _);
+        ApplySelectedShip();
+        lastSaveMessage = "Технология завершена: " + GetTechnologyDisplayName(technology);
+    }
+
+    private bool TryStartOrContinueResearchCycle(TechnologyConfig technology, TechnologyResearchProgress state, long startTicks, out string reason)
+    {
+        reason = "";
+        if (technology == null || state == null) return false;
+        if (state.HasActiveCycle) return true;
+
+        IslandProductionState storage = progress.GetIslandProductionState(GetCapitalIslandId(), true);
+        return TryStartTechnologyCycle(technology, state, storage, startTicks, out reason);
+    }
+
+    private bool TryStartTechnologyCycle(TechnologyConfig technology, TechnologyResearchProgress state, IslandProductionState storage, long startTicks, out string reason)
+    {
+        reason = "";
+        if (technology == null || state == null || storage == null)
+        {
+            reason = "Нет склада столицы для исследования.";
+            return false;
+        }
+
+        if (!TrySpendTechnologyCycleCost(storage, technology, out reason))
+        {
+            return false;
+        }
+
+        int durationSeconds = Mathf.Max(0, technology.cycleTimeSeconds);
+        state.activeCycleStartUtcTicks = startTicks;
+        state.activeCycleEndUtcTicks = startTicks + TimeSpan.FromSeconds(durationSeconds).Ticks;
+        reason = "Цикл исследования начат.";
+        return true;
+    }
+
+    private bool AreTechnologyPrerequisitesCompleted(TechnologyConfig technology, out string reason)
+    {
+        reason = "";
+        if (technology == null) return false;
+        if (technology.prerequisiteTechnologyIds == null || technology.prerequisiteTechnologyIds.Count == 0) return true;
+
+        for (int i = 0; i < technology.prerequisiteTechnologyIds.Count; i++)
+        {
+            string prerequisiteId = technology.prerequisiteTechnologyIds[i];
+            if (string.IsNullOrWhiteSpace(prerequisiteId)) continue;
+
+            if (!progress.IsTechnologyCompleted(prerequisiteId))
+            {
+                reason = "Нужна технология: " + worldConfig.GetTechnologyNameRu(prerequisiteId);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool HasTechnologyCycleCost(IslandProductionState storage, TechnologyConfig technology)
+    {
+        if (technology == null || storage == null) return false;
+        if (technology.cycleCost == null || technology.cycleCost.Count == 0) return true;
+
+        for (int i = 0; i < technology.cycleCost.Count; i++)
+        {
+            TechnologyCostConfig cost = technology.cycleCost[i];
+            if (cost == null || string.IsNullOrWhiteSpace(cost.itemId) || cost.amount <= 0) continue;
+            if (storage.GetResourceAmount(cost.itemId) < cost.amount) return false;
+        }
+
+        return true;
+    }
+
+    private bool TrySpendTechnologyCycleCost(IslandProductionState storage, TechnologyConfig technology, out string reason)
+    {
+        reason = "";
+        if (technology == null || storage == null)
+        {
+            reason = "Нет склада столицы для исследования.";
+            return false;
+        }
+
+        if (!HasTechnologyCycleCost(storage, technology))
+        {
+            reason = "На складе столицы не хватает ресурсов для цикла.";
+            return false;
+        }
+
+        if (technology.cycleCost == null) return true;
+
+        for (int i = 0; i < technology.cycleCost.Count; i++)
+        {
+            TechnologyCostConfig cost = technology.cycleCost[i];
+            if (cost == null || string.IsNullOrWhiteSpace(cost.itemId) || cost.amount <= 0) continue;
+            storage.TrySpendResource(cost.itemId, cost.amount);
+        }
+
+        return true;
+    }
+
     private CargoCapacityInfo CalculateCargoCapacity()
     {
         CargoCapacityInfo info = new CargoCapacityInfo
@@ -1323,6 +1698,28 @@ public class MetaGameState : MonoBehaviour
                     progress.EnsureStarterHull(node.EffectivePartId);
                 }
             }
+        }
+    }
+
+    private void ApplyStartingTechnologies()
+    {
+        if (worldConfig == null || !worldConfig.isLoaded || progress == null) return;
+
+        for (int i = 0; i < worldConfig.technologies.Count; i++)
+        {
+            TechnologyConfig technology = worldConfig.technologies[i];
+            if (technology == null || string.IsNullOrWhiteSpace(technology.id)) continue;
+            if (technology.prerequisiteTechnologyIds != null && technology.prerequisiteTechnologyIds.Count > 0) continue;
+            if (technology.cycleCost != null && technology.cycleCost.Count > 0) continue;
+            if (technology.cycleTimeSeconds > 0) continue;
+
+            progress.CompleteTechnology(technology.id);
+            progress.PurchaseNode(technology.id);
+
+            TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
+            state.completedCycles = Mathf.Max(state.completedCycles, Mathf.Max(1, technology.requiredCycles));
+            state.activeCycleStartUtcTicks = 0;
+            state.activeCycleEndUtcTicks = 0;
         }
     }
 
@@ -1642,7 +2039,6 @@ public class MetaGameState : MonoBehaviour
 
         DrawProcessList();
         DrawIslandProductionList();
-        DrawTechTreeList();
     }
 
     private void DrawFlightDebugUi()
