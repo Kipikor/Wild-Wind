@@ -10,11 +10,15 @@ public class WorldConfigDatabase
     private readonly Dictionary<string, ItemConfig> itemsById = new Dictionary<string, ItemConfig>();
     private readonly Dictionary<string, IslandConfig> islandsById = new Dictionary<string, IslandConfig>();
     private readonly Dictionary<string, IslandProductionConfig> productionsById = new Dictionary<string, IslandProductionConfig>();
+    private readonly Dictionary<string, GasCloudTypeConfig> gasCloudTypesById = new Dictionary<string, GasCloudTypeConfig>();
+    private readonly Dictionary<string, GasCloudConfig> gasCloudsById = new Dictionary<string, GasCloudConfig>();
     private readonly Dictionary<string, TechnologyConfig> technologiesById = new Dictionary<string, TechnologyConfig>();
 
     public List<ItemConfig> items = new List<ItemConfig>();
     public List<IslandConfig> islands = new List<IslandConfig>();
     public List<IslandProductionConfig> productions = new List<IslandProductionConfig>();
+    public List<GasCloudTypeConfig> gasCloudTypes = new List<GasCloudTypeConfig>();
+    public List<GasCloudConfig> gasClouds = new List<GasCloudConfig>();
     public List<TechnologyConfig> technologies = new List<TechnologyConfig>();
 
     public bool isLoaded;
@@ -34,7 +38,9 @@ public class WorldConfigDatabase
         {
             LoadItems(Path.Combine(folder, "Item.csv"));
             LoadProductions(Path.Combine(folder, "Island_production.csv"));
+            LoadGasCloudTypes(Path.Combine(folder, "Gas_cloud_type.csv"));
             LoadIslands(Path.Combine(folder, "Island.csv"));
+            LoadGasClouds(Path.Combine(folder, "Gas_cloud.csv"));
             LoadTechnologies(Path.Combine(folder, "Technology.csv"));
             isLoaded = true;
             lastError = "";
@@ -75,6 +81,20 @@ public class WorldConfigDatabase
         return technology;
     }
 
+    public GasCloudTypeConfig GetGasCloudType(string cloudTypeId)
+    {
+        if (string.IsNullOrWhiteSpace(cloudTypeId)) return null;
+        gasCloudTypesById.TryGetValue(cloudTypeId, out GasCloudTypeConfig cloudType);
+        return cloudType;
+    }
+
+    public GasCloudConfig GetGasCloud(string cloudId)
+    {
+        if (string.IsNullOrWhiteSpace(cloudId)) return null;
+        gasCloudsById.TryGetValue(cloudId, out GasCloudConfig cloud);
+        return cloud;
+    }
+
     public string GetItemNameRu(string itemId)
     {
         ItemConfig item = GetItem(itemId);
@@ -94,10 +114,14 @@ public class WorldConfigDatabase
         items.Clear();
         islands.Clear();
         productions.Clear();
+        gasCloudTypes.Clear();
+        gasClouds.Clear();
         technologies.Clear();
         itemsById.Clear();
         islandsById.Clear();
         productionsById.Clear();
+        gasCloudTypesById.Clear();
+        gasCloudsById.Clear();
         technologiesById.Clear();
         isLoaded = false;
         lastError = "";
@@ -175,6 +199,62 @@ public class WorldConfigDatabase
             if (string.IsNullOrWhiteSpace(production.id)) continue;
             productions.Add(production);
             productionsById[production.id] = production;
+        }
+    }
+
+    private void LoadGasCloudTypes(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            GasCloudTypeConfig cloudType = new GasCloudTypeConfig
+            {
+                id = Get(row, "id_cloud_type"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                condensateItemId = Get(row, "condensate_item"),
+                condensateLitersPerCubicMeter = Mathf.Max(0.0001f, ParseFloat(Get(row, "condensate_l_per_m3"), 0.005f)),
+                color = ParseColor(Get(row, "color_hex"), new Color(0.75f, 0.85f, 1f, 0.35f))
+            };
+
+            List<string> itemIds = SplitInlineList(Get(row, "composition_id_item"));
+            List<string> shares = SplitInlineList(Get(row, "composition_share"));
+            int count = Mathf.Min(itemIds.Count, shares.Count);
+            for (int i = 0; i < count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(itemIds[i])) continue;
+                cloudType.composition.Add(new GasCloudCompositionConfig
+                {
+                    itemId = itemIds[i],
+                    share = Mathf.Max(0f, ParseFloat(shares[i]))
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(cloudType.id)) continue;
+            gasCloudTypes.Add(cloudType);
+            gasCloudTypesById[cloudType.id] = cloudType;
+        }
+    }
+
+    private void LoadGasClouds(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            GasCloudConfig cloud = new GasCloudConfig
+            {
+                id = Get(row, "id_cloud"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                cloudTypeId = Get(row, "cloud_type_id"),
+                position = new Vector3(
+                    ParseFloat(Get(row, "position_x")),
+                    ParseFloat(Get(row, "position_y")),
+                    ParseFloat(Get(row, "position_z"))),
+                initialVolumeLiters = Mathf.Max(0f, ParseFloat(Get(row, "initial_volume_l")))
+            };
+
+            if (string.IsNullOrWhiteSpace(cloud.id)) continue;
+            gasClouds.Add(cloud);
+            gasCloudsById[cloud.id] = cloud;
         }
     }
 
@@ -310,6 +390,19 @@ public class WorldConfigDatabase
     {
         return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float result) ? result : fallback;
     }
+
+    private static Color ParseColor(string value, Color fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return fallback;
+        if (!value.StartsWith("#", StringComparison.Ordinal))
+        {
+            value = "#" + value;
+        }
+
+        if (!ColorUtility.TryParseHtmlString(value, out Color color)) return fallback;
+        color.a = fallback.a;
+        return color;
+    }
 }
 
 public class ItemConfig
@@ -329,6 +422,33 @@ public class IslandConfig
     public string productionId = "";
     public float dockingRadius;
     public float timeForOneItemLoadSeconds = 1f;
+}
+
+public class GasCloudTypeConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public string condensateItemId = "";
+    public float condensateLitersPerCubicMeter = 0.005f;
+    public Color color = new Color(0.75f, 0.85f, 1f, 0.35f);
+    public List<GasCloudCompositionConfig> composition = new List<GasCloudCompositionConfig>();
+}
+
+public class GasCloudCompositionConfig
+{
+    public string itemId = "";
+    public float share;
+}
+
+public class GasCloudConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public string cloudTypeId = "";
+    public Vector3 position;
+    public float initialVolumeLiters;
 }
 
 public class IslandProductionConfig

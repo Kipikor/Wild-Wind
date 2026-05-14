@@ -25,6 +25,10 @@ public partial class MetaGameState : MonoBehaviour
     public MissionController missionController;
     [InspectorName("Логистический флот")]
     public LogisticsFleetController logisticsFleet;
+    [InspectorName("Gas clouds")]
+    public GasCloudManager gasCloudManager;
+    [InspectorName("Gas autopilots")]
+    public GasHarvesterFleetController gasHarvesterFleet;
     [InspectorName("Стартовые деньги")]
     public int startingMoney;
     [InspectorName("Прогресс игрока")]
@@ -171,7 +175,9 @@ public partial class MetaGameState : MonoBehaviour
             progress.Normalize();
             IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
             EnsureLogisticsFleet();
+            EnsureGasSystems();
             logisticsFleet?.EnsureRuntimeShips(progress);
+            gasHarvesterFleet?.EnsureRuntimeShips(progress);
         }
     }
 
@@ -196,6 +202,50 @@ public partial class MetaGameState : MonoBehaviour
         if (logisticsFleet != null && logisticsFleet.metaGameState == null)
         {
             logisticsFleet.metaGameState = this;
+        }
+    }
+
+    private void EnsureGasSystems()
+    {
+        if (gasCloudManager == null)
+        {
+            gasCloudManager = GetComponent<GasCloudManager>();
+        }
+
+        if (gasCloudManager == null)
+        {
+            gasCloudManager = FindFirstObjectByType<GasCloudManager>();
+        }
+
+        if (gasCloudManager == null && Application.isPlaying)
+        {
+            gasCloudManager = gameObject.AddComponent<GasCloudManager>();
+        }
+
+        if (gasCloudManager != null && gasCloudManager.metaGameState == null)
+        {
+            gasCloudManager.metaGameState = this;
+        }
+
+        if (gasHarvesterFleet == null)
+        {
+            gasHarvesterFleet = GetComponent<GasHarvesterFleetController>();
+        }
+
+        if (gasHarvesterFleet == null)
+        {
+            gasHarvesterFleet = FindFirstObjectByType<GasHarvesterFleetController>();
+        }
+
+        if (gasHarvesterFleet == null && Application.isPlaying)
+        {
+            gasHarvesterFleet = gameObject.AddComponent<GasHarvesterFleetController>();
+            gasHarvesterFleet.CreateExampleSetupIfEmpty();
+        }
+
+        if (gasHarvesterFleet != null && gasHarvesterFleet.metaGameState == null)
+        {
+            gasHarvesterFleet.metaGameState = this;
         }
     }
 
@@ -288,6 +338,8 @@ public partial class MetaGameState : MonoBehaviour
         shipLoader = FindFirstObjectByType<ShipLoader>();
         missionController = FindFirstObjectByType<MissionController>();
         logisticsFleet = FindFirstObjectByType<LogisticsFleetController>();
+        gasCloudManager = FindFirstObjectByType<GasCloudManager>();
+        gasHarvesterFleet = FindFirstObjectByType<GasHarvesterFleetController>();
     }
 
     private void Awake()
@@ -307,6 +359,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         EnsureLogisticsFleet();
+        EnsureGasSystems();
 
         bool loadedGame = false;
         if (loadSavedGameOnAwake)
@@ -316,6 +369,7 @@ public partial class MetaGameState : MonoBehaviour
 
         EnsureProgressInitialized();
         SpawnConfiguredIslands();
+        gasCloudManager?.SpawnConfiguredClouds();
         if (!loadedGame || !TryAdvanceOfflineProgressFromLastSave(DateTime.UtcNow, out _))
         {
             AdvanceRealTimeProcessesSliced(DateTime.UtcNow);
@@ -329,7 +383,9 @@ public partial class MetaGameState : MonoBehaviour
 
     private void Start()
     {
+        EnsureGasSystems();
         SpawnConfiguredIslands();
+        gasCloudManager?.SpawnConfiguredClouds();
         ApplySelectedShip();
         ApplySessionModeToShip();
     }
@@ -365,7 +421,9 @@ public partial class MetaGameState : MonoBehaviour
         EnsureWorldConfigLoaded();
         IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
         EnsureLogisticsFleet();
+        EnsureGasSystems();
         logisticsFleet?.EnsureRuntimeShips(progress);
+        gasHarvesterFleet?.EnsureRuntimeShips(progress);
 
         if (initialized) return;
 
@@ -377,6 +435,7 @@ public partial class MetaGameState : MonoBehaviour
         progress.Normalize();
         IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
         logisticsFleet?.EnsureRuntimeShips(progress);
+        gasHarvesterFleet?.EnsureRuntimeShips(progress);
 
         if (progress.lastSavedUtcTicks == 0 && string.IsNullOrWhiteSpace(progress.currentDockId))
         {
@@ -1043,6 +1102,11 @@ public partial class MetaGameState : MonoBehaviour
                 completedCycles += logisticsFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
             }
 
+            if (gasHarvesterFleet != null)
+            {
+                completedCycles += gasHarvesterFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
+            }
+
             for (int i = progress.activeProcesses.Count - 1; i >= 0; i--)
             {
                 TimedProcessState process = progress.activeProcesses[i];
@@ -1546,6 +1610,40 @@ public partial class MetaGameState : MonoBehaviour
             storage.TrySpendResource(cost.itemId, cost.amount);
         }
 
+        return true;
+    }
+
+    public float GetRemainingShipCargoCapacityKg()
+    {
+        EnsureProgressInitialized();
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        if (!capacity.assemblyValid) return 0f;
+        return Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg);
+    }
+
+    public bool TryAddShipCargoFromRuntime(string resourceId, int amount, out string reason)
+    {
+        reason = "";
+        if (string.IsNullOrWhiteSpace(resourceId))
+        {
+            reason = "Нельзя добавить груз без id ресурса.";
+            return false;
+        }
+
+        if (amount <= 0) return true;
+
+        EnsureProgressInitialized();
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        int freeKg = Mathf.FloorToInt(Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg));
+        if (!capacity.assemblyValid || freeKg < amount)
+        {
+            reason = $"Не хватает места в трюме: нужно {amount} кг, свободно {freeKg} кг.";
+            return false;
+        }
+
+        progress.AddShipCargo(resourceId, amount);
+        ApplyCargoMassToShip(GetActiveShip());
+        ResetCargoPlan();
         return true;
     }
 

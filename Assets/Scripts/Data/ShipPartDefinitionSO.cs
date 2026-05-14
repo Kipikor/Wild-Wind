@@ -211,5 +211,13 @@ public enum ShipStatId
     [InspectorName("Демпфирование гироповорота")]
     GyroTurnDamping = 44,
     [InspectorName("Максимальная взлетная масса корпуса, кг")]
-    HullMaxTakeoffMassKg = 45
+    HullMaxTakeoffMassKg = 45,
+    [InspectorName("Харвестер: производительность, м3/с")]
+    GasHarvesterVolumeM3PerSecond = 50,
+    [InspectorName("Харвестер: забор мощности, кВт")]
+    GasHarvesterPowerDrawKw = 51,
+    [InspectorName("Харвестер: радиус забора, м")]
+    GasHarvesterRadiusMeters = 52,
+    [InspectorName("Харвестер: длительность цикла, сек")]
+    GasHarvesterCycleSeconds = 53
 }

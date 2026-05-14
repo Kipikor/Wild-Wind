@@ -359,6 +359,10 @@ public class ShipStatBlock
 
         ship.enginePowerKwAt100 = Mathf.Max(0f, Get(ShipStatId.EngineMaxPower, ship.enginePowerKwAt100));
         ship.engineFuelEfficiency = Mathf.Clamp(Get(ShipStatId.EngineFuelEfficiency, ship.engineFuelEfficiency), 0.01f, 0.95f);
+        ship.gasHarvesterVolumeM3PerSecond = Mathf.Max(0f, Get(ShipStatId.GasHarvesterVolumeM3PerSecond, 0f));
+        ship.gasHarvesterPowerDrawKw = Mathf.Max(0f, Get(ShipStatId.GasHarvesterPowerDrawKw, 0f));
+        ship.gasHarvesterRadiusMeters = Mathf.Max(0f, Get(ShipStatId.GasHarvesterRadiusMeters, 0f));
+        ship.gasHarvesterCycleSeconds = Mathf.Max(0.1f, Get(ShipStatId.GasHarvesterCycleSeconds, 5f));
 
         Rigidbody body = ship.GetComponent<Rigidbody>();
         if (body != null)

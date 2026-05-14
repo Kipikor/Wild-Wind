@@ -173,9 +173,27 @@ public class ShipPhysicsEditor : Editor
             EditorGUILayout.LabelField($"Запрошенный подъем: {ship.claudiumRequestedLiftKg:F0} кг", EditorStyles.label);
             EditorGUILayout.LabelField($"Фактический подъем: {ship.activeLiftForce / 9.81f:F0} кг", EditorStyles.label);
             EditorGUILayout.LabelField($"Забор мощности: {ship.claudiumPowerDrawKw:F1} кВт", EditorStyles.label);
-            EditorGUILayout.LabelField($"Остаток на винт: {Mathf.Max(0f, ship.engineGeneratedPowerKw - ship.claudiumPowerDrawKw):F1} кВт", EditorStyles.label);
+            EditorGUILayout.LabelField($"Остаток на винт: {Mathf.Max(0f, ship.engineGeneratedPowerKw - ship.claudiumPowerDrawKw - ship.gasHarvesterPowerDrawActualKw):F1} кВт", EditorStyles.label);
             EditorGUILayout.LabelField($"Топливо: {ship.engineFuelStockKg:F2} кг, энергоемкость {ship.engineFuelEnergyKwhPerKg:F1} кВт·ч/кг", EditorStyles.label);
             EditorGUILayout.LabelField($"Расход топлива: {ship.engineFuelConsumptionKgPerSecond:F4} кг/с", EditorStyles.label);
+        }
+
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Харвестеринг", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("gasHarvesterEnabled"), new GUIContent("Включить харвестер"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("gasHarvesterVolumeM3PerSecond"), new GUIContent("Производительность (м3/с)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("gasHarvesterPowerDrawKw"), new GUIContent("Забор мощности (кВт)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("gasHarvesterRadiusMeters"), new GUIContent("Радиус забора (м)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("gasHarvesterCycleSeconds"), new GUIContent("Цикл добычи (с)"));
+
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField("Состояние харвестера", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField($"Забор мощности: {ship.gasHarvesterPowerDrawActualKw:F1} кВт", EditorStyles.label);
+            EditorGUILayout.LabelField($"Прогресс цикла: {ship.gasHarvesterCycleProgressSeconds:F1}/{Mathf.Max(0.1f, ship.gasHarvesterCycleSeconds):F1} с", EditorStyles.label);
+            EditorGUILayout.LabelField($"Буфер концентрата: {ship.gasHarvesterBufferKg:F2} кг", EditorStyles.label);
+            EditorGUILayout.LabelField($"Облако: {(string.IsNullOrWhiteSpace(ship.gasHarvesterActiveCloudId) ? "-" : ship.gasHarvesterActiveCloudId)}", EditorStyles.label);
+            EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(ship.gasHarvesterLastMessage) ? "Готов." : ship.gasHarvesterLastMessage, EditorStyles.wordWrappedLabel);
         }
 
         EditorGUILayout.Space(10);

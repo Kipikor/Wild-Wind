@@ -66,6 +66,23 @@ public class ShipPhysics : MonoBehaviour
     [HideInInspector] public float claudiumPowerDrawWatts;
     [HideInInspector] public float claudiumPowerDrawKw;
     [HideInInspector] public float claudiumRequestedLiftKg;
+
+    [Header("Харвестеринг")]
+    [Tooltip("Включает установленный газовый харвестер. Модуль работает циклами и кладет целые кг концентрата в трюм.")]
+    public bool gasHarvesterEnabled;
+    [Tooltip("Сколько кубометров облака всасывается и конденсируется в секунду.")]
+    public float gasHarvesterVolumeM3PerSecond;
+    [Tooltip("Сколько мощности харвестер забирает после клавдиевого контура и до винта.")]
+    public float gasHarvesterPowerDrawKw;
+    [Tooltip("Радиус забора. Добыча возможна, если этот радиус пересекается с облаком.")]
+    public float gasHarvesterRadiusMeters;
+    [Tooltip("Длительность одного цикла добычи. Контакт с облаком проверяется в начале и в конце цикла.")]
+    public float gasHarvesterCycleSeconds = 5f;
+    [HideInInspector] public float gasHarvesterPowerDrawActualKw;
+    [HideInInspector] public float gasHarvesterCycleProgressSeconds;
+    [HideInInspector] public float gasHarvesterBufferKg;
+    [HideInInspector] public string gasHarvesterActiveCloudId = "";
+    [HideInInspector] public string gasHarvesterLastMessage = "";
     
     [Header("Гироскопический поворот")]
     public float gyroTurnTorque = 12000f; // Максимальный внутренний момент поворота корпуса, Н*м
@@ -161,6 +178,8 @@ public class ShipPhysics : MonoBehaviour
     private bool routePreviousHeadingHold = false;
     private bool routePreviousPositionHold = false;
     private bool positionHoldWasEnabled = false;
+    private string gasHarvesterCycleCloudId = "";
+    private MetaGameState cachedMetaGameState;
     
     // Единая ручка управления мощностью (Обороты для CSU / Газ для Manual)
     void Awake()
@@ -336,6 +355,7 @@ public class ShipPhysics : MonoBehaviour
         UpdateEngineThrottles();
         UpdateHeadingAutopilot(); // Автопилот курса
         UpdateClaudium(); // Магия Клавдия
+        UpdateGasHarvester();
         
         // --- АЭРОДИНАМИКА (с учетом ветра) ---
         Vector3 airVelocity = rb.linearVelocity - windVelocity;
@@ -392,7 +412,7 @@ public class ShipPhysics : MonoBehaviour
 
     private void ApplyPropellerThrust()
     {
-        float residualPowerKw = Mathf.Max(0f, engineGeneratedPowerKw - claudiumPowerDrawKw);
+        float residualPowerKw = Mathf.Max(0f, engineGeneratedPowerKw - claudiumPowerDrawKw - gasHarvesterPowerDrawActualKw);
         float thrustDirection = Mathf.Sign(thrustInput);
         float propellerEngagement = Mathf.Clamp01(Mathf.Abs(thrustInput));
 
@@ -695,7 +715,8 @@ public class ShipPhysics : MonoBehaviour
             && claudiumLiftEfficiency > 0f;
 
         float requestedPowerKw = canLift ? CalculateClaudiumPowerKwForLift(requestedLiftKg) : 0f;
-        UpdateEnginePowerOutput(requestedPowerKw);
+        float requestedModulePowerKw = CalculatePoweredModulePowerRequestKw(requestedPowerKw);
+        UpdateEnginePowerOutput(requestedPowerKw + requestedModulePowerKw);
 
         float targetLiftN = 0f;
         if (!hasClaudium)
@@ -744,6 +765,21 @@ public class ShipPhysics : MonoBehaviour
         }
 
         activeLiftForce = claudiumCurrentLiftN;
+    }
+
+    private float CalculatePoweredModulePowerRequestKw(float claudiumPowerKw)
+    {
+        if (!gasHarvesterEnabled || gasHarvesterVolumeM3PerSecond <= 0f || gasHarvesterPowerDrawKw <= 0f)
+        {
+            return 0f;
+        }
+
+        if (claudiumPowerKw + gasHarvesterPowerDrawKw > enginePowerKwAt100 + 0.001f)
+        {
+            return 0f;
+        }
+
+        return gasHarvesterPowerDrawKw;
     }
 
     private float CalculateClaudiumPowerKwForLift(float liftKg)
@@ -841,6 +877,137 @@ public class ShipPhysics : MonoBehaviour
     void UpdateClaudium()
     {
         UpdateSimplifiedClaudium();
+    }
+
+    private void UpdateGasHarvester()
+    {
+        gasHarvesterPowerDrawActualKw = 0f;
+
+        if (!gasHarvesterEnabled)
+        {
+            ResetGasHarvesterCycle();
+            return;
+        }
+
+        if (gasHarvesterVolumeM3PerSecond <= 0f || gasHarvesterRadiusMeters <= 0f || gasHarvesterPowerDrawKw <= 0f)
+        {
+            gasHarvesterLastMessage = "Харвестер не установлен или не имеет рабочих характеристик.";
+            ResetGasHarvesterCycle();
+            return;
+        }
+
+        if (claudiumPowerDrawKw + gasHarvesterPowerDrawKw > enginePowerKwAt100 + 0.001f)
+        {
+            gasHarvesterLastMessage = "Харвестер выключен: после клавдиевого контура не хватает мощности до лимита 100%.";
+            ResetGasHarvesterCycle();
+            return;
+        }
+
+        if (engineGeneratedPowerKw + 0.001f < claudiumPowerDrawKw + gasHarvesterPowerDrawKw || !engineHasFuel)
+        {
+            gasHarvesterLastMessage = "Харвестер ждет мощность или топливо.";
+            ResetGasHarvesterCycle();
+            return;
+        }
+
+        MetaGameState meta = ResolveMetaGameState();
+        if (meta == null || meta.progress == null)
+        {
+            gasHarvesterLastMessage = "Харвестер ждет MetaGameState.";
+            ResetGasHarvesterCycle();
+            return;
+        }
+
+        if (meta.GetRemainingShipCargoCapacityKg() < 1f)
+        {
+            gasHarvesterEnabled = false;
+            gasHarvesterLastMessage = "Харвестер выключен: трюм заполнен.";
+            ResetGasHarvesterCycle();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(gasHarvesterCycleCloudId))
+        {
+            GasCloud startCloud = GasCloud.FindRandomOverlapping(transform.position, gasHarvesterRadiusMeters);
+            if (startCloud == null)
+            {
+                gasHarvesterLastMessage = "Нет облака в радиусе харвестера.";
+                ResetGasHarvesterCycle();
+                return;
+            }
+
+            gasHarvesterCycleCloudId = startCloud.cloudId;
+            gasHarvesterActiveCloudId = startCloud.cloudId;
+            gasHarvesterCycleProgressSeconds = 0f;
+            gasHarvesterLastMessage = "Цикл начат: " + startCloud.displayName;
+        }
+
+        gasHarvesterPowerDrawActualKw = gasHarvesterPowerDrawKw;
+        gasHarvesterCycleProgressSeconds += Time.fixedDeltaTime;
+        float cycleSeconds = Mathf.Max(0.1f, gasHarvesterCycleSeconds);
+        if (gasHarvesterCycleProgressSeconds < cycleSeconds)
+        {
+            return;
+        }
+
+        GasCloud endCloud = GasCloud.FindById(gasHarvesterCycleCloudId);
+        if (endCloud == null || !endCloud.IntersectsHarvestRadius(transform.position, gasHarvesterRadiusMeters))
+        {
+            gasHarvesterLastMessage = "Цикл сорван: в конце цикла нет контакта с выбранным облаком.";
+            ResetGasHarvesterCycle();
+            return;
+        }
+
+        float sampledCubicMeters = gasHarvesterVolumeM3PerSecond * cycleSeconds;
+        float possibleLiters = Mathf.Min(sampledCubicMeters * Mathf.Max(0.0001f, endCloud.condensateLitersPerCubicMeter), endCloud.remainingVolumeLiters);
+        int possibleWholeKg = Mathf.FloorToInt(gasHarvesterBufferKg + possibleLiters + 0.0001f);
+        if (possibleWholeKg > 0 && meta.GetRemainingShipCargoCapacityKg() < possibleWholeKg)
+        {
+            gasHarvesterEnabled = false;
+            gasHarvesterLastMessage = "Харвестер выключен: не хватит места для результата цикла.";
+            ResetGasHarvesterCycle();
+            return;
+        }
+
+        float harvestedLiters = endCloud.HarvestLiters(sampledCubicMeters);
+        gasHarvesterBufferKg += harvestedLiters;
+        int wholeKg = Mathf.FloorToInt(gasHarvesterBufferKg + 0.0001f);
+        if (wholeKg > 0)
+        {
+            if (meta.TryAddShipCargoFromRuntime(endCloud.condensateItemId, wholeKg, out string cargoError))
+            {
+                gasHarvesterBufferKg -= wholeKg;
+                gasHarvesterLastMessage = $"Добыто {wholeKg} кг: {endCloud.condensateItemId}. Остаток облака {endCloud.remainingVolumeLiters:F1} кг.";
+            }
+            else
+            {
+                gasHarvesterEnabled = false;
+                gasHarvesterLastMessage = cargoError;
+            }
+        }
+        else
+        {
+            gasHarvesterLastMessage = $"Буфер {gasHarvesterBufferKg:F2} кг. Остаток облака {endCloud.remainingVolumeLiters:F1} кг.";
+        }
+
+        ResetGasHarvesterCycle();
+    }
+
+    private void ResetGasHarvesterCycle()
+    {
+        gasHarvesterCycleCloudId = "";
+        gasHarvesterActiveCloudId = "";
+        gasHarvesterCycleProgressSeconds = 0f;
+    }
+
+    private MetaGameState ResolveMetaGameState()
+    {
+        if (cachedMetaGameState == null)
+        {
+            cachedMetaGameState = FindFirstObjectByType<MetaGameState>();
+        }
+
+        return cachedMetaGameState;
     }
 
     private void UpdateEngineThrottles()

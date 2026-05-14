@@ -70,6 +70,8 @@ public class MetaGameStateEditor : Editor
         LocalizedInspector.Property(serializedObject, "shipLoader", "Загрузчик корабля", "Компонент, который создает корпус-префаб и применяет текущую сборку.");
         LocalizedInspector.Property(serializedObject, "missionController", "Контроллер миссии", "Активная миссия сцены. Может быть пусто, если миссий в сцене нет.");
         LocalizedInspector.Property(serializedObject, "logisticsFleet", "Логистический флот", "Контроллер виртуальных грузовиков и маршрутов.");
+        LocalizedInspector.Property(serializedObject, "gasCloudManager", "Газовые облака", "Создает и синхронизирует исчерпаемые облака из CSV-конфигов.");
+        LocalizedInspector.Property(serializedObject, "gasHarvesterFleet", "Газовые автопилоты", "Виртуальные сборщики газа, привязанные к островам.");
         LocalizedInspector.Property(serializedObject, "startingMoney", "Стартовые деньги", "Сколько денег получает новая игра.");
         LocalizedInspector.DrawPlayerProgress(serializedObject.FindProperty("progress"), "Прогресс игрока");
 

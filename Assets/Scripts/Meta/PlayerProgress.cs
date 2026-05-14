@@ -42,6 +42,7 @@ public class PlayerProgress
     public List<ShipExperienceWallet> shipExperience = new List<ShipExperienceWallet>();
     public List<InstalledModuleState> installedModules = new List<InstalledModuleState>();
     public List<LogisticsShipState> logisticsShips = new List<LogisticsShipState>();
+    public List<GasHarvesterShipState> gasHarvesterShips = new List<GasHarvesterShipState>();
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
     public DockingLocationKind currentDockKind = DockingLocationKind.Island;
@@ -61,6 +62,7 @@ public class PlayerProgress
     public List<ResourceStack> inventory = new List<ResourceStack>();
     public List<ResourceStack> shipCargo = new List<ResourceStack>();
     public List<IslandProductionState> islandProductions = new List<IslandProductionState>();
+    public List<GasCloudState> gasClouds = new List<GasCloudState>();
     public CargoTransferState cargoTransfer = new CargoTransferState();
     public List<TimedProcessState> activeProcesses = new List<TimedProcessState>();
     public List<string> acceptedMissionIds = new List<string>();
@@ -86,9 +88,11 @@ public class PlayerProgress
         shipExperience ??= new List<ShipExperienceWallet>();
         installedModules ??= new List<InstalledModuleState>();
         logisticsShips ??= new List<LogisticsShipState>();
+        gasHarvesterShips ??= new List<GasHarvesterShipState>();
         inventory ??= new List<ResourceStack>();
         shipCargo ??= new List<ResourceStack>();
         islandProductions ??= new List<IslandProductionState>();
+        gasClouds ??= new List<GasCloudState>();
         cargoTransfer ??= new CargoTransferState();
         activeProcesses ??= new List<TimedProcessState>();
         acceptedMissionIds ??= new List<string>();
@@ -147,6 +151,18 @@ public class PlayerProgress
             ship.Normalize();
         }
 
+        for (int i = gasHarvesterShips.Count - 1; i >= 0; i--)
+        {
+            GasHarvesterShipState ship = gasHarvesterShips[i];
+            if (ship == null || string.IsNullOrWhiteSpace(ship.shipId))
+            {
+                gasHarvesterShips.RemoveAt(i);
+                continue;
+            }
+
+            ship.Normalize();
+        }
+
         for (int i = activeProcesses.Count - 1; i >= 0; i--)
         {
             if (activeProcesses[i] == null)
@@ -173,6 +189,18 @@ public class PlayerProgress
             {
                 islandProductions.RemoveAt(i);
             }
+        }
+
+        for (int i = gasClouds.Count - 1; i >= 0; i--)
+        {
+            GasCloudState cloud = gasClouds[i];
+            if (cloud == null || string.IsNullOrWhiteSpace(cloud.cloudId))
+            {
+                gasClouds.RemoveAt(i);
+                continue;
+            }
+
+            cloud.Normalize();
         }
     }
 
@@ -319,6 +347,27 @@ public class PlayerProgress
         return newState;
     }
 
+    public GasHarvesterShipState GetGasHarvesterShipState(string shipId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(shipId)) return null;
+        gasHarvesterShips ??= new List<GasHarvesterShipState>();
+
+        for (int i = 0; i < gasHarvesterShips.Count; i++)
+        {
+            GasHarvesterShipState state = gasHarvesterShips[i];
+            if (state != null && state.shipId == shipId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        GasHarvesterShipState newState = new GasHarvesterShipState { shipId = shipId };
+        gasHarvesterShips.Add(newState);
+        return newState;
+    }
+
     public bool PurchaseNode(string nodeId)
     {
         if (string.IsNullOrWhiteSpace(nodeId)) return false;
@@ -447,6 +496,27 @@ public class PlayerProgress
 
         IslandProductionState newState = new IslandProductionState { islandId = islandId };
         islandProductions.Add(newState);
+        return newState;
+    }
+
+    public GasCloudState GetGasCloudState(string cloudId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(cloudId)) return null;
+        gasClouds ??= new List<GasCloudState>();
+
+        for (int i = 0; i < gasClouds.Count; i++)
+        {
+            GasCloudState state = gasClouds[i];
+            if (state != null && state.cloudId == cloudId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        GasCloudState newState = new GasCloudState { cloudId = cloudId };
+        gasClouds.Add(newState);
         return newState;
     }
 
@@ -679,6 +749,140 @@ public class PlayerProgress
         }
 
         existing.amount = amount;
+    }
+}
+
+[Serializable]
+public class GasCloudState
+{
+    public string cloudId = "";
+    public bool initialized;
+    public float remainingVolumeLiters;
+
+    public void Normalize()
+    {
+        cloudId ??= "";
+        remainingVolumeLiters = Mathf.Max(0f, remainingVolumeLiters);
+    }
+}
+
+public enum GasHarvesterShipStatus
+{
+    Idle,
+    FlyingToCloud,
+    Harvesting,
+    Returning,
+    Unloading,
+    WaitingForResources,
+    Error
+}
+
+[Serializable]
+public class GasHarvesterShipState
+{
+    public string shipId = "";
+    public string displayName = "";
+    public string homeIslandId = "capital";
+    public GasHarvesterShipStatus status = GasHarvesterShipStatus.Idle;
+    public string targetCloudId = "";
+    public long nextEventUtcTicks;
+    public long flightStartedUtcTicks;
+    public long flightArrivesUtcTicks;
+    public Vector3 lastKnownPosition;
+    public List<ResourceStack> cargo = new List<ResourceStack>();
+    public float harvestBufferKg;
+    public float pendingFuelConsumptionKg;
+    public float pendingClaudiumConsumptionKg;
+    public int completedTrips;
+    public string lastError = "";
+
+    public void Normalize()
+    {
+        shipId ??= "";
+        displayName ??= "";
+        homeIslandId ??= "";
+        targetCloudId ??= "";
+        cargo ??= new List<ResourceStack>();
+        harvestBufferKg = Mathf.Max(0f, harvestBufferKg);
+        pendingFuelConsumptionKg = Mathf.Max(0f, pendingFuelConsumptionKg);
+        pendingClaudiumConsumptionKg = Mathf.Max(0f, pendingClaudiumConsumptionKg);
+        completedTrips = Mathf.Max(0, completedTrips);
+        lastError ??= "";
+
+        for (int i = cargo.Count - 1; i >= 0; i--)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0)
+            {
+                cargo.RemoveAt(i);
+                continue;
+            }
+
+            stack.amount = Mathf.Max(0, stack.amount);
+        }
+    }
+
+    public int GetCargoAmount(string itemId)
+    {
+        ResourceStack stack = GetCargoStack(itemId, false);
+        return stack != null ? stack.amount : 0;
+    }
+
+    public int GetCargoMassKg()
+    {
+        int total = 0;
+        if (cargo == null) return total;
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null) continue;
+            total += Mathf.Max(0, stack.amount);
+        }
+
+        return total;
+    }
+
+    public void AddCargo(string itemId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0) return;
+        ResourceStack stack = GetCargoStack(itemId, true);
+        stack.amount += amount;
+    }
+
+    public bool TrySpendCargo(string itemId, int amount)
+    {
+        if (amount <= 0) return true;
+        ResourceStack stack = GetCargoStack(itemId, false);
+        if (stack == null || stack.amount < amount) return false;
+
+        stack.amount -= amount;
+        if (stack.amount <= 0)
+        {
+            cargo.Remove(stack);
+        }
+
+        return true;
+    }
+
+    private ResourceStack GetCargoStack(string itemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return null;
+        cargo ??= new List<ResourceStack>();
+
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack != null && stack.resourceId == itemId)
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ResourceStack newStack = new ResourceStack { resourceId = itemId };
+        cargo.Add(newStack);
+        return newStack;
     }
 }
 

@@ -69,7 +69,7 @@ public class DockingPort : MonoBehaviour
 
         if (currentMode != GameSessionMode.Flight) return;
 
-        if (requireLeaveBeforeRedocking && IsCurrentDock() && !leftRadiusSinceFlightStart)
+        if (requireLeaveBeforeRedocking && !leftRadiusSinceFlightStart)
         {
             if (!inside)
             {
