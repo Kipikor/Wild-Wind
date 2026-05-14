@@ -41,6 +41,7 @@ public class PlayerProgress
     public List<TechnologyResearchProgress> technologyResearchProgress = new List<TechnologyResearchProgress>();
     public List<ShipExperienceWallet> shipExperience = new List<ShipExperienceWallet>();
     public List<InstalledModuleState> installedModules = new List<InstalledModuleState>();
+    public List<LogisticsShipState> logisticsShips = new List<LogisticsShipState>();
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
     public DockingLocationKind currentDockKind = DockingLocationKind.Island;
@@ -84,6 +85,7 @@ public class PlayerProgress
         technologyResearchProgress ??= new List<TechnologyResearchProgress>();
         shipExperience ??= new List<ShipExperienceWallet>();
         installedModules ??= new List<InstalledModuleState>();
+        logisticsShips ??= new List<LogisticsShipState>();
         inventory ??= new List<ResourceStack>();
         shipCargo ??= new List<ResourceStack>();
         islandProductions ??= new List<IslandProductionState>();
@@ -131,6 +133,18 @@ public class PlayerProgress
             }
 
             state.Normalize();
+        }
+
+        for (int i = logisticsShips.Count - 1; i >= 0; i--)
+        {
+            LogisticsShipState ship = logisticsShips[i];
+            if (ship == null || string.IsNullOrWhiteSpace(ship.shipId))
+            {
+                logisticsShips.RemoveAt(i);
+                continue;
+            }
+
+            ship.Normalize();
         }
 
         for (int i = activeProcesses.Count - 1; i >= 0; i--)
@@ -281,6 +295,27 @@ public class PlayerProgress
 
         TechnologyResearchProgress newState = new TechnologyResearchProgress { technologyId = technologyId };
         technologyResearchProgress.Add(newState);
+        return newState;
+    }
+
+    public LogisticsShipState GetLogisticsShipState(string shipId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(shipId)) return null;
+        logisticsShips ??= new List<LogisticsShipState>();
+
+        for (int i = 0; i < logisticsShips.Count; i++)
+        {
+            LogisticsShipState state = logisticsShips[i];
+            if (state != null && state.shipId == shipId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        LogisticsShipState newState = new LogisticsShipState { shipId = shipId };
+        logisticsShips.Add(newState);
         return newState;
     }
 

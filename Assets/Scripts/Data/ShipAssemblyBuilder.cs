@@ -251,6 +251,8 @@ public class ShipStatBlock
     private readonly HashSet<ShipStatId> setStats = new HashSet<ShipStatId>();
     private string engineFuelId = "";
 
+    public string EngineFuelId => engineFuelId;
+
     public bool ApplyPart(ShipPartDefinitionSO part, out string error)
     {
         error = "";

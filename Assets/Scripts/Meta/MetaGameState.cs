@@ -23,6 +23,8 @@ public class MetaGameState : MonoBehaviour
     public ShipLoader shipLoader;
     [InspectorName("Контроллер миссии")]
     public MissionController missionController;
+    [InspectorName("Логистический флот")]
+    public LogisticsFleetController logisticsFleet;
     [InspectorName("Стартовые деньги")]
     public int startingMoney;
     [InspectorName("Прогресс игрока")]
@@ -73,6 +75,26 @@ public class MetaGameState : MonoBehaviour
     [Tooltip("Через этот интервал меняется зерно магазина. Ассортимент можно строить от этого числа.")]
     public int shopRefreshIntervalSeconds = 3600;
 
+    [Header("Ускорение времени")]
+    [InspectorName("Множитель времени")]
+    [Range(1f, 64f)]
+    public float gameTimeScale = 1f;
+    [InspectorName("Ускорять физику Unity")]
+    [Tooltip("Если включено, полет игрока тоже ускоряется через Time.timeScale, но не выше безопасного лимита ниже.")]
+    public bool accelerateUnityTimeScale = true;
+    [InspectorName("Лимит физики Unity")]
+    [Range(1f, 8f)]
+    public float maxUnityTimeScale = 4f;
+    [InspectorName("Максимальный шаг мета-времени, сек")]
+    [Tooltip("Большие ускоренные промежутки нарезаются на шаги, чтобы производство, исследования, погрузка и логистика не прыгали одним грубым куском.")]
+    public float maxAcceleratedProcessStepSeconds = 15f;
+    [InspectorName("Offline-прогресс при загрузке")]
+    [Tooltip("Если включено, при запуске игры симуляция догоняет время, прошедшее с последнего сохранения.")]
+    public bool processOfflineProgressOnLoad = true;
+    [InspectorName("Лимит offline-догонки, часов")]
+    [Tooltip("Защита от огромных скачков системных часов. Для теста 100 часов оставьте значение выше 100.")]
+    public float maxOfflineCatchUpHours = 240f;
+
     [Header("Конфиги мира")]
     [InspectorName("Папка конфигов от Assets")]
     [Tooltip("CSV-конфиги мира загружаются из этой папки при старте Play Mode.")]
@@ -117,8 +139,14 @@ public class MetaGameState : MonoBehaviour
     private string syncedClaudiumResourceId = "";
     private float pendingFuelConsumedKg;
     private float pendingClaudiumConsumedKg;
+    private DateTime lastProcessRealtimeUtc;
+    private float originalFixedDeltaTime = -1f;
+    private float originalMaximumDeltaTime = -1f;
 
     private ShipCatalogSO ActiveCatalog => catalog != null ? catalog : shipLoader != null ? shipLoader.catalog : null;
+    public WorldConfigDatabase WorldConfig => worldConfig;
+    public ShipCatalogSO CurrentCatalog => ActiveCatalog;
+    public DateTime CurrentProcessUtcNow => GetProcessUtcNow();
 
     private class CargoPlanEntry
     {
@@ -166,6 +194,32 @@ public class MetaGameState : MonoBehaviour
         {
             progress.Normalize();
             IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+            EnsureLogisticsFleet();
+            logisticsFleet?.EnsureRuntimeShips(progress);
+        }
+    }
+
+    private void EnsureLogisticsFleet()
+    {
+        if (logisticsFleet == null)
+        {
+            logisticsFleet = GetComponent<LogisticsFleetController>();
+        }
+
+        if (logisticsFleet == null)
+        {
+            logisticsFleet = FindFirstObjectByType<LogisticsFleetController>();
+        }
+
+        if (logisticsFleet == null && Application.isPlaying)
+        {
+            logisticsFleet = gameObject.AddComponent<LogisticsFleetController>();
+            logisticsFleet.CreateExampleSetupIfEmpty();
+        }
+
+        if (logisticsFleet != null && logisticsFleet.metaGameState == null)
+        {
+            logisticsFleet.metaGameState = this;
         }
     }
 
@@ -257,10 +311,13 @@ public class MetaGameState : MonoBehaviour
     {
         shipLoader = FindFirstObjectByType<ShipLoader>();
         missionController = FindFirstObjectByType<MissionController>();
+        logisticsFleet = FindFirstObjectByType<LogisticsFleetController>();
     }
 
     private void Awake()
     {
+        CacheUnityTimeSettings();
+        ResetProcessRealtimeClock();
         ReloadWorldConfigs();
 
         if (shipLoader == null)
@@ -273,14 +330,22 @@ public class MetaGameState : MonoBehaviour
             missionController = FindFirstObjectByType<MissionController>();
         }
 
+        EnsureLogisticsFleet();
+
+        bool loadedGame = false;
         if (loadSavedGameOnAwake)
         {
-            LoadGame();
+            loadedGame = LoadGame();
         }
 
         EnsureProgressInitialized();
         SpawnConfiguredIslands();
-        AdvanceRealTimeProcesses(DateTime.UtcNow);
+        if (!loadedGame || !TryAdvanceOfflineProgressFromLastSave(DateTime.UtcNow, out _))
+        {
+            AdvanceRealTimeProcessesSliced(DateTime.UtcNow);
+        }
+
+        ResetProcessRealtimeClock();
         ApplySelectedShip();
         ApplySessionModeToShip();
         InstallCrashDetectorIfNeeded();
@@ -295,10 +360,12 @@ public class MetaGameState : MonoBehaviour
 
     private void Update()
     {
+        ApplyUnityTimeScale();
+
         if (processRealTimeWhilePlaying)
         {
             EnsureProgressInitialized();
-            AdvanceRealTimeProcesses(DateTime.UtcNow);
+            AdvanceScaledRealTimeProcesses();
         }
 
         SyncShipConsumablesWithCargo(false);
@@ -307,6 +374,159 @@ public class MetaGameState : MonoBehaviour
     private void OnApplicationQuit()
     {
         TrySaveGame(true);
+        RestoreUnityTimeSettings();
+    }
+
+    private void OnDisable()
+    {
+        RestoreUnityTimeSettings();
+    }
+
+    private void CacheUnityTimeSettings()
+    {
+        if (originalFixedDeltaTime <= 0f)
+        {
+            originalFixedDeltaTime = Time.fixedDeltaTime;
+        }
+
+        if (originalMaximumDeltaTime <= 0f)
+        {
+            originalMaximumDeltaTime = Time.maximumDeltaTime;
+        }
+    }
+
+    private void RestoreUnityTimeSettings()
+    {
+        if (!Application.isPlaying) return;
+        if (originalFixedDeltaTime > 0f)
+        {
+            Time.fixedDeltaTime = originalFixedDeltaTime;
+        }
+
+        if (originalMaximumDeltaTime > 0f)
+        {
+            Time.maximumDeltaTime = originalMaximumDeltaTime;
+        }
+
+        Time.timeScale = 1f;
+    }
+
+    private void ApplyUnityTimeScale()
+    {
+        if (!Application.isPlaying) return;
+        CacheUnityTimeSettings();
+
+        float physicsScale = accelerateUnityTimeScale ? Mathf.Clamp(gameTimeScale, 1f, Mathf.Max(1f, maxUnityTimeScale)) : 1f;
+        Time.timeScale = physicsScale;
+        Time.fixedDeltaTime = originalFixedDeltaTime > 0f ? originalFixedDeltaTime : Time.fixedDeltaTime;
+        Time.maximumDeltaTime = originalMaximumDeltaTime > 0f ? Mathf.Max(originalMaximumDeltaTime, Time.fixedDeltaTime * 4f) : Time.maximumDeltaTime;
+    }
+
+    private void ResetProcessRealtimeClock()
+    {
+        lastProcessRealtimeUtc = DateTime.UtcNow;
+    }
+
+    private void AdvanceScaledRealTimeProcesses()
+    {
+        DateTime realNow = DateTime.UtcNow;
+        if (lastProcessRealtimeUtc.Ticks <= 0)
+        {
+            lastProcessRealtimeUtc = realNow;
+        }
+
+        double realSeconds = Math.Max(0d, (realNow - lastProcessRealtimeUtc).TotalSeconds);
+        lastProcessRealtimeUtc = realNow;
+        if (realSeconds <= 0d) return;
+
+        long startTicks = progress != null && progress.lastProcessUtcTicks > 0 ? progress.lastProcessUtcTicks : realNow.Ticks;
+        double scaledSeconds = realSeconds * Mathf.Max(1f, gameTimeScale);
+        long deltaTicks = TimeSpan.FromSeconds(scaledSeconds).Ticks;
+        if (deltaTicks <= 0) return;
+
+        long maxTicks = DateTime.MaxValue.Ticks;
+        long targetTicks = startTicks > maxTicks - deltaTicks ? maxTicks : startTicks + deltaTicks;
+        AdvanceRealTimeProcessesSliced(new DateTime(targetTicks, DateTimeKind.Utc));
+    }
+
+    private DateTime GetProcessUtcNow()
+    {
+        if (progress != null && progress.lastProcessUtcTicks > 0)
+        {
+            return new DateTime(progress.lastProcessUtcTicks, DateTimeKind.Utc);
+        }
+
+        return DateTime.UtcNow;
+    }
+
+    private int AdvanceRealTimeProcessesSliced(DateTime targetUtc)
+    {
+        if (progress == null) return 0;
+        if (progress.lastProcessUtcTicks <= 0)
+        {
+            return AdvanceRealTimeProcesses(targetUtc);
+        }
+
+        long targetTicks = targetUtc.Ticks;
+        long currentTicks = progress.lastProcessUtcTicks;
+        if (targetTicks <= currentTicks) return 0;
+
+        long stepTicks = TimeSpan.FromSeconds(Mathf.Max(0.25f, maxAcceleratedProcessStepSeconds)).Ticks;
+        int total = 0;
+        int guard = 0;
+        while (currentTicks < targetTicks && guard < 100000)
+        {
+            guard++;
+            long nextTicks = Math.Min(targetTicks, currentTicks + stepTicks);
+            total += AdvanceRealTimeProcesses(new DateTime(nextTicks, DateTimeKind.Utc));
+            if (progress.lastProcessUtcTicks <= currentTicks)
+            {
+                break;
+            }
+
+            currentTicks = progress.lastProcessUtcTicks;
+        }
+
+        return total;
+    }
+
+    private bool TryAdvanceOfflineProgressFromLastSave(DateTime realNowUtc, out int changedEvents)
+    {
+        changedEvents = 0;
+        if (!processOfflineProgressOnLoad || progress == null || progress.lastSavedUtcTicks <= 0) return false;
+
+        long elapsedTicks = realNowUtc.Ticks - progress.lastSavedUtcTicks;
+        if (elapsedTicks <= TimeSpan.FromSeconds(1).Ticks) return false;
+
+        double elapsedHours = new TimeSpan(elapsedTicks).TotalHours;
+        double cappedHours = Math.Min(elapsedHours, Math.Max(0.01f, maxOfflineCatchUpHours));
+        if (cappedHours <= 0d) return false;
+
+        changedEvents = FastForwardSimulation(TimeSpan.FromHours(cappedHours));
+        string capText = elapsedHours > cappedHours + 0.001d ? $" (ограничено с {elapsedHours:0.#} ч)" : "";
+        lastSaveMessage = $"Offline-прогресс: прошло {cappedHours:0.#} ч{capText}, событий {changedEvents}.";
+        return true;
+    }
+
+    public int FastForwardSimulationHours(float hours)
+    {
+        return FastForwardSimulation(TimeSpan.FromHours(Mathf.Max(0f, hours)));
+    }
+
+    public int FastForwardSimulation(TimeSpan duration)
+    {
+        EnsureProgressInitialized();
+        if (progress == null || duration <= TimeSpan.Zero) return 0;
+
+        DateTime start = GetProcessUtcNow();
+        long durationTicks = duration.Ticks;
+        long maxTicks = DateTime.MaxValue.Ticks;
+        long targetTicks = start.Ticks > maxTicks - durationTicks ? maxTicks : start.Ticks + durationTicks;
+        int changedEvents = AdvanceRealTimeProcessesSliced(new DateTime(targetTicks, DateTimeKind.Utc));
+        SyncShipConsumablesWithCargo(false);
+        ResetProcessRealtimeClock();
+        lastSaveMessage = $"Перемотка: {duration.TotalHours:0.#} ч, событий {changedEvents}.";
+        return changedEvents;
     }
 
     public void EnsureProgressInitialized()
@@ -315,6 +535,8 @@ public class MetaGameState : MonoBehaviour
         progress.Normalize();
         EnsureWorldConfigLoaded();
         IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+        EnsureLogisticsFleet();
+        logisticsFleet?.EnsureRuntimeShips(progress);
 
         if (initialized) return;
 
@@ -325,6 +547,7 @@ public class MetaGameState : MonoBehaviour
 
         progress.Normalize();
         IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+        logisticsFleet?.EnsureRuntimeShips(progress);
 
         if (progress.lastSavedUtcTicks == 0 && string.IsNullOrWhiteSpace(progress.currentDockId))
         {
@@ -588,7 +811,7 @@ public class MetaGameState : MonoBehaviour
         TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
         state.completedCycles = Mathf.Clamp(state.completedCycles, 0, Mathf.Max(1, technology.requiredCycles));
 
-        TryStartOrContinueResearchCycle(technology, state, DateTime.UtcNow.Ticks, out reason);
+        TryStartOrContinueResearchCycle(technology, state, GetProcessUtcNow().Ticks, out reason);
         lastSaveMessage = string.IsNullOrWhiteSpace(reason) ? "Исследование выбрано: " + GetTechnologyDisplayName(technology) : reason;
         AutoSaveIfDocked();
         return true;
@@ -866,7 +1089,7 @@ public class MetaGameState : MonoBehaviour
         if (!IsDocked) return false;
         if (progress.HasActiveProcess("idle_mining")) return false;
 
-        DateTime now = DateTime.UtcNow;
+        DateTime now = GetProcessUtcNow();
         TimedProcessState process = new TimedProcessState
         {
             processId = "idle_mining",
@@ -892,7 +1115,7 @@ public class MetaGameState : MonoBehaviour
         if (!IsDocked) return false;
         if (!progress.TrySpendResource("ore", Mathf.Max(1, ironSmeltingOreCost))) return false;
 
-        DateTime now = DateTime.UtcNow;
+        DateTime now = GetProcessUtcNow();
         string processId = "iron_smelting_" + now.Ticks;
         TimedProcessState process = new TimedProcessState
         {
@@ -928,7 +1151,7 @@ public class MetaGameState : MonoBehaviour
         if (progress.HasActiveProcess("mission_" + mission.missionId)) return false;
         if (progress.IsMissionCompleted(mission.missionId)) return false;
 
-        DateTime now = DateTime.UtcNow;
+        DateTime now = GetProcessUtcNow();
         int duration = mission.realTimeDurationSeconds > 0 ? mission.realTimeDurationSeconds : defaultTimedMissionDurationSeconds;
 
         TimedProcessState process = new TimedProcessState
@@ -966,7 +1189,17 @@ public class MetaGameState : MonoBehaviour
             EnsureWorldConfigLoaded();
             IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
 
-            long previousProcessTicks = progress.lastProcessUtcTicks > 0 ? progress.lastProcessUtcTicks : utcNow.Ticks;
+            if (progress.lastProcessUtcTicks <= 0)
+            {
+                progress.lastProcessUtcTicks = utcNow.Ticks;
+            }
+
+            long previousProcessTicks = progress.lastProcessUtcTicks;
+            if (utcNow.Ticks <= previousProcessTicks)
+            {
+                return 0;
+            }
+
             AdvanceShopRefresh(utcNow);
 
             if (islandProductionEnabled)
@@ -976,6 +1209,10 @@ public class MetaGameState : MonoBehaviour
 
             completedCycles += AdvanceCargoTransfer(utcNow);
             completedCycles += AdvanceTechnologyResearch(utcNow);
+            if (logisticsFleet != null)
+            {
+                completedCycles += logisticsFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
+            }
 
             for (int i = progress.activeProcesses.Count - 1; i >= 0; i--)
             {
@@ -1049,7 +1286,14 @@ public class MetaGameState : MonoBehaviour
         }
 
         DateTime now = DateTime.UtcNow;
-        AdvanceRealTimeProcesses(now);
+        if (Application.isPlaying)
+        {
+            AdvanceScaledRealTimeProcesses();
+        }
+        else
+        {
+            AdvanceRealTimeProcessesSliced(now);
+        }
         SyncShipConsumablesWithCargo(false);
         if (IsDocked)
         {
@@ -1061,7 +1305,10 @@ public class MetaGameState : MonoBehaviour
         }
 
         progress.lastSavedUtcTicks = now.Ticks;
-        progress.lastProcessUtcTicks = now.Ticks;
+        if (progress.lastProcessUtcTicks <= 0)
+        {
+            progress.lastProcessUtcTicks = now.Ticks;
+        }
         progress.Normalize();
 
         MetaGameSaveData saveData = new MetaGameSaveData { progress = progress };
@@ -1962,6 +2209,7 @@ public class MetaGameState : MonoBehaviour
         GUILayout.Label("Деньги: " + progress.money);
         GUILayout.Label("Руда: " + progress.GetResourceAmount("ore") + "  Железо: " + progress.GetResourceAmount("iron"));
         GUILayout.Label("Зерно магазина: " + progress.shopSeed + "  обновление через " + FormatRemaining(progress.nextShopRefreshUtcTicks));
+        DrawTimeScaleUi();
 
         if (!string.IsNullOrWhiteSpace(lastSaveMessage))
         {
@@ -1981,6 +2229,52 @@ public class MetaGameState : MonoBehaviour
 
         GUILayout.EndScrollView();
         GUILayout.EndArea();
+    }
+
+    private void DrawTimeScaleUi()
+    {
+        GUILayout.Space(6f);
+        GUILayout.Label($"Время: x{gameTimeScale:0.#}   физика: x{(accelerateUnityTimeScale ? Mathf.Min(gameTimeScale, maxUnityTimeScale) : 1f):0.#}");
+        GUILayout.BeginHorizontal();
+        DrawTimeScaleButton(1f);
+        DrawTimeScaleButton(2f);
+        DrawTimeScaleButton(4f);
+        DrawTimeScaleButton(8f);
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        DrawTimeScaleButton(16f);
+        DrawTimeScaleButton(32f);
+        DrawTimeScaleButton(64f);
+        GUILayout.EndHorizontal();
+        GUILayout.Label("Перемотка");
+        GUILayout.BeginHorizontal();
+        DrawFastForwardButton(1f, "+1ч");
+        DrawFastForwardButton(8f, "+8ч");
+        DrawFastForwardButton(24f, "+24ч");
+        DrawFastForwardButton(100f, "+100ч");
+        GUILayout.EndHorizontal();
+    }
+
+    private void DrawTimeScaleButton(float scale)
+    {
+        bool wasEnabled = GUI.enabled;
+        GUI.enabled = wasEnabled && !Mathf.Approximately(gameTimeScale, scale);
+        if (GUILayout.Button("x" + scale.ToString("0")))
+        {
+            gameTimeScale = scale;
+            ResetProcessRealtimeClock();
+            ApplyUnityTimeScale();
+        }
+
+        GUI.enabled = wasEnabled;
+    }
+
+    private void DrawFastForwardButton(float hours, string label)
+    {
+        if (GUILayout.Button(label))
+        {
+            FastForwardSimulationHours(hours);
+        }
     }
 
     private void DrawDockedDebugUi()
@@ -2397,7 +2691,7 @@ public class MetaGameState : MonoBehaviour
         progress.cargoTransfer ??= new CargoTransferState();
         progress.cargoTransfer.active = true;
         progress.cargoTransfer.islandId = island.id;
-        progress.cargoTransfer.startedUtcTicks = DateTime.UtcNow.Ticks;
+        progress.cargoTransfer.startedUtcTicks = GetProcessUtcNow().Ticks;
         progress.cargoTransfer.secondsPerItem = Mathf.Max(0.01f, island.timeForOneItemLoadSeconds);
         progress.cargoTransfer.nextOperationUtcTicks = progress.cargoTransfer.startedUtcTicks + TimeSpan.FromSeconds(progress.cargoTransfer.secondsPerItem).Ticks;
         progress.cargoTransfer.currentOperationIndex = 0;
@@ -2765,11 +3059,11 @@ public class MetaGameState : MonoBehaviour
         }
     }
 
-    private static string FormatRemaining(long targetUtcTicks)
+    private string FormatRemaining(long targetUtcTicks)
     {
         if (targetUtcTicks <= 0) return "-";
 
-        TimeSpan remaining = new DateTime(targetUtcTicks, DateTimeKind.Utc) - DateTime.UtcNow;
+        TimeSpan remaining = new DateTime(targetUtcTicks, DateTimeKind.Utc) - GetProcessUtcNow();
         if (remaining <= TimeSpan.Zero) return "ready";
 
         if (remaining.TotalHours >= 1)

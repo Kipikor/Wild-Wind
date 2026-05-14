@@ -69,6 +69,7 @@ public class MetaGameStateEditor : Editor
         LocalizedInspector.Property(serializedObject, "techTree", "Древо техники", "Данные исследований и покупок техники.");
         LocalizedInspector.Property(serializedObject, "shipLoader", "Загрузчик корабля", "Компонент, который создает корпус-префаб и применяет текущую сборку.");
         LocalizedInspector.Property(serializedObject, "missionController", "Контроллер миссии", "Активная миссия сцены. Может быть пусто, если миссий в сцене нет.");
+        LocalizedInspector.Property(serializedObject, "logisticsFleet", "Логистический флот", "Контроллер виртуальных грузовиков и маршрутов.");
         LocalizedInspector.Property(serializedObject, "startingMoney", "Стартовые деньги", "Сколько денег получает новая игра.");
         LocalizedInspector.DrawPlayerProgress(serializedObject.FindProperty("progress"), "Прогресс игрока");
 
@@ -93,6 +94,14 @@ public class MetaGameStateEditor : Editor
         LocalizedInspector.Property(serializedObject, "ironSmeltingIronOutput", "Выход плавки, железо", "Сколько железа добавляется после завершения плавки.");
         LocalizedInspector.Property(serializedObject, "defaultTimedMissionDurationSeconds", "Длительность миссии по умолчанию, сек", "Запасная длительность для миссий, где не задана своя длительность.");
         LocalizedInspector.Property(serializedObject, "shopRefreshIntervalSeconds", "Интервал обновления магазина, сек", "Через этот интервал меняется зерно магазина. Ассортимент можно строить от этого числа.");
+
+        LocalizedInspector.Section("Ускорение времени");
+        LocalizedInspector.Property(serializedObject, "gameTimeScale", "Множитель времени", "Ускоряет мета-процессы, исследования, погрузку и виртуальную логистику.");
+        LocalizedInspector.Property(serializedObject, "accelerateUnityTimeScale", "Ускорять физику Unity", "Если включено, полет игрока тоже ускоряется через Time.timeScale, но не выше лимита.");
+        LocalizedInspector.Property(serializedObject, "maxUnityTimeScale", "Лимит физики Unity", "Безопасный потолок физического ускорения, чтобы Rigidbody и автопилот не получали слишком крупные скачки.");
+        LocalizedInspector.Property(serializedObject, "maxAcceleratedProcessStepSeconds", "Шаг мета-времени, сек", "Ускоренное время нарезается на такие шаги перед обновлением производств, исследований и логистики.");
+        LocalizedInspector.Property(serializedObject, "processOfflineProgressOnLoad", "Offline-прогресс", "Если включено, при загрузке сохранения симуляция догоняет время, прошедшее пока игра была выключена.");
+        LocalizedInspector.Property(serializedObject, "maxOfflineCatchUpHours", "Лимит offline-догонки, часов", "Защита от слишком больших скачков системных часов. Для тестовой перемотки на 100 часов значение должно быть выше 100.");
 
         LocalizedInspector.Section("Конфиги мира");
         LocalizedInspector.Property(serializedObject, "worldConfigFolder", "Папка конфигов от Assets", "CSV-конфиги ресурсов, островов и производств. По умолчанию Data/Config.");
@@ -346,6 +355,7 @@ public static class LocalizedInspector
         DrawStringList(progress.FindPropertyRelative("purchasedNodeIds"), "Купленные узлы", "Идентификаторы купленных узлов древа техники.");
         Property(progress, "activeResearchTechnologyId", "Активная технология", "Технология, выбранная в лаборатории столицы.");
         EditorGUILayout.PropertyField(progress.FindPropertyRelative("technologyResearchProgress"), new GUIContent("Прогресс технологий", "Сколько циклов завершено и идет ли текущий цикл."), true);
+        EditorGUILayout.PropertyField(progress.FindPropertyRelative("logisticsShips"), new GUIContent("Логистические корабли", "Состояния виртуальных грузовиков, их ETA, груз и ошибки."), true);
         DrawShipExperienceList(progress.FindPropertyRelative("shipExperience"), "Опыт корпусов");
 
         Property(progress, "currentMode", "Текущий режим", "Стыковка разрешает ручное сохранение. Выход из игры в вылете сохраняет позицию корабля.");

@@ -31,7 +31,7 @@ public class CapitalResearchStationEditor : Editor
         }
 
         meta.EnsureProgressInitialized();
-        meta.AdvanceRealTimeProcesses(System.DateTime.UtcNow);
+        meta.AdvanceRealTimeProcesses(meta.CurrentProcessUtcNow);
 
         DrawDockState(station, meta);
         DrawCapitalStorage(meta);
@@ -109,7 +109,7 @@ public class CapitalResearchStationEditor : Editor
         if (progress != null && progress.HasActiveCycle)
         {
             float duration = Mathf.Max(0.001f, (progress.activeCycleEndUtcTicks - progress.activeCycleStartUtcTicks) / (float)System.TimeSpan.TicksPerSecond);
-            float elapsed = Mathf.Clamp((System.DateTime.UtcNow.Ticks - progress.activeCycleStartUtcTicks) / (float)System.TimeSpan.TicksPerSecond, 0f, duration);
+            float elapsed = Mathf.Clamp((meta.CurrentProcessUtcNow.Ticks - progress.activeCycleStartUtcTicks) / (float)System.TimeSpan.TicksPerSecond, 0f, duration);
             Rect rect = GUILayoutUtility.GetRect(18f, 18f);
             EditorGUI.ProgressBar(rect, elapsed / duration, "Текущий цикл");
         }

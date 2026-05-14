@@ -466,6 +466,7 @@ GameObject:
   - component: {fileID: 1497055334}
   - component: {fileID: 1497055333}
   - component: {fileID: 1497055332}
+  - component: {fileID: 1497055335}
   m_Layer: 0
   m_Name: "\u041C\u0435\u0442\u0430-\u0438\u0433\u0440\u0430"
   m_TagString: Untagged
@@ -489,6 +490,7 @@ MonoBehaviour:
   techTree: {fileID: 11400000, guid: 94035a180d6f44a7a934773e0d8e32d4, type: 2}
   shipLoader: {fileID: 1497055333}
   missionController: {fileID: 883150469}
+  logisticsFleet: {fileID: 1497055335}
   startingMoney: 0
   progress:
     money: 0
@@ -528,9 +530,87 @@ MonoBehaviour:
   ironSmeltingIronOutput: 1
   defaultTimedMissionDurationSeconds: 300
   shopRefreshIntervalSeconds: 3600
+  gameTimeScale: 1
+  accelerateUnityTimeScale: 1
+  maxUnityTimeScale: 4
+  maxAcceleratedProcessStepSeconds: 15
+  processOfflineProgressOnLoad: 1
+  maxOfflineCatchUpHours: 240
   showDockingDebugUI: 1
   debugUiWidth: 380
   autoInstallCrashDetector: 1
+--- !u!114 &1497055335
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497055331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58ac28f3e1c94017ae1f3dfe94ecb3e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LogisticsFleetController
+  metaGameState: {fileID: 1497055332}
+  simulationEnabled: 1
+  reserveMultiplier: 1.2
+  cruiseSpeedFactor: 0.8
+  cruisePowerLever: 0.75
+  fallbackSecondsPerItem: 1
+  defaultClaudiumResourceId: claudium
+  debugLogging: 1
+  routes:
+  - routeId: starter_food_wood_tools
+    displayName: Starter food wood tools
+    loop: 1
+    stops:
+    - islandId: Island1
+      unload: []
+      load:
+      - itemId: food
+        amount: 20
+      refuelEngine: 1
+      targetFuelKg: 30
+      refillClaudium: 1
+      claudiumResourceId: claudium
+      targetClaudiumKg: 15
+    - islandId: Island6
+      unload:
+      - itemId: food
+        amount: 10
+      load:
+      - itemId: wood
+        amount: 10
+      refuelEngine: 1
+      targetFuelKg: 30
+      refillClaudium: 1
+      claudiumResourceId: claudium
+      targetClaudiumKg: 15
+    - islandId: Island5
+      unload:
+      - itemId: food
+        amount: 10
+      - itemId: wood
+        amount: 10
+      load:
+      - itemId: tools
+        amount: 20
+      refuelEngine: 1
+      targetFuelKg: 30
+      refillClaudium: 1
+      claudiumResourceId: claudium
+      targetClaudiumKg: 15
+  ships:
+  - enabled: 1
+    shipId: logi_01
+    displayName: Cargo Hauler 01
+    routeId: starter_food_wood_tools
+    startingIslandId: Island1
+    hullId: starter_hull
+    claudiumResourceId: claudium
+    autoInstallRequiredModules: 1
+    installedModules: []
+    startingCargo: []
 --- !u!114 &1497055333
 MonoBehaviour:
   m_ObjectHideFlags: 0
