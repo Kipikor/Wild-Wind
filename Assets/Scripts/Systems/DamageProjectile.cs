@@ -5,10 +5,23 @@ using UnityEngine;
 public class DamageProjectile : MonoBehaviour
 {
     [Header("Снаряд")]
+    [InspectorName("Пресет снаряда")]
     public DamageShellPreset shell = new DamageShellPreset();
+    [InspectorName("Источник")]
+    [Tooltip("Название оружия или объекта, выпустившего снаряд.")]
     public string sourceName = "Тестовая пушка";
+    [InspectorName("Время жизни, сек")]
     public float maxLifetimeSeconds = 8f;
+    [InspectorName("Уничтожать при любом столкновении")]
     public bool destroyOnAnyCollision = true;
+    [Header("Физический толчок")]
+    [InspectorName("Двигать kinematic цель")]
+    [Tooltip("Используется тестовым стендом: если цель закреплена, фугас считает урон, но не двигает Rigidbody.")]
+    public bool moveKinematicTargets;
+    [InspectorName("Масштаб импульса фугаса")]
+    public float highExplosiveImpulseScale = 25f;
+    [InspectorName("Макс. Δv от фугаса, м/с")]
+    public float highExplosiveMaxDeltaVelocityMS = 8f;
 
     private Rigidbody body;
     private Collider ownCollider;
@@ -140,7 +153,8 @@ public class DamageProjectile : MonoBehaviour
         {
             if (!moduleHitbox.BlocksProjectile) return false;
 
-            moduleHitbox.ReceiveDirectHit(context);
+            DamageHitResult result = moduleHitbox.ReceiveDirectHit(context);
+            ApplyHighExplosiveImpulse(hitCollider, hitPoint, hitNormal, direction, result);
             hasHit = true;
             return true;
         }
@@ -148,7 +162,8 @@ public class DamageProjectile : MonoBehaviour
         PaintedArmorBody paintedArmor = hitCollider.GetComponentInParent<PaintedArmorBody>();
         if (paintedArmor != null)
         {
-            paintedArmor.ReceiveHit(context);
+            DamageHitResult result = paintedArmor.ReceiveHit(context);
+            ApplyHighExplosiveImpulse(hitCollider, hitPoint, hitNormal, direction, result);
             hasHit = true;
             return true;
         }
@@ -156,7 +171,8 @@ public class DamageProjectile : MonoBehaviour
         MeshArmorBody meshArmor = hitCollider.GetComponentInParent<MeshArmorBody>();
         if (meshArmor != null)
         {
-            meshArmor.ReceiveHit(context, triangleIndex);
+            DamageHitResult result = meshArmor.ReceiveHit(context, triangleIndex);
+            ApplyHighExplosiveImpulse(hitCollider, hitPoint, hitNormal, direction, result);
             hasHit = true;
             return true;
         }
@@ -170,9 +186,79 @@ public class DamageProjectile : MonoBehaviour
 
         if (zone == null) return false;
 
-        zone.ReceiveHit(context);
+        DamageHitResult zoneResult = zone.ReceiveHit(context);
+        ApplyHighExplosiveImpulse(hitCollider, hitPoint, hitNormal, direction, zoneResult);
         hasHit = true;
         return true;
+    }
+
+    private void ApplyHighExplosiveImpulse(
+        Collider hitCollider,
+        Vector3 hitPoint,
+        Vector3 hitNormal,
+        Vector3 projectileDirection,
+        DamageHitResult result)
+    {
+        if (shell.shellType != DamageShellType.HighExplosive) return;
+
+        Rigidbody targetBody = ResolveTargetRigidbody(hitCollider);
+        if (targetBody == null) return;
+        if (targetBody.isKinematic)
+        {
+            if (!moveKinematicTargets) return;
+
+            targetBody.isKinematic = false;
+        }
+
+        targetBody.useGravity = false;
+
+        Vector3 pushDirection = targetBody.worldCenterOfMass - hitPoint;
+        if (pushDirection.sqrMagnitude < 0.001f)
+        {
+            pushDirection = projectileDirection.sqrMagnitude > 0.001f ? projectileDirection : -hitNormal;
+        }
+
+        pushDirection.Normalize();
+        float penetrationMultiplier = result.outcome == DamageHitOutcome.Penetration ? 3f : 1f;
+        float impulseNs = Mathf.Max(0f, shell.damagePoints) * Mathf.Max(0f, highExplosiveImpulseScale) * penetrationMultiplier;
+        float maxImpulse = Mathf.Max(0f, highExplosiveMaxDeltaVelocityMS) * Mathf.Max(1f, targetBody.mass);
+        impulseNs = Mathf.Min(impulseNs, maxImpulse);
+        if (impulseNs <= 0.001f) return;
+
+        targetBody.AddForce(pushDirection * impulseNs, ForceMode.Impulse);
+    }
+
+    private static Rigidbody ResolveTargetRigidbody(Collider hitCollider)
+    {
+        if (hitCollider == null) return null;
+        if (hitCollider.attachedRigidbody != null) return hitCollider.attachedRigidbody;
+
+        Rigidbody body = hitCollider.GetComponentInParent<Rigidbody>();
+        if (body != null) return body;
+
+        MeshArmorBody meshArmor = hitCollider.GetComponentInParent<MeshArmorBody>();
+        if (meshArmor != null && meshArmor.owner != null)
+        {
+            body = meshArmor.owner.GetComponentInParent<Rigidbody>();
+            if (body != null) return body;
+        }
+
+        DamageableModuleHitbox module = hitCollider.GetComponentInParent<DamageableModuleHitbox>();
+        if (module != null && module.owner != null)
+        {
+            body = module.owner.GetComponentInParent<Rigidbody>();
+            if (body != null) return body;
+        }
+
+        ArmorZone zone = hitCollider.GetComponentInParent<ArmorZone>();
+        if (zone != null && zone.Owner != null)
+        {
+            body = zone.Owner.GetComponentInParent<Rigidbody>();
+            if (body != null) return body;
+        }
+
+        DamageableShip ship = hitCollider.GetComponentInParent<DamageableShip>();
+        return ship != null ? ship.GetComponentInParent<Rigidbody>() : null;
     }
 
     private static float RollPenetration(DamageShellPreset preset)

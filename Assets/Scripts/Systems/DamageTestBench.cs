@@ -3,29 +3,53 @@ using UnityEngine;
 
 public enum DamageMuzzleAxis
 {
+    [InspectorName("Локально вперёд")]
     LocalForward,
+    [InspectorName("Локально вверх")]
     LocalUp,
+    [InspectorName("Локально вправо")]
     LocalRight,
+    [InspectorName("Локально назад")]
     NegativeLocalForward,
+    [InspectorName("Локально вниз")]
     NegativeLocalUp,
+    [InspectorName("Локально влево")]
     NegativeLocalRight
 }
 
 public class DamageTestBench : MonoBehaviour
 {
     [Header("Цель")]
+    [InspectorName("Цель")]
+    [Tooltip("Корабль или бронекорпус, по которому стреляет тестовый стенд.")]
     public DamageableShip target;
+    [InspectorName("Ствол")]
+    [Tooltip("Точка, из которой выходит снаряд и откуда рисуется прицельный луч.")]
     public Transform muzzle;
+    [InspectorName("Ось ствола")]
+    [Tooltip("Какая локальная ось объекта ствола считается направлением выстрела.")]
     public DamageMuzzleAxis muzzleAxis = DamageMuzzleAxis.LocalUp;
+    [InspectorName("Дальность стрельбы, м")]
+    [Tooltip("Максимальная длина тестового луча и дальность raycast-выстрела.")]
     public float maxRangeMeters = 400f;
 
     [Header("Стрельба")]
+    [InspectorName("Создавать физические снаряды в Play Mode")]
+    [Tooltip("Если включено, в Play Mode выстрел создаёт настоящий Rigidbody-снаряд. В редакторе кнопки используют быстрый raycast.")]
     public bool spawnPhysicalProjectilesInPlayMode = true;
+    [InspectorName("Начальная скорость снаряда, м/с")]
     public float muzzleVelocityMS = 160f;
+    [InspectorName("Масса снаряда, кг")]
     public float projectileMassKg = 8f;
+    [InspectorName("Радиус снаряда, м")]
     public float projectileRadiusMeters = 0.25f;
+    [InspectorName("Боковое смещение косого выстрела, м")]
+    [Tooltip("Насколько вбок от цели ставится виртуальная пушка для кнопок косого ББ-выстрела.")]
     public float obliqueShotSideOffsetMeters = 170f;
+    [InspectorName("Продольное смещение косого выстрела, м")]
+    [Tooltip("Насколько назад от цели ставится виртуальная пушка для кнопок косого ББ-выстрела.")]
     public float obliqueShotForwardOffsetMeters = 120f;
+    [InspectorName("Бронебойный снаряд")]
     public DamageShellPreset armorPiercingShell = new DamageShellPreset
     {
         displayNameRu = "ББ 76 мм",
@@ -40,6 +64,7 @@ public class DamageTestBench : MonoBehaviour
         penetrationRollSpread = 0.1f,
         projectileColor = Color.red
     };
+    [InspectorName("Фугасный снаряд")]
     public DamageShellPreset highExplosiveShell = new DamageShellPreset
     {
         displayNameRu = "Фугас 90 мм",
@@ -55,24 +80,68 @@ public class DamageTestBench : MonoBehaviour
         penetrationRollSpread = 0.05f,
         projectileColor = new Color(1f, 0.75f, 0.1f)
     };
+    [Header("Фугасный толчок")]
+    [InspectorName("Масштаб импульса фугаса")]
+    [Tooltip("Импульс фугаса = урон снаряда * этот масштаб. При пробитии брони импульс утраивается.")]
+    [Min(0f)]
+    public float highExplosiveImpulseScale = 25f;
+    [InspectorName("Макс. Δv от фугаса, м/с")]
+    [Min(0f)]
+    public float highExplosiveMaxTargetDeltaVelocityMS = 8f;
 
     [Header("Таран")]
+    [InspectorName("Бронезона тарана")]
     public string ramZoneId = "front";
+    [InspectorName("Масса таранящего объекта, кг")]
+    [Min(1f)]
     public float rammerMassKg = 2200f;
+    [InspectorName("Масса цели, кг")]
+    [Min(1f)]
     public float ramTargetMassKg = 1800f;
+    [InspectorName("Скорость удара, м/с")]
+    [Min(0f)]
     public float ramRelativeSpeedMS = 12f;
-    public float ramDamagePerKJ = 0.08f;
+    [InspectorName("Минимальная скорость урона, м/с")]
+    [Min(0f)]
+    public float ramMinDamageSpeedMS = 4f;
+    [InspectorName("Масштаб урона тарана")]
+    [Tooltip("Урон считается как sqrt(энергия удара в кДж) * этот масштаб.")]
+    [Min(0f)]
+    public float ramDamageScale = 10f;
+    [InspectorName("Модификатор урона таранящего")]
+    [Min(0f)]
+    public float rammerDamageMultiplier = 1f;
+    [InspectorName("Упругость толчка")]
+    [Range(0f, 1f)]
+    public float ramPushElasticity = 0.45f;
+    [InspectorName("Макс. скорость толчка цели")]
+    [Min(0f)]
+    public float ramMaxTargetDeltaVelocityMS = 16f;
+    [InspectorName("Цель закреплена для теста")]
+    [Tooltip("Если включено, урон считается, но физический толчок не применяется. Удобно для повторных тестов.")]
+    public bool ramKeepTargetAnchored = true;
 
     [Header("Отладка")]
+    [InspectorName("Писать логи")]
     public bool debugLogging = true;
+    [InspectorName("Показывать прицельный луч в сцене")]
     public bool drawAimRayInScene = true;
+    [InspectorName("Показывать луч только при выборе")]
     public bool drawAimRayOnlyWhenSelected = false;
+    [InspectorName("Радиус маркера попадания")]
     public float aimRayHitMarkerRadius = 1.25f;
+    [InspectorName("Цвет попадания в броню")]
     public Color aimRayArmorHitColor = new Color(0.2f, 1f, 0.25f, 1f);
+    [InspectorName("Цвет попадания в другой объект")]
     public Color aimRayOtherHitColor = new Color(1f, 0.85f, 0.1f, 1f);
+    [InspectorName("Цвет промаха")]
     public Color aimRayMissColor = new Color(1f, 0.15f, 0.1f, 1f);
+    [InspectorName("Цвет косого луча")]
     public Color aimRayObliqueColor = new Color(0.2f, 0.7f, 1f, 0.65f);
+    [InspectorName("Показывать косые лучи")]
     public bool drawObliqueShotRays = true;
+    [InspectorName("Последнее сообщение")]
+    [TextArea(2, 5)]
     public string lastMessage = "";
 
     private void Reset()
@@ -129,6 +198,7 @@ public class DamageTestBench : MonoBehaviour
 
         if (Application.isPlaying && spawnPhysicalProjectilesInPlayMode)
         {
+            PrepareTargetForProjectilePhysics(preset);
             SpawnProjectile(preset, origin, direction);
             Log("Выстрел: " + preset.displayNameRu + " по " + target.displayNameRu + ".");
             return;
@@ -167,6 +237,7 @@ public class DamageTestBench : MonoBehaviour
 
         if (Application.isPlaying && spawnPhysicalProjectilesInPlayMode)
         {
+            PrepareTargetForProjectilePhysics(preset);
             SpawnProjectile(preset, origin, direction);
             Log("Косой выстрел: " + preset.displayNameRu + " по " + target.displayNameRu + ".");
             return;
@@ -264,20 +335,16 @@ public class DamageTestBench : MonoBehaviour
             return;
         }
 
-        ArmorZone zone = target.FindZoneById(ramZoneId);
-        if (zone == null)
+        float speed = Mathf.Max(0f, ramRelativeSpeedMS);
+        if (speed < ramMinDamageSpeedMS)
         {
-            zone = target.GetDefaultZone();
-        }
-
-        if (zone == null)
-        {
-            Log("У цели нет бронезон для тарана.");
+            Log($"Таран слишком медленный: {speed:0.0} м/с меньше порога {ramMinDamageSpeedMS:0.0} м/с. Урон не считается.");
             return;
         }
 
+        ApplyTargetTestMass();
         float reducedMass = rammerMassKg * ramTargetMassKg / Mathf.Max(1f, rammerMassKg + ramTargetMassKg);
-        float energyKJ = 0.5f * reducedMass * ramRelativeSpeedMS * ramRelativeSpeedMS / 1000f;
+        float energyKJ = 0.5f * reducedMass * speed * speed / 1000f;
         Vector3 incoming = (target.GetAimPoint() - (muzzle != null ? muzzle.position : transform.position)).normalized;
         if (incoming.sqrMagnitude < 0.001f)
         {
@@ -290,15 +357,88 @@ public class DamageTestBench : MonoBehaviour
             shellName = "Тестовый таран",
             sourceName = name,
             impactEnergyKJ = energyKJ,
-            impactDamagePerKJ = ramDamagePerKJ,
-            hitPoint = zone.transform.position,
+            impactDamagePerKJ = ramDamageScale,
+            impactSpeedMS = speed,
+            impactSourceMassKg = rammerMassKg,
+            impactTargetMassKg = ramTargetMassKg,
+            impactSourceDamageMultiplier = rammerDamageMultiplier,
+            hitPoint = target.GetAimPoint(),
             hitNormal = -incoming,
             incomingDirection = incoming,
-            velocity = incoming * ramRelativeSpeedMS
+            velocity = incoming * speed
         };
 
-        DamageHitResult result = zone.ReceiveHit(context);
-        lastMessage = result.message;
+        DamageHitResult result = ApplyRamHit(context, incoming);
+        string pushMessage = ApplyRamPushToTarget(incoming, reducedMass, speed);
+        lastMessage = string.IsNullOrWhiteSpace(pushMessage)
+            ? result.message
+            : result.message + " " + pushMessage;
+    }
+
+    private DamageHitResult ApplyRamHit(DamageHitContext context, Vector3 incoming)
+    {
+        ArmorZone zone = target.FindZoneById(ramZoneId);
+        if (zone == null)
+        {
+            zone = target.GetDefaultZone();
+        }
+
+        if (zone != null)
+        {
+            context.hitPoint = zone.transform.position;
+            context.hitNormal = -incoming;
+            return zone.ReceiveHit(context);
+        }
+
+        MeshArmorBody meshArmor = FindTargetMeshArmor();
+        if (meshArmor != null)
+        {
+            context.hitPoint = meshArmor.transform.position;
+            context.hitNormal = -incoming;
+            return meshArmor.ReceiveHit(context, -1);
+        }
+
+        DamageHitResult miss = new DamageHitResult
+        {
+            outcome = DamageHitOutcome.Miss,
+            message = "[Урон] У цели нет ArmorZone или MeshArmorBody для тарана."
+        };
+        Log(miss.message);
+        return miss;
+    }
+
+    private MeshArmorBody FindTargetMeshArmor()
+    {
+        if (target == null) return null;
+
+        MeshArmorBody meshArmor = target.GetComponentInChildren<MeshArmorBody>(true);
+        if (meshArmor != null) return meshArmor;
+
+        MeshArmorBody[] armorBodies = FindObjectsByType<MeshArmorBody>(FindObjectsSortMode.None);
+        MeshArmorBody fallback = null;
+        for (int i = 0; i < armorBodies.Length; i++)
+        {
+            MeshArmorBody armor = armorBodies[i];
+            if (armor == null) continue;
+
+            if (armor.owner == target)
+            {
+                return armor;
+            }
+
+            DamageableShip parentOwner = armor.GetComponentInParent<DamageableShip>();
+            if (parentOwner == target)
+            {
+                return armor;
+            }
+
+            if (fallback == null && armor.owner == null && armorBodies.Length == 1)
+            {
+                fallback = armor;
+            }
+        }
+
+        return fallback;
     }
 
     public void ResetTargetDamage()
@@ -316,6 +456,64 @@ public class DamageTestBench : MonoBehaviour
 
         target.ResetDamageState();
         lastMessage = target.lastDamageMessage;
+    }
+
+    private void ApplyTargetTestMass()
+    {
+        if (target == null) return;
+
+        Rigidbody targetBody = target.GetComponentInParent<Rigidbody>();
+        if (targetBody != null)
+        {
+            targetBody.mass = Mathf.Max(1f, ramTargetMassKg);
+            targetBody.useGravity = false;
+            if (ramKeepTargetAnchored)
+            {
+                if (!targetBody.isKinematic)
+                {
+                    targetBody.linearVelocity = Vector3.zero;
+                    targetBody.angularVelocity = Vector3.zero;
+                }
+
+                targetBody.isKinematic = true;
+            }
+            else
+            {
+                targetBody.isKinematic = false;
+            }
+        }
+    }
+
+    private string ApplyRamPushToTarget(Vector3 incoming, float reducedMass, float speed)
+    {
+        float impulseNs = Mathf.Max(0f, reducedMass * speed * ramPushElasticity);
+        float rawDeltaVelocity = impulseNs / Mathf.Max(1f, ramTargetMassKg);
+        float deltaVelocity = Mathf.Min(rawDeltaVelocity, Mathf.Max(0f, ramMaxTargetDeltaVelocityMS));
+
+        if (ramKeepTargetAnchored)
+        {
+            return $"Толчок рассчитан: импульс {impulseNs:0} Н·с, Δv {deltaVelocity:0.00} м/с, но цель закреплена.";
+        }
+
+        Rigidbody targetBody = target != null ? target.GetComponentInParent<Rigidbody>() : null;
+        if (targetBody != null)
+        {
+            targetBody.isKinematic = false;
+            targetBody.useGravity = false;
+            if (Application.isPlaying)
+            {
+                targetBody.AddForce(incoming.normalized * Mathf.Min(impulseNs, deltaVelocity * ramTargetMassKg), ForceMode.Impulse);
+                return $"Толчок применён: импульс {impulseNs:0} Н·с, Δv до {deltaVelocity:0.00} м/с.";
+            }
+        }
+
+        if (target != null)
+        {
+            target.transform.position += incoming.normalized * Mathf.Min(5f, deltaVelocity * 0.25f);
+            return $"Тестовый сдвиг цели применён в редакторе: Δv {deltaVelocity:0.00} м/с.";
+        }
+
+        return "";
     }
 
     private DamageHitContext CreateHitContext(DamageShellPreset preset, Vector3 hitPoint, Vector3 hitNormal, Vector3 direction)
@@ -354,6 +552,12 @@ public class DamageTestBench : MonoBehaviour
             renderer.material.color = preset.projectileColor;
         }
 
+        Collider projectileCollider = projectileObject.GetComponent<Collider>();
+        if (projectileCollider != null)
+        {
+            projectileCollider.isTrigger = true;
+        }
+
         Rigidbody projectileBody = projectileObject.AddComponent<Rigidbody>();
         projectileBody.mass = Mathf.Max(0.01f, projectileMassKg);
         projectileBody.useGravity = false;
@@ -363,6 +567,37 @@ public class DamageTestBench : MonoBehaviour
         DamageProjectile projectile = projectileObject.AddComponent<DamageProjectile>();
         projectile.shell = CopyPreset(preset);
         projectile.sourceName = name;
+        projectile.moveKinematicTargets = !ramKeepTargetAnchored;
+        projectile.highExplosiveImpulseScale = highExplosiveImpulseScale;
+        projectile.highExplosiveMaxDeltaVelocityMS = highExplosiveMaxTargetDeltaVelocityMS;
+    }
+
+    private void PrepareTargetForProjectilePhysics(DamageShellPreset preset)
+    {
+        if (target == null) return;
+
+        Rigidbody targetBody = target.GetComponentInParent<Rigidbody>();
+        if (targetBody == null) return;
+
+        targetBody.mass = Mathf.Max(1f, ramTargetMassKg);
+        targetBody.useGravity = false;
+
+        if (ramKeepTargetAnchored)
+        {
+            if (!targetBody.isKinematic)
+            {
+                targetBody.linearVelocity = Vector3.zero;
+                targetBody.angularVelocity = Vector3.zero;
+            }
+
+            targetBody.isKinematic = true;
+            return;
+        }
+
+        if (preset != null && preset.shellType == DamageShellType.HighExplosive)
+        {
+            targetBody.isKinematic = false;
+        }
     }
 
     private bool TryGetCurrentAimRay(out Vector3 origin, out Vector3 direction)

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,32 +6,68 @@ using UnityEngine;
 public class DamageableShip : MonoBehaviour
 {
     [Header("Прочность")]
+    [InspectorName("ID корабля")]
+    [Tooltip("Технический id цели в логах и будущих сохранениях.")]
     public string shipId = "target_ship";
+    [InspectorName("Название")]
+    [Tooltip("Название цели для инспектора и сообщений о попаданиях.")]
     public string displayNameRu = "Цель";
+    [InspectorName("Максимальная прочность корпуса")]
     public float maxStructureHp = 500f;
+    [InspectorName("Текущая прочность корпуса")]
     public float structureHp = 500f;
+    [InspectorName("Модули")]
+    [Tooltip("Состояние внутренних и внешних модулей, которые могут получать урон.")]
     public List<ShipDamageModuleState> modules = new List<ShipDamageModuleState>();
 
     [Header("Связь с физикой")]
+    [InspectorName("Влиять повреждениями на полёт")]
+    [Tooltip("Если включено, повреждения двигателя, винта и контура временно меняют характеристики ShipPhysics.")]
     public bool applyModuleEffectsToShipPhysics = true;
+    [InspectorName("Физика корабля")]
     public ShipPhysics shipPhysics;
 
+    [Header("Таран")]
+    [InspectorName("Получаемый урон тараном")]
+    [Tooltip("Множитель получаемого тараном/ударом урона для корпуса. 1 = как есть, 0.5 = получает вдвое меньше, 2 = вдвое больше.")]
+    [Min(0f)] public float ramDamageTakenMultiplier = 1f;
+    [InspectorName("Наносимый урон тараном")]
+    [Tooltip("Множитель урона, который этот корпус наносит другим при таране.")]
+    [Min(0f)] public float ramDamageDealtMultiplier = 1f;
+
     [Header("Отладка")]
+    [InspectorName("Писать логи")]
     public bool debugLogging = true;
+    [InspectorName("Последнее сообщение")]
+    [TextArea(2, 5)]
     public string lastDamageMessage = "";
+    [InspectorName("Итог последнего попадания")]
     public DamageHitOutcome lastHitOutcome = DamageHitOutcome.Miss;
+    [InspectorName("Последняя зона")]
     public string lastHitZoneId = "";
+    [InspectorName("Броня последнего попадания, мм")]
     public float lastHitArmorMm;
+    [InspectorName("Приведённая броня, мм")]
     public float lastHitEffectiveArmorMm;
+    [InspectorName("Угол попадания, град")]
     public float lastHitImpactAngleDeg;
+    [InspectorName("Пробитие снаряда, мм")]
     public float lastHitPenetrationMm;
+    [InspectorName("Попаданий всего")]
     public int hitCount;
+    [InspectorName("Пробитий")]
     public int penetrationCount;
+    [InspectorName("Рикошетов")]
     public int ricochetCount;
+    [InspectorName("Непробитий")]
     public int noPenetrationCount;
+    [InspectorName("Фугасных взрывов")]
     public int explosiveSplashCount;
+    [InspectorName("Ударов/таранов")]
     public int impactCount;
+    [InspectorName("Последние события")]
     public List<string> recentEvents = new List<string>();
+    [InspectorName("Размер истории событий")]
     public int maxRecentEvents = 8;
 
     private float baseEnginePowerKwAt100;
@@ -82,6 +119,8 @@ public class DamageableShip : MonoBehaviour
     {
         maxStructureHp = Mathf.Max(1f, maxStructureHp);
         structureHp = Mathf.Clamp(structureHp, 0f, maxStructureHp);
+        ramDamageTakenMultiplier = Mathf.Max(0f, ramDamageTakenMultiplier);
+        ramDamageDealtMultiplier = Mathf.Max(0f, ramDamageDealtMultiplier);
         maxRecentEvents = Mathf.Clamp(maxRecentEvents, 1, 20);
     }
 
@@ -239,19 +278,23 @@ public class DamageableShip : MonoBehaviour
         hitCount++;
         CaptureShipPhysicsBaselines();
 
-        float moduleDamage = moduleHitbox != null ? moduleHitbox.ApplyModuleDamage(context.moduleDamage) : 0f;
-        float hullDamage = ApplyHullDamage(context.hullDamageOnPenetration);
         string moduleId = moduleHitbox != null ? moduleHitbox.moduleId : "";
         string moduleName = moduleHitbox != null ? moduleHitbox.displayNameRu : "модуль";
+        bool externalModule = moduleHitbox != null && moduleHitbox.externalModule;
+        string moduleKind = externalModule ? "внешний модуль" : "модуль";
+        float moduleDamageMultiplier = externalModule ? 2f : 1f;
+        float rawModuleDamage = context.moduleDamage * moduleDamageMultiplier;
+        float moduleDamage = moduleHitbox != null ? moduleHitbox.ApplyModuleDamage(rawModuleDamage) : 0f;
+        string multiplierText = externalModule ? " x2 за внешний модуль" : "";
 
         DamageHitResult result = new DamageHitResult
         {
             outcome = DamageHitOutcome.ModuleHit,
-            message = $"[Урон] Прямое попадание во внешний модуль {moduleName}: корпус -{hullDamage:0.0}, модуль -{moduleDamage:0.0}.",
+            message = $"[Урон] Прямое попадание в {moduleKind} {moduleName}: модуль -{moduleDamage:0.0}{multiplierText}, корпус не задет.",
             zoneId = moduleId,
             moduleId = moduleId,
             moduleNameRu = moduleName,
-            structureDamage = hullDamage,
+            structureDamage = 0f,
             moduleDamage = moduleDamage,
             remainingStructureHp = structureHp
         };
@@ -421,10 +464,22 @@ public class DamageableShip : MonoBehaviour
         ref DamageHitResult result)
     {
         impactCount++;
-        float damage = context.impactEnergyKJ * Mathf.Max(0.001f, context.impactDamagePerKJ);
-        result.structureDamage = ApplyHullDamage(damage);
+        float sourceMultiplier = context.impactSourceDamageMultiplier > 0.001f
+            ? context.impactSourceDamageMultiplier
+            : 1f;
+        float damageScale = context.impactDamagePerKJ > 0.001f ? context.impactDamagePerKJ : 10f;
+        float totalDamage = Mathf.Sqrt(Mathf.Max(0f, context.impactEnergyKJ))
+            * damageScale
+            * sourceMultiplier
+            * Mathf.Max(0f, ramDamageTakenMultiplier)
+            * Mathf.Max(0f, surface.ramDamageMultiplier);
+
+        int damagedModules = ApplyDistributedImpactDamage(totalDamage, ref result);
         result.outcome = DamageHitOutcome.ImpactDamage;
-        result.message = $"[Урон] Таран/удар в {surface.displayNameRu}: энергия {context.impactEnergyKJ:0.0} кДж, корпус -{result.structureDamage:0.0}.";
+        string moduleText = damagedModules > 0
+            ? $"модули -{result.moduleDamage:0.0} по {damagedModules} целым"
+            : "живых модулей нет";
+        result.message = $"[Урон] Таран/удар в {surface.displayNameRu}: скорость {context.impactSpeedMS:0.0} м/с, массы {context.impactSourceMassKg:0}/{context.impactTargetMassKg:0} кг, энергия {context.impactEnergyKJ:0.0} кДж, урон {totalDamage:0.0}: корпус -{result.structureDamage:0.0}, {moduleText}.";
     }
 
     private float ApplyHullDamage(float amount)
@@ -432,6 +487,56 @@ public class DamageableShip : MonoBehaviour
         float previous = structureHp;
         structureHp = Mathf.Clamp(structureHp - Mathf.Max(0f, amount), 0f, maxStructureHp);
         return previous - structureHp;
+    }
+
+    private int ApplyDistributedImpactDamage(float totalDamage, ref DamageHitResult result)
+    {
+        totalDamage = Mathf.Max(0f, totalDamage);
+        List<ShipDamageModuleState> aliveModules = new List<ShipDamageModuleState>();
+        if (modules != null)
+        {
+            for (int i = 0; i < modules.Count; i++)
+            {
+                ShipDamageModuleState module = modules[i];
+                if (module == null || module.IsDestroyed || IsHullModule(module)) continue;
+                aliveModules.Add(module);
+            }
+        }
+
+        float hullDamage = aliveModules.Count > 0 ? totalDamage * 0.5f : totalDamage;
+        float modulePool = totalDamage - hullDamage;
+        result.structureDamage = ApplyHullDamage(hullDamage);
+
+        if (aliveModules.Count <= 0 || modulePool <= 0.001f)
+        {
+            result.moduleDamage = 0f;
+            return 0;
+        }
+
+        float damagePerModule = modulePool / aliveModules.Count;
+        float appliedModuleDamage = 0f;
+        for (int i = 0; i < aliveModules.Count; i++)
+        {
+            appliedModuleDamage += ApplyModuleRawDamage(aliveModules[i], damagePerModule);
+        }
+
+        result.moduleDamage = appliedModuleDamage;
+        result.moduleNameRu = $"{aliveModules.Count} мод.";
+        return aliveModules.Count;
+    }
+
+    private static bool IsHullModule(ShipDamageModuleState module)
+    {
+        return module != null && string.Equals(module.moduleId, "hull", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static float ApplyModuleRawDamage(ShipDamageModuleState module, float amount)
+    {
+        if (module == null) return 0f;
+
+        float previous = module.hp;
+        module.hp = Mathf.Max(0f, module.hp - Mathf.Max(0f, amount));
+        return Mathf.Max(0f, previous - module.hp);
     }
 
     private void TryDamageFirstInternalModule(DamageHitContext context, ref DamageHitResult result)

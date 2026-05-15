@@ -4,19 +4,29 @@ using UnityEngine;
 
 public enum DamageShellType
 {
+    [InspectorName("Бронебойный")]
     ArmorPiercing,
+    [InspectorName("Фугасный")]
     HighExplosive,
+    [InspectorName("Удар/таран")]
     Impact
 }
 
 public enum DamageHitOutcome
 {
+    [InspectorName("Пробитие")]
     Penetration,
+    [InspectorName("Непробитие")]
     NoPenetration,
+    [InspectorName("Рикошет")]
     Ricochet,
+    [InspectorName("Фугасный взрыв")]
     ExplosiveSplash,
+    [InspectorName("Ударный урон")]
     ImpactDamage,
+    [InspectorName("Промах")]
     Miss,
+    [InspectorName("Попадание в модуль")]
     ModuleHit
 }
 
@@ -33,7 +43,7 @@ public class DamageShellPreset
     [Tooltip("Оставлено для совместимости. Новая модель использует три отдельных урона ниже.")]
     public float damagePoints = 100f;
     [InspectorName("Урон корпусу при пробитии")]
-    [Tooltip("Сколько прочности корпуса снимает снаряд, если бронелист пробит. При попадании во внешний модуль тоже наносится корпусу.")]
+    [Tooltip("Сколько прочности корпуса снимает снаряд, если бронелист пробит. При прямом попадании во внешний модуль корпус не повреждается.")]
     public float hullDamageOnPenetration = 100f;
     [InspectorName("Урон бронелисту")]
     [Tooltip("Сколько прочности бронелиста снимает попадание. При пробитии удваивается, при непробитии идет как есть, при рикошете делится пополам.")]
@@ -68,6 +78,10 @@ public struct DamageHitContext
     public float normalizationDegrees;
     public float impactEnergyKJ;
     public float impactDamagePerKJ;
+    public float impactSpeedMS;
+    public float impactSourceMassKg;
+    public float impactTargetMassKg;
+    public float impactSourceDamageMultiplier;
     public float internalTravelDistance;
     public bool deferResultLogging;
     public Vector3 hitPoint;
@@ -133,10 +147,16 @@ public struct ArmorSurface
 [Serializable]
 public class ShipDamageModuleState
 {
+    [InspectorName("ID модуля")]
     public string moduleId = "module";
+    [InspectorName("Название")]
     public string displayNameRu = "Модуль";
+    [InspectorName("Максимальная прочность")]
     public float maxHp = 100f;
+    [InspectorName("Текущая прочность")]
     public float hp = 100f;
+    [InspectorName("Вес урона")]
+    [Tooltip("Множитель получаемого урона для этого модуля. 1 = как есть, 0.5 = вдвое меньше, 2 = вдвое больше.")]
     [Range(0f, 2f)] public float damageWeight = 1f;
 
     public float HpRatio

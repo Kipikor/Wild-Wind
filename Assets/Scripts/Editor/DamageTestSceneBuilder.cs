@@ -251,9 +251,59 @@ public class DamageTestBenchEditor : Editor
 {
     public override void OnInspectorGUI()
     {
-        DrawDefaultInspector();
-
+        serializedObject.Update();
         DamageTestBench bench = (DamageTestBench)target;
+
+        DrawScriptField();
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Цель", EditorStyles.boldLabel);
+        DrawProperty("target", "Цель", "Корабль или бронекорпус, по которому стреляет тестовый стенд.");
+        DrawProperty("muzzle", "Ствол", "Точка, из которой выходит снаряд и рисуется прицельный луч.");
+        DrawProperty("muzzleAxis", "Ось ствола", "Какая локальная ось объекта ствола считается направлением выстрела.");
+        DrawProperty("maxRangeMeters", "Дальность стрельбы, м", "Максимальная длина тестового луча и raycast-выстрела.");
+
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Стрельба", EditorStyles.boldLabel);
+        DrawProperty("spawnPhysicalProjectilesInPlayMode", "Создавать физические снаряды в Play Mode");
+        DrawProperty("muzzleVelocityMS", "Начальная скорость снаряда, м/с");
+        DrawProperty("projectileMassKg", "Масса снаряда, кг");
+        DrawProperty("projectileRadiusMeters", "Радиус снаряда, м");
+        DrawProperty("obliqueShotSideOffsetMeters", "Боковое смещение косого выстрела, м");
+        DrawProperty("obliqueShotForwardOffsetMeters", "Продольное смещение косого выстрела, м");
+        DrawShellPreset(serializedObject.FindProperty("armorPiercingShell"), "Бронебойный снаряд");
+        DrawShellPreset(serializedObject.FindProperty("highExplosiveShell"), "Фугасный снаряд");
+        DrawProperty("highExplosiveImpulseScale", "Масштаб импульса фугаса", "Импульс фугаса = урон снаряда * масштаб. При пробитии брони импульс утраивается.");
+        DrawProperty("highExplosiveMaxTargetDeltaVelocityMS", "Макс. Δv от фугаса, м/с");
+
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Таран", EditorStyles.boldLabel);
+        DrawProperty("ramZoneId", "ID бронезоны тарана");
+        DrawProperty("rammerMassKg", "Масса таранящего объекта, кг");
+        DrawProperty("ramTargetMassKg", "Масса цели, кг");
+        DrawProperty("ramRelativeSpeedMS", "Скорость удара, м/с");
+        DrawProperty("ramMinDamageSpeedMS", "Минимальная скорость урона, м/с");
+        DrawProperty("ramDamageScale", "Масштаб урона тарана", "Урон считается как sqrt(энергия удара в кДж) * масштаб.");
+        DrawProperty("rammerDamageMultiplier", "Модификатор урона таранящего");
+        DrawProperty("ramPushElasticity", "Упругость толчка");
+        DrawProperty("ramMaxTargetDeltaVelocityMS", "Макс. скорость толчка цели, м/с");
+        DrawProperty("ramKeepTargetAnchored", "Цель закреплена для теста", "Если включено, урон считается, но физический толчок от тарана и фугаса не применяется.");
+
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Отладка", EditorStyles.boldLabel);
+        DrawProperty("debugLogging", "Писать логи");
+        DrawProperty("drawAimRayInScene", "Показывать прицельный луч в сцене");
+        DrawProperty("drawAimRayOnlyWhenSelected", "Показывать луч только при выборе");
+        DrawProperty("aimRayHitMarkerRadius", "Радиус маркера попадания");
+        DrawProperty("aimRayArmorHitColor", "Цвет попадания в броню");
+        DrawProperty("aimRayOtherHitColor", "Цвет попадания в другой объект");
+        DrawProperty("aimRayMissColor", "Цвет промаха");
+        DrawProperty("aimRayObliqueColor", "Цвет косого луча");
+        DrawProperty("drawObliqueShotRays", "Показывать косые лучи");
+        DrawProperty("lastMessage", "Последнее сообщение");
+
+        serializedObject.ApplyModifiedProperties();
+
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Обстрел", EditorStyles.boldLabel);
 
@@ -308,6 +358,56 @@ public class DamageTestBenchEditor : Editor
         {
             DrawDamageSummary(bench.target);
         }
+    }
+
+    private void DrawScriptField()
+    {
+        SerializedProperty script = serializedObject.FindProperty("m_Script");
+        if (script == null) return;
+
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.PropertyField(script, new GUIContent("Скрипт"));
+        }
+    }
+
+    private void DrawProperty(string propertyName, string label, string tooltip = "")
+    {
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property == null) return;
+
+        EditorGUILayout.PropertyField(property, new GUIContent(label, tooltip), true);
+    }
+
+    private static void DrawShellPreset(SerializedProperty shell, string label)
+    {
+        if (shell == null) return;
+
+        shell.isExpanded = EditorGUILayout.Foldout(shell.isExpanded, label, true);
+        if (!shell.isExpanded) return;
+
+        EditorGUI.indentLevel++;
+        DrawRelative(shell, "displayNameRu", "Название");
+        DrawRelative(shell, "shellType", "Тип снаряда");
+        DrawRelative(shell, "caliberMm", "Калибр, мм");
+        DrawRelative(shell, "damagePoints", "Старый общий урон");
+        DrawRelative(shell, "hullDamageOnPenetration", "Урон корпусу при пробитии");
+        DrawRelative(shell, "armorPlateDamage", "Урон бронелисту");
+        DrawRelative(shell, "moduleDamage", "Урон модулю");
+        DrawRelative(shell, "penetrationMm", "Пробитие, мм");
+        DrawRelative(shell, "explosiveRadiusMeters", "Радиус фугаса, м");
+        DrawRelative(shell, "normalizationDegrees", "Нормализация, град");
+        DrawRelative(shell, "penetrationRollSpread", "Разброс пробития");
+        DrawRelative(shell, "projectileColor", "Цвет снаряда");
+        EditorGUI.indentLevel--;
+    }
+
+    private static void DrawRelative(SerializedProperty parent, string propertyName, string label, string tooltip = "")
+    {
+        SerializedProperty property = parent.FindPropertyRelative(propertyName);
+        if (property == null) return;
+
+        EditorGUILayout.PropertyField(property, new GUIContent(label, tooltip), true);
     }
 
     private static void RecordBenchAndTarget(DamageTestBench bench, string action)

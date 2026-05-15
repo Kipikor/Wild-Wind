@@ -5,27 +5,43 @@ using UnityEngine;
 public class ArmorZone : MonoBehaviour
 {
     [Header("Бронезона")]
+    [InspectorName("ID зоны")]
     public string zoneId = "front";
+    [InspectorName("Название")]
     public string displayNameRu = "Лобовая броня";
+    [InspectorName("Толщина брони, мм")]
     [Min(0f)] public float armorMm = 40f;
+    [InspectorName("Угол рикошета, град")]
     [Range(0f, 89f)] public float ricochetAngleDeg = 70f;
+    [InspectorName("Множитель overmatch")]
     [Tooltip("Калибр в три толщины брони отключает авторикошет, как игровой overmatch.")]
     public float overmatchCaliberMultiplier = 3f;
 
     [Header("Урон")]
+    [InspectorName("Множитель урона корпусу")]
     [Range(0f, 3f)] public float structureDamageMultiplier = 1f;
+    [InspectorName("Множитель урона модулям")]
     [Range(0f, 3f)] public float moduleDamageMultiplier = 0.65f;
+    [InspectorName("Доля поверхностного урона фугаса")]
     [Range(0f, 1f)] public float highExplosiveSurfaceDamageMultiplier = 0.35f;
+    [InspectorName("Множитель урона тарана")]
     [Range(0f, 3f)] public float ramDamageMultiplier = 1f;
+    [InspectorName("Защищённые модули")]
     public List<string> protectedModuleIds = new List<string>();
 
     [Header("Таран")]
+    [InspectorName("Получать урон от тарана")]
     public bool receiveRamDamage = true;
+    [InspectorName("Минимальная скорость тарана, м/с")]
     public float ramMinRelativeSpeedMS = 4f;
-    public float ramDamagePerKJ = 0.08f;
+    [InspectorName("Масштаб урона тарана")]
+    [Tooltip("Урон считается как sqrt(энергия удара в кДж) * этот масштаб.")]
+    public float ramDamageScale = 10f;
+    [InspectorName("Запасная масса другого объекта, кг")]
     public float fallbackOtherMassKg = 1000f;
 
     [Header("Отладка")]
+    [InspectorName("Цвет gizmo")]
     public Color gizmoColor = new Color(1f, 0.6f, 0.1f, 0.25f);
 
     public DamageableShip Owner
@@ -92,8 +108,6 @@ public class ArmorZone : MonoBehaviour
     {
         if (!receiveRamDamage) return;
         if (collision.collider.GetComponentInParent<DamageProjectile>() != null) return;
-        if (collision.relativeVelocity.magnitude < ramMinRelativeSpeedMS) return;
-
         DamageableShip owner = Owner;
         if (owner == null) return;
 
@@ -105,13 +119,17 @@ public class ArmorZone : MonoBehaviour
 
         float ownMass = owner.EstimatedMassKg;
         float reducedMass = ownMass > 0f ? ownMass * otherMass / Mathf.Max(1f, ownMass + otherMass) : otherMass;
-        float speed = collision.relativeVelocity.magnitude;
+        ContactPoint contact = collision.GetContact(0);
+        float normalSpeed = Mathf.Abs(Vector3.Dot(collision.relativeVelocity, contact.normal));
+        float speed = normalSpeed > 0.001f ? normalSpeed : collision.relativeVelocity.magnitude;
+        if (speed < ramMinRelativeSpeedMS) return;
+
         float energyKJ = 0.5f * reducedMass * speed * speed / 1000f;
 
-        ContactPoint contact = collision.GetContact(0);
         Vector3 incoming = collision.relativeVelocity.sqrMagnitude > 0.001f
             ? collision.relativeVelocity.normalized
             : -contact.normal;
+        DamageableShip otherShip = collision.collider.GetComponentInParent<DamageableShip>();
 
         DamageHitContext context = new DamageHitContext
         {
@@ -121,7 +139,11 @@ public class ArmorZone : MonoBehaviour
             damagePoints = 0f,
             penetrationMm = 0f,
             impactEnergyKJ = energyKJ,
-            impactDamagePerKJ = ramDamagePerKJ,
+            impactDamagePerKJ = ramDamageScale,
+            impactSpeedMS = speed,
+            impactSourceMassKg = otherMass,
+            impactTargetMassKg = ownMass,
+            impactSourceDamageMultiplier = otherShip != null ? otherShip.ramDamageDealtMultiplier : 1f,
             hitPoint = contact.point,
             hitNormal = contact.normal,
             incomingDirection = incoming,
@@ -152,4 +174,3 @@ public class ArmorZone : MonoBehaviour
         Gizmos.matrix = previous;
     }
 }
-
