@@ -43,6 +43,7 @@ public class PlayerProgress
     public List<InstalledModuleState> installedModules = new List<InstalledModuleState>();
     public List<LogisticsShipState> logisticsShips = new List<LogisticsShipState>();
     public List<GasHarvesterShipState> gasHarvesterShips = new List<GasHarvesterShipState>();
+    public List<MiningShipState> miningShips = new List<MiningShipState>();
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
     public DockingLocationKind currentDockKind = DockingLocationKind.Island;
@@ -61,8 +62,11 @@ public class PlayerProgress
 
     public List<ResourceStack> inventory = new List<ResourceStack>();
     public List<ResourceStack> shipCargo = new List<ResourceStack>();
+    public List<ResourceStack> shipImpactCargo = new List<ResourceStack>();
     public List<IslandProductionState> islandProductions = new List<IslandProductionState>();
     public List<GasCloudState> gasClouds = new List<GasCloudState>();
+    public List<MiningRockState> miningRocks = new List<MiningRockState>();
+    public List<MiningZoneState> miningZones = new List<MiningZoneState>();
     public CargoTransferState cargoTransfer = new CargoTransferState();
     public List<TimedProcessState> activeProcesses = new List<TimedProcessState>();
     public List<string> acceptedMissionIds = new List<string>();
@@ -89,10 +93,14 @@ public class PlayerProgress
         installedModules ??= new List<InstalledModuleState>();
         logisticsShips ??= new List<LogisticsShipState>();
         gasHarvesterShips ??= new List<GasHarvesterShipState>();
+        miningShips ??= new List<MiningShipState>();
         inventory ??= new List<ResourceStack>();
         shipCargo ??= new List<ResourceStack>();
+        shipImpactCargo ??= new List<ResourceStack>();
         islandProductions ??= new List<IslandProductionState>();
         gasClouds ??= new List<GasCloudState>();
+        miningRocks ??= new List<MiningRockState>();
+        miningZones ??= new List<MiningZoneState>();
         cargoTransfer ??= new CargoTransferState();
         activeProcesses ??= new List<TimedProcessState>();
         acceptedMissionIds ??= new List<string>();
@@ -110,6 +118,20 @@ public class PlayerProgress
 
             stack.amount = Mathf.Max(0, stack.amount);
         }
+
+        for (int i = shipImpactCargo.Count - 1; i >= 0; i--)
+        {
+            ResourceStack stack = shipImpactCargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId))
+            {
+                shipImpactCargo.RemoveAt(i);
+                continue;
+            }
+
+            stack.amount = Mathf.Max(0, stack.amount);
+        }
+
+        MigrateDeprecatedImpactCargoToShipCargo();
 
         for (int i = installedModules.Count - 1; i >= 0; i--)
         {
@@ -163,6 +185,18 @@ public class PlayerProgress
             ship.Normalize();
         }
 
+        for (int i = miningShips.Count - 1; i >= 0; i--)
+        {
+            MiningShipState ship = miningShips[i];
+            if (ship == null || string.IsNullOrWhiteSpace(ship.shipId))
+            {
+                miningShips.RemoveAt(i);
+                continue;
+            }
+
+            ship.Normalize();
+        }
+
         for (int i = activeProcesses.Count - 1; i >= 0; i--)
         {
             if (activeProcesses[i] == null)
@@ -201,6 +235,30 @@ public class PlayerProgress
             }
 
             cloud.Normalize();
+        }
+
+        for (int i = miningRocks.Count - 1; i >= 0; i--)
+        {
+            MiningRockState rock = miningRocks[i];
+            if (rock == null || string.IsNullOrWhiteSpace(rock.rockId))
+            {
+                miningRocks.RemoveAt(i);
+                continue;
+            }
+
+            rock.Normalize();
+        }
+
+        for (int i = miningZones.Count - 1; i >= 0; i--)
+        {
+            MiningZoneState zone = miningZones[i];
+            if (zone == null || string.IsNullOrWhiteSpace(zone.zoneId))
+            {
+                miningZones.RemoveAt(i);
+                continue;
+            }
+
+            zone.Normalize();
         }
     }
 
@@ -265,6 +323,7 @@ public class PlayerProgress
     {
         shipCargo ??= new List<ResourceStack>();
         shipCargo.Clear();
+        ClearShipImpactCargo();
     }
 
     public void StopCargoTransfer()
@@ -368,6 +427,27 @@ public class PlayerProgress
         return newState;
     }
 
+    public MiningShipState GetMiningShipState(string shipId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(shipId)) return null;
+        miningShips ??= new List<MiningShipState>();
+
+        for (int i = 0; i < miningShips.Count; i++)
+        {
+            MiningShipState state = miningShips[i];
+            if (state != null && state.shipId == shipId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        MiningShipState newState = new MiningShipState { shipId = shipId };
+        miningShips.Add(newState);
+        return newState;
+    }
+
     public bool PurchaseNode(string nodeId)
     {
         if (string.IsNullOrWhiteSpace(nodeId)) return false;
@@ -466,6 +546,11 @@ public class PlayerProgress
 
     public int GetShipCargoMassKg()
     {
+        return GetShipInternalCargoMassKg();
+    }
+
+    public int GetShipInternalCargoMassKg()
+    {
         int total = 0;
         shipCargo ??= new List<ResourceStack>();
         for (int i = 0; i < shipCargo.Count; i++)
@@ -476,6 +561,76 @@ public class PlayerProgress
         }
 
         return total;
+    }
+
+    public int GetShipImpactCargoAmount(string resourceId)
+    {
+        ResourceStack stack = GetShipImpactCargoStack(resourceId, false);
+        return stack != null ? stack.amount : 0;
+    }
+
+    public void AddShipImpactCargo(string resourceId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(resourceId) || amount <= 0) return;
+
+        ResourceStack stack = GetShipImpactCargoStack(resourceId, true);
+        stack.amount += amount;
+    }
+
+    public void SetShipImpactCargoAmount(string resourceId, int amount)
+    {
+        shipImpactCargo ??= new List<ResourceStack>();
+        SetStackAmount(shipImpactCargo, resourceId, amount);
+    }
+
+    public bool TrySpendShipImpactCargo(string resourceId, int amount)
+    {
+        if (amount <= 0) return true;
+
+        ResourceStack stack = GetShipImpactCargoStack(resourceId, false);
+        if (stack == null || stack.amount < amount) return false;
+
+        stack.amount -= amount;
+        if (stack.amount <= 0)
+        {
+            shipImpactCargo.Remove(stack);
+        }
+
+        return true;
+    }
+
+    public int GetShipImpactCargoMassKg()
+    {
+        int total = 0;
+        shipImpactCargo ??= new List<ResourceStack>();
+        for (int i = 0; i < shipImpactCargo.Count; i++)
+        {
+            ResourceStack stack = shipImpactCargo[i];
+            if (stack == null) continue;
+            total += Mathf.Max(0, stack.amount);
+        }
+
+        return total;
+    }
+
+    public void ClearShipImpactCargo()
+    {
+        shipImpactCargo ??= new List<ResourceStack>();
+        shipImpactCargo.Clear();
+    }
+
+    private void MigrateDeprecatedImpactCargoToShipCargo()
+    {
+        if (shipImpactCargo == null || shipImpactCargo.Count == 0) return;
+
+        for (int i = 0; i < shipImpactCargo.Count; i++)
+        {
+            ResourceStack stack = shipImpactCargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0) continue;
+            AddShipCargo(stack.resourceId, stack.amount);
+        }
+
+        shipImpactCargo.Clear();
     }
 
     public IslandProductionState GetIslandProductionState(string islandId, bool createIfMissing)
@@ -517,6 +672,48 @@ public class PlayerProgress
 
         GasCloudState newState = new GasCloudState { cloudId = cloudId };
         gasClouds.Add(newState);
+        return newState;
+    }
+
+    public MiningRockState GetMiningRockState(string rockId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(rockId)) return null;
+        miningRocks ??= new List<MiningRockState>();
+
+        for (int i = 0; i < miningRocks.Count; i++)
+        {
+            MiningRockState state = miningRocks[i];
+            if (state != null && state.rockId == rockId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        MiningRockState newState = new MiningRockState { rockId = rockId };
+        miningRocks.Add(newState);
+        return newState;
+    }
+
+    public MiningZoneState GetMiningZoneState(string zoneId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(zoneId)) return null;
+        miningZones ??= new List<MiningZoneState>();
+
+        for (int i = 0; i < miningZones.Count; i++)
+        {
+            MiningZoneState state = miningZones[i];
+            if (state != null && state.zoneId == zoneId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        MiningZoneState newState = new MiningZoneState { zoneId = zoneId };
+        miningZones.Add(newState);
         return newState;
     }
 
@@ -711,6 +908,27 @@ public class PlayerProgress
         return newStack;
     }
 
+    private ResourceStack GetShipImpactCargoStack(string resourceId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(resourceId)) return null;
+        shipImpactCargo ??= new List<ResourceStack>();
+
+        for (int i = 0; i < shipImpactCargo.Count; i++)
+        {
+            ResourceStack stack = shipImpactCargo[i];
+            if (stack != null && stack.resourceId == resourceId)
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ResourceStack newStack = new ResourceStack { resourceId = resourceId };
+        shipImpactCargo.Add(newStack);
+        return newStack;
+    }
+
     private static void SetStackAmount(List<ResourceStack> list, string resourceId, int amount)
     {
         if (string.IsNullOrWhiteSpace(resourceId)) return;
@@ -806,6 +1024,182 @@ public class GasHarvesterShipState
         harvestBufferKg = Mathf.Max(0f, harvestBufferKg);
         pendingFuelConsumptionKg = Mathf.Max(0f, pendingFuelConsumptionKg);
         pendingClaudiumConsumptionKg = Mathf.Max(0f, pendingClaudiumConsumptionKg);
+        completedTrips = Mathf.Max(0, completedTrips);
+        lastError ??= "";
+
+        for (int i = cargo.Count - 1; i >= 0; i--)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0)
+            {
+                cargo.RemoveAt(i);
+                continue;
+            }
+
+            stack.amount = Mathf.Max(0, stack.amount);
+        }
+    }
+
+    public int GetCargoAmount(string itemId)
+    {
+        ResourceStack stack = GetCargoStack(itemId, false);
+        return stack != null ? stack.amount : 0;
+    }
+
+    public int GetCargoMassKg()
+    {
+        int total = 0;
+        if (cargo == null) return total;
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null) continue;
+            total += Mathf.Max(0, stack.amount);
+        }
+
+        return total;
+    }
+
+    public void AddCargo(string itemId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0) return;
+        ResourceStack stack = GetCargoStack(itemId, true);
+        stack.amount += amount;
+    }
+
+    public bool TrySpendCargo(string itemId, int amount)
+    {
+        if (amount <= 0) return true;
+        ResourceStack stack = GetCargoStack(itemId, false);
+        if (stack == null || stack.amount < amount) return false;
+
+        stack.amount -= amount;
+        if (stack.amount <= 0)
+        {
+            cargo.Remove(stack);
+        }
+
+        return true;
+    }
+
+    private ResourceStack GetCargoStack(string itemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return null;
+        cargo ??= new List<ResourceStack>();
+
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack != null && stack.resourceId == itemId)
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ResourceStack newStack = new ResourceStack { resourceId = itemId };
+        cargo.Add(newStack);
+        return newStack;
+    }
+}
+
+[Serializable]
+public class MiningZoneState
+{
+    public string zoneId = "";
+    public long lastSpawnUtcTicks;
+    public int spawnCounter;
+    public bool initialRocksSpawned;
+
+    public void Normalize()
+    {
+        zoneId ??= "";
+        if (lastSpawnUtcTicks < 0) lastSpawnUtcTicks = 0;
+        spawnCounter = Mathf.Max(0, spawnCounter);
+    }
+}
+
+[Serializable]
+public class MiningRockState
+{
+    public string rockId = "";
+    public string zoneId = "";
+    public string oreTypeId = "";
+    public long spawnedUtcTicks;
+    public Vector3 spawnPosition;
+    public float remainingOreKg;
+    public float shedBufferKg;
+    public long nextNaturalShedUtcTicks;
+    public long lastNaturalShedUtcTicks;
+    public int lastNaturalShedAmountKg;
+    public string lastNaturalShedOreItemId = "";
+    public int shedEventCounter;
+    public bool impactedIsland;
+
+    public void Normalize()
+    {
+        rockId ??= "";
+        zoneId ??= "";
+        oreTypeId ??= "";
+        if (spawnedUtcTicks < 0) spawnedUtcTicks = 0;
+        remainingOreKg = Mathf.Max(0f, remainingOreKg);
+        shedBufferKg = Mathf.Max(0f, shedBufferKg);
+        if (nextNaturalShedUtcTicks < 0) nextNaturalShedUtcTicks = 0;
+        if (lastNaturalShedUtcTicks < 0) lastNaturalShedUtcTicks = 0;
+        lastNaturalShedAmountKg = Mathf.Max(0, lastNaturalShedAmountKg);
+        lastNaturalShedOreItemId ??= "";
+        shedEventCounter = Mathf.Max(0, shedEventCounter);
+    }
+}
+
+public enum MiningShipStatus
+{
+    Idle,
+    FlyingToRock,
+    Mining,
+    Returning,
+    Unloading,
+    WaitingForResources,
+    Error
+}
+
+[Serializable]
+public class MiningShipState
+{
+    public string shipId = "";
+    public string displayName = "";
+    public string homeIslandId = "capital";
+    public MiningShipStatus status = MiningShipStatus.Idle;
+    public string targetRockId = "";
+    public string targetOreTypeId = "";
+    public long nextEventUtcTicks;
+    public long flightStartedUtcTicks;
+    public long flightArrivesUtcTicks;
+    public long miningStartedUtcTicks;
+    public long lastObservedShedUtcTicks;
+    public Vector3 lastKnownPosition;
+    public Vector3 miningPosition;
+    public List<ResourceStack> cargo = new List<ResourceStack>();
+    public float miningBufferKg;
+    public float pendingFuelConsumptionKg;
+    public float pendingClaudiumConsumptionKg;
+    public int completedTrips;
+    public string lastError = "";
+
+    public void Normalize()
+    {
+        shipId ??= "";
+        displayName ??= "";
+        homeIslandId ??= "";
+        targetRockId ??= "";
+        targetOreTypeId ??= "";
+        cargo ??= new List<ResourceStack>();
+        miningBufferKg = Mathf.Max(0f, miningBufferKg);
+        pendingFuelConsumptionKg = Mathf.Max(0f, pendingFuelConsumptionKg);
+        pendingClaudiumConsumptionKg = Mathf.Max(0f, pendingClaudiumConsumptionKg);
+        if (miningStartedUtcTicks < 0) miningStartedUtcTicks = 0;
+        if (lastObservedShedUtcTicks < 0) lastObservedShedUtcTicks = 0;
         completedTrips = Mathf.Max(0, completedTrips);
         lastError ??= "";
 

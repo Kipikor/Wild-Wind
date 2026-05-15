@@ -18,6 +18,7 @@ public static class ShipAssemblySetupEditor
     private const string StarterClaudiumLoopPath = "Assets/Data/ShipParts/StarterClaudiumLoop.asset";
     private const string StarterCargoRackPath = "Assets/Data/ShipParts/StarterCargoRack.asset";
     private const string StarterGasHarvesterPath = "Assets/Data/ShipParts/StarterGasHarvester.asset";
+    private const string StarterMiningHoldPath = "Assets/Data/ShipParts/StarterMiningHold.asset";
 
     private const string StarterHullPrefabPath = "Assets/Data/ShipPrefabs/StarterHull.prefab";
     private const string StarterEnginePrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterEngine.prefab";
@@ -25,6 +26,7 @@ public static class ShipAssemblySetupEditor
     private const string StarterClaudiumLoopPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterClaudiumLoop.prefab";
     private const string StarterCargoRackPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterCargoRack.prefab";
     private const string StarterGasHarvesterPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterGasHarvester.prefab";
+    private const string StarterMiningHoldPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterMiningHold.prefab";
 
     [MenuItem("Wild Wind/Корабли/Собрать базовый сетап сборки")]
     public static void BuildStarterAssemblySetup()
@@ -41,6 +43,7 @@ public static class ShipAssemblySetupEditor
         ShipPartDefinitionSO claudiumLoop = CreateOrLoadPart(StarterClaudiumLoopPath);
         ShipPartDefinitionSO cargoRack = CreateOrLoadPart(StarterCargoRackPath);
         ShipPartDefinitionSO gasHarvester = CreateOrLoadPart(StarterGasHarvesterPath);
+        ShipPartDefinitionSO miningHold = CreateOrLoadPart(StarterMiningHoldPath);
 
         GameObject hullPrefab = CreateStarterHullPrefab();
         GameObject enginePrefab = CreateModulePrefab(StarterEnginePrefabPath, "Паровой двигатель I", PrimitiveType.Cube, new Vector3(1.2f, 0.8f, 1.6f));
@@ -48,6 +51,7 @@ public static class ShipAssemblySetupEditor
         GameObject claudiumLoopPrefab = CreateModulePrefab(StarterClaudiumLoopPrefabPath, "Клавдиевый контур I", PrimitiveType.Sphere, new Vector3(0.9f, 0.9f, 0.9f));
         GameObject cargoRackPrefab = CreateModulePrefab(StarterCargoRackPrefabPath, "Грузовая полка", PrimitiveType.Cube, new Vector3(1.7f, 0.25f, 1.1f));
         GameObject gasHarvesterPrefab = CreateModulePrefab(StarterGasHarvesterPrefabPath, "Харвестер облаков I", PrimitiveType.Cylinder, new Vector3(0.9f, 0.6f, 0.9f));
+        GameObject miningHoldPrefab = CreateModulePrefab(StarterMiningHoldPrefabPath, "Противоударный кузов I", PrimitiveType.Cube, new Vector3(1.8f, 0.55f, 1.25f));
 
         ConfigureStarterHull(hull, hullPrefab);
         ConfigureStarterEngine(engine, enginePrefab);
@@ -55,12 +59,13 @@ public static class ShipAssemblySetupEditor
         ConfigureStarterClaudiumLoop(claudiumLoop, claudiumLoopPrefab);
         ConfigureStarterCargoRack(cargoRack, cargoRackPrefab);
         ConfigureStarterGasHarvester(gasHarvester, gasHarvesterPrefab);
+        ConfigureStarterMiningHold(miningHold, miningHoldPrefab);
 
         ShipCatalogSO catalog = CreateOrLoadAsset<ShipCatalogSO>(CatalogPath);
-        ConfigureCatalog(catalog, hull, engine, propeller, claudiumLoop, cargoRack, gasHarvester);
+        ConfigureCatalog(catalog, hull, engine, propeller, claudiumLoop, cargoRack, gasHarvester, miningHold);
 
         TechTreeDefinitionSO techTree = CreateOrLoadAsset<TechTreeDefinitionSO>(TechTreePath);
-        ConfigureTechTree(techTree, hull, engine, propeller, claudiumLoop, cargoRack, gasHarvester);
+        ConfigureTechTree(techTree, hull, engine, propeller, claudiumLoop, cargoRack, gasHarvester, miningHold);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -289,6 +294,28 @@ public static class ShipAssemblySetupEditor
         EditorUtility.SetDirty(harvester);
     }
 
+    private static void ConfigureStarterMiningHold(ShipPartDefinitionSO hold, GameObject prefab)
+    {
+        Undo.RecordObject(hold, "Configure starter mining hold");
+        hold.partId = "starter_mining_hold";
+        hold.displayName = "Противоударный кузов I";
+        hold.description = "Стартовый модуль для сбора падающих кусков руды под нестабильными глыбами.";
+        hold.completedTechId = "";
+        hold.kind = ShipPartKind.Module;
+        hold.prefab = prefab;
+        hold.engineFuelId = "";
+        hold.slots.Clear();
+        hold.compatibleSlotTypeIds = new List<string> { "utility" };
+        hold.grantedSlots.Clear();
+        hold.statModifiers = new List<ShipStatModifier>
+        {
+            Add(ShipStatId.BaseMass, 55f),
+            Set(ShipStatId.MiningImpactHoldCapacityKg, 60f)
+        };
+
+        EditorUtility.SetDirty(hold);
+    }
+
     private static void ConfigureCatalog(ShipCatalogSO catalog, params ShipPartDefinitionSO[] parts)
     {
         Undo.RecordObject(catalog, "Настроить каталог кораблей");
@@ -306,7 +333,8 @@ public static class ShipAssemblySetupEditor
         ShipPartDefinitionSO propeller,
         ShipPartDefinitionSO claudiumLoop,
         ShipPartDefinitionSO cargoRack,
-        ShipPartDefinitionSO gasHarvester)
+        ShipPartDefinitionSO gasHarvester,
+        ShipPartDefinitionSO miningHold)
     {
         Undo.RecordObject(techTree, "Настроить базовое древо техники");
         techTree.nodes ??= new List<TechTreeNode>();
@@ -336,6 +364,7 @@ public static class ShipAssemblySetupEditor
         techTree.nodes.Add(cargoNode);
 
         techTree.nodes.Add(CreatePartNode("starter_gas_harvester_node", "Харвестер облаков I", TechTreeNodeKind.Module, gasHarvester, 1, 0, 0, true, true, 660f, -120f));
+        techTree.nodes.Add(CreatePartNode("starter_mining_hold_node", "Противоударный кузов I", TechTreeNodeKind.Module, miningHold, 1, 0, 0, true, true, 660f, -240f));
 
         EditorUtility.SetDirty(techTree);
     }

@@ -1,0 +1,6 @@
+id_mining_zone,local_name_ru,local_name_en,position_x,position_z,radius_m,ore_type_id,max_active_rocks,spawn_interval_seconds,initial_rocks,initial_age_fraction,storm_y,storm_safety_clearance_y,spawn_y,apex_y,descent_speed_ms,ascent_duration_seconds,rock_radius_m,rock_ore_kg
+capital_training_belt,Учебный пояс столицы,Capital Training Belt,0,0,650,"windshale,dawnspar,bluebrass,silverdrift",2,600,1,0.45,-100,45,-100,165,0.075,90,12,8000
+green_low_belt,Зеленый нижний пояс,Green Low Belt,-650,-250,700,"needlechalk,rainroot,emberloam,glassmire",2,900,0,0.50,-100,45,-100,190,0.027,110,20,25000
+storm_scar_belt,Грозовой шрам,Storm Scar,650,650,850,"stormbone,ashpearl,liftmarrow,thundergrit",2,1100,0,0.46,-100,55,-100,230,0.023,130,32,55000
+deep_rare_belt,Глубокий редкий пояс,Deep Rare Belt,1200,-900,1100,"duskclay,mirrorbasalt,hollowchalk,crownstone,claudreef",1,1500,0,0.55,-100,65,-100,260,0.0125,150,42,110000
+void_edge_belt,Край пустоты,Void Edge,-1300,950,1300,"blackhoneycomb,embervein,nullcrust,claudreef",1,1800,0,0.58,-100,75,-100,300,0.0093,170,50,180000

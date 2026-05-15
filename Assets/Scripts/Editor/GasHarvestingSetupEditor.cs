@@ -13,7 +13,7 @@ public static class GasHarvestingSetupEditor
     {
         MetaGameState meta = FindOrCreateMetaGameState();
         PrepareStarterGasShip(meta);
-        EditorUtility.DisplayDialog("Gas harvesting", "Starter ship prepared with a cloud harvester, fuel and claudium.", "OK");
+        Debug.Log("[Газовый харвестинг] Стартовый корабль подготовлен: установлен харвестер облаков, добавлены топливо и клавдий.");
     }
 
     [MenuItem("Wild Wind/Gas Harvesting/Prepare Gas Test Scene")]
@@ -24,7 +24,7 @@ public static class GasHarvestingSetupEditor
         PrepareStarterGasShip(meta);
         PrepareExampleGasAutopilot(meta);
         StockAllIslandTestFuel(meta);
-        EditorUtility.DisplayDialog("Gas harvesting", "Scene links, starter gas ship and example gas autopilot are ready.", "OK");
+        Debug.Log("[Газовый харвестинг] Тестовая сцена подготовлена: связи сцены, стартовый корабль и пример автопилота готовы.");
     }
 
     [MenuItem("Wild Wind/Gas Harvesting/Stock All Islands Test Fuel")]
@@ -33,7 +33,7 @@ public static class GasHarvestingSetupEditor
         MetaGameState meta = FindOrCreateMetaGameState();
         EnsureSceneLinks(meta);
         int changed = StockAllIslandTestFuel(meta);
-        EditorUtility.DisplayDialog("Gas harvesting", $"All islands stocked for tests. Added/raised {changed} kg.", "OK");
+        Debug.Log("[Газовый харвестинг] Тестовое топливо и клавдий на островах пополнены. Добавлено/поднято до минимума: " + changed + " кг.");
     }
 
     public static void PrepareStarterGasShip(MetaGameState meta)
@@ -194,7 +194,7 @@ public class GasHarvesterFleetControllerEditor : Editor
             meta.EnsureProgressInitialized();
             int changed = fleet.DebugStockAllIslandFuelAndClaudium(meta.WorldConfig, meta.progress);
             EditorUtility.SetDirty(meta);
-            Debug.Log("[GasHarvesting] Stocked all islands for tests, added/raised " + changed + " kg.", fleet);
+            Debug.Log("[Газовый харвестинг] Тестовое топливо и клавдий на островах пополнены. Добавлено/поднято до минимума: " + changed + " кг.", fleet);
         }
 
         if (Application.isPlaying)

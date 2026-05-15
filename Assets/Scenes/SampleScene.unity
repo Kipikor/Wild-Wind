@@ -151,6 +151,177 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &220230806
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 220230807}
+  - component: {fileID: 220230808}
+  m_Layer: 0
+  m_Name: "\u0412\u0441\u043F\u043E\u043C\u043E\u0433\u0430\u0442\u0435\u043B\u044C\u043D\u044B\u0439
+    \u0441\u043B\u043E\u0442"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &220230807
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 220230806}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.05, z: 1.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1309299095}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &220230808
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 220230806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d0d8c4bb6a74dcf96f65f17a2b61f0e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipSocket
+  slotId: utility_01
+  slotTypeId: utility
+  mountPoint: {fileID: 220230807}
+--- !u!1 &407971825
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 407971826}
+  - component: {fileID: 407971828}
+  - component: {fileID: 407971827}
+  m_Layer: 0
+  m_Name: "\u0412\u0438\u0437\u0443\u0430\u043B"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &407971826
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 407971825}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.9, y: 0.9, z: 0.9}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1896886965}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &407971827
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 407971825}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 9452ae1262a74094f8a68013fbcd1834, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &407971828
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 407971825}
+  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &465148287
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 465148288}
+  m_Layer: 0
+  m_Name: "\u041F\u0430\u0440\u043E\u0432\u043E\u0439 \u0434\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C
+    I"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &465148288
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 465148287}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1167213490}
+  m_Father: {fileID: 1605896588}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -288,6 +459,38 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &526168661
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 526168662}
+  m_Layer: 0
+  m_Name: "\u0412\u0438\u0437\u0443\u0430\u043B"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &526168662
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 526168661}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1157940482}
+  m_Father: {fileID: 855601457}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -404,6 +607,230 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &855601451
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 855601457}
+  - component: {fileID: 855601456}
+  - component: {fileID: 855601455}
+  - component: {fileID: 855601454}
+  - component: {fileID: 855601453}
+  - component: {fileID: 855601452}
+  m_Layer: 0
+  m_Name: "\u0421\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u043A\u043E\u0440\u043F\u0443\u0441"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &855601452
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 855601451}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42b7984f466445c5b71526ea8d1d2b50, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipCrashDetector
+  metaGameState: {fileID: 1497055332}
+  crashRelativeSpeed: 14
+  crashBelowAltitude: -10
+  crashWhenBelowAltitude: 1
+--- !u!65 &855601453
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 855601451}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2.6, y: 1.2, z: 6.8}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &855601454
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 855601451}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91ee23d7452c4e1db20b663c2edac29b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipAssemblyRuntime
+  shipPhysics: {fileID: 855601455}
+  moduleRoot: {fileID: 0}
+  clearOldModules: 1
+  spawnedModules:
+  - {fileID: 465148287}
+  - {fileID: 1747203037}
+  - {fileID: 1896886964}
+--- !u!114 &855601455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 855601451}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 39c28ffc5291a3d4db6c8d13cfb709b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipPhysics
+  baseMass: 1585
+  hullMaxTakeoffMassKg: 3000
+  cargoMassKg: 150
+  enginePowerKwAt100: 190
+  engineFuelId: wood
+  engineFuelEfficiency: 0.32
+  engineFuelEnergyKwhPerKg: 4
+  engineFuelStockKg: 100
+  propellerMaxSpeedMS: 30
+  propellerEfficiency: 0.78
+  propellerMaxThrustKgf: 220
+  claudiumResourceId: claudium
+  claudiumStock: 50
+  claudiumConsumptionPerTonSecond: 0.005
+  claudiumLiftEfficiency: 10
+  claudiumMaxLiftKg: 2600
+  claudiumLiftSmoothing: 2.5
+  claudiumCurrentLiftN: 0
+  claudiumPowerDrawWatts: 0
+  claudiumPowerDrawKw: 0
+  claudiumRequestedLiftKg: 0
+  gasHarvesterEnabled: 0
+  gasHarvesterVolumeM3PerSecond: 0
+  gasHarvesterPowerDrawKw: 0
+  gasHarvesterRadiusMeters: 0
+  gasHarvesterCycleSeconds: 5
+  gasHarvesterPowerDrawActualKw: 0
+  gasHarvesterCycleProgressSeconds: 0
+  gasHarvesterBufferKg: 0
+  gasHarvesterActiveCloudId: 
+  gasHarvesterLastMessage: 
+  miningImpactHoldCapacityKg: 60
+  miningCatchRadiusMeters: 10
+  miningManualShotRangeMeters: 180
+  miningLastMessage: 
+  gyroTurnTorque: 12000
+  gyroTurnDamping: 0.8
+  currentGyroTurnTorque: 0
+  airDensity: 1.225
+  dragCoefficient: 0.8
+  frontalArea: 8
+  sideResistance: 2
+  verticalAreaFactor: 4
+  maxStructuralVerticalSpeed: 5
+  maxAutoVerticalSpeed: 1
+  windVelocity: {x: 0, y: 0, z: 0}
+  autoStabilizeAtStart: 1
+  altitudeHold: 0
+  targetAltitude: 0
+  altStiffness: 0.2
+  altDamping: 1.2
+  altDriftTolerance: 0.15
+  cruiseControl: 0
+  targetSpeedMS: 0
+  headingHold: 0
+  targetHeading: 0
+  headingStiffness: 0.5
+  headingDamping: 0.5
+  maxAutoTurnRateDeg: 5
+  maxStructuralTurnRateDeg: 15
+  routeEnabled: 0
+  waypoints: []
+  waypointRadius: 10
+  routeArrivalSpeedMS: 1
+  routeBrakeAccelerationMS2: 2.5
+  currentWaypointIndex: 0
+  positionHold: 0
+  targetHoldPosition: {x: 0, y: 0, z: 0}
+  positionHoldRadius: 5
+  positionHoldMaxSpeedMS: 8
+  positionHoldStiffness: 0.35
+  positionHoldDamping: 0.9
+  propellerPitch: 0
+  speedStiffness: 0.8
+  speedDamping: 0.3
+  thrustInput: 0
+  turnInput: 0
+  targetTrimMass: 1585
+  liftInput: 0
+  currentGasLift: 0
+  activeLiftForce: 0
+  enginePowerLever: 0.88
+  engineEfficiencyCurrent: 0
+  engineGeneratedPowerKw: 0
+  engineFuelConsumptionKgPerSecond: 0
+  engineMinimumPowerLever: 0
+  engineHasFuel: 1
+  propellerInputPowerKw: 0
+  propellerUsefulPowerKw: 0
+  propellerCalculatedEfficiency: 0
+  propellerThrustKgf: 0
+--- !u!54 &855601456
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 855601451}
+  serializedVersion: 5
+  m_Mass: 1735
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!4 &855601457
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 855601451}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 100, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 526168662}
+  - {fileID: 1309299095}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &883150468
 GameObject:
   m_ObjectHideFlags: 0
@@ -434,7 +861,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionController
   mission: {fileID: 11400000, guid: f6d4b324fe9b4ba6aff23dc90e15163a, type: 2}
-  targetShip: {fileID: 0}
+  targetShip: {fileID: 855601455}
   metaGameState: {fileID: 1497055332}
   startPoint: {fileID: 704420549}
   destinationPoint: {fileID: 1579994936}
@@ -455,6 +882,269 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1157940481
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1157940482}
+  - component: {fileID: 1157940484}
+  - component: {fileID: 1157940483}
+  m_Layer: 0
+  m_Name: "\u041A\u043E\u0440\u043F\u0443\u0441"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1157940482
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1157940481}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 2.4, y: 0.9, z: 6.2}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 526168662}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1157940483
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1157940481}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 9452ae1262a74094f8a68013fbcd1834, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1157940484
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1157940481}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1159523980
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1159523981}
+  - component: {fileID: 1159523982}
+  m_Layer: 0
+  m_Name: "\u0412\u0438\u043D\u0442"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1159523981
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1159523980}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.1, z: -3.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1747203038}
+  m_Father: {fileID: 1309299095}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1159523982
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1159523980}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d0d8c4bb6a74dcf96f65f17a2b61f0e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipSocket
+  slotId: propeller_main
+  slotTypeId: propeller_main
+  mountPoint: {fileID: 1159523981}
+--- !u!1 &1167213489
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1167213490}
+  - component: {fileID: 1167213492}
+  - component: {fileID: 1167213491}
+  m_Layer: 0
+  m_Name: "\u0412\u0438\u0437\u0443\u0430\u043B"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1167213490
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1167213489}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1.2, y: 0.8, z: 1.6}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 465148288}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1167213491
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1167213489}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 9452ae1262a74094f8a68013fbcd1834, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1167213492
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1167213489}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1309299094
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1309299095}
+  m_Layer: 0
+  m_Name: "\u0421\u043E\u043A\u0435\u0442\u044B"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1309299095
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1309299094}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1605896588}
+  - {fileID: 1159523981}
+  - {fileID: 1824566870}
+  - {fileID: 220230807}
+  m_Father: {fileID: 855601457}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1497055331
 GameObject:
   m_ObjectHideFlags: 0
@@ -467,6 +1157,10 @@ GameObject:
   - component: {fileID: 1497055333}
   - component: {fileID: 1497055332}
   - component: {fileID: 1497055335}
+  - component: {fileID: 1497055337}
+  - component: {fileID: 1497055336}
+  - component: {fileID: 1497055339}
+  - component: {fileID: 1497055338}
   m_Layer: 0
   m_Name: "\u041C\u0435\u0442\u0430-\u0438\u0433\u0440\u0430"
   m_TagString: Untagged
@@ -491,26 +1185,713 @@ MonoBehaviour:
   shipLoader: {fileID: 1497055333}
   missionController: {fileID: 883150469}
   logisticsFleet: {fileID: 1497055335}
+  gasCloudManager: {fileID: 1497055337}
+  gasHarvesterFleet: {fileID: 1497055336}
+  miningRockManager: {fileID: 1497055339}
+  miningFleet: {fileID: 1497055338}
   startingMoney: 0
   progress:
     money: 0
-    selectedHullId: ""
-    researchedNodeIds: []
-    purchasedNodeIds: []
+    selectedHullId: starter_hull
+    researchedNodeIds:
+    - fundamentals_airship
+    - starter_hull_node
+    - starter_engine_node
+    - starter_propeller_node
+    - starter_claudium_loop_node
+    - basic_airship
+    purchasedNodeIds:
+    - starter_hull_node
+    - starter_engine_node
+    - starter_propeller_node
+    - starter_claudium_loop_node
+    - basic_airship
+    activeResearchTechnologyId: 
+    technologyResearchProgress:
+    - technologyId: basic_airship
+      completedCycles: 1
+      activeCycleStartUtcTicks: 0
+      activeCycleEndUtcTicks: 0
     shipExperience: []
-    installedModules: []
+    installedModules:
+    - slotId: engine_main
+      moduleId: starter_engine
+    - slotId: propeller_main
+      moduleId: starter_propeller
+    - slotId: claudium_loop
+      moduleId: starter_claudium_loop
+    - slotId: utility_01
+      moduleId: starter_mining_hold
+    logisticsShips:
+    - shipId: logi_01
+      displayName: Cargo Hauler 01
+      routeId: starter_food_wood_tools
+      status: 0
+      currentIslandId: Island1
+      targetIslandId: 
+      currentStopIndex: 0
+      targetStopIndex: -1
+      needsStopService: 1
+      nextEventUtcTicks: 0
+      flightStartedUtcTicks: 0
+      flightArrivesUtcTicks: 0
+      lastKnownPosition: {x: 0, y: 0, z: 0}
+      cargo: []
+      completedRouteLoops: 0
+      lastError: "\u0413\u043E\u0442\u043E\u0432 \u043A \u043C\u0430\u0440\u0448\u0440\u0443\u0442\u0443."
+    gasHarvesterShips:
+    - shipId: gas_harvester_01
+      displayName: Gas Harvester 01
+      homeIslandId: capital
+      status: 0
+      targetCloudId: 
+      nextEventUtcTicks: 0
+      flightStartedUtcTicks: 0
+      flightArrivesUtcTicks: 0
+      lastKnownPosition: {x: 0, y: 0, z: 0}
+      cargo: []
+      harvestBufferKg: 0
+      pendingFuelConsumptionKg: 0
+      pendingClaudiumConsumptionKg: 0
+      completedTrips: 0
+      lastError: Ready to harvest gas.
+    miningShips:
+    - shipId: miner_01
+      displayName: Mining Kamaz 01
+      homeIslandId: capital
+      status: 0
+      targetRockId: 
+      targetOreTypeId: 
+      nextEventUtcTicks: 0
+      flightStartedUtcTicks: 0
+      flightArrivesUtcTicks: 0
+      miningStartedUtcTicks: 0
+      lastObservedShedUtcTicks: 0
+      lastKnownPosition: {x: 0, y: 0, z: 0}
+      miningPosition: {x: 0, y: 0, z: 0}
+      cargo: []
+      miningBufferKg: 0
+      pendingFuelConsumptionKg: 0
+      pendingClaudiumConsumptionKg: 0
+      completedTrips: 0
+      lastError: 
     currentMode: 0
     currentDockKind: 0
     currentDockId: capital
     hasCurrentDockPosition: 0
     currentDockPosition: {x: 0, y: 0, z: 0}
+    hasCurrentFlightPose: 0
+    currentFlightPosition: {x: 0, y: 0, z: 0}
+    currentFlightRotation: {x: 0, y: 0, z: 0, w: 1}
     activeFlightMissionId: 
     lastSavedUtcTicks: 0
-    lastProcessUtcTicks: 0
-    nextShopRefreshUtcTicks: 0
-    shopSeed: 0
-    receivedStartingInventory: 0
-    inventory: []
+    lastProcessUtcTicks: 639143778155923240
+    nextShopRefreshUtcTicks: 639143814155923240
+    shopSeed: 1764612168
+    receivedStartingInventory: 1
+    inventory:
+    - resourceId: ore
+      amount: 4
+    shipCargo:
+    - resourceId: wood
+      amount: 100
+    - resourceId: claudium
+      amount: 50
+    shipImpactCargo: []
+    islandProductions:
+    - islandId: capital
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      - resourceId: charcoal
+        amount: 500
+      productionProgress: 0
+      consumptions: []
+    - islandId: Island1
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: water
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: tools
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: sulfur
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: mechanisms
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island2
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: food
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: tools
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: gunpowder
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: medicines
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island3
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: food
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: tools
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: water
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: medicines
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island4
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: food
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: charcoal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: gunpowder
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: cloth
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island5
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: fat
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: wood
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: metal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: mechanisms
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island6
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: tools
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: gunpowder
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: mechanisms
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: metal
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island7
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: alcohol
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: sulfur
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: fat
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: cloth
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island8
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: food
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: water
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: cloth
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: wood
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island9
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: sulfur
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: wood
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: fat
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: medicines
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island10
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: metal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: fat
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: charcoal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: medicines
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island11
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: water
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: alcohol
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: charcoal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: gunpowder
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island12
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: charcoal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: cloth
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: alcohol
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: metal
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island13
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: sulfur
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: mechanisms
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: wood
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: alcohol
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island14
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: water
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: tools
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: sulfur
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: mechanisms
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island15
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: food
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: tools
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: gunpowder
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: medicines
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island16
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: food
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: tools
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: water
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: medicines
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island17
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: food
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: charcoal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: gunpowder
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: cloth
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island18
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: fat
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: wood
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: metal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: mechanisms
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island19
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: tools
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: gunpowder
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: mechanisms
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: metal
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island20
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: alcohol
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: sulfur
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: fat
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: cloth
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island21
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: food
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: water
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: cloth
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: wood
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island22
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: sulfur
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: wood
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: fat
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: medicines
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island23
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: metal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: fat
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: charcoal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: medicines
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island24
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: water
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: alcohol
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: charcoal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: gunpowder
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island25
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: charcoal
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: cloth
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: alcohol
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: metal
+        consumptionProgress: 0
+        isSatisfied: 0
+    - islandId: Island26
+      storage:
+      - resourceId: wood
+        amount: 500
+      - resourceId: charcoal
+        amount: 500
+      - resourceId: claudium
+        amount: 250
+      productionProgress: 0
+      consumptions:
+      - itemId: sulfur
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: mechanisms
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: wood
+        consumptionProgress: 0
+        isSatisfied: 0
+      - itemId: alcohol
+        consumptionProgress: 0
+        isSatisfied: 0
+    gasClouds: []
+    miningRocks: []
+    miningZones: []
+    cargoTransfer:
+      active: 0
+      islandId: 
+      startedUtcTicks: 0
+      nextOperationUtcTicks: 0
+      secondsPerItem: 1
+      currentOperationIndex: 0
+      operations: []
     activeProcesses: []
     acceptedMissionIds: []
     completedMissionIds: []
@@ -522,6 +1903,8 @@ MonoBehaviour:
   saveFileName: wild_wind_save.json
   startingOre: 4
   startingIron: 0
+  startingFuelKg: 50
+  startingClaudiumKg: 25
   processRealTimeWhilePlaying: 1
   idleMiningIntervalSeconds: 60
   idleMiningOrePerCycle: 1
@@ -530,15 +1913,55 @@ MonoBehaviour:
   ironSmeltingIronOutput: 1
   defaultTimedMissionDurationSeconds: 300
   shopRefreshIntervalSeconds: 3600
+  worldConfigFolder: Data/Config
+  capitalIslandId: capital
+  islandProductionEnabled: 1
+  spawnConfigIslandsOnPlay: 1
+  configIslandVisualRadius: 80
+  showDockingDebugUI: 1
+  debugUiWidth: 380
+  autoInstallCrashDetector: 1
   gameTimeScale: 1
   accelerateUnityTimeScale: 1
   maxUnityTimeScale: 4
   maxAcceleratedProcessStepSeconds: 15
   processOfflineProgressOnLoad: 1
   maxOfflineCatchUpHours: 240
-  showDockingDebugUI: 1
-  debugUiWidth: 380
-  autoInstallCrashDetector: 1
+--- !u!114 &1497055333
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497055331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcb3cf2e8c934b20b324bf48b3c44f9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipLoader
+  catalog: {fileID: 11400000, guid: 67a70c9cbb9d438398b8a835864d71a1, type: 2}
+  targetShip: {fileID: 855601455}
+  spawnPoint: {fileID: 40584892}
+  spawnedParent: {fileID: 0}
+  destroySpawnedShipOnRebuild: 1
+  disableSceneShipWhenSpawning: 1
+  spawnedHullId: starter_hull
+  spawnedShipObject: {fileID: 855601451}
+--- !u!4 &1497055334
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497055331}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1497055335
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -611,7 +2034,7 @@ MonoBehaviour:
     autoInstallRequiredModules: 1
     installedModules: []
     startingCargo: []
---- !u!114 &1497055333
+--- !u!114 &1497055336
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -620,32 +2043,198 @@ MonoBehaviour:
   m_GameObject: {fileID: 1497055331}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bcb3cf2e8c934b20b324bf48b3c44f9b, type: 3}
+  m_Script: {fileID: 11500000, guid: 83024f541e6c4664a8011bc49870d9bd, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShipLoader
-  catalog: {fileID: 11400000, guid: 67a70c9cbb9d438398b8a835864d71a1, type: 2}
-  targetShip: {fileID: 0}
-  spawnPoint: {fileID: 40584892}
-  spawnedParent: {fileID: 0}
-  destroySpawnedShipOnRebuild: 1
-  disableSceneShipWhenSpawning: 1
-  spawnedHullId: ""
-  spawnedShipObject: {fileID: 0}
---- !u!4 &1497055334
-Transform:
+  m_EditorClassIdentifier: Assembly-CSharp::GasHarvesterFleetController
+  metaGameState: {fileID: 1497055332}
+  simulationEnabled: 1
+  reserveMultiplier: 1.2
+  cruiseSpeedFactor: 0.75
+  cruisePowerLever: 0.7
+  defaultClaudiumResourceId: claudium
+  unloadSecondsPerKg: 0.5
+  debugLogging: 1
+  debugStockAllIslandFuelAndClaudium: 1
+  debugMinIslandWoodKg: 500
+  debugMinIslandCharcoalKg: 500
+  debugMinIslandClaudiumKg: 250
+  ships:
+  - enabled: 1
+    shipId: gas_harvester_01
+    displayName: Gas Harvester 01
+    homeIslandId: capital
+    searchRadiusMeters: 1200
+    targetCargoKg: 35
+    hullId: starter_hull
+    claudiumResourceId: claudium
+    autoInstallRequiredModules: 1
+    installedModules:
+    - slotId: utility_01
+      moduleId: starter_gas_harvester
+    startingCargo: []
+--- !u!114 &1497055337
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1497055331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a93a8499e0dc4f638cc6b2077dcd8410, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GasCloudManager
+  metaGameState: {fileID: 1497055332}
+  spawnConfigCloudsOnPlay: 1
+  minVisualRadiusMeters: 3
+--- !u!114 &1497055338
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497055331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d6c73436e0946fd9456d4162a42fc73, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MiningFleetController
+  metaGameState: {fileID: 1497055332}
+  simulationEnabled: 1
+  reserveMultiplier: 1.2
+  cruiseSpeedFactor: 0.7
+  cruisePowerLever: 0.7
+  defaultClaudiumResourceId: claudium
+  miningCycleSeconds: 5
+  plannedMiningWorkCycles: 8
+  maxMiningWatchSeconds: 300
+  unloadSecondsPerKg: 0.5
+  miningOffsetBelowRockMeters: 24
+  debugLogging: 1
+  debugStockAllIslandFuelAndClaudium: 1
+  debugMinIslandWoodKg: 500
+  debugMinIslandCharcoalKg: 500
+  debugMinIslandClaudiumKg: 250
+  ships:
+  - enabled: 1
+    shipId: miner_01
+    displayName: Mining Kamaz 01
+    homeIslandId: capital
+    searchRadiusMeters: 1600
+    targetOreKg: 45
+    passiveCatchEfficiency: 1
+    hullId: starter_hull
+    claudiumResourceId: claudium
+    autoInstallRequiredModules: 1
+    installedModules:
+    - slotId: utility_01
+      moduleId: starter_mining_hold
+    startingCargo: []
+--- !u!114 &1497055339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1497055331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ddcf59352cb544159b530768696a2196, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MiningRockManager
+  metaGameState: {fileID: 1497055332}
+  spawnRocksOnPlay: 1
+  syncIntervalSeconds: 1
+--- !u!1 &1516577151
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1516577152}
+  - component: {fileID: 1516577154}
+  - component: {fileID: 1516577153}
+  m_Layer: 0
+  m_Name: "\u0412\u0438\u0437\u0443\u0430\u043B"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1516577152
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1516577151}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2.8, y: 0.08, z: 2.8}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 1747203038}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1516577153
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1516577151}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 9452ae1262a74094f8a68013fbcd1834, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1516577154
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1516577151}
+  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1579994935
 GameObject:
   m_ObjectHideFlags: 0
@@ -691,7 +2280,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DockingPort
   metaGameState: {fileID: 1497055332}
-  targetShip: {fileID: 0}
+  targetShip: {fileID: 855601455}
   dockId: destination_island
   displayName: "\u041E\u0441\u0442\u0440\u043E\u0432 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F"
   kind: 0
@@ -700,6 +2289,168 @@ MonoBehaviour:
   autoDockWhenInRange: 1
   requireLeaveBeforeRedocking: 1
   snapPoint: {fileID: 1579994936}
+--- !u!1 &1605896587
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1605896588}
+  - component: {fileID: 1605896589}
+  m_Layer: 0
+  m_Name: "\u0414\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1605896588
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1605896587}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.25, z: -1.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 465148288}
+  m_Father: {fileID: 1309299095}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1605896589
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1605896587}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d0d8c4bb6a74dcf96f65f17a2b61f0e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipSocket
+  slotId: engine_main
+  slotTypeId: engine_main
+  mountPoint: {fileID: 1605896588}
+--- !u!1 &1747203037
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1747203038}
+  m_Layer: 0
+  m_Name: "\u0414\u0435\u0440\u0435\u0432\u044F\u043D\u043D\u044B\u0439 \u0432\u0438\u043D\u0442
+    2.8 \u043C"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1747203038
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1747203037}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1516577152}
+  m_Father: {fileID: 1159523981}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1824566869
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1824566870}
+  - component: {fileID: 1824566871}
+  m_Layer: 0
+  m_Name: "\u041A\u043B\u0430\u0432\u0434\u0438\u0435\u0432\u044B\u0439 \u043A\u043E\u043D\u0442\u0443\u0440"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1824566870
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1824566869}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.85, z: 0.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1896886965}
+  m_Father: {fileID: 1309299095}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1824566871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1824566869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d0d8c4bb6a74dcf96f65f17a2b61f0e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipSocket
+  slotId: claudium_loop
+  slotTypeId: claudium_loop
+  mountPoint: {fileID: 1824566870}
+--- !u!1 &1896886964
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1896886965}
+  m_Layer: 0
+  m_Name: "\u041A\u043B\u0430\u0432\u0434\u0438\u0435\u0432\u044B\u0439 \u043A\u043E\u043D\u0442\u0443\u0440
+    I"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1896886965
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1896886964}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 407971826}
+  m_Father: {fileID: 1824566870}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -711,3 +2462,4 @@ SceneRoots:
   - {fileID: 704420549}
   - {fileID: 1579994936}
   - {fileID: 40584892}
+  - {fileID: 855601457}

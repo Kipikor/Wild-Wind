@@ -12,6 +12,8 @@ public class WorldConfigDatabase
     private readonly Dictionary<string, IslandProductionConfig> productionsById = new Dictionary<string, IslandProductionConfig>();
     private readonly Dictionary<string, GasCloudTypeConfig> gasCloudTypesById = new Dictionary<string, GasCloudTypeConfig>();
     private readonly Dictionary<string, GasCloudConfig> gasCloudsById = new Dictionary<string, GasCloudConfig>();
+    private readonly Dictionary<string, OreTypeConfig> oreTypesById = new Dictionary<string, OreTypeConfig>();
+    private readonly Dictionary<string, MiningZoneConfig> miningZonesById = new Dictionary<string, MiningZoneConfig>();
     private readonly Dictionary<string, TechnologyConfig> technologiesById = new Dictionary<string, TechnologyConfig>();
 
     public List<ItemConfig> items = new List<ItemConfig>();
@@ -19,6 +21,8 @@ public class WorldConfigDatabase
     public List<IslandProductionConfig> productions = new List<IslandProductionConfig>();
     public List<GasCloudTypeConfig> gasCloudTypes = new List<GasCloudTypeConfig>();
     public List<GasCloudConfig> gasClouds = new List<GasCloudConfig>();
+    public List<OreTypeConfig> oreTypes = new List<OreTypeConfig>();
+    public List<MiningZoneConfig> miningZones = new List<MiningZoneConfig>();
     public List<TechnologyConfig> technologies = new List<TechnologyConfig>();
 
     public bool isLoaded;
@@ -39,8 +43,10 @@ public class WorldConfigDatabase
             LoadItems(Path.Combine(folder, "Item.csv"));
             LoadProductions(Path.Combine(folder, "Island_production.csv"));
             LoadGasCloudTypes(Path.Combine(folder, "Gas_cloud_type.csv"));
+            LoadOreTypes(Path.Combine(folder, "Ore_type.csv"));
             LoadIslands(Path.Combine(folder, "Island.csv"));
             LoadGasClouds(Path.Combine(folder, "Gas_cloud.csv"));
+            LoadMiningZones(Path.Combine(folder, "Mining_zone.csv"));
             LoadTechnologies(Path.Combine(folder, "Technology.csv"));
             isLoaded = true;
             lastError = "";
@@ -95,6 +101,20 @@ public class WorldConfigDatabase
         return cloud;
     }
 
+    public OreTypeConfig GetOreType(string oreTypeId)
+    {
+        if (string.IsNullOrWhiteSpace(oreTypeId)) return null;
+        oreTypesById.TryGetValue(oreTypeId, out OreTypeConfig oreType);
+        return oreType;
+    }
+
+    public MiningZoneConfig GetMiningZone(string zoneId)
+    {
+        if (string.IsNullOrWhiteSpace(zoneId)) return null;
+        miningZonesById.TryGetValue(zoneId, out MiningZoneConfig zone);
+        return zone;
+    }
+
     public string GetItemNameRu(string itemId)
     {
         ItemConfig item = GetItem(itemId);
@@ -116,12 +136,16 @@ public class WorldConfigDatabase
         productions.Clear();
         gasCloudTypes.Clear();
         gasClouds.Clear();
+        oreTypes.Clear();
+        miningZones.Clear();
         technologies.Clear();
         itemsById.Clear();
         islandsById.Clear();
         productionsById.Clear();
         gasCloudTypesById.Clear();
         gasCloudsById.Clear();
+        oreTypesById.Clear();
+        miningZonesById.Clear();
         technologiesById.Clear();
         isLoaded = false;
         lastError = "";
@@ -255,6 +279,78 @@ public class WorldConfigDatabase
             if (string.IsNullOrWhiteSpace(cloud.id)) continue;
             gasClouds.Add(cloud);
             gasCloudsById[cloud.id] = cloud;
+        }
+    }
+
+    private void LoadOreTypes(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            OreTypeConfig oreType = new OreTypeConfig
+            {
+                id = Get(row, "id_ore_type"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                oreItemId = Get(row, "ore_item"),
+                baseValue = Mathf.Max(0f, ParseFloat(Get(row, "base_value"))),
+                naturalShedKgPerMinute = Mathf.Max(0f, ParseFloat(Get(row, "natural_shed_intensity"), ParseFloat(Get(row, "natural_shed_kg_per_min"), 0.5f))),
+                shotShedKg = Mathf.Max(0, ParseInt(Get(row, "shot_shed_kg"), 6)),
+                fragmentFallSpeedMS = Mathf.Max(0.1f, ParseFloat(Get(row, "fragment_fall_speed_ms"), 4f)),
+                color = ParseColor(Get(row, "color_hex"), new Color(0.55f, 0.5f, 0.45f, 1f))
+            };
+
+            List<string> mineralIds = SplitInlineList(Get(row, "composition_id_item"));
+            List<string> shares = SplitInlineList(Get(row, "composition_share"));
+            int count = Mathf.Min(mineralIds.Count, shares.Count);
+            for (int i = 0; i < count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(mineralIds[i])) continue;
+                oreType.composition.Add(new OreMineralCompositionConfig
+                {
+                    mineralItemId = mineralIds[i],
+                    share = Mathf.Max(0f, ParseFloat(shares[i]))
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(oreType.id)) continue;
+            oreTypes.Add(oreType);
+            oreTypesById[oreType.id] = oreType;
+        }
+    }
+
+    private void LoadMiningZones(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            MiningZoneConfig zone = new MiningZoneConfig
+            {
+                id = Get(row, "id_mining_zone"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                center = new Vector3(
+                    ParseFloat(Get(row, "position_x")),
+                    0f,
+                    ParseFloat(Get(row, "position_z"))),
+                radiusMeters = Mathf.Max(1f, ParseFloat(Get(row, "radius_m"), 300f)),
+                maxActiveRocks = Mathf.Max(0, ParseInt(Get(row, "max_active_rocks"), 3)),
+                spawnIntervalSeconds = Mathf.Max(1f, ParseFloat(Get(row, "spawn_interval_seconds"), 240f)),
+                initialRockCount = Mathf.Max(0, ParseInt(Get(row, "initial_rocks"), 1)),
+                initialAgeFraction = Mathf.Clamp01(ParseFloat(Get(row, "initial_age_fraction"), 0.45f)),
+                stormY = ParseFloat(Get(row, "storm_y"), -100f),
+                stormSafetyClearanceY = Mathf.Max(0f, ParseFloat(Get(row, "storm_safety_clearance_y"), 45f)),
+                spawnY = ParseFloat(Get(row, "spawn_y"), -100f),
+                apexY = ParseFloat(Get(row, "apex_y"), 170f),
+                descentSpeedMS = Mathf.Max(0.1f, ParseFloat(Get(row, "descent_speed_ms"), 0.35f)),
+                ascentDurationSeconds = Mathf.Max(1f, ParseFloat(Get(row, "ascent_duration_seconds"), 90f)),
+                rockRadiusMeters = Mathf.Max(2f, ParseFloat(Get(row, "rock_radius_m"), 24f)),
+                rockOreKg = Mathf.Max(1f, ParseFloat(Get(row, "rock_ore_kg"), 160f))
+            };
+
+            zone.oreTypeIds.AddRange(SplitInlineList(Get(row, "ore_type_id")));
+
+            if (string.IsNullOrWhiteSpace(zone.id)) continue;
+            miningZones.Add(zone);
+            miningZonesById[zone.id] = zone;
         }
     }
 
@@ -449,6 +545,58 @@ public class GasCloudConfig
     public string cloudTypeId = "";
     public Vector3 position;
     public float initialVolumeLiters;
+}
+
+public class OreTypeConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public string oreItemId = "";
+    public float baseValue;
+    public float naturalShedKgPerMinute = 2f;
+    public int shotShedKg = 6;
+    public float fragmentFallSpeedMS = 4f;
+    public Color color = new Color(0.55f, 0.5f, 0.45f, 1f);
+    public List<OreMineralCompositionConfig> composition = new List<OreMineralCompositionConfig>();
+}
+
+public class OreMineralCompositionConfig
+{
+    public string mineralItemId = "";
+    public float share;
+}
+
+public class MiningZoneConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public Vector3 center;
+    public float radiusMeters = 300f;
+    public List<string> oreTypeIds = new List<string>();
+    public int maxActiveRocks = 3;
+    public float spawnIntervalSeconds = 240f;
+    public int initialRockCount = 1;
+    public float initialAgeFraction = 0.45f;
+    public float stormY = -100f;
+    public float stormSafetyClearanceY = 45f;
+    public float spawnY = -100f;
+    public float apexY = 170f;
+    public float descentSpeedMS = 0.35f;
+    public float ascentDurationSeconds = 90f;
+    public float rockRadiusMeters = 24f;
+    public float rockOreKg = 160f;
+
+    public float DescentDurationSeconds
+    {
+        get
+        {
+            return Mathf.Max(1f, (apexY - stormY) / Mathf.Max(0.1f, descentSpeedMS));
+        }
+    }
+
+    public float LifetimeSeconds => ascentDurationSeconds + DescentDurationSeconds;
 }
 
 public class IslandProductionConfig

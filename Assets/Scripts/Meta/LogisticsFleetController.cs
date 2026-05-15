@@ -555,7 +555,7 @@ public class LogisticsFleetController : MonoBehaviour
         metrics.claudiumMaxLiftKg = stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f);
         metrics.claudiumLiftEfficiency = stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f);
         metrics.hullLimitKg = stats.Get(ShipStatId.HullMaxTakeoffMassKg, metrics.emptyMassKg);
-        metrics.engineLiftKg = metrics.enginePowerKw * 0.9f * metrics.claudiumLiftEfficiency;
+        metrics.engineLiftKg = metrics.enginePowerKw * metrics.claudiumLiftEfficiency;
         metrics.allowedTakeoffMassKg = Mathf.Min(metrics.engineLiftKg, Mathf.Min(metrics.claudiumMaxLiftKg, metrics.hullLimitKg));
         metrics.maxCargoKg = Mathf.Max(0f, metrics.allowedTakeoffMassKg - metrics.emptyMassKg);
         metrics.cruiseSpeedMS = Mathf.Max(0f, metrics.propellerMaxSpeedMS * Mathf.Clamp(cruiseSpeedFactor, 0.1f, 1f));

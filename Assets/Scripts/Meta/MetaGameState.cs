@@ -29,6 +29,10 @@ public partial class MetaGameState : MonoBehaviour
     public GasCloudManager gasCloudManager;
     [InspectorName("Gas autopilots")]
     public GasHarvesterFleetController gasHarvesterFleet;
+    [InspectorName("Mining rocks")]
+    public MiningRockManager miningRockManager;
+    [InspectorName("Mining autopilots")]
+    public MiningFleetController miningFleet;
     [InspectorName("Стартовые деньги")]
     public int startingMoney;
     [InspectorName("Прогресс игрока")]
@@ -176,8 +180,10 @@ public partial class MetaGameState : MonoBehaviour
             IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
             EnsureLogisticsFleet();
             EnsureGasSystems();
+            EnsureMiningSystems();
             logisticsFleet?.EnsureRuntimeShips(progress);
             gasHarvesterFleet?.EnsureRuntimeShips(progress);
+            miningFleet?.EnsureRuntimeShips(progress);
         }
     }
 
@@ -246,6 +252,50 @@ public partial class MetaGameState : MonoBehaviour
         if (gasHarvesterFleet != null && gasHarvesterFleet.metaGameState == null)
         {
             gasHarvesterFleet.metaGameState = this;
+        }
+    }
+
+    private void EnsureMiningSystems()
+    {
+        if (miningRockManager == null)
+        {
+            miningRockManager = GetComponent<MiningRockManager>();
+        }
+
+        if (miningRockManager == null)
+        {
+            miningRockManager = FindFirstObjectByType<MiningRockManager>();
+        }
+
+        if (miningRockManager == null && Application.isPlaying)
+        {
+            miningRockManager = gameObject.AddComponent<MiningRockManager>();
+        }
+
+        if (miningRockManager != null && miningRockManager.metaGameState == null)
+        {
+            miningRockManager.metaGameState = this;
+        }
+
+        if (miningFleet == null)
+        {
+            miningFleet = GetComponent<MiningFleetController>();
+        }
+
+        if (miningFleet == null)
+        {
+            miningFleet = FindFirstObjectByType<MiningFleetController>();
+        }
+
+        if (miningFleet == null && Application.isPlaying)
+        {
+            miningFleet = gameObject.AddComponent<MiningFleetController>();
+            miningFleet.CreateExampleSetupIfEmpty();
+        }
+
+        if (miningFleet != null && miningFleet.metaGameState == null)
+        {
+            miningFleet.metaGameState = this;
         }
     }
 
@@ -340,6 +390,8 @@ public partial class MetaGameState : MonoBehaviour
         logisticsFleet = FindFirstObjectByType<LogisticsFleetController>();
         gasCloudManager = FindFirstObjectByType<GasCloudManager>();
         gasHarvesterFleet = FindFirstObjectByType<GasHarvesterFleetController>();
+        miningRockManager = FindFirstObjectByType<MiningRockManager>();
+        miningFleet = FindFirstObjectByType<MiningFleetController>();
     }
 
     private void Awake()
@@ -360,6 +412,7 @@ public partial class MetaGameState : MonoBehaviour
 
         EnsureLogisticsFleet();
         EnsureGasSystems();
+        EnsureMiningSystems();
 
         bool loadedGame = false;
         if (loadSavedGameOnAwake)
@@ -370,6 +423,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureProgressInitialized();
         SpawnConfiguredIslands();
         gasCloudManager?.SpawnConfiguredClouds();
+        miningRockManager?.SpawnConfiguredRocks();
         if (!loadedGame || !TryAdvanceOfflineProgressFromLastSave(DateTime.UtcNow, out _))
         {
             AdvanceRealTimeProcessesSliced(DateTime.UtcNow);
@@ -384,8 +438,10 @@ public partial class MetaGameState : MonoBehaviour
     private void Start()
     {
         EnsureGasSystems();
+        EnsureMiningSystems();
         SpawnConfiguredIslands();
         gasCloudManager?.SpawnConfiguredClouds();
+        miningRockManager?.SpawnConfiguredRocks();
         ApplySelectedShip();
         ApplySessionModeToShip();
     }
@@ -422,8 +478,10 @@ public partial class MetaGameState : MonoBehaviour
         IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
         EnsureLogisticsFleet();
         EnsureGasSystems();
+        EnsureMiningSystems();
         logisticsFleet?.EnsureRuntimeShips(progress);
         gasHarvesterFleet?.EnsureRuntimeShips(progress);
+        miningFleet?.EnsureRuntimeShips(progress);
 
         if (initialized) return;
 
@@ -436,6 +494,7 @@ public partial class MetaGameState : MonoBehaviour
         IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
         logisticsFleet?.EnsureRuntimeShips(progress);
         gasHarvesterFleet?.EnsureRuntimeShips(progress);
+        miningFleet?.EnsureRuntimeShips(progress);
 
         if (progress.lastSavedUtcTicks == 0 && string.IsNullOrWhiteSpace(progress.currentDockId))
         {
@@ -1107,6 +1166,12 @@ public partial class MetaGameState : MonoBehaviour
                 completedCycles += gasHarvesterFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
             }
 
+            completedCycles += MiningWorldSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
+            if (miningFleet != null)
+            {
+                completedCycles += miningFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
+            }
+
             for (int i = progress.activeProcesses.Count - 1; i >= 0; i--)
             {
                 TimedProcessState process = progress.activeProcesses[i];
@@ -1637,7 +1702,7 @@ public partial class MetaGameState : MonoBehaviour
         int freeKg = Mathf.FloorToInt(Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg));
         if (!capacity.assemblyValid || freeKg < amount)
         {
-            reason = $"Не хватает места в трюме: нужно {amount} кг, свободно {freeKg} кг.";
+            reason = $"Не хватает грузоподъемности: нужно {amount} кг, свободно {freeKg} кг.";
             return false;
         }
 
@@ -1645,6 +1710,23 @@ public partial class MetaGameState : MonoBehaviour
         ApplyCargoMassToShip(GetActiveShip());
         ResetCargoPlan();
         return true;
+    }
+
+    public float GetRemainingShipImpactCargoCapacityKg(float impactHoldCapacityKg)
+    {
+        return GetRemainingShipCargoCapacityKg();
+    }
+
+    public bool TryAddShipImpactCargoFromRuntime(string resourceId, int amount, float impactHoldCapacityKg, out string reason)
+    {
+        return TryAddShipCargoFromRuntime(resourceId, amount, out reason);
+    }
+
+    public bool UnloadShipImpactCargoToCurrentIsland(out string reason)
+    {
+        EnsureProgressInitialized();
+        reason = "Отдельного кузова больше нет: пойманная руда лежит в общем грузе корабля и выгружается обычной разгрузкой.";
+        return false;
     }
 
     private CargoCapacityInfo CalculateCargoCapacity()
@@ -1669,7 +1751,7 @@ public partial class MetaGameState : MonoBehaviour
 
             info.assemblyValid = true;
             info.emptyMassKg = ship.baseMass;
-            info.engineLiftKg = ship.enginePowerKwAt100 * 0.9f * ship.claudiumLiftEfficiency;
+            info.engineLiftKg = CalculateEngineLiftKg(ship.enginePowerKwAt100, ship.claudiumLiftEfficiency);
             info.claudiumMaxLiftKg = ship.claudiumMaxLiftKg;
             info.hullLimitKg = ship.hullMaxTakeoffMassKg;
             return CompleteCargoCapacity(info);
@@ -1681,15 +1763,30 @@ public partial class MetaGameState : MonoBehaviour
             return info;
         }
 
-        ShipStatBlock stats = result.stats;
         ShipPhysics activeShip = GetActiveShip();
-        float hullLimitFallback = activeShip != null ? activeShip.hullMaxTakeoffMassKg : 2000f;
+        ShipStatBlock stats = result.stats;
         info.assemblyValid = true;
-        info.emptyMassKg = stats.Get(ShipStatId.BaseMass, 0f);
-        info.engineLiftKg = stats.Get(ShipStatId.EngineMaxPower, 0f) * 0.9f * stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f);
-        info.claudiumMaxLiftKg = stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f);
-        info.hullLimitKg = stats.Get(ShipStatId.HullMaxTakeoffMassKg, hullLimitFallback);
+        if (activeShip != null)
+        {
+            info.emptyMassKg = activeShip.baseMass;
+            info.engineLiftKg = CalculateEngineLiftKg(activeShip.enginePowerKwAt100, activeShip.claudiumLiftEfficiency);
+            info.claudiumMaxLiftKg = activeShip.claudiumMaxLiftKg;
+            info.hullLimitKg = activeShip.hullMaxTakeoffMassKg;
+        }
+        else
+        {
+            info.emptyMassKg = stats.Get(ShipStatId.BaseMass, 0f);
+            info.engineLiftKg = CalculateEngineLiftKg(stats.Get(ShipStatId.EngineMaxPower, 0f), stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f));
+            info.claudiumMaxLiftKg = stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f);
+            info.hullLimitKg = stats.Get(ShipStatId.HullMaxTakeoffMassKg, 2000f);
+        }
+
         return CompleteCargoCapacity(info);
+    }
+
+    private static float CalculateEngineLiftKg(float enginePowerKw, float liftKgPerKw)
+    {
+        return Mathf.Max(0f, enginePowerKw) * Mathf.Max(0f, liftKgPerKw);
     }
 
     private static CargoCapacityInfo CompleteCargoCapacity(CargoCapacityInfo info)

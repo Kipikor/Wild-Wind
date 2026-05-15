@@ -68,7 +68,7 @@ public class ShipPhysics : MonoBehaviour
     [HideInInspector] public float claudiumRequestedLiftKg;
 
     [Header("Харвестеринг")]
-    [Tooltip("Включает установленный газовый харвестер. Модуль работает циклами и кладет целые кг концентрата в трюм.")]
+    [Tooltip("Включает установленный газовый харвестер. Модуль работает циклами и кладет целые кг концентрата в общий груз корабля.")]
     public bool gasHarvesterEnabled;
     [Tooltip("Сколько кубометров облака всасывается и конденсируется в секунду.")]
     public float gasHarvesterVolumeM3PerSecond;
@@ -83,6 +83,15 @@ public class ShipPhysics : MonoBehaviour
     [HideInInspector] public float gasHarvesterBufferKg;
     [HideInInspector] public string gasHarvesterActiveCloudId = "";
     [HideInInspector] public string gasHarvesterLastMessage = "";
+
+    [Header("Майнинг")]
+    [Tooltip("Противоударный кузов ловит падающие куски. Пойманная руда складывается в общий груз корабля.")]
+    public float miningImpactHoldCapacityKg;
+    [Tooltip("Радиус сбора падающих кусков вокруг корабля.")]
+    public float miningCatchRadiusMeters = 10f;
+    [Tooltip("Дальность временной кнопки выстрела по глыбе.")]
+    public float miningManualShotRangeMeters = 180f;
+    [HideInInspector] public string miningLastMessage = "";
     
     [Header("Гироскопический поворот")]
     public float gyroTurnTorque = 12000f; // Максимальный внутренний момент поворота корпуса, Н*м
@@ -209,6 +218,73 @@ public class ShipPhysics : MonoBehaviour
     public float GetTotalMassKg()
     {
         return Mathf.Max(1f, baseMass + Mathf.Max(0f, cargoMassKg));
+    }
+
+    public bool TryCollectMiningFragment(string oreItemId, int amountKg, out string reason)
+    {
+        reason = "";
+        if (string.IsNullOrWhiteSpace(oreItemId) || amountKg <= 0)
+        {
+            return true;
+        }
+
+        if (miningImpactHoldCapacityKg <= 0f)
+        {
+            reason = "На корабле нет противоударного кузова.";
+            miningLastMessage = reason;
+            return false;
+        }
+
+        MetaGameState meta = ResolveMetaGameState();
+        if (meta == null || meta.progress == null)
+        {
+            reason = "Майнинг ждет MetaGameState.";
+            miningLastMessage = reason;
+            return false;
+        }
+
+        float freeCargoKg = meta.GetRemainingShipCargoCapacityKg();
+        if (freeCargoKg + 0.001f < amountKg)
+        {
+            reason = $"Не хватает грузоподъемности: нужно {amountKg} кг, свободно {Mathf.FloorToInt(freeCargoKg)} кг.";
+            miningLastMessage = reason;
+            StopRouteForFullMiningHold();
+            return false;
+        }
+
+        if (!meta.TryAddShipCargoFromRuntime(oreItemId, amountKg, out reason))
+        {
+            miningLastMessage = reason;
+            return false;
+        }
+
+        miningLastMessage = "Поймано в груз " + amountKg + " кг: " + oreItemId + ".";
+        return true;
+    }
+
+    private void StopRouteForFullMiningHold()
+    {
+        if (!routeEnabled) return;
+
+        routeEnabled = false;
+        routeWasEnabled = false;
+        targetSpeedMS = 0f;
+        thrustInput = 0f;
+        turnInput = 0f;
+
+        positionHold = true;
+        positionHoldWasEnabled = true;
+        targetHoldPosition = transform.position;
+
+        altitudeHold = true;
+        if (rb != null)
+        {
+            targetAltitude = rb.position.y;
+        }
+
+        cruiseControl = true;
+        headingHold = true;
+        miningLastMessage += " Маршрут остановлен, удерживаю позицию.";
     }
 
     public RouteEtaInfo GetCurrentRouteEta()
@@ -535,7 +611,7 @@ public class ShipPhysics : MonoBehaviour
 
         if (currentWaypointIndex >= waypoints.Count)
         {
-            routeEnabled = false; // Маршрут завершен
+            CompleteRouteWithPositionHold(waypoints[waypoints.Count - 1]);
             return;
         }
 
@@ -563,8 +639,7 @@ public class ShipPhysics : MonoBehaviour
             currentWaypointIndex++;
             if (currentWaypointIndex >= waypoints.Count)
             {
-                routeEnabled = false;
-                targetSpeedMS = 0f; // Остановка по завершении маршрута
+                CompleteRouteWithPositionHold(currentTarget);
                 return;
             }
             currentTarget = waypoints[currentWaypointIndex];
@@ -583,6 +658,25 @@ public class ShipPhysics : MonoBehaviour
         }
 
         ApplyRouteHorizontalControl(currentTarget);
+    }
+
+    private void CompleteRouteWithPositionHold(Vector3 holdPosition)
+    {
+        routeEnabled = false;
+        routeWasEnabled = false;
+        currentWaypointIndex = waypoints != null ? waypoints.Count : currentWaypointIndex;
+
+        altitudeHold = true;
+        cruiseControl = true;
+        headingHold = true;
+        positionHold = true;
+        positionHoldWasEnabled = true;
+
+        targetHoldPosition = holdPosition;
+        targetAltitude = holdPosition.y;
+        targetSpeedMS = 0f;
+        thrustInput = 0f;
+        turnInput = 0f;
     }
 
     private void UpdatePositionHold()
@@ -619,7 +713,7 @@ public class ShipPhysics : MonoBehaviour
         Vector3 directionToTarget = horizontalError / distance;
         float maxSpeed = Mathf.Max(0f, propellerMaxSpeedMS);
         float stopDistance = Mathf.Max(0f, distance - waypointRadius);
-        float brakeAcceleration = Mathf.Max(0.25f, routeBrakeAccelerationMS2);
+        float brakeAcceleration = EstimateRouteBrakeAcceleration();
         float desiredSpeed = Mathf.Min(maxSpeed, Mathf.Sqrt(2f * brakeAcceleration * stopDistance));
 
         Vector3 desiredGroundVelocity = directionToTarget * desiredSpeed;
@@ -633,16 +727,61 @@ public class ShipPhysics : MonoBehaviour
         targetSpeedMS = Mathf.Clamp(desiredSpeed, 0f, maxSpeed);
     }
 
+    private float EstimateRouteBrakeAcceleration()
+    {
+        float configuredAcceleration = Mathf.Max(0.25f, routeBrakeAccelerationMS2);
+        if (rb == null || propellerMaxThrustKgf <= 0f || propellerEfficiency <= 0f)
+        {
+            return configuredAcceleration;
+        }
+
+        float mass = Mathf.Max(1f, rb.mass);
+        float staticThrustN = propellerMaxThrustKgf * 9.81f;
+        float staticAcceleration = staticThrustN / mass;
+
+        float liftPowerKw = altitudeHold ? CalculateClaudiumPowerKwForLift(mass) : 0f;
+        float modulePowerKw = gasHarvesterEnabled ? Mathf.Max(0f, gasHarvesterPowerDrawKw) : 0f;
+        float residualPowerKw = Mathf.Max(0f, enginePowerKwAt100 - liftPowerKw - modulePowerKw);
+        float usefulPowerW = residualPowerKw * Mathf.Clamp01(propellerEfficiency) * 1000f;
+        float horizontalAirspeed = FlattenHorizontal(rb.linearVelocity - windVelocity).magnitude;
+        float powerLimitedThrustN = usefulPowerW > 0f ? usefulPowerW / Mathf.Max(1f, horizontalAirspeed) : 0f;
+        float estimatedThrustN = Mathf.Min(staticThrustN, powerLimitedThrustN);
+        float estimatedAcceleration = estimatedThrustN / mass;
+
+        // РљРѕСЌС„С„РёС†РёРµРЅС‚ Р·Р°РїР°СЃР° РЅСѓР¶РµРЅ, РїРѕС‚РѕРјСѓ С‡С‚Рѕ РєРѕСЂР°Р±Р»СЊ РµС‰Рµ РґРѕРІРѕСЂР°С‡РёРІР°РµС‚ РЅРѕСЃ РґР»СЏ СЂРµРІРµСЂСЃР°.
+        float safeAcceleration = Mathf.Max(0.25f, Mathf.Min(staticAcceleration, estimatedAcceleration) * 0.6f);
+        return Mathf.Min(configuredAcceleration, safeAcceleration);
+    }
+
     private void ApplyPositionHoldHorizontalControl(Vector3 target, float radius, float maxSpeed)
     {
         Vector3 horizontalError = FlattenHorizontal(target - transform.position);
         Vector3 horizontalVelocity = FlattenHorizontal(rb.linearVelocity);
-        Vector3 correctionVelocity = horizontalError * Mathf.Max(0f, positionHoldStiffness)
-            - horizontalVelocity * Mathf.Max(0f, positionHoldDamping);
+        float distance = horizontalError.magnitude;
+        float speed = horizontalVelocity.magnitude;
+        float holdRadius = Mathf.Max(0.1f, radius);
+        float maxHoldSpeed = Mathf.Max(0f, maxSpeed);
+        float brakeAcceleration = EstimateRouteBrakeAcceleration();
+        float stoppingDistance = speed * speed / Mathf.Max(0.5f, 2f * brakeAcceleration);
+        float remainingToHold = Mathf.Max(0f, distance - holdRadius);
 
-        correctionVelocity = Vector3.ClampMagnitude(correctionVelocity, Mathf.Max(0f, maxSpeed));
+        Vector3 headingVector = Vector3.zero;
+        float desiredSpeed = 0f;
 
-        Vector3 headingVector = correctionVelocity;
+        if (speed > 0.15f && (distance <= holdRadius || stoppingDistance >= remainingToHold))
+        {
+            headingVector = -horizontalVelocity;
+        }
+        else
+        {
+            Vector3 correctionVelocity = horizontalError * Mathf.Max(0f, positionHoldStiffness)
+                - horizontalVelocity * Mathf.Max(0f, positionHoldDamping);
+            float approachSpeedLimit = Mathf.Sqrt(2f * brakeAcceleration * remainingToHold);
+            correctionVelocity = Vector3.ClampMagnitude(correctionVelocity, Mathf.Min(maxHoldSpeed, approachSpeedLimit));
+            headingVector = correctionVelocity;
+            desiredSpeed = correctionVelocity.magnitude;
+        }
+
         if (headingVector.sqrMagnitude < 0.04f)
         {
             if (horizontalVelocity.sqrMagnitude > 0.04f)
@@ -664,8 +803,7 @@ public class ShipPhysics : MonoBehaviour
             targetHeading = HeadingFromVector(headingVector);
         }
 
-        float desiredSpeed = correctionVelocity.magnitude;
-        if (horizontalError.magnitude <= Mathf.Max(0.1f, radius) && correctionVelocity.sqrMagnitude < 0.25f)
+        if (distance <= holdRadius && speed < 0.35f)
         {
             desiredSpeed = 0f;
         }
@@ -921,7 +1059,7 @@ public class ShipPhysics : MonoBehaviour
         if (meta.GetRemainingShipCargoCapacityKg() < 1f)
         {
             gasHarvesterEnabled = false;
-            gasHarvesterLastMessage = "Харвестер выключен: трюм заполнен.";
+            gasHarvesterLastMessage = "Харвестер выключен: не осталось грузоподъемности.";
             ResetGasHarvesterCycle();
             return;
         }

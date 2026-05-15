@@ -198,6 +198,8 @@ public class ShipPhysicsEditor : Editor
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Автопилот и Системы", EditorStyles.boldLabel);
+        DrawMiningPanel(ship);
+
         EditorGUILayout.PropertyField(serializedObject.FindProperty("autoStabilizeAtStart"), new GUIContent("Стабилизация при старте"));
         EditorGUILayout.PropertyField(altitudeHoldProp, new GUIContent("Удержание высоты"));
         EditorGUILayout.PropertyField(cruiseControlProp, new GUIContent("Круиз-контроль (скорость)"));
@@ -387,6 +389,80 @@ public class ShipPhysicsEditor : Editor
 
         // Применяем изменения
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private void DrawMiningPanel(ShipPhysics ship)
+    {
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Майнинг", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("miningImpactHoldCapacityKg"), new GUIContent("Противоударный кузов, кг"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("miningCatchRadiusMeters"), new GUIContent("Радиус сбора кусков, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("miningManualShotRangeMeters"), new GUIContent("Дальность выстрела, м"));
+
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField("Состояние майнинга", EditorStyles.miniBoldLabel);
+
+            MetaGameState meta = Application.isPlaying ? FindFirstObjectByType<MetaGameState>() : null;
+            if (Application.isPlaying && meta != null)
+            {
+                meta.EnsureProgressInitialized();
+                EditorGUILayout.LabelField("Груз", FormatCargo(meta.progress.shipCargo));
+                EditorGUILayout.LabelField("Запас грузоподъемности", meta.GetRemainingShipCargoCapacityKg().ToString("0") + " кг");
+                DrawCargoCapacityBreakdown(ship, meta);
+            }
+            else
+            {
+                EditorGUILayout.LabelField("Груз", "доступен в Play Mode");
+            }
+
+            EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(ship.miningLastMessage) ? "Готов." : ship.miningLastMessage, EditorStyles.wordWrappedLabel);
+
+            if (Application.isPlaying)
+            {
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Выстрел"))
+                {
+                    Undo.RecordObject(ship, "Mining Shot");
+                    MiningRock.ShootNearest(ship.transform.position, ship.miningManualShotRangeMeters, out string message);
+                    ship.miningLastMessage = message;
+                    EditorUtility.SetDirty(ship);
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+        }
+    }
+
+    private static string FormatCargo(System.Collections.Generic.List<ResourceStack> cargo)
+    {
+        if (cargo == null || cargo.Count == 0) return "пусто";
+
+        string text = "";
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0) continue;
+            if (text.Length > 0) text += ", ";
+            text += stack.resourceId + "=" + stack.amount;
+        }
+
+        return text.Length > 0 ? text : "пусто";
+    }
+
+    private static void DrawCargoCapacityBreakdown(ShipPhysics ship, MetaGameState meta)
+    {
+        if (ship == null || meta == null || meta.progress == null) return;
+
+        float engineLoopLiftKg = Mathf.Max(0f, ship.enginePowerKwAt100) * Mathf.Max(0f, ship.claudiumLiftEfficiency);
+        float allowedTakeoffKg = Mathf.Min(engineLoopLiftKg, Mathf.Min(Mathf.Max(0f, ship.claudiumMaxLiftKg), Mathf.Max(0f, ship.hullMaxTakeoffMassKg)));
+        float maxCargoKg = Mathf.Max(0f, allowedTakeoffKg - Mathf.Max(0f, ship.baseMass));
+        int currentCargoKg = meta.progress.GetShipCargoMassKg();
+
+        EditorGUILayout.LabelField("Сухая масса", ship.baseMass.ToString("0") + " кг");
+        EditorGUILayout.LabelField("Грузоподъемность", currentCargoKg.ToString("0") + " / " + maxCargoKg.ToString("0") + " кг");
+        EditorGUILayout.LabelField(
+            "Лимиты",
+            $"двиг+контур {engineLoopLiftKg:0} кг, контур {ship.claudiumMaxLiftKg:0} кг, рама {ship.hullMaxTakeoffMassKg:0} кг");
     }
 
     private static void DrawRouteEtaInfo(ShipPhysics ship)

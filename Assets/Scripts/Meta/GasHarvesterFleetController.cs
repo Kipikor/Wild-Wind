@@ -691,7 +691,7 @@ public class GasHarvesterFleetController : MonoBehaviour
         metrics.harvesterPowerDrawKw = stats.Get(ShipStatId.GasHarvesterPowerDrawKw, 0f);
         metrics.harvesterRadiusMeters = stats.Get(ShipStatId.GasHarvesterRadiusMeters, 0f);
         metrics.harvesterCycleSeconds = Mathf.Max(0.1f, stats.Get(ShipStatId.GasHarvesterCycleSeconds, 5f));
-        metrics.engineLiftKg = metrics.enginePowerKw * 0.9f * metrics.claudiumLiftEfficiency;
+        metrics.engineLiftKg = metrics.enginePowerKw * metrics.claudiumLiftEfficiency;
         metrics.allowedTakeoffMassKg = Mathf.Min(metrics.engineLiftKg, Mathf.Min(metrics.claudiumMaxLiftKg, metrics.hullLimitKg));
         metrics.maxCargoKg = Mathf.Max(0f, metrics.allowedTakeoffMassKg - metrics.emptyMassKg);
         metrics.cruiseSpeedMS = Mathf.Max(0f, metrics.propellerMaxSpeedMS * Mathf.Clamp(cruiseSpeedFactor, 0.1f, 1f));

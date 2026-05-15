@@ -72,6 +72,8 @@ public class MetaGameStateEditor : Editor
         LocalizedInspector.Property(serializedObject, "logisticsFleet", "Логистический флот", "Контроллер виртуальных грузовиков и маршрутов.");
         LocalizedInspector.Property(serializedObject, "gasCloudManager", "Газовые облака", "Создает и синхронизирует исчерпаемые облака из CSV-конфигов.");
         LocalizedInspector.Property(serializedObject, "gasHarvesterFleet", "Газовые автопилоты", "Виртуальные сборщики газа, привязанные к островам.");
+        LocalizedInspector.Property(serializedObject, "miningRockManager", "Майнинговые глыбы", "Создает и синхронизирует короткоживущие рудные глыбы из CSV-конфигов.");
+        LocalizedInspector.Property(serializedObject, "miningFleet", "Майнинговые автопилоты", "Виртуальные корабли с противоударными кузовами для сбора руды.");
         LocalizedInspector.Property(serializedObject, "startingMoney", "Стартовые деньги", "Сколько денег получает новая игра.");
         LocalizedInspector.DrawPlayerProgress(serializedObject.FindProperty("progress"), "Прогресс игрока");
 

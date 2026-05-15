@@ -219,5 +219,7 @@ public enum ShipStatId
     [InspectorName("Харвестер: радиус забора, м")]
     GasHarvesterRadiusMeters = 52,
     [InspectorName("Харвестер: длительность цикла, сек")]
-    GasHarvesterCycleSeconds = 53
+    GasHarvesterCycleSeconds = 53,
+    [InspectorName("Майнинг: вместимость противоударного кузова, кг")]
+    MiningImpactHoldCapacityKg = 60
 }
