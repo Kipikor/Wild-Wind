@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -19,6 +20,760 @@ public struct RouteEtaInfo
     public float verticalClosingSpeed;
     public float etaSeconds;
     public string status;
+}
+
+[DisallowMultipleComponent]
+[RequireComponent(typeof(Rigidbody))]
+public class Leviathan : MonoBehaviour
+{
+    private static readonly List<Leviathan> ActiveLeviathans = new List<Leviathan>();
+
+    public string leviathanId = "";
+    public string typeId = "";
+    public string zoneId = "";
+    public string displayName = "";
+    public string carcassItemId = "";
+    public Vector3 homeCenter;
+    public float zoneRadiusMeters = 300f;
+    public float minY = 40f;
+    public float maxY = 180f;
+    public float bodyLengthMeters = 28f;
+    public float bodyRadiusMeters = 5f;
+    public float massKg = 5000f;
+    public float maxHealth = 300f;
+    public float health = 300f;
+    public float maxFlightCapability = 240f;
+    public float flightCapability = 240f;
+    public float claudiumLiftKg = 5500f;
+    public float swimForceN = 9000f;
+    public float maxSpeedMS = 9f;
+    public float wanderRadiusMeters = 220f;
+    public float turnTorque = 1200f;
+    public float headArmorMm = 28f;
+    public float bodyArmorMm = 5f;
+    public float ramDamageMultiplier = 1f;
+    public int carcassMassKg = 2500;
+    public bool isCarcass;
+    public bool debugLogging;
+    public float harpoonStruggleForceMultiplier = 1.15f;
+    public float harpoonDiveBias = 0.35f;
+    public float harpoonPanicTurnIntervalSeconds = 2.4f;
+
+    private Rigidbody rb;
+    private Vector3 wanderTarget;
+    private Vector3 harpoonPanicDirection;
+    private float nextHarpoonPanicTurnTime;
+    private float nextWanderChangeTime;
+    private float nextStatusLogTime;
+    private Color visualColor = new Color(0.35f, 0.55f, 0.7f, 1f);
+    private HarpoonTether activeTether;
+
+    public Rigidbody Body
+    {
+        get
+        {
+            if (rb == null) rb = GetComponent<Rigidbody>();
+            return rb;
+        }
+    }
+
+    public float HealthFraction => maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;
+    public float FlightFraction => maxFlightCapability > 0f ? Mathf.Clamp01(flightCapability / maxFlightCapability) : 0f;
+    public bool CanBeClaimed => isCarcass || health <= 0f || flightCapability <= 0f;
+
+    private void OnEnable()
+    {
+        if (!ActiveLeviathans.Contains(this))
+        {
+            ActiveLeviathans.Add(this);
+        }
+    }
+
+    private void OnDisable()
+    {
+        ActiveLeviathans.Remove(this);
+    }
+
+    public void Initialize(string id, LeviathanTypeConfig type, LeviathanZoneConfig zone, Vector3 position)
+    {
+        leviathanId = id;
+        typeId = type != null ? type.id : "";
+        zoneId = zone != null ? zone.id : "";
+        displayName = type != null ? type.DisplayNameRu : id;
+        carcassItemId = type != null ? type.carcassItemId : "";
+        bodyLengthMeters = type != null ? type.bodyLengthMeters : bodyLengthMeters;
+        bodyRadiusMeters = type != null ? type.bodyRadiusMeters : bodyRadiusMeters;
+        massKg = type != null ? type.massKg : massKg;
+        maxHealth = type != null ? type.maxHealth : maxHealth;
+        health = maxHealth;
+        maxFlightCapability = type != null ? type.maxFlightCapability : maxFlightCapability;
+        flightCapability = maxFlightCapability;
+        claudiumLiftKg = type != null ? type.claudiumLiftKg : claudiumLiftKg;
+        swimForceN = type != null ? type.swimForceN : swimForceN;
+        maxSpeedMS = type != null ? type.maxSpeedMS : maxSpeedMS;
+        wanderRadiusMeters = type != null ? type.wanderRadiusMeters : wanderRadiusMeters;
+        turnTorque = type != null ? type.turnTorque : turnTorque;
+        headArmorMm = type != null ? type.headArmorMm : headArmorMm;
+        bodyArmorMm = type != null ? type.bodyArmorMm : bodyArmorMm;
+        ramDamageMultiplier = type != null ? type.ramDamageMultiplier : ramDamageMultiplier;
+        carcassMassKg = type != null ? type.CarcassMassKg : Mathf.Max(1, Mathf.RoundToInt(massKg * 0.5f));
+        visualColor = type != null ? type.color : visualColor;
+        homeCenter = zone != null ? zone.center : position;
+        zoneRadiusMeters = zone != null ? zone.radiusMeters : zoneRadiusMeters;
+        minY = zone != null ? zone.minY : minY;
+        maxY = zone != null ? zone.maxY : maxY;
+
+        transform.position = position;
+        name = displayName;
+
+        rb = GetComponent<Rigidbody>();
+        rb.mass = Mathf.Max(1f, massKg);
+        rb.useGravity = true;
+        rb.linearDamping = 0.4f;
+        rb.angularDamping = 1.6f;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+        CapsuleCollider capsule = GetComponent<CapsuleCollider>();
+        if (capsule != null)
+        {
+            capsule.direction = 2;
+            capsule.radius = Mathf.Max(0.5f, bodyRadiusMeters);
+            capsule.height = Mathf.Max(bodyRadiusMeters * 2f, bodyLengthMeters);
+        }
+
+        PickNewWanderTarget(true);
+        EnsureVisual();
+    }
+
+    private void Start()
+    {
+        EnsureVisual();
+    }
+
+    private void FixedUpdate()
+    {
+        if (rb == null) rb = GetComponent<Rigidbody>();
+        EnsureVisual();
+
+        if (health <= 0f || flightCapability <= 0f)
+        {
+            BecomeCarcass();
+        }
+
+        if (isCarcass)
+        {
+            ClampCarcassSpeed();
+            return;
+        }
+
+        UpdateLift();
+        if (activeTether != null && activeTether.IsAttached)
+        {
+            UpdateHarpoonedStruggle();
+        }
+        else
+        {
+            UpdateWander();
+        }
+
+        ClampAliveSpeed();
+
+        if (debugLogging && Time.time >= nextStatusLogTime)
+        {
+            nextStatusLogTime = Time.time + 5f;
+            Debug.Log("[Левиафан] " + GetStatusRu(), this);
+        }
+    }
+
+    private void EnsureVisual()
+    {
+        if (transform.Find("Визуал левиафана") != null) return;
+
+        Transform visualRoot = new GameObject("Визуал левиафана").transform;
+        visualRoot.SetParent(transform, false);
+        visualRoot.localPosition = Vector3.zero;
+        visualRoot.localRotation = Quaternion.identity;
+        visualRoot.localScale = Vector3.one;
+
+        GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        body.name = "Тело";
+        body.transform.SetParent(visualRoot, false);
+        body.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        body.transform.localScale = new Vector3(bodyRadiusMeters * 2f, bodyLengthMeters * 0.5f, bodyRadiusMeters * 2f);
+        RemoveVisualCollider(body);
+        SetVisualColor(body, visualColor);
+
+        GameObject head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        head.name = "Бронированная голова";
+        head.transform.SetParent(visualRoot, false);
+        head.transform.localPosition = Vector3.forward * bodyLengthMeters * 0.48f;
+        head.transform.localScale = Vector3.one * bodyRadiusMeters * 2.2f;
+        RemoveVisualCollider(head);
+        SetVisualColor(head, Color.Lerp(visualColor, Color.white, 0.2f));
+
+        GameObject tail = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        tail.name = "Хвост";
+        tail.transform.SetParent(visualRoot, false);
+        tail.transform.localPosition = Vector3.back * bodyLengthMeters * 0.52f;
+        tail.transform.localScale = new Vector3(bodyRadiusMeters * 1.2f, bodyRadiusMeters * 0.8f, bodyRadiusMeters * 1.8f);
+        RemoveVisualCollider(tail);
+        SetVisualColor(tail, Color.Lerp(visualColor, Color.black, 0.12f));
+
+        GameObject dorsal = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        dorsal.name = "Спинной плавник";
+        dorsal.transform.SetParent(visualRoot, false);
+        dorsal.transform.localPosition = new Vector3(0f, bodyRadiusMeters * 0.75f, -bodyLengthMeters * 0.05f);
+        dorsal.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        dorsal.transform.localScale = new Vector3(bodyRadiusMeters * 0.35f, bodyRadiusMeters * 1.2f, bodyLengthMeters * 0.32f);
+        RemoveVisualCollider(dorsal);
+        SetVisualColor(dorsal, Color.Lerp(visualColor, Color.black, 0.2f));
+    }
+
+    private static void RemoveVisualCollider(GameObject obj)
+    {
+        Collider collider = obj != null ? obj.GetComponent<Collider>() : null;
+        if (collider == null) return;
+
+        if (Application.isPlaying)
+        {
+            Destroy(collider);
+        }
+        else
+        {
+            DestroyImmediate(collider);
+        }
+    }
+
+    private static void SetVisualColor(GameObject obj, Color color)
+    {
+        Renderer renderer = obj != null ? obj.GetComponent<Renderer>() : null;
+        if (renderer == null) return;
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) shader = Shader.Find("Standard");
+        if (shader == null) shader = Shader.Find("Sprites/Default");
+
+        Material material = shader != null ? new Material(shader) : new Material(renderer.sharedMaterial);
+        material.color = color;
+        renderer.sharedMaterial = material;
+    }
+
+    public void ApplyHarpoonFatigue(float amount)
+    {
+        if (amount <= 0f || isCarcass) return;
+        flightCapability = Mathf.Max(0f, flightCapability - amount);
+        if (flightCapability <= 0f) BecomeCarcass();
+    }
+
+    public void SetHarpoonTether(HarpoonTether tether)
+    {
+        activeTether = tether;
+        nextHarpoonPanicTurnTime = 0f;
+    }
+
+    public void ClearHarpoonTether(HarpoonTether tether)
+    {
+        if (activeTether == tether)
+        {
+            activeTether = null;
+        }
+    }
+
+    public void ApplyDamage(float amount)
+    {
+        if (amount <= 0f || isCarcass) return;
+        health = Mathf.Max(0f, health - amount);
+        if (health <= 0f) BecomeCarcass();
+    }
+
+    public string GetStatusRu()
+    {
+        string state = isCarcass ? "туша" : "жив";
+        return $"{displayName}: {state}, здоровье {health:F0}/{maxHealth:F0}, полет {flightCapability:F0}/{maxFlightCapability:F0}, масса туши {carcassMassKg} кг.";
+    }
+
+    private void UpdateLift()
+    {
+        float liftKg = Mathf.Min(Mathf.Max(0f, claudiumLiftKg), massKg * 1.08f) * FlightFraction;
+        rb.AddForce(Vector3.up * liftKg * 9.81f, ForceMode.Force);
+        if (rb.position.y < minY + 10f)
+        {
+            rb.AddForce(Vector3.up * massKg * 5f, ForceMode.Force);
+        }
+    }
+
+    private void UpdateWander()
+    {
+        if (Time.time >= nextWanderChangeTime || Vector3.Distance(rb.position, wanderTarget) < bodyLengthMeters)
+        {
+            PickNewWanderTarget(false);
+        }
+
+        Vector3 toTarget = wanderTarget - rb.position;
+        Vector3 desiredDirection = toTarget.sqrMagnitude > 1f ? toTarget.normalized : transform.forward;
+        Vector3 desiredVelocity = desiredDirection * Mathf.Max(0.1f, maxSpeedMS);
+        Vector3 velocityError = desiredVelocity - rb.linearVelocity;
+        Vector3 force = Vector3.ClampMagnitude(velocityError * rb.mass * 0.35f, Mathf.Max(0f, swimForceN));
+        rb.AddForce(force, ForceMode.Force);
+
+        Vector3 flatDirection = Vector3.ProjectOnPlane(desiredDirection, Vector3.up);
+        if (flatDirection.sqrMagnitude > 0.01f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(flatDirection.normalized, Vector3.up);
+            Quaternion newRotation = Quaternion.RotateTowards(rb.rotation, targetRotation, Mathf.Max(5f, turnTorque * 0.01f) * Time.fixedDeltaTime);
+            rb.MoveRotation(newRotation);
+        }
+    }
+
+    private void PickNewWanderTarget(bool immediate)
+    {
+        float angle = Random.Range(0f, Mathf.PI * 2f);
+        float radius = Mathf.Sqrt(Random.value) * Mathf.Min(zoneRadiusMeters, wanderRadiusMeters);
+        float y = Random.Range(Mathf.Min(minY, maxY), Mathf.Max(minY, maxY));
+        wanderTarget = homeCenter + new Vector3(Mathf.Cos(angle) * radius, y - homeCenter.y, Mathf.Sin(angle) * radius);
+        nextWanderChangeTime = Time.time + (immediate ? 1f : Random.Range(12f, 28f));
+    }
+
+    private void UpdateHarpoonedStruggle()
+    {
+        if (activeTether == null || !activeTether.IsAttached)
+        {
+            activeTether = null;
+            UpdateWander();
+            return;
+        }
+
+        Vector3 awayFromShip = rb.worldCenterOfMass - activeTether.ShipPoint;
+        awayFromShip.y = 0f;
+        if (awayFromShip.sqrMagnitude < 0.1f)
+        {
+            awayFromShip = transform.forward;
+            awayFromShip.y = 0f;
+        }
+
+        if (Time.time >= nextHarpoonPanicTurnTime || harpoonPanicDirection.sqrMagnitude < 0.1f)
+        {
+            Vector2 random = Random.insideUnitCircle.normalized;
+            harpoonPanicDirection = new Vector3(random.x, 0f, random.y);
+            nextHarpoonPanicTurnTime = Time.time + Mathf.Max(0.2f, harpoonPanicTurnIntervalSeconds) * Random.Range(0.7f, 1.35f);
+        }
+
+        Vector3 dive = Vector3.down * Mathf.Clamp01(harpoonDiveBias);
+        if (rb.position.y < minY)
+        {
+            dive = Vector3.up * 0.4f;
+        }
+
+        Vector3 direction = awayFromShip.normalized + harpoonPanicDirection * 0.35f + dive;
+        if (direction.sqrMagnitude < 0.1f)
+        {
+            direction = awayFromShip.normalized;
+        }
+
+        direction.Normalize();
+
+        float panicFromTension = activeTether.maxTensionKg > 0f
+            ? Mathf.Clamp01(activeTether.CurrentTensionKg / activeTether.maxTensionKg)
+            : 0f;
+        float panic = Mathf.Lerp(0.65f, 1.35f, panicFromTension);
+        float force = Mathf.Max(0f, swimForceN) * Mathf.Max(0f, harpoonStruggleForceMultiplier) * panic;
+        rb.AddForce(direction * force, ForceMode.Force);
+
+        Vector3 flatDirection = Vector3.ProjectOnPlane(direction, Vector3.up);
+        if (flatDirection.sqrMagnitude > 0.01f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(flatDirection.normalized, Vector3.up);
+            Quaternion newRotation = Quaternion.RotateTowards(rb.rotation, targetRotation, Mathf.Max(8f, turnTorque * 0.014f) * Time.fixedDeltaTime);
+            rb.MoveRotation(newRotation);
+        }
+    }
+
+    private void ClampAliveSpeed()
+    {
+        float speedLimit = Mathf.Max(0.1f, maxSpeedMS);
+        if (rb.linearVelocity.magnitude > speedLimit)
+        {
+            rb.linearVelocity = rb.linearVelocity.normalized * speedLimit;
+        }
+    }
+
+    private void ClampCarcassSpeed()
+    {
+        float speedLimit = Mathf.Max(12f, maxSpeedMS * 1.5f);
+        if (rb.linearVelocity.magnitude > speedLimit)
+        {
+            rb.linearVelocity = rb.linearVelocity.normalized * speedLimit;
+        }
+    }
+
+    private void BecomeCarcass()
+    {
+        if (isCarcass) return;
+        isCarcass = true;
+        rb.linearDamping = 0.15f;
+        rb.angularDamping = 0.6f;
+        Debug.Log("[Левиафан] " + displayName + " потерял полетоспособность и стал добычей.", this);
+    }
+
+    public static Leviathan FindNearest(Vector3 position, float rangeMeters, bool requireAlive, string ignoredLeviathanId = "")
+    {
+        Leviathan best = null;
+        float bestSqr = Mathf.Max(0f, rangeMeters) * Mathf.Max(0f, rangeMeters);
+        for (int i = 0; i < ActiveLeviathans.Count; i++)
+        {
+            Leviathan leviathan = ActiveLeviathans[i];
+            if (leviathan == null) continue;
+            if (requireAlive && leviathan.CanBeClaimed) continue;
+            if (!string.IsNullOrWhiteSpace(ignoredLeviathanId) && leviathan.leviathanId == ignoredLeviathanId) continue;
+
+            float sqr = (leviathan.transform.position - position).sqrMagnitude;
+            if (sqr > bestSqr) continue;
+
+            best = leviathan;
+            bestSqr = sqr;
+        }
+
+        return best;
+    }
+
+    public static Leviathan FindById(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        for (int i = 0; i < ActiveLeviathans.Count; i++)
+        {
+            Leviathan leviathan = ActiveLeviathans[i];
+            if (leviathan != null && leviathan.leviathanId == id) return leviathan;
+        }
+
+        return null;
+    }
+
+    public static int CountInZone(string zoneId)
+    {
+        int count = 0;
+        for (int i = 0; i < ActiveLeviathans.Count; i++)
+        {
+            Leviathan leviathan = ActiveLeviathans[i];
+            if (leviathan != null && leviathan.zoneId == zoneId) count++;
+        }
+
+        return count;
+    }
+}
+
+[DisallowMultipleComponent]
+public class HarpoonTether : MonoBehaviour
+{
+    public ShipPhysics ownerShip;
+    public Leviathan target;
+    public float ropeLengthMeters = 80f;
+    public float maxTensionKg = 3000f;
+    public float stiffnessNPerMeter = 320f;
+    public float dampingNsPerMeter = 90f;
+    public float reelForceN;
+    public float fatiguePerSecond = 14f;
+    public float collectionRadiusMeters = 14f;
+    public float carcassWinchSpeedMetersPerSecond = 6f;
+    public float currentTensionN;
+    public string lastMessage = "";
+
+    private Rigidbody shipBody;
+    private Rigidbody targetBody;
+    private LineRenderer lineRenderer;
+    private bool attached;
+
+    public bool IsAttached => attached && ownerShip != null && target != null;
+    public float CurrentTensionKg => currentTensionN / 9.81f;
+    public Vector3 ShipPoint => shipBody != null ? shipBody.worldCenterOfMass : transform.position;
+    public Vector3 TargetPoint => targetBody != null ? targetBody.worldCenterOfMass : transform.position;
+    public float DistanceToTargetMeters
+    {
+        get
+        {
+            if (shipBody == null || targetBody == null) return 0f;
+            return Vector3.Distance(shipBody.worldCenterOfMass, targetBody.worldCenterOfMass);
+        }
+    }
+
+    public bool TargetInCollectionRadius => IsAttached && target != null && target.CanBeClaimed && DistanceToTargetMeters <= Mathf.Max(0.1f, collectionRadiusMeters);
+
+    public void Attach(ShipPhysics ship, Leviathan leviathan)
+    {
+        ownerShip = ship;
+        target = leviathan;
+        shipBody = ship != null ? ship.GetComponent<Rigidbody>() : null;
+        targetBody = leviathan != null ? leviathan.Body : null;
+        attached = shipBody != null && targetBody != null;
+
+        lineRenderer = GetComponent<LineRenderer>();
+        if (lineRenderer == null) lineRenderer = gameObject.AddComponent<LineRenderer>();
+
+        lineRenderer.positionCount = 2;
+        lineRenderer.startWidth = 0.18f;
+        lineRenderer.endWidth = 0.1f;
+        lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        lineRenderer.startColor = new Color(1f, 0.75f, 0.2f, 1f);
+        lineRenderer.endColor = new Color(1f, 0.35f, 0.05f, 1f);
+
+        if (attached)
+        {
+            float initialDistance = Vector3.Distance(shipBody.worldCenterOfMass, targetBody.worldCenterOfMass);
+            ropeLengthMeters = Mathf.Min(Mathf.Max(1f, ropeLengthMeters), Mathf.Max(1f, initialDistance * 0.92f));
+            lastMessage = "Гарпун держит " + target.displayName + ".";
+            target.SetHarpoonTether(this);
+        }
+        else
+        {
+            lastMessage = "Гарпун не смог закрепиться.";
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        if (!IsAttached)
+        {
+            Detach("Трос потерял цель.");
+            return;
+        }
+
+        Vector3 shipPoint = shipBody.worldCenterOfMass;
+        Vector3 targetPoint = targetBody.worldCenterOfMass;
+        Vector3 delta = targetPoint - shipPoint;
+        float distance = delta.magnitude;
+        if (distance < 0.01f)
+        {
+            currentTensionN = 0f;
+            UpdateLine(shipPoint, targetPoint);
+            return;
+        }
+
+        Vector3 direction = delta / distance;
+        bool winchingCarcass = target.CanBeClaimed;
+        if (winchingCarcass)
+        {
+            float targetRopeLength = Mathf.Max(0.5f, collectionRadiusMeters * 0.65f);
+            ropeLengthMeters = Mathf.MoveTowards(
+                ropeLengthMeters,
+                targetRopeLength,
+                Mathf.Max(0.1f, carcassWinchSpeedMetersPerSecond) * Time.fixedDeltaTime);
+        }
+
+        float stretch = Mathf.Max(0f, distance - Mathf.Max(0.5f, ropeLengthMeters));
+        float separatingSpeed = Vector3.Dot(targetBody.linearVelocity - shipBody.linearVelocity, direction);
+        float dampingForce = separatingSpeed > 0f ? separatingSpeed * Mathf.Max(0f, dampingNsPerMeter) : 0f;
+        currentTensionN = stretch * Mathf.Max(0f, stiffnessNPerMeter) + dampingForce;
+        if (stretch > 0.01f) currentTensionN += Mathf.Max(0f, reelForceN) * (winchingCarcass ? 1.8f : 1f);
+
+        float maxTensionN = Mathf.Max(1f, maxTensionKg) * 9.81f;
+        if (currentTensionN > maxTensionN)
+        {
+            Detach($"Гарпун оборвался: натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг.");
+            return;
+        }
+
+        if (winchingCarcass)
+        {
+            if (currentTensionN > 0f)
+            {
+                shipBody.AddForce(direction * currentTensionN, ForceMode.Force);
+                targetBody.AddForce(-direction * currentTensionN, ForceMode.Force);
+            }
+
+            lastMessage = TargetInCollectionRadius
+                ? $"Туша в радиусе сбора: {distance:F1}/{collectionRadiusMeters:F1} м. Можно грузить."
+                : $"Лебедка тянет тушу: {distance:F1}/{collectionRadiusMeters:F1} м, трос {ropeLengthMeters:F1} м, натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг.";
+            UpdateLine(shipPoint, targetPoint);
+            return;
+        }
+
+        if (currentTensionN > 0f)
+        {
+            shipBody.AddForce(direction * currentTensionN, ForceMode.Force);
+            targetBody.AddForce(-direction * currentTensionN, ForceMode.Force);
+
+            float fatigueScale = Mathf.Clamp01(currentTensionN / maxTensionN);
+            target.ApplyHarpoonFatigue(Mathf.Max(0f, fatiguePerSecond) * fatigueScale * Time.fixedDeltaTime);
+            lastMessage = $"Натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг, полет цели {target.flightCapability:F0}/{target.maxFlightCapability:F0}.";
+        }
+        else
+        {
+            lastMessage = "Трос провис, натяжения нет.";
+        }
+
+        UpdateLine(shipPoint, targetPoint);
+    }
+
+    public void Detach(string reason)
+    {
+        if (!string.IsNullOrWhiteSpace(reason)) lastMessage = reason;
+        attached = false;
+        currentTensionN = 0f;
+        if (target != null) target.ClearHarpoonTether(this);
+        if (lineRenderer != null) lineRenderer.enabled = false;
+        if (ownerShip != null) ownerShip.ClearHarpoonReference(this, lastMessage);
+        Destroy(gameObject);
+    }
+
+    private void UpdateLine(Vector3 shipPoint, Vector3 targetPoint)
+    {
+        if (lineRenderer == null) return;
+        lineRenderer.enabled = true;
+        lineRenderer.SetPosition(0, shipPoint);
+        lineRenderer.SetPosition(1, targetPoint);
+    }
+}
+
+[DisallowMultipleComponent]
+public class LeviathanManager : MonoBehaviour
+{
+    public MetaGameState metaGameState;
+    public bool spawnLeviathansOnPlay = true;
+    public float syncIntervalSeconds = 2f;
+
+    private Transform leviathanRoot;
+    private float nextSyncTime;
+
+    private MetaGameState Meta
+    {
+        get
+        {
+            if (metaGameState == null) metaGameState = FindFirstObjectByType<MetaGameState>();
+            return metaGameState;
+        }
+    }
+
+    private void Start()
+    {
+        SpawnConfiguredLeviathans();
+    }
+
+    private void Update()
+    {
+        if (!spawnLeviathansOnPlay || Time.unscaledTime < nextSyncTime) return;
+        nextSyncTime = Time.unscaledTime + Mathf.Max(0.2f, syncIntervalSeconds);
+        SpawnConfiguredLeviathans();
+    }
+
+    public void SpawnConfiguredLeviathans(bool forceRebuild = false)
+    {
+        if (!Application.isPlaying || !spawnLeviathansOnPlay) return;
+
+        MetaGameState meta = Meta;
+        if (meta == null || meta.WorldConfig == null || !meta.WorldConfig.isLoaded) return;
+
+        if (leviathanRoot != null && forceRebuild)
+        {
+            Destroy(leviathanRoot.gameObject);
+            leviathanRoot = null;
+        }
+
+        if (leviathanRoot == null)
+        {
+            GameObject root = new GameObject("Левиафаны");
+            leviathanRoot = root.transform;
+        }
+
+        for (int i = 0; i < meta.WorldConfig.leviathanZones.Count; i++)
+        {
+            LeviathanZoneConfig zone = meta.WorldConfig.leviathanZones[i];
+            if (zone == null || string.IsNullOrWhiteSpace(zone.id)) continue;
+
+            int activeInZone = Leviathan.CountInZone(zone.id);
+            int desired = Mathf.Min(Mathf.Max(0, zone.initialCount), Mathf.Max(0, zone.maxActive));
+            for (int spawnIndex = activeInZone; spawnIndex < desired; spawnIndex++)
+            {
+                LeviathanTypeConfig type = PickType(meta.WorldConfig, zone, spawnIndex);
+                if (type == null) continue;
+
+                string id = zone.id + "_" + type.id + "_" + spawnIndex.ToString("00");
+                if (Leviathan.FindById(id) != null) continue;
+
+                CreateLeviathan(id, type, zone, PickSpawnPosition(zone, spawnIndex));
+            }
+        }
+    }
+
+    private static LeviathanTypeConfig PickType(WorldConfigDatabase config, LeviathanZoneConfig zone, int index)
+    {
+        if (config == null || zone == null || zone.leviathanTypeIds == null || zone.leviathanTypeIds.Count == 0) return null;
+        for (int attempt = 0; attempt < zone.leviathanTypeIds.Count; attempt++)
+        {
+            string typeId = zone.leviathanTypeIds[(index + attempt) % zone.leviathanTypeIds.Count];
+            LeviathanTypeConfig type = config.GetLeviathanType(typeId);
+            if (type != null) return type;
+        }
+
+        return null;
+    }
+
+    private static Vector3 PickSpawnPosition(LeviathanZoneConfig zone, int index)
+    {
+        float angle = (index * 137.5f) * Mathf.Deg2Rad;
+        float radius = Mathf.Lerp(zone.radiusMeters * 0.18f, zone.radiusMeters * 0.62f, Mathf.Repeat(index * 0.37f, 1f));
+        float y = Mathf.Lerp(zone.minY, zone.maxY, 0.35f + 0.3f * Mathf.Repeat(index * 0.23f, 1f));
+        return zone.center + new Vector3(Mathf.Cos(angle) * radius, y - zone.center.y, Mathf.Sin(angle) * radius);
+    }
+
+    private void CreateLeviathan(string id, LeviathanTypeConfig type, LeviathanZoneConfig zone, Vector3 position)
+    {
+        GameObject leviathanObject = new GameObject(type.DisplayNameRu);
+        leviathanObject.transform.SetParent(leviathanRoot, false);
+        leviathanObject.transform.position = position;
+
+        Rigidbody body = leviathanObject.AddComponent<Rigidbody>();
+        body.mass = Mathf.Max(1f, type.massKg);
+        body.useGravity = true;
+
+        CapsuleCollider collider = leviathanObject.AddComponent<CapsuleCollider>();
+        collider.direction = 2;
+        collider.radius = Mathf.Max(0.5f, type.bodyRadiusMeters);
+        collider.height = Mathf.Max(type.bodyLengthMeters, type.bodyRadiusMeters * 2f);
+
+        Leviathan leviathan = leviathanObject.AddComponent<Leviathan>();
+        leviathan.Initialize(id, type, zone, position);
+    }
+
+    private static void BuildVisual(Transform parent, LeviathanTypeConfig type)
+    {
+        GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        body.name = "Тело";
+        body.transform.SetParent(parent, false);
+        body.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        body.transform.localScale = new Vector3(type.bodyRadiusMeters * 2f, type.bodyLengthMeters * 0.5f, type.bodyRadiusMeters * 2f);
+        DestroyImmediateSafe(body.GetComponent<Collider>());
+        SetColor(body, type.color);
+
+        GameObject head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        head.name = "Бронированная голова";
+        head.transform.SetParent(parent, false);
+        head.transform.localPosition = Vector3.forward * type.bodyLengthMeters * 0.48f;
+        head.transform.localScale = Vector3.one * type.bodyRadiusMeters * 2.2f;
+        DestroyImmediateSafe(head.GetComponent<Collider>());
+        SetColor(head, Color.Lerp(type.color, Color.white, 0.18f));
+
+        GameObject tail = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        tail.name = "Хвост";
+        tail.transform.SetParent(parent, false);
+        tail.transform.localPosition = Vector3.back * type.bodyLengthMeters * 0.52f;
+        tail.transform.localScale = new Vector3(type.bodyRadiusMeters * 1.2f, type.bodyRadiusMeters * 0.8f, type.bodyRadiusMeters * 1.8f);
+        DestroyImmediateSafe(tail.GetComponent<Collider>());
+        SetColor(tail, Color.Lerp(type.color, Color.black, 0.12f));
+    }
+
+    private static void SetColor(GameObject obj, Color color)
+    {
+        Renderer renderer = obj.GetComponent<Renderer>();
+        if (renderer == null) return;
+        renderer.material = new Material(Shader.Find("Standard"));
+        renderer.material.color = color;
+    }
+
+    private static void DestroyImmediateSafe(Object obj)
+    {
+        if (obj == null) return;
+        if (Application.isPlaying) Destroy(obj);
+        else DestroyImmediate(obj);
+    }
 }
 
 [RequireComponent(typeof(Rigidbody))]
@@ -92,6 +847,44 @@ public class ShipPhysics : MonoBehaviour
     [Tooltip("Дальность временной кнопки выстрела по глыбе.")]
     public float miningManualShotRangeMeters = 180f;
     [HideInInspector] public string miningLastMessage = "";
+
+    [Header("Охота на левиафанов")]
+    [Tooltip("Дальность ручного выстрела гарпуном по ближайшему левиафану.")]
+    public float harpoonRangeMeters = 280f;
+    [Tooltip("Рабочая длина троса. Если цель дальше этой длины, трос натягивается и тянет обе стороны.")]
+    public float harpoonRopeLengthMeters = 160f;
+    [Tooltip("Максимальное натяжение, которое выдерживает гарпун, в килограммах силы.")]
+    public float harpoonMaxTensionKg = 4500f;
+    [Tooltip("Жесткость троса: сколько ньютонов появляется за каждый метр растяжения.")]
+    public float harpoonStiffnessNPerMeter = 360f;
+    [Tooltip("Демпфер троса: гасит рывок, если цель и корабль расходятся.")]
+    public float harpoonDampingNsPerMeter = 110f;
+    [Tooltip("Постоянная подтяжка лебедкой, когда трос уже натянут.")]
+    public float harpoonReelForceN = 600f;
+    [Tooltip("Сколько полетоспособности левиафан теряет в секунду при полном натяжении троса.")]
+    public float harpoonFatiguePerSecond = 18f;
+    [Tooltip("Р Р°РґРёСѓСЃ, РІ РєРѕС‚РѕСЂРѕРј С‚СѓС€Сѓ РјРѕР¶РЅРѕ РїРѕРіСЂСѓР·РёС‚СЊ РІ С‚СЂСЋРј.")]
+    public float harpoonCarcassCollectionRadiusMeters = 14f;
+    [Tooltip("РЎРєРѕСЂРѕСЃС‚СЊ, СЃ РєРѕС‚РѕСЂРѕР№ Р»РµР±РµРґРєР° СѓРєРѕСЂР°С‡РёРІР°РµС‚ С‚СЂРѕСЃ РїРѕСЃР»Рµ С‚РѕРіРѕ, РєР°Рє С†РµР»СЊ СЃС‚Р°Р»Р° С‚СѓС€РµР№.")]
+    public float harpoonCarcassWinchSpeedMS = 7f;
+    [Header("Охотничий автопилот")]
+    [Tooltip("Если включено, корабль сам подходит к ближайшему левиафану, стреляет гарпуном и забирает тушу после подтяжки.")]
+    public bool leviathanHuntAutopilotEnabled;
+    [Tooltip("Радиус поиска цели для охотничьего автопилота.")]
+    public float leviathanHuntSearchRangeMeters = 900f;
+    [Tooltip("На какой дистанции автопилот считает, что можно стрелять гарпуном.")]
+    public float leviathanHuntEngageRangeMeters = 240f;
+    [Tooltip("На какой дистанции от живой цели автопилот старается остановиться перед выстрелом.")]
+    public float leviathanHuntApproachDistanceMeters = 90f;
+    [Tooltip("Минимальная высота, ниже которой охотничий автопилот не назначает точку подхода.")]
+    public float leviathanHuntMinimumAltitudeMeters = 45f;
+    [Tooltip("Пауза между автоматическими выстрелами гарпуном.")]
+    public float leviathanHuntShotCooldownSeconds = 4f;
+    [Tooltip("На сколько секунд автоохота игнорирует цель, которая только что оборвала трос.")]
+    public float leviathanHuntBrokenTargetCooldownSeconds = 25f;
+    [HideInInspector] public string leviathanHuntAutopilotMessage = "";
+    [HideInInspector] public string harpoonLastMessage = "";
+    [HideInInspector] public HarpoonTether activeHarpoon;
     
     [Header("Гироскопический поворот")]
     public float gyroTurnTorque = 12000f; // Максимальный внутренний момент поворота корпуса, Н*м
@@ -187,6 +980,12 @@ public class ShipPhysics : MonoBehaviour
     private bool routePreviousHeadingHold = false;
     private bool routePreviousPositionHold = false;
     private bool positionHoldWasEnabled = false;
+    private bool leviathanHuntAutopilotWasEnabled = false;
+    private float nextLeviathanHuntShotTime;
+    private string leviathanHuntIgnoredTargetId = "";
+    private float leviathanHuntIgnoreUntilTime;
+    private bool leviathanHuntHasTetherHoldPosition;
+    private Vector3 leviathanHuntTetherHoldPosition;
     private string gasHarvesterCycleCloudId = "";
     private MetaGameState cachedMetaGameState;
     
@@ -260,6 +1059,323 @@ public class ShipPhysics : MonoBehaviour
 
         miningLastMessage = "Поймано в груз " + amountKg + " кг: " + oreItemId + ".";
         return true;
+    }
+
+    public bool TryFireHarpoonAtNearestLeviathan(out string reason)
+    {
+        reason = "";
+        if (activeHarpoon != null && activeHarpoon.IsAttached)
+        {
+            reason = "Гарпун уже держит цель.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        Leviathan target = Leviathan.FindNearest(transform.position, Mathf.Max(0f, harpoonRangeMeters), true);
+        if (target == null)
+        {
+            reason = "В радиусе гарпуна нет живого левиафана.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        GameObject tetherObject = new GameObject("Гарпунный трос");
+        tetherObject.transform.SetParent(transform, false);
+        activeHarpoon = tetherObject.AddComponent<HarpoonTether>();
+        activeHarpoon.ropeLengthMeters = Mathf.Max(1f, harpoonRopeLengthMeters);
+        activeHarpoon.maxTensionKg = Mathf.Max(1f, harpoonMaxTensionKg);
+        activeHarpoon.stiffnessNPerMeter = Mathf.Max(0f, harpoonStiffnessNPerMeter);
+        activeHarpoon.dampingNsPerMeter = Mathf.Max(0f, harpoonDampingNsPerMeter);
+        activeHarpoon.reelForceN = Mathf.Max(0f, harpoonReelForceN);
+        activeHarpoon.fatiguePerSecond = Mathf.Max(0f, harpoonFatiguePerSecond);
+        activeHarpoon.collectionRadiusMeters = Mathf.Max(0.1f, harpoonCarcassCollectionRadiusMeters);
+        activeHarpoon.carcassWinchSpeedMetersPerSecond = Mathf.Max(0.1f, harpoonCarcassWinchSpeedMS);
+        activeHarpoon.Attach(this, target);
+
+        reason = activeHarpoon.lastMessage;
+        harpoonLastMessage = reason;
+        return activeHarpoon.IsAttached;
+    }
+
+    public void DetachHarpoon(string reason = "Гарпун отцеплен.")
+    {
+        if (activeHarpoon == null)
+        {
+            harpoonLastMessage = reason;
+            return;
+        }
+
+        HarpoonTether tether = activeHarpoon;
+        activeHarpoon = null;
+        tether.Detach(reason);
+    }
+
+    public void StopLeviathanHuntForDocking()
+    {
+        leviathanHuntAutopilotEnabled = false;
+        leviathanHuntAutopilotWasEnabled = false;
+        leviathanHuntAutopilotMessage = "Охота остановлена стыковкой.";
+
+        if (activeHarpoon != null)
+        {
+            DetachHarpoon("Гарпун отцеплен перед стыковкой.");
+        }
+
+        leviathanHuntHasTetherHoldPosition = false;
+        routeEnabled = false;
+        routeWasEnabled = false;
+        positionHold = true;
+        positionHoldWasEnabled = true;
+        targetHoldPosition = transform.position;
+        targetSpeedMS = 0f;
+        thrustInput = 0f;
+        turnInput = 0f;
+    }
+
+    public void ClearHarpoonReference(HarpoonTether tether, string reason)
+    {
+        RegisterLeviathanHuntTetherLoss(tether, reason);
+
+        if (activeHarpoon == tether)
+        {
+            activeHarpoon = null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            harpoonLastMessage = reason;
+        }
+    }
+
+    private void RegisterLeviathanHuntTetherLoss(HarpoonTether tether, string reason)
+    {
+        if (!leviathanHuntAutopilotEnabled || tether == null) return;
+
+        leviathanHuntHasTetherHoldPosition = false;
+        nextLeviathanHuntShotTime = Time.time + Mathf.Max(0.1f, leviathanHuntShotCooldownSeconds);
+
+        Leviathan target = tether.target;
+        if (target == null) return;
+
+        string text = string.IsNullOrWhiteSpace(reason) ? "" : reason.ToLowerInvariant();
+        bool wasBreak = text.Contains("обор") || text.Contains("break");
+        if (!wasBreak) return;
+
+        leviathanHuntIgnoredTargetId = target.leviathanId;
+        leviathanHuntIgnoreUntilTime = Time.time + Mathf.Max(0.1f, leviathanHuntBrokenTargetCooldownSeconds);
+        leviathanHuntAutopilotMessage = $"Трос оборвался на цели {target.displayName}. Автоохота временно ищет другую цель.";
+    }
+
+    public bool TryClaimHarpoonedLeviathan(out string reason)
+    {
+        reason = "";
+        HarpoonTether tether = activeHarpoon;
+        Leviathan target = tether != null ? tether.target : null;
+        if (target == null)
+        {
+            reason = "Гарпун не держит левиафана.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        if (!target.CanBeClaimed)
+        {
+            reason = "Левиафан еще держится в воздухе: ослабь здоровье или полетоспособность.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        if (!tether.TargetInCollectionRadius)
+        {
+            float distance = tether.DistanceToTargetMeters;
+            reason = $"Туша еще далеко: {distance:F1}/{tether.collectionRadiusMeters:F1} м. Лебедка подтягивает ее к кораблю.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(target.carcassItemId))
+        {
+            reason = "У этого вида не задан ресурс туши.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        MetaGameState meta = ResolveMetaGameState();
+        if (meta == null || meta.progress == null)
+        {
+            reason = "Охота ждет MetaGameState.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        int amountKg = Mathf.Max(1, target.carcassMassKg);
+        if (!meta.TryAddShipCargoFromRuntime(target.carcassItemId, amountKg, out reason))
+        {
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        reason = $"Туша погружена: {target.displayName}, {amountKg} кг.";
+        harpoonLastMessage = reason;
+        tether.Detach("Туша погружена.");
+        Destroy(target.gameObject);
+        return true;
+    }
+
+    public string GetHarpoonStatusRu()
+    {
+        HarpoonTether tether = activeHarpoon;
+        if (tether == null || !tether.IsAttached)
+        {
+            return string.IsNullOrWhiteSpace(harpoonLastMessage) ? "Гарпун готов." : harpoonLastMessage;
+        }
+
+        Leviathan target = tether.target;
+        string targetText = target != null ? target.GetStatusRu() : "цель потеряна";
+        return $"{targetText}\nТрос: {tether.CurrentTensionKg:F0}/{harpoonMaxTensionKg:F0} кг. {tether.lastMessage}";
+    }
+
+    private void UpdateLeviathanHuntAutopilot()
+    {
+        if (!leviathanHuntAutopilotEnabled)
+        {
+            if (leviathanHuntAutopilotWasEnabled)
+            {
+                leviathanHuntHasTetherHoldPosition = false;
+                routeEnabled = false;
+                routeWasEnabled = false;
+                positionHold = true;
+                positionHoldWasEnabled = true;
+                targetHoldPosition = transform.position;
+                targetSpeedMS = 0f;
+                thrustInput = 0f;
+                turnInput = 0f;
+                leviathanHuntAutopilotMessage = "Автоохота выключена, удерживаю текущую позицию.";
+            }
+
+            leviathanHuntAutopilotWasEnabled = false;
+            return;
+        }
+
+        leviathanHuntAutopilotWasEnabled = true;
+        if (rb == null) rb = GetComponent<Rigidbody>();
+
+        HarpoonTether tether = activeHarpoon;
+        if (tether != null && tether.IsAttached)
+        {
+            if (!leviathanHuntHasTetherHoldPosition)
+            {
+                leviathanHuntTetherHoldPosition = transform.position;
+                leviathanHuntHasTetherHoldPosition = true;
+            }
+
+            routeEnabled = false;
+            routeWasEnabled = false;
+            positionHold = true;
+            positionHoldWasEnabled = true;
+            targetHoldPosition = leviathanHuntTetherHoldPosition;
+            altitudeHold = true;
+            targetAltitude = Mathf.Max(leviathanHuntTetherHoldPosition.y, leviathanHuntMinimumAltitudeMeters);
+            cruiseControl = true;
+            headingHold = true;
+
+            Leviathan target = tether.target;
+            if (target != null && !target.CanBeClaimed)
+            {
+                Vector3 away = FlattenHorizontal(transform.position - target.transform.position);
+                if (away.sqrMagnitude > 0.04f)
+                {
+                    targetHeading = HeadingFromVector(away);
+                }
+            }
+
+            if (target != null && target.CanBeClaimed && tether.TargetInCollectionRadius)
+            {
+                TryClaimHarpoonedLeviathan(out string claimMessage);
+                leviathanHuntHasTetherHoldPosition = false;
+                leviathanHuntAutopilotMessage = claimMessage;
+                return;
+            }
+
+            float drift = Vector3.Distance(FlattenHorizontal(transform.position), FlattenHorizontal(leviathanHuntTetherHoldPosition));
+            leviathanHuntAutopilotMessage = $"{tether.lastMessage} Удерживаю точку захвата, снос {drift:F1} м.";
+            return;
+        }
+
+        leviathanHuntHasTetherHoldPosition = false;
+
+        if (!string.IsNullOrWhiteSpace(leviathanHuntIgnoredTargetId) && Time.time >= leviathanHuntIgnoreUntilTime)
+        {
+            leviathanHuntIgnoredTargetId = "";
+        }
+
+        string ignoredTarget = !string.IsNullOrWhiteSpace(leviathanHuntIgnoredTargetId) && Time.time < leviathanHuntIgnoreUntilTime
+            ? leviathanHuntIgnoredTargetId
+            : "";
+        Leviathan nearest = Leviathan.FindNearest(transform.position, Mathf.Max(0f, leviathanHuntSearchRangeMeters), true, ignoredTarget);
+        if (nearest == null)
+        {
+            if (!string.IsNullOrWhiteSpace(ignoredTarget))
+            {
+                float wait = Mathf.Max(0f, leviathanHuntIgnoreUntilTime - Time.time);
+                leviathanHuntAutopilotMessage = $"Цель только что оборвала трос. Жду {wait:F1} сек или ищу другую цель.";
+            }
+            else
+            {
+                leviathanHuntAutopilotMessage = "В радиусе поиска нет живого левиафана.";
+            }
+
+            return;
+        }
+
+        float distance = Vector3.Distance(transform.position, nearest.transform.position);
+        float engageDistance = Mathf.Min(Mathf.Max(1f, harpoonRangeMeters), Mathf.Max(1f, leviathanHuntEngageRangeMeters));
+        if (distance <= engageDistance)
+        {
+            if (Time.time < nextLeviathanHuntShotTime)
+            {
+                float wait = Mathf.Max(0f, nextLeviathanHuntShotTime - Time.time);
+                leviathanHuntAutopilotMessage = $"Гарпун перезаряжается: {wait:F1} сек. Цель {nearest.displayName} в {distance:F0} м.";
+                return;
+            }
+
+            routeEnabled = false;
+            routeWasEnabled = false;
+            positionHold = true;
+            positionHoldWasEnabled = true;
+            targetHoldPosition = transform.position;
+            altitudeHold = true;
+            targetAltitude = Mathf.Max(transform.position.y, leviathanHuntMinimumAltitudeMeters);
+            cruiseControl = true;
+            headingHold = true;
+            TryFireHarpoonAtNearestLeviathan(out string fireMessage);
+            leviathanHuntAutopilotMessage = fireMessage;
+            return;
+        }
+
+        Vector3 fromTargetToShip = FlattenHorizontal(transform.position - nearest.transform.position);
+        if (fromTargetToShip.sqrMagnitude < 0.04f)
+        {
+            fromTargetToShip = FlattenHorizontal(-transform.forward);
+            if (fromTargetToShip.sqrMagnitude < 0.04f) fromTargetToShip = Vector3.back;
+        }
+
+        float approachDistance = Mathf.Max(10f, leviathanHuntApproachDistanceMeters);
+        Vector3 approachPoint = nearest.transform.position + fromTargetToShip.normalized * approachDistance;
+        approachPoint.y = Mathf.Max(nearest.transform.position.y, leviathanHuntMinimumAltitudeMeters);
+
+        if (waypoints == null) waypoints = new System.Collections.Generic.List<Vector3>();
+        waypoints.Clear();
+        waypoints.Add(approachPoint);
+        currentWaypointIndex = 0;
+        routeEnabled = true;
+        positionHold = false;
+        altitudeHold = true;
+        cruiseControl = true;
+        headingHold = true;
+        targetAltitude = approachPoint.y;
+
+        leviathanHuntAutopilotMessage = $"Иду к цели {nearest.displayName}: {distance:F0} м, точка подхода {approachDistance:F0} м.";
     }
 
     private void StopRouteForFullMiningHold()
@@ -423,6 +1539,7 @@ public class ShipPhysics : MonoBehaviour
 
     void FixedUpdate()
     {
+        UpdateLeviathanHuntAutopilot();
         UpdateRouteModeState();
         UpdateWaypointNavigation(); // Мастер-автопилот
         UpdateRouteModeState();

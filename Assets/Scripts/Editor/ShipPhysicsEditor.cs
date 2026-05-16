@@ -25,7 +25,7 @@ public class ShipPhysicsEditor : Editor
     private SerializedProperty thrustInputProp;
     private SerializedProperty turnInputProp;
     private SerializedProperty targetTrimMassProp;
-    private bool resourceCheatsExpanded = true;
+    private bool resourceCheatsExpanded = false;
     private WorldConfigDatabase resourceCheatConfig;
     private string resourceCheatConfigFolder = "";
     private string customCheatResourceId = "";
@@ -199,6 +199,7 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Автопилот и Системы", EditorStyles.boldLabel);
         DrawMiningPanel(ship);
+        DrawLeviathanHuntingPanel(ship);
 
         EditorGUILayout.PropertyField(serializedObject.FindProperty("autoStabilizeAtStart"), new GUIContent("Стабилизация при старте"));
         EditorGUILayout.PropertyField(altitudeHoldProp, new GUIContent("Удержание высоты"));
@@ -429,6 +430,68 @@ public class ShipPhysicsEditor : Editor
                     EditorUtility.SetDirty(ship);
                 }
                 EditorGUILayout.EndHorizontal();
+            }
+        }
+    }
+
+    private void DrawLeviathanHuntingPanel(ShipPhysics ship)
+    {
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("Охота на левиафанов", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonRangeMeters"), new GUIContent("Дальность гарпуна, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonRopeLengthMeters"), new GUIContent("Длина троса, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonMaxTensionKg"), new GUIContent("Предел троса, кгс"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonStiffnessNPerMeter"), new GUIContent("Жесткость троса, Н/м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonDampingNsPerMeter"), new GUIContent("Демпфер рывка, Н·с/м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonReelForceN"), new GUIContent("Подтяжка лебедки, Н"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonFatiguePerSecond"), new GUIContent("Усталость цели в секунду"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonCarcassCollectionRadiusMeters"), new GUIContent("Радиус сбора туши, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonCarcassWinchSpeedMS"), new GUIContent("Скорость лебедки, м/с"));
+        EditorGUILayout.Space(4);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntAutopilotEnabled"), new GUIContent("Автоохота"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntSearchRangeMeters"), new GUIContent("Радиус поиска, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntEngageRangeMeters"), new GUIContent("Дистанция выстрела, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntApproachDistanceMeters"), new GUIContent("Дистанция подхода, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntMinimumAltitudeMeters"), new GUIContent("Мин. высота подхода, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntShotCooldownSeconds"), new GUIContent("Пауза выстрела, сек"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntBrokenTargetCooldownSeconds"), new GUIContent("Игнор после обрыва, сек"));
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField("Состояние гарпуна", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField(ship.GetHarpoonStatusRu(), EditorStyles.wordWrappedLabel);
+            if (!string.IsNullOrWhiteSpace(ship.leviathanHuntAutopilotMessage))
+            {
+                EditorGUILayout.LabelField("Автоохота", ship.leviathanHuntAutopilotMessage, EditorStyles.wordWrappedLabel);
+            }
+
+            if (Application.isPlaying)
+            {
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Выстрел гарпуном"))
+                {
+                    Undo.RecordObject(ship, "Fire Harpoon");
+                    ship.TryFireHarpoonAtNearestLeviathan(out _);
+                    EditorUtility.SetDirty(ship);
+                }
+
+                if (GUILayout.Button("Отцепить"))
+                {
+                    Undo.RecordObject(ship, "Detach Harpoon");
+                    ship.DetachHarpoon();
+                    EditorUtility.SetDirty(ship);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (GUILayout.Button("Забрать тушу в груз"))
+                {
+                    Undo.RecordObject(ship, "Claim Leviathan Carcass");
+                    ship.TryClaimHarpoonedLeviathan(out _);
+                    EditorUtility.SetDirty(ship);
+                }
+            }
+            else
+            {
+                EditorGUILayout.LabelField("Кнопки охоты доступны в Play Mode.", EditorStyles.miniLabel);
             }
         }
     }
@@ -695,5 +758,265 @@ public class ShipPhysicsEditor : Editor
     {
         bool isTyping = GUIUtility.keyboardControl != 0;
         return Application.isPlaying && !isTyping;
+    }
+}
+
+public static class LeviathanHuntingSetupEditor
+{
+    private const string CatalogPath = "Assets/Data/ShipCatalog.asset";
+    private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
+
+    [MenuItem("Wild Wind/Leviathans/Prepare Leviathan Test Scene")]
+    public static void PrepareLeviathanTestSceneMenu()
+    {
+        MetaGameState meta = FindOrCreateMetaGameState();
+        EnsureSceneLinks(meta);
+        PrepareStarterHunterShip(meta);
+        Debug.Log("[Левиафаны] Тестовая сцена подготовлена: MetaGameState, ShipLoader, менеджер левиафанов и стартовый охотничий корабль настроены.");
+    }
+
+    [MenuItem("Wild Wind/Leviathans/Prepare Starter Hunter Ship")]
+    public static void PrepareStarterHunterShipMenu()
+    {
+        MetaGameState meta = FindOrCreateMetaGameState();
+        EnsureSceneLinks(meta);
+        PrepareStarterHunterShip(meta);
+        Debug.Log("[Левиафаны] Стартовый корабль подготовлен для охоты: гарпун настроен, добавлены немного топлива и клавдия.");
+    }
+
+    [MenuItem("Wild Wind/Leviathans/Rebuild Leviathans From Configs")]
+    public static void RebuildLeviathansFromConfigsMenu()
+    {
+        MetaGameState meta = FindOrCreateMetaGameState();
+        EnsureSceneLinks(meta);
+        if (Application.isPlaying && meta.leviathanManager != null)
+        {
+            meta.leviathanManager.SpawnConfiguredLeviathans(true);
+            Debug.Log("[Левиафаны] Левиафаны пересозданы из CSV-конфигов.");
+        }
+        else
+        {
+            Debug.Log("[Левиафаны] Менеджер готов. Пересоздание видимых левиафанов работает в Play Mode.");
+        }
+    }
+
+    private static void PrepareStarterHunterShip(MetaGameState meta)
+    {
+        if (meta == null) return;
+
+        EnsureSceneLinks(meta);
+        Undo.RecordObject(meta, "Prepare starter leviathan hunter ship");
+
+        meta.EnsureProgressInitialized();
+        meta.progress.SelectHull("starter_hull");
+        ShipAssemblyBuilder.AutoInstallRequiredModules(meta.CurrentCatalog, meta.techTree, meta.progress, out _);
+        meta.progress.SetShipCargoAmount("wood", 18);
+        meta.progress.SetShipCargoAmount("claudium", 8);
+        meta.ApplySelectedShip();
+
+        ShipPhysics ship = meta.shipLoader != null ? meta.shipLoader.targetShip : UnityEngine.Object.FindFirstObjectByType<ShipPhysics>();
+        if (ship != null)
+        {
+            Undo.RecordObject(ship, "Prepare leviathan hunter settings");
+            ship.harpoonRangeMeters = 280f;
+            ship.harpoonRopeLengthMeters = 160f;
+            ship.harpoonMaxTensionKg = 4500f;
+            ship.harpoonStiffnessNPerMeter = 360f;
+            ship.harpoonDampingNsPerMeter = 110f;
+            ship.harpoonReelForceN = 600f;
+            ship.harpoonFatiguePerSecond = 18f;
+            ship.harpoonCarcassCollectionRadiusMeters = 14f;
+            ship.harpoonCarcassWinchSpeedMS = 7f;
+            ship.leviathanHuntSearchRangeMeters = 900f;
+            ship.leviathanHuntEngageRangeMeters = 240f;
+            ship.leviathanHuntApproachDistanceMeters = 90f;
+            ship.leviathanHuntMinimumAltitudeMeters = 45f;
+            ship.leviathanHuntShotCooldownSeconds = 4f;
+            ship.leviathanHuntBrokenTargetCooldownSeconds = 25f;
+            ship.harpoonLastMessage = "Гарпун готов к тестовой охоте.";
+            ship.RefreshRuntimeShipSettings();
+            EditorUtility.SetDirty(ship);
+        }
+
+        EditorUtility.SetDirty(meta);
+    }
+
+    private static MetaGameState FindOrCreateMetaGameState()
+    {
+        MetaGameState meta = UnityEngine.Object.FindFirstObjectByType<MetaGameState>();
+        if (meta != null) return meta;
+
+        GameObject gameObject = new GameObject("MetaGameState");
+        Undo.RegisterCreatedObjectUndo(gameObject, "Create MetaGameState");
+        return gameObject.AddComponent<MetaGameState>();
+    }
+
+    private static void EnsureSceneLinks(MetaGameState meta)
+    {
+        if (meta == null) return;
+
+        Undo.RecordObject(meta, "Prepare leviathan scene");
+        meta.worldConfigFolder = "Data/Config";
+
+        ShipCatalogSO catalog = AssetDatabase.LoadAssetAtPath<ShipCatalogSO>(CatalogPath);
+        if (catalog != null)
+        {
+            meta.catalog = catalog;
+        }
+
+        TechTreeDefinitionSO techTree = AssetDatabase.LoadAssetAtPath<TechTreeDefinitionSO>(TechTreePath);
+        if (techTree != null)
+        {
+            meta.techTree = techTree;
+        }
+
+        if (meta.shipLoader == null)
+        {
+            meta.shipLoader = UnityEngine.Object.FindFirstObjectByType<ShipLoader>();
+        }
+
+        if (meta.shipLoader == null)
+        {
+            GameObject loaderObject = new GameObject("ShipLoader");
+            Undo.RegisterCreatedObjectUndo(loaderObject, "Create ShipLoader");
+            meta.shipLoader = loaderObject.AddComponent<ShipLoader>();
+        }
+
+        meta.shipLoader.catalog = meta.catalog;
+        if (meta.shipLoader.targetShip == null)
+        {
+            meta.shipLoader.targetShip = UnityEngine.Object.FindFirstObjectByType<ShipPhysics>();
+        }
+
+        if (meta.leviathanManager == null)
+        {
+            meta.leviathanManager = UnityEngine.Object.FindFirstObjectByType<LeviathanManager>();
+        }
+
+        if (meta.leviathanManager == null)
+        {
+            meta.leviathanManager = Undo.AddComponent<LeviathanManager>(meta.gameObject);
+        }
+
+        meta.leviathanManager.metaGameState = meta;
+        meta.leviathanManager.spawnLeviathansOnPlay = true;
+        meta.spawnConfigIslandsOnPlay = true;
+
+        EditorUtility.SetDirty(meta);
+        EditorUtility.SetDirty(meta.shipLoader);
+        EditorUtility.SetDirty(meta.leviathanManager);
+    }
+}
+
+[CustomEditor(typeof(LeviathanManager))]
+public class LeviathanManagerEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        serializedObject.Update();
+
+        LocalizedInspector.Section("Связи");
+        LocalizedInspector.Property(serializedObject, "metaGameState", "Мета-игра", "MetaGameState, из которого берутся CSV-конфиги мира.");
+
+        LocalizedInspector.Section("Спавн");
+        LocalizedInspector.Property(serializedObject, "spawnLeviathansOnPlay", "Создавать в Play Mode", "Если включено, менеджер создает левиафанов из Leviathan_zone.csv и Leviathan_type.csv.");
+        LocalizedInspector.Property(serializedObject, "syncIntervalSeconds", "Интервал синхронизации, сек", "Как часто менеджер проверяет, что нужные левиафаны существуют в сцене.");
+
+        serializedObject.ApplyModifiedProperties();
+
+        LeviathanManager manager = (LeviathanManager)target;
+        if (Application.isPlaying && GUILayout.Button("Пересоздать левиафанов из конфигов"))
+        {
+            manager.SpawnConfiguredLeviathans(true);
+            Debug.Log("[Левиафаны] Левиафаны пересозданы из CSV-конфигов.", manager);
+        }
+    }
+}
+
+[CustomEditor(typeof(Leviathan))]
+public class LeviathanEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        serializedObject.Update();
+
+        LocalizedInspector.Section("Идентификация");
+        LocalizedInspector.Property(serializedObject, "leviathanId", "id левиафана", "Уникальный id конкретного существа в сцене.");
+        LocalizedInspector.Property(serializedObject, "typeId", "Тип", "id вида из Leviathan_type.csv.");
+        LocalizedInspector.Property(serializedObject, "zoneId", "Зона", "id зоны появления из Leviathan_zone.csv.");
+        LocalizedInspector.Property(serializedObject, "displayName", "Название", "Название, которое показывается в отладке и логах.");
+        LocalizedInspector.Property(serializedObject, "carcassItemId", "Ресурс туши", "id ресурса, который попадет в груз после успешной охоты.");
+
+        LocalizedInspector.Section("Зона плавания");
+        LocalizedInspector.Property(serializedObject, "homeCenter", "Центр зоны", "Точка, вокруг которой левиафан выбирает цели плавания.");
+        LocalizedInspector.Property(serializedObject, "zoneRadiusMeters", "Радиус зоны, м", "Как далеко левиафан может уходить от центра.");
+        LocalizedInspector.Property(serializedObject, "minY", "Нижняя высота, м", "Ниже этой высоты левиафан старается подниматься.");
+        LocalizedInspector.Property(serializedObject, "maxY", "Верхняя высота, м", "Верхняя граница случайного выбора высоты.");
+
+        LocalizedInspector.Section("Тело");
+        LocalizedInspector.Property(serializedObject, "bodyLengthMeters", "Длина тела, м", "Размер визуала и капсульного коллайдера вдоль тела.");
+        LocalizedInspector.Property(serializedObject, "bodyRadiusMeters", "Радиус тела, м", "Толщина тела и визуального объема.");
+        LocalizedInspector.Property(serializedObject, "massKg", "Масса, кг", "Физическая масса живого левиафана.");
+        LocalizedInspector.Property(serializedObject, "carcassMassKg", "Масса туши, кг", "Сколько килограммов ресурса туши попадет в груз корабля.");
+
+        LocalizedInspector.Section("Живучесть и полет");
+        LocalizedInspector.Property(serializedObject, "maxHealth", "Макс. здоровье", "Полное здоровье существа.");
+        LocalizedInspector.Property(serializedObject, "health", "Здоровье", "Текущее здоровье. При нуле левиафан становится добычей.");
+        LocalizedInspector.Property(serializedObject, "maxFlightCapability", "Макс. полетоспособность", "Запас способности держаться в воздухе.");
+        LocalizedInspector.Property(serializedObject, "flightCapability", "Полетоспособность", "Текущий запас полета. Гарпун снижает эту величину.");
+        LocalizedInspector.Property(serializedObject, "claudiumLiftKg", "Клавдиевый подъем, кг", "Сколько подъема дает природный клавдий левиафана.");
+        LocalizedInspector.Property(serializedObject, "isCarcass", "Туша", "Если включено, левиафан уже потерял полетоспособность или здоровье.");
+
+        LocalizedInspector.Section("Движение");
+        LocalizedInspector.Property(serializedObject, "swimForceN", "Сила плавания, Н", "Максимальная сила, которой левиафан разгоняется к выбранной точке.");
+        LocalizedInspector.Property(serializedObject, "maxSpeedMS", "Макс. скорость, м/с", "Ограничение скорости живого левиафана.");
+        LocalizedInspector.Property(serializedObject, "wanderRadiusMeters", "Радиус блуждания, м", "Как далеко от центра зоны выбираются случайные цели.");
+        LocalizedInspector.Property(serializedObject, "turnTorque", "Поворотливость", "Насколько быстро визуально доворачивается тело к направлению движения.");
+        LocalizedInspector.Property(serializedObject, "harpoonStruggleForceMultiplier", "Сила рывков на гарпуне", "Множитель силы, с которой живой левиафан сопротивляется натянутому тросу.");
+        LocalizedInspector.Property(serializedObject, "harpoonDiveBias", "Стремление вниз", "Насколько сильно пойманный левиафан пытается уйти вниз.");
+        LocalizedInspector.Property(serializedObject, "harpoonPanicTurnIntervalSeconds", "Интервал рывков, сек", "Как часто левиафан меняет направление панического рывка.");
+
+        LocalizedInspector.Section("Бой");
+        LocalizedInspector.Property(serializedObject, "headArmorMm", "Броня головы, мм", "Пока справочная величина для будущей боевой модели.");
+        LocalizedInspector.Property(serializedObject, "bodyArmorMm", "Броня тела, мм", "Пока справочная величина для будущей боевой модели.");
+        LocalizedInspector.Property(serializedObject, "ramDamageMultiplier", "Множитель тарана", "Сколько урона левиафан наносит/получает тараном относительно базовой модели.");
+
+        LocalizedInspector.Section("Отладка");
+        LocalizedInspector.Property(serializedObject, "debugLogging", "Писать лог", "Если включено, левиафан периодически пишет состояние в Console.");
+
+        serializedObject.ApplyModifiedProperties();
+
+        Leviathan leviathan = (Leviathan)target;
+        EditorGUILayout.Space(6);
+        EditorGUILayout.HelpBox(leviathan.GetStatusRu(), MessageType.Info);
+    }
+}
+
+[CustomEditor(typeof(HarpoonTether))]
+public class HarpoonTetherEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        serializedObject.Update();
+
+        LocalizedInspector.Section("Связи");
+        LocalizedInspector.Property(serializedObject, "ownerShip", "Корабль", "Корабль, который выпустил гарпун.");
+        LocalizedInspector.Property(serializedObject, "target", "Цель", "Левиафан, в которого попал гарпун.");
+
+        LocalizedInspector.Section("Трос");
+        LocalizedInspector.Property(serializedObject, "ropeLengthMeters", "Длина троса, м", "После этой дистанции трос начинает натягиваться.");
+        LocalizedInspector.Property(serializedObject, "maxTensionKg", "Прочность троса, кгс", "Если натяжение выше этого значения, гарпун обрывается.");
+        LocalizedInspector.Property(serializedObject, "stiffnessNPerMeter", "Жесткость, Н/м", "Сколько силы добавляется за метр растяжения.");
+        LocalizedInspector.Property(serializedObject, "dampingNsPerMeter", "Демпфер, Н·с/м", "Гасит рывки, когда корабль и цель расходятся.");
+        LocalizedInspector.Property(serializedObject, "reelForceN", "Подтяжка лебедки, Н", "Постоянная сила подтягивания при натянутом тросе.");
+        LocalizedInspector.Property(serializedObject, "fatiguePerSecond", "Усталость в секунду", "Сколько полетоспособности цель теряет при полном натяжении.");
+        LocalizedInspector.Property(serializedObject, "collectionRadiusMeters", "Радиус сбора туши, м", "Когда туша входит в этот радиус, ее можно погрузить в трюм.");
+        LocalizedInspector.Property(serializedObject, "carcassWinchSpeedMetersPerSecond", "Скорость лебедки, м/с", "Как быстро лебедка укорачивает трос после потери полетоспособности цели.");
+
+        LocalizedInspector.Section("Состояние");
+        LocalizedInspector.Property(serializedObject, "currentTensionN", "Натяжение, Н", "Текущее физическое натяжение троса.");
+        LocalizedInspector.Property(serializedObject, "lastMessage", "Сообщение", "Последнее состояние или причина обрыва.");
+
+        serializedObject.ApplyModifiedProperties();
     }
 }

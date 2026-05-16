@@ -63,7 +63,7 @@ public static class MissionSetupEditor
         destinationDock.kind = mission.destinationDockKind;
         destinationDock.dockingRadius = Mathf.Max(mission.arrivalRadius, 1f);
         destinationDock.canEndSession = true;
-        destinationDock.autoDockWhenInRange = true;
+        destinationDock.autoDockWhenInRange = false;
         destinationDock.snapPoint = destinationPoint;
 
         EditorUtility.SetDirty(controller);

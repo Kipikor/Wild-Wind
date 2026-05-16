@@ -33,6 +33,8 @@ public partial class MetaGameState : MonoBehaviour
     public MiningRockManager miningRockManager;
     [InspectorName("Mining autopilots")]
     public MiningFleetController miningFleet;
+    [InspectorName("Leviathans")]
+    public LeviathanManager leviathanManager;
     [InspectorName("Стартовые деньги")]
     public int startingMoney;
     [InspectorName("Прогресс игрока")]
@@ -181,6 +183,7 @@ public partial class MetaGameState : MonoBehaviour
             EnsureLogisticsFleet();
             EnsureGasSystems();
             EnsureMiningSystems();
+            EnsureLeviathanSystems();
             logisticsFleet?.EnsureRuntimeShips(progress);
             gasHarvesterFleet?.EnsureRuntimeShips(progress);
             miningFleet?.EnsureRuntimeShips(progress);
@@ -299,6 +302,29 @@ public partial class MetaGameState : MonoBehaviour
         }
     }
 
+    private void EnsureLeviathanSystems()
+    {
+        if (leviathanManager == null)
+        {
+            leviathanManager = GetComponent<LeviathanManager>();
+        }
+
+        if (leviathanManager == null)
+        {
+            leviathanManager = FindFirstObjectByType<LeviathanManager>();
+        }
+
+        if (leviathanManager == null && Application.isPlaying)
+        {
+            leviathanManager = gameObject.AddComponent<LeviathanManager>();
+        }
+
+        if (leviathanManager != null && leviathanManager.metaGameState == null)
+        {
+            leviathanManager.metaGameState = this;
+        }
+    }
+
     private void SpawnConfiguredIslands(bool forceRebuild = false)
     {
         if (!Application.isPlaying || !spawnConfigIslandsOnPlay) return;
@@ -357,7 +383,7 @@ public partial class MetaGameState : MonoBehaviour
             dock.kind = DockingLocationKind.Island;
             dock.dockingRadius = Mathf.Max(0.1f, island.dockingRadius);
             dock.canEndSession = true;
-            dock.autoDockWhenInRange = true;
+            dock.autoDockWhenInRange = false;
             dock.requireLeaveBeforeRedocking = true;
             dock.snapPoint = islandObject.transform;
 
@@ -392,6 +418,7 @@ public partial class MetaGameState : MonoBehaviour
         gasHarvesterFleet = FindFirstObjectByType<GasHarvesterFleetController>();
         miningRockManager = FindFirstObjectByType<MiningRockManager>();
         miningFleet = FindFirstObjectByType<MiningFleetController>();
+        leviathanManager = FindFirstObjectByType<LeviathanManager>();
     }
 
     private void Awake()
@@ -413,6 +440,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureLogisticsFleet();
         EnsureGasSystems();
         EnsureMiningSystems();
+        EnsureLeviathanSystems();
 
         bool loadedGame = false;
         if (loadSavedGameOnAwake)
@@ -424,6 +452,7 @@ public partial class MetaGameState : MonoBehaviour
         SpawnConfiguredIslands();
         gasCloudManager?.SpawnConfiguredClouds();
         miningRockManager?.SpawnConfiguredRocks();
+        leviathanManager?.SpawnConfiguredLeviathans();
         if (!loadedGame || !TryAdvanceOfflineProgressFromLastSave(DateTime.UtcNow, out _))
         {
             AdvanceRealTimeProcessesSliced(DateTime.UtcNow);
@@ -439,9 +468,11 @@ public partial class MetaGameState : MonoBehaviour
     {
         EnsureGasSystems();
         EnsureMiningSystems();
+        EnsureLeviathanSystems();
         SpawnConfiguredIslands();
         gasCloudManager?.SpawnConfiguredClouds();
         miningRockManager?.SpawnConfiguredRocks();
+        leviathanManager?.SpawnConfiguredLeviathans();
         ApplySelectedShip();
         ApplySessionModeToShip();
     }
@@ -479,6 +510,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureLogisticsFleet();
         EnsureGasSystems();
         EnsureMiningSystems();
+        EnsureLeviathanSystems();
         logisticsFleet?.EnsureRuntimeShips(progress);
         gasHarvesterFleet?.EnsureRuntimeShips(progress);
         miningFleet?.EnsureRuntimeShips(progress);
@@ -945,6 +977,12 @@ public partial class MetaGameState : MonoBehaviour
     public bool DockAt(string dockId, DockingLocationKind dockKind)
     {
         EnsureProgressInitialized();
+
+        ShipPhysics ship = GetActiveShip();
+        if (ship != null)
+        {
+            ship.StopLeviathanHuntForDocking();
+        }
 
         progress.SetDocked(dockId, dockKind, GetCurrentShipPosition());
         ApplySessionModeToShip();
@@ -2348,15 +2386,54 @@ public partial class MetaGameState : MonoBehaviour
             }
         }
 
-        if (GUILayout.Button(new GUIContent("Состыковаться здесь", "Завершает вылет в текущей точке и сохраняет новый док.")))
+        DockingPort nearbyDock = FindAvailableDockingPort(ship);
+        if (nearbyDock != null)
         {
-            DockAt("field_dock", DockingLocationKind.Island);
+            GUILayout.Label("Док в радиусе: " + nearbyDock.displayName);
+            if (GUILayout.Button(new GUIContent("Стыковка", "Завершает вылет у выбранного дока. Охота и гарпун будут остановлены.")))
+            {
+                if (ship != null)
+                {
+                    ship.transform.position = nearbyDock.DockPosition;
+                }
+
+                DockAt(nearbyDock.dockId, nearbyDock.kind);
+            }
+        }
+        else
+        {
+            GUILayout.Label("Стыковка недоступна: нет дока в радиусе.");
+            GUI.enabled = false;
+            GUILayout.Button(new GUIContent("Стыковка", "Подлети в радиус стыковки острова или корабля."));
+            GUI.enabled = true;
         }
 
         if (GUILayout.Button(new GUIContent("Потерять корабль", "Завершает вылет аварией: груз и текущая сборка теряются, игрок возвращается в город на стартовом корабле.")))
         {
             LoseShipAndReturnToCity("Ручной аварийный возврат");
         }
+    }
+
+    private DockingPort FindAvailableDockingPort(ShipPhysics ship)
+    {
+        if (ship == null) return null;
+
+        DockingPort[] dockingPorts = FindObjectsByType<DockingPort>(FindObjectsSortMode.None);
+        DockingPort best = null;
+        float bestDistance = float.PositiveInfinity;
+        for (int i = 0; i < dockingPorts.Length; i++)
+        {
+            DockingPort dock = dockingPorts[i];
+            if (dock == null || !dock.canEndSession || !dock.Contains(ship.transform.position)) continue;
+
+            float distance = Vector3.Distance(ship.transform.position, dock.DockPosition);
+            if (distance >= bestDistance) continue;
+
+            best = dock;
+            bestDistance = distance;
+        }
+
+        return best;
     }
 
     private void DrawRouteEtaFlightInfo(ShipPhysics ship)

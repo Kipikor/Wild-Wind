@@ -23,7 +23,7 @@ public class DockingPort : MonoBehaviour
     public bool canEndSession = true;
     [InspectorName("Автостыковка в радиусе")]
     [Tooltip("Если включено, корабль автоматически перейдет в режим стыковки при входе в радиус.")]
-    public bool autoDockWhenInRange = true;
+    public bool autoDockWhenInRange = false;
     [InspectorName("Ждать выхода из текущего дока")]
     [Tooltip("Если корабль начал вылет из этого дока, автостыковка сработает только после того, как корабль сначала покинет радиус. Это не дает свободному вылету сразу вернуться в стыковку.")]
     public bool requireLeaveBeforeRedocking = true;
@@ -56,33 +56,20 @@ public class DockingPort : MonoBehaviour
 
     private void Update()
     {
-        if (!autoDockWhenInRange || !canEndSession || metaGameState == null || targetShip == null) return;
+        // Стыковка теперь только ручная: игрок должен быть в радиусе и нажать кнопку "Стыковка".
+        // Поля автостыковки оставлены для старых сцен, но больше не завершают вылет сами.
+        if (metaGameState == null || targetShip == null) return;
 
         GameSessionMode currentMode = metaGameState.CurrentMode;
-        bool inside = Contains(targetShip.transform.position);
-
         if (currentMode != lastObservedMode)
         {
             lastObservedMode = currentMode;
-            leftRadiusSinceFlightStart = currentMode == GameSessionMode.Flight && !inside;
+            leftRadiusSinceFlightStart = currentMode == GameSessionMode.Flight && !Contains(targetShip.transform.position);
         }
-
-        if (currentMode != GameSessionMode.Flight) return;
-
-        if (requireLeaveBeforeRedocking && !leftRadiusSinceFlightStart)
+        else if (currentMode == GameSessionMode.Flight && !Contains(targetShip.transform.position))
         {
-            if (!inside)
-            {
-                leftRadiusSinceFlightStart = true;
-            }
-
-            return;
+            leftRadiusSinceFlightStart = true;
         }
-
-        if (!inside) return;
-
-        targetShip.transform.position = DockPosition;
-        metaGameState.DockAt(dockId, kind);
     }
 
     private bool IsCurrentDock()

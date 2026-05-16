@@ -14,6 +14,8 @@ public class WorldConfigDatabase
     private readonly Dictionary<string, GasCloudConfig> gasCloudsById = new Dictionary<string, GasCloudConfig>();
     private readonly Dictionary<string, OreTypeConfig> oreTypesById = new Dictionary<string, OreTypeConfig>();
     private readonly Dictionary<string, MiningZoneConfig> miningZonesById = new Dictionary<string, MiningZoneConfig>();
+    private readonly Dictionary<string, LeviathanTypeConfig> leviathanTypesById = new Dictionary<string, LeviathanTypeConfig>();
+    private readonly Dictionary<string, LeviathanZoneConfig> leviathanZonesById = new Dictionary<string, LeviathanZoneConfig>();
     private readonly Dictionary<string, TechnologyConfig> technologiesById = new Dictionary<string, TechnologyConfig>();
 
     public List<ItemConfig> items = new List<ItemConfig>();
@@ -23,6 +25,8 @@ public class WorldConfigDatabase
     public List<GasCloudConfig> gasClouds = new List<GasCloudConfig>();
     public List<OreTypeConfig> oreTypes = new List<OreTypeConfig>();
     public List<MiningZoneConfig> miningZones = new List<MiningZoneConfig>();
+    public List<LeviathanTypeConfig> leviathanTypes = new List<LeviathanTypeConfig>();
+    public List<LeviathanZoneConfig> leviathanZones = new List<LeviathanZoneConfig>();
     public List<TechnologyConfig> technologies = new List<TechnologyConfig>();
 
     public bool isLoaded;
@@ -47,6 +51,8 @@ public class WorldConfigDatabase
             LoadIslands(Path.Combine(folder, "Island.csv"));
             LoadGasClouds(Path.Combine(folder, "Gas_cloud.csv"));
             LoadMiningZones(Path.Combine(folder, "Mining_zone.csv"));
+            LoadLeviathanTypes(Path.Combine(folder, "Leviathan_type.csv"));
+            LoadLeviathanZones(Path.Combine(folder, "Leviathan_zone.csv"));
             LoadTechnologies(Path.Combine(folder, "Technology.csv"));
             isLoaded = true;
             lastError = "";
@@ -115,6 +121,20 @@ public class WorldConfigDatabase
         return zone;
     }
 
+    public LeviathanTypeConfig GetLeviathanType(string typeId)
+    {
+        if (string.IsNullOrWhiteSpace(typeId)) return null;
+        leviathanTypesById.TryGetValue(typeId, out LeviathanTypeConfig type);
+        return type;
+    }
+
+    public LeviathanZoneConfig GetLeviathanZone(string zoneId)
+    {
+        if (string.IsNullOrWhiteSpace(zoneId)) return null;
+        leviathanZonesById.TryGetValue(zoneId, out LeviathanZoneConfig zone);
+        return zone;
+    }
+
     public string GetItemNameRu(string itemId)
     {
         ItemConfig item = GetItem(itemId);
@@ -138,6 +158,8 @@ public class WorldConfigDatabase
         gasClouds.Clear();
         oreTypes.Clear();
         miningZones.Clear();
+        leviathanTypes.Clear();
+        leviathanZones.Clear();
         technologies.Clear();
         itemsById.Clear();
         islandsById.Clear();
@@ -146,6 +168,8 @@ public class WorldConfigDatabase
         gasCloudsById.Clear();
         oreTypesById.Clear();
         miningZonesById.Clear();
+        leviathanTypesById.Clear();
+        leviathanZonesById.Clear();
         technologiesById.Clear();
         isLoaded = false;
         lastError = "";
@@ -351,6 +375,68 @@ public class WorldConfigDatabase
             if (string.IsNullOrWhiteSpace(zone.id)) continue;
             miningZones.Add(zone);
             miningZonesById[zone.id] = zone;
+        }
+    }
+
+    private void LoadLeviathanTypes(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            LeviathanTypeConfig type = new LeviathanTypeConfig
+            {
+                id = Get(row, "id_leviathan_type"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                carcassItemId = Get(row, "carcass_item"),
+                bodyLengthMeters = Mathf.Max(2f, ParseFloat(Get(row, "body_length_m"), 28f)),
+                bodyRadiusMeters = Mathf.Max(0.5f, ParseFloat(Get(row, "body_radius_m"), 5f)),
+                massKg = Mathf.Max(1f, ParseFloat(Get(row, "mass_kg"), 5000f)),
+                maxHealth = Mathf.Max(1f, ParseFloat(Get(row, "max_health"), 300f)),
+                maxFlightCapability = Mathf.Max(1f, ParseFloat(Get(row, "max_flight_capability"), 240f)),
+                claudiumLiftKg = Mathf.Max(0f, ParseFloat(Get(row, "claudium_lift_kg"), 5500f)),
+                swimForceN = Mathf.Max(0f, ParseFloat(Get(row, "swim_force_n"), 9000f)),
+                maxSpeedMS = Mathf.Max(0.1f, ParseFloat(Get(row, "max_speed_ms"), 9f)),
+                wanderRadiusMeters = Mathf.Max(1f, ParseFloat(Get(row, "wander_radius_m"), 220f)),
+                turnTorque = Mathf.Max(0f, ParseFloat(Get(row, "turn_torque"), 1200f)),
+                headArmorMm = Mathf.Max(0f, ParseFloat(Get(row, "head_armor_mm"), 28f)),
+                bodyArmorMm = Mathf.Max(0f, ParseFloat(Get(row, "body_armor_mm"), 5f)),
+                ramDamageMultiplier = Mathf.Max(0f, ParseFloat(Get(row, "ram_damage_multiplier"), 1f)),
+                carcassMassFraction = Mathf.Clamp01(ParseFloat(Get(row, "carcass_mass_fraction"), 0.55f)),
+                color = ParseColor(Get(row, "color_hex"), new Color(0.35f, 0.55f, 0.7f, 1f))
+            };
+
+            if (string.IsNullOrWhiteSpace(type.id)) continue;
+            leviathanTypes.Add(type);
+            leviathanTypesById[type.id] = type;
+        }
+    }
+
+    private void LoadLeviathanZones(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            LeviathanZoneConfig zone = new LeviathanZoneConfig
+            {
+                id = Get(row, "id_leviathan_zone"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                center = new Vector3(
+                    ParseFloat(Get(row, "position_x")),
+                    ParseFloat(Get(row, "position_y"), 90f),
+                    ParseFloat(Get(row, "position_z"))),
+                radiusMeters = Mathf.Max(1f, ParseFloat(Get(row, "radius_m"), 600f)),
+                initialCount = Mathf.Max(0, ParseInt(Get(row, "initial_count"), 2)),
+                maxActive = Mathf.Max(0, ParseInt(Get(row, "max_active"), 4)),
+                spawnIntervalSeconds = Mathf.Max(1f, ParseFloat(Get(row, "spawn_interval_seconds"), 900f)),
+                minY = ParseFloat(Get(row, "min_y"), 40f),
+                maxY = ParseFloat(Get(row, "max_y"), 180f)
+            };
+
+            zone.leviathanTypeIds.AddRange(SplitInlineList(Get(row, "leviathan_type_id")));
+
+            if (string.IsNullOrWhiteSpace(zone.id)) continue;
+            leviathanZones.Add(zone);
+            leviathanZonesById[zone.id] = zone;
         }
     }
 
@@ -597,6 +683,49 @@ public class MiningZoneConfig
     }
 
     public float LifetimeSeconds => ascentDurationSeconds + DescentDurationSeconds;
+}
+
+public class LeviathanTypeConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public string carcassItemId = "";
+    public float bodyLengthMeters = 28f;
+    public float bodyRadiusMeters = 5f;
+    public float massKg = 5000f;
+    public float maxHealth = 300f;
+    public float maxFlightCapability = 240f;
+    public float claudiumLiftKg = 5500f;
+    public float swimForceN = 9000f;
+    public float maxSpeedMS = 9f;
+    public float wanderRadiusMeters = 220f;
+    public float turnTorque = 1200f;
+    public float headArmorMm = 28f;
+    public float bodyArmorMm = 5f;
+    public float ramDamageMultiplier = 1f;
+    public float carcassMassFraction = 0.55f;
+    public Color color = new Color(0.35f, 0.55f, 0.7f, 1f);
+
+    public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
+    public int CarcassMassKg => Mathf.Max(1, Mathf.RoundToInt(massKg * Mathf.Clamp01(carcassMassFraction)));
+}
+
+public class LeviathanZoneConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public Vector3 center;
+    public float radiusMeters = 600f;
+    public List<string> leviathanTypeIds = new List<string>();
+    public int initialCount = 2;
+    public int maxActive = 4;
+    public float spawnIntervalSeconds = 900f;
+    public float minY = 40f;
+    public float maxY = 180f;
+
+    public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }
 
 public class IslandProductionConfig
