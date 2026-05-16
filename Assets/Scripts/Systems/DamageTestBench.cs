@@ -58,7 +58,6 @@ public class DamageTestBench : MonoBehaviour
         damagePoints = 120f,
         hullDamageOnPenetration = 120f,
         armorPlateDamage = 25f,
-        moduleDamage = 80f,
         penetrationMm = 80f,
         normalizationDegrees = 5f,
         penetrationRollSpread = 0.1f,
@@ -73,7 +72,6 @@ public class DamageTestBench : MonoBehaviour
         damagePoints = 150f,
         hullDamageOnPenetration = 85f,
         armorPlateDamage = 55f,
-        moduleDamage = 35f,
         penetrationMm = 28f,
         explosiveRadiusMeters = 6f,
         normalizationDegrees = 0f,
@@ -273,16 +271,6 @@ public class DamageTestBench : MonoBehaviour
 
             DamageHitContext context = CreateHitContext(preset, hit.point, hit.normal, shotDirection);
 
-            DamageableModuleHitbox moduleHitbox = hit.collider.GetComponentInParent<DamageableModuleHitbox>();
-            if (moduleHitbox != null)
-            {
-                if (!moduleHitbox.BlocksProjectile) continue;
-
-                DamageHitResult moduleResult = moduleHitbox.ReceiveDirectHit(context);
-                lastMessage = moduleResult.message;
-                return moduleResult;
-            }
-
             PaintedArmorBody paintedArmor = hit.collider.GetComponentInParent<PaintedArmorBody>();
             if (paintedArmor != null)
             {
@@ -316,7 +304,7 @@ public class DamageTestBench : MonoBehaviour
         DamageHitResult noDamage = new DamageHitResult
         {
             outcome = DamageHitOutcome.Miss,
-            message = "[Урон] Промах: на линии огня не найден бронелист или модуль."
+            message = "[Урон] Промах: на линии огня не найден бронелист."
         };
         Log(noDamage.message);
         return noDamage;
@@ -528,7 +516,6 @@ public class DamageTestBench : MonoBehaviour
             damagePoints = preset.damagePoints,
             hullDamageOnPenetration = preset.hullDamageOnPenetration > 0.001f ? preset.hullDamageOnPenetration : preset.damagePoints,
             armorPlateDamage = preset.armorPlateDamage,
-            moduleDamage = preset.moduleDamage,
             penetrationMm = RollPenetration(preset),
             explosiveRadiusMeters = preset.explosiveRadiusMeters,
             normalizationDegrees = preset.normalizationDegrees,
@@ -690,15 +677,12 @@ public class DamageTestBench : MonoBehaviour
             RaycastHit hit = hits[i];
             if (hit.collider == null) continue;
 
-            DamageableModuleHitbox moduleHitbox = hit.collider.GetComponentInParent<DamageableModuleHitbox>();
-            if (moduleHitbox != null && !moduleHitbox.BlocksProjectile) continue;
-
             end = hit.point;
             ArmorZone zone = hit.collider.GetComponentInParent<ArmorZone>();
             PaintedArmorBody paintedArmor = hit.collider.GetComponentInParent<PaintedArmorBody>();
             MeshArmorBody meshArmor = hit.collider.GetComponentInParent<MeshArmorBody>();
             rayColor = mainRay
-                ? (zone != null || paintedArmor != null || meshArmor != null || moduleHitbox != null ? aimRayArmorHitColor : aimRayOtherHitColor)
+                ? (zone != null || paintedArmor != null || meshArmor != null ? aimRayArmorHitColor : aimRayOtherHitColor)
                 : aimRayObliqueColor;
 
             Gizmos.color = rayColor;
@@ -721,7 +705,6 @@ public class DamageTestBench : MonoBehaviour
             damagePoints = preset.damagePoints,
             hullDamageOnPenetration = preset.hullDamageOnPenetration,
             armorPlateDamage = preset.armorPlateDamage,
-            moduleDamage = preset.moduleDamage,
             penetrationMm = preset.penetrationMm,
             explosiveRadiusMeters = preset.explosiveRadiusMeters,
             normalizationDegrees = preset.normalizationDegrees,

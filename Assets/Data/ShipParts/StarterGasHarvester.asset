@@ -15,10 +15,10 @@ MonoBehaviour:
   partId: starter_gas_harvester
   displayName: "\u0425\u0430\u0440\u0432\u0435\u0441\u0442\u0435\u0440 \u043E\u0431\u043B\u0430\u043A\u043E\u0432 I"
   description: "\u0421\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u043C\u043E\u0434\u0443\u043B\u044C \u0434\u043B\u044F \u0441\u0431\u043E\u0440\u0430 \u0441\u044B\u0440\u043E\u0433\u043E \u043A\u043E\u043D\u0446\u0435\u043D\u0442\u0440\u0430\u0442\u0430 \u0438\u0437 \u0433\u0430\u0437\u043E\u0432\u044B\u0445 \u043E\u0431\u043B\u0430\u043A\u043E\u0432."
-  completedTechId: 
+  completedTechId:
   kind: 1
-  prefab: {fileID: 0}
-  engineFuelId: 
+  prefab: {fileID: 6100010000000000001, guid: dd5ec4fb0e204a29947d887276cd2c19, type: 3}
+  engineFuelId:
   slots: []
   compatibleSlotTypeIds:
   - utility

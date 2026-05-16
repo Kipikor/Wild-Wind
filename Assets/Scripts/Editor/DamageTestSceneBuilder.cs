@@ -52,22 +52,8 @@ public static class DamageTestSceneBuilder
         damageable.maxStructureHp = 600f;
         damageable.structureHp = 600f;
         damageable.debugLogging = true;
-        damageable.applyModuleEffectsToShipPhysics = false;
-        damageable.modules = new List<ShipDamageModuleState>
-        {
-            Module("hull", "Корпус", 260f, 0.6f),
-            Module("engine", "Двигатель", 120f, 1f),
-            Module("propeller", "Винт", 90f, 1f),
-            Module("claudium_loop", "Клавдиевый контур", 140f, 1f),
-            Module("cargo", "Грузовой отсек", 100f, 0.8f)
-        };
 
         CreatePaintedArmorBody(root.transform, damageable);
-
-        CreateModuleMarker(root.transform, damageable, "engine", "Двигатель", new Vector3(4f, 0f, 3.2f), new Vector3(3f, 2f, 2.2f), new Color(0.8f, 0.25f, 0.15f), false);
-        CreateModuleMarker(root.transform, damageable, "claudium_loop", "Контур", new Vector3(-3.5f, 0f, -0.5f), new Vector3(2.6f, 2.6f, 2.6f), new Color(0.2f, 0.8f, 1f), false);
-        CreateModuleMarker(root.transform, damageable, "cargo", "Груз", new Vector3(0f, -0.6f, -1.5f), new Vector3(4.5f, 2.2f, 3f), new Color(0.7f, 0.55f, 0.2f), false);
-        CreateModuleMarker(root.transform, damageable, "propeller", "Внешний винт", new Vector3(0f, 0f, 6.8f), new Vector3(7f, 1f, 1f), new Color(0.45f, 0.7f, 1f), true);
 
         return damageable;
     }
@@ -155,54 +141,6 @@ public static class DamageTestSceneBuilder
             armorHp = Mathf.Max(1f, armorHp),
             ricochetAngleDeg = 70f,
             debugColor = new Color(color.r, color.g, color.b, 0.75f)
-        };
-    }
-
-    private static void CreateModuleMarker(
-        Transform parent,
-        DamageableShip owner,
-        string moduleId,
-        string name,
-        Vector3 localPosition,
-        Vector3 localScale,
-        Color color,
-        bool externalModule)
-    {
-        GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        Undo.RegisterCreatedObjectUndo(marker, "Create module marker");
-        marker.name = GeneratedPrefix + "Module " + name;
-        marker.transform.SetParent(parent, false);
-        marker.transform.localPosition = localPosition;
-        marker.transform.localScale = localScale;
-        Collider collider = marker.GetComponent<Collider>();
-        if (collider != null)
-        {
-            collider.isTrigger = true;
-        }
-
-        DamageableModuleHitbox hitbox = Undo.AddComponent<DamageableModuleHitbox>(marker);
-        hitbox.owner = owner;
-        hitbox.moduleId = moduleId;
-        hitbox.displayNameRu = name;
-        hitbox.defaultMaxHp = owner != null && owner.GetModule(moduleId) != null
-            ? owner.GetModule(moduleId).maxHp
-            : 100f;
-        hitbox.externalModule = externalModule;
-        hitbox.transparentWhenDestroyed = true;
-        hitbox.debugColor = new Color(color.r, color.g, color.b, 0.25f);
-
-        SetColor(marker, color);
-    }
-
-    private static ShipDamageModuleState Module(string id, string nameRu, float hp, float weight)
-    {
-        return new ShipDamageModuleState
-        {
-            moduleId = id,
-            displayNameRu = nameRu,
-            maxHp = hp,
-            hp = hp,
-            damageWeight = weight
         };
     }
 
@@ -436,8 +374,6 @@ public class DamageTestBenchEditor : Editor
         EditorGUILayout.LabelField("Попадания", $"{ship.hitCount}, пробития {ship.penetrationCount}, рикошеты {ship.ricochetCount}, непробития {ship.noPenetrationCount}, фугасы {ship.explosiveSplashCount}, тараны {ship.impactCount}");
         EditorGUILayout.LabelField("Последнее попадание", $"{ship.lastHitOutcome} / {ship.lastHitZoneId}");
         EditorGUILayout.LabelField("Угол и броня", $"{ship.lastHitImpactAngleDeg:0}°, {ship.lastHitArmorMm:0}->{ship.lastHitEffectiveArmorMm:0} мм, пробитие {ship.lastHitPenetrationMm:0} мм");
-
-        EditorGUILayout.LabelField("Модули", "урон по модулям отключен");
 
         if (ship.recentEvents != null && ship.recentEvents.Count > 0)
         {

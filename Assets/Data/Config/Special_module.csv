@@ -1,0 +1,5 @@
+id_special_module,local_name_ru,local_name_en,description_ru,complited_tech,base_mass_kg,compatible_slot_type,gas_harvester_volume_m3_per_second,gas_harvester_power_draw_kw,gas_harvester_radius_m,gas_harvester_cycle_seconds,mining_impact_hold_capacity_kg,observation_radius_m,observation_facts_at_half_radius_per_second,observation_rock_info_efficiency,observation_cloud_info_efficiency,observation_leviathan_info_efficiency
+starter_cargo_rack,Грузовая полка,Cargo Rack,Необязательный вспомогательный модуль для проверки установки покупаемых деталей,,120,utility,,,,,,,,,,
+starter_gas_harvester,Харвестер облаков I,Gas Harvester I,Стартовый модуль для сбора сырого концентрата из газовых облаков,,95,utility,12,22,22,5,,,,,,
+starter_mining_hold,Противоударный кузов I,Impact Ore Hold I,Стартовый модуль для сбора падающих кусков руды под нестабильными глыбами,,55,utility,,,,,60,,,,,
+starter_observation_post,Наблюдательный пост I,Observation Post I,Простой научно-разведывательный модуль расширяет радиус наблюдения и перерабатывает бумагу в информацию,,80,utility,,,,,,550,2,0.75,0.7,0.45

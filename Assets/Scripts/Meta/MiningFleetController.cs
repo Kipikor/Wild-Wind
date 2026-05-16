@@ -664,6 +664,7 @@ public class MiningFleetController : MonoBehaviour
         {
             MiningRockState rock = progress.miningRocks[i];
             if (rock == null || !MiningWorldSimulator.IsRockSafeForAutopilot(config, rock, currentTicks)) continue;
+            if (!SurveySystem.IsFullySurveyedForWork(progress, ScoutedObjectKind.MiningRock, rock.rockId)) continue;
 
             MiningZoneConfig zone = config.GetMiningZone(rock.zoneId);
             OreTypeConfig oreType = config.GetOreType(rock.oreTypeId);

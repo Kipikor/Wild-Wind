@@ -32,10 +32,8 @@ public class MeshArmorPlate
             ricochetAngleDeg = ricochetAngleDeg,
             overmatchCaliberMultiplier = 0f,
             structureDamageMultiplier = 1f,
-            moduleDamageMultiplier = 1f,
             highExplosiveSurfaceDamageMultiplier = 1f,
-            ramDamageMultiplier = 1f,
-            protectedModuleIds = null
+            ramDamageMultiplier = 1f
         };
     }
 

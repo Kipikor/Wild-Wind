@@ -35,6 +35,8 @@ public partial class MetaGameState : MonoBehaviour
     public MiningFleetController miningFleet;
     [InspectorName("Leviathans")]
     public LeviathanManager leviathanManager;
+    [InspectorName("Разведывательный флот")]
+    public ScoutFleetController scoutFleet;
     [InspectorName("Стартовые деньги")]
     public int startingMoney;
     [InspectorName("Прогресс игрока")]
@@ -65,10 +67,16 @@ public partial class MetaGameState : MonoBehaviour
     public int startingFuelKg = 50;
     [InspectorName("Стартовый клавдий на борту, кг")]
     public int startingClaudiumKg = 25;
+    [InspectorName("Стартовая бумага в столице, кг")]
+    [Tooltip("Нужна разведчикам: 1 кг бумаги превращается в 1 кг научной информации.")]
+    public int startingPaperKg = 120;
 
     [Header("Процессы реального времени")]
     [InspectorName("Обновлять процессы во время игры")]
     public bool processRealTimeWhilePlaying = true;
+    [InspectorName("Пропустить стартовую догонку процессов")]
+    [Tooltip("Для изолированных тестовых сцен: не прокручивает логистику, разведку и другие процессы в Awake.")]
+    public bool skipInitialProcessCatchUp;
     [InspectorName("Интервал добычи руды, сек")]
     public int idleMiningIntervalSeconds = 60;
     [InspectorName("Руды за цикл добычи")]
@@ -107,6 +115,10 @@ public partial class MetaGameState : MonoBehaviour
     public bool showDockingDebugUI = true;
     [InspectorName("Ширина интерфейса")]
     public int debugUiWidth = 380;
+    [InspectorName("Ресурс для отладки склада")]
+    public string productionDebugResourceId = "wood";
+    [InspectorName("Количество для отладки склада")]
+    public int productionDebugAmount = 25;
 
     [Header("Аварии")]
     [InspectorName("Автоматически добавить детектор крушений")]
@@ -165,6 +177,7 @@ public partial class MetaGameState : MonoBehaviour
         if (!worldConfig.isLoaded)
         {
             worldConfig.LoadFromAssetsConfigFolder(worldConfigFolder);
+            SyncCsvShipPartConfigs();
         }
     }
 
@@ -176,6 +189,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         worldConfig.LoadFromAssetsConfigFolder(worldConfigFolder);
+        SyncCsvShipPartConfigs();
         if (progress != null)
         {
             progress.Normalize();
@@ -184,10 +198,23 @@ public partial class MetaGameState : MonoBehaviour
             EnsureGasSystems();
             EnsureMiningSystems();
             EnsureLeviathanSystems();
+            EnsureScoutSystems();
             logisticsFleet?.EnsureRuntimeShips(progress);
             gasHarvesterFleet?.EnsureRuntimeShips(progress);
             miningFleet?.EnsureRuntimeShips(progress);
+            scoutFleet?.EnsureRuntimeShips(progress);
+            IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
         }
+    }
+
+    private void SyncCsvShipPartConfigs()
+    {
+        if (worldConfig == null || !worldConfig.isLoaded) return;
+
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog == null) return;
+
+        ShipAssemblyBuilder.ApplySpecialModuleConfigs(activeCatalog, worldConfig);
     }
 
     private void EnsureLogisticsFleet()
@@ -325,6 +352,30 @@ public partial class MetaGameState : MonoBehaviour
         }
     }
 
+    private void EnsureScoutSystems()
+    {
+        if (scoutFleet == null)
+        {
+            scoutFleet = GetComponent<ScoutFleetController>();
+        }
+
+        if (scoutFleet == null)
+        {
+            scoutFleet = FindFirstObjectByType<ScoutFleetController>();
+        }
+
+        if (scoutFleet == null && Application.isPlaying)
+        {
+            scoutFleet = gameObject.AddComponent<ScoutFleetController>();
+            scoutFleet.CreateExampleSetupIfEmpty();
+        }
+
+        if (scoutFleet != null && scoutFleet.metaGameState == null)
+        {
+            scoutFleet.metaGameState = this;
+        }
+    }
+
     private void SpawnConfiguredIslands(bool forceRebuild = false)
     {
         if (!Application.isPlaying || !spawnConfigIslandsOnPlay) return;
@@ -419,6 +470,7 @@ public partial class MetaGameState : MonoBehaviour
         miningRockManager = FindFirstObjectByType<MiningRockManager>();
         miningFleet = FindFirstObjectByType<MiningFleetController>();
         leviathanManager = FindFirstObjectByType<LeviathanManager>();
+        scoutFleet = FindFirstObjectByType<ScoutFleetController>();
     }
 
     private void Awake()
@@ -441,6 +493,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureGasSystems();
         EnsureMiningSystems();
         EnsureLeviathanSystems();
+        EnsureScoutSystems();
 
         bool loadedGame = false;
         if (loadSavedGameOnAwake)
@@ -453,7 +506,7 @@ public partial class MetaGameState : MonoBehaviour
         gasCloudManager?.SpawnConfiguredClouds();
         miningRockManager?.SpawnConfiguredRocks();
         leviathanManager?.SpawnConfiguredLeviathans();
-        if (!loadedGame || !TryAdvanceOfflineProgressFromLastSave(DateTime.UtcNow, out _))
+        if (!skipInitialProcessCatchUp && (!loadedGame || !TryAdvanceOfflineProgressFromLastSave(DateTime.UtcNow, out _)))
         {
             AdvanceRealTimeProcessesSliced(DateTime.UtcNow);
         }
@@ -469,6 +522,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureGasSystems();
         EnsureMiningSystems();
         EnsureLeviathanSystems();
+        EnsureScoutSystems();
         SpawnConfiguredIslands();
         gasCloudManager?.SpawnConfiguredClouds();
         miningRockManager?.SpawnConfiguredRocks();
@@ -507,6 +561,7 @@ public partial class MetaGameState : MonoBehaviour
         progress.Normalize();
         EnsureWorldConfigLoaded();
         IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+        IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
         EnsureLogisticsFleet();
         EnsureGasSystems();
         EnsureMiningSystems();
@@ -524,9 +579,11 @@ public partial class MetaGameState : MonoBehaviour
 
         progress.Normalize();
         IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+        IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
         logisticsFleet?.EnsureRuntimeShips(progress);
         gasHarvesterFleet?.EnsureRuntimeShips(progress);
         miningFleet?.EnsureRuntimeShips(progress);
+        scoutFleet?.EnsureRuntimeShips(progress);
 
         if (progress.lastSavedUtcTicks == 0 && string.IsNullOrWhiteSpace(progress.currentDockId))
         {
@@ -559,6 +616,12 @@ public partial class MetaGameState : MonoBehaviour
             progress.AddResource("iron", startingIron);
             AddStartingShipConsumables();
             progress.receivedStartingInventory = true;
+        }
+
+        if (!progress.receivedStartingPaper)
+        {
+            AddStartingIslandSupplies();
+            progress.receivedStartingPaper = true;
         }
 
         long nowTicks = DateTime.UtcNow.Ticks;
@@ -598,6 +661,7 @@ public partial class MetaGameState : MonoBehaviour
         if (shipLoader == null) return false;
 
         EnsureProgressInitialized();
+        SyncCsvShipPartConfigs();
         if (shipLoader.catalog == null)
         {
             shipLoader.catalog = ActiveCatalog;
@@ -1173,6 +1237,7 @@ public partial class MetaGameState : MonoBehaviour
             progress.Normalize();
             EnsureWorldConfigLoaded();
             IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+            IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
 
             if (progress.lastProcessUtcTicks <= 0)
             {
@@ -1190,6 +1255,7 @@ public partial class MetaGameState : MonoBehaviour
             if (islandProductionEnabled)
             {
                 completedCycles += IslandProductionSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
+                completedCycles += IslandIndustrySimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
             }
 
             completedCycles += AdvanceCargoTransfer(utcNow);
@@ -1197,6 +1263,11 @@ public partial class MetaGameState : MonoBehaviour
             if (logisticsFleet != null)
             {
                 completedCycles += logisticsFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
+            }
+
+            if (scoutFleet != null)
+            {
+                completedCycles += scoutFleet.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
             }
 
             if (gasHarvesterFleet != null)
@@ -2087,13 +2158,27 @@ public partial class MetaGameState : MonoBehaviour
 
         if (startingFuelKg > 0)
         {
-            progress.AddShipCargo("wood", startingFuelKg);
+            progress.AddShipCargo(GetStartingEngineFuelId(), startingFuelKg);
         }
 
         if (startingClaudiumKg > 0)
         {
             progress.AddShipCargo("claudium", startingClaudiumKg);
         }
+    }
+
+    private string GetStartingEngineFuelId()
+    {
+        string fuelId = shipLoader != null && shipLoader.targetShip != null ? shipLoader.targetShip.engineFuelId : "";
+        return string.IsNullOrWhiteSpace(fuelId) ? "wood" : fuelId;
+    }
+
+    private void AddStartingIslandSupplies()
+    {
+        if (progress == null || startingPaperKg <= 0) return;
+
+        IslandProductionState capitalStorage = progress.GetIslandProductionState(GetCapitalIslandId(), true);
+        capitalStorage?.AddResource("paper", startingPaperKg);
     }
 
     private string GetSelectedExperienceTargetId()
@@ -2321,6 +2406,7 @@ public partial class MetaGameState : MonoBehaviour
         GUILayout.Label("Руда: " + progress.GetResourceAmount("ore") + "  Железо: " + progress.GetResourceAmount("iron"));
         GUILayout.Label("Зерно магазина: " + progress.shopSeed + "  обновление через " + FormatRemaining(progress.nextShopRefreshUtcTicks));
         DrawTimeScaleUi();
+        DrawSurveyDebugUi();
 
         if (!string.IsNullOrWhiteSpace(lastSaveMessage))
         {
@@ -2340,6 +2426,55 @@ public partial class MetaGameState : MonoBehaviour
 
         GUILayout.EndScrollView();
         GUILayout.EndArea();
+    }
+
+    private void DrawSurveyDebugUi()
+    {
+        if (progress == null || progress.scoutedObjects == null) return;
+
+        int knownCoordinates = 0;
+        int completedFacts = 0;
+        int infoKg = 0;
+        for (int i = 0; i < progress.scoutedObjects.Count; i++)
+        {
+            ScoutedObjectState state = progress.scoutedObjects[i];
+            if (state == null) continue;
+            if (state.coordinatesKnown) knownCoordinates++;
+            if (state.factsComplete) completedFacts++;
+            infoKg += Mathf.FloorToInt(state.informationExtractedKg + 0.0001f);
+        }
+
+        GUILayout.Label($"Разведка: координаты {knownCoordinates}, изучено {completedFacts}, снято информации {infoKg} кг");
+
+        int shown = 0;
+        for (int i = progress.scoutedObjects.Count - 1; i >= 0 && shown < 3; i--)
+        {
+            ScoutedObjectState state = progress.scoutedObjects[i];
+            if (state == null || !state.coordinatesKnown) continue;
+
+            string name = string.IsNullOrWhiteSpace(state.displayName) ? state.objectId : state.displayName;
+            string facts = state.factsComplete
+                ? "сведения полные"
+                : $"{state.factsProgress:F1}/{state.factsRequired:F1}";
+            GUILayout.Label($"{GetScoutedKindName(state.kind)} {name}: {facts}, инф. {state.informationExtractedKg:F0}/{state.informationPotentialKg:F0} кг");
+            if (state.factsComplete && !string.IsNullOrWhiteSpace(state.summaryRu))
+            {
+                GUILayout.Label(state.summaryRu);
+            }
+
+            shown++;
+        }
+    }
+
+    private static string GetScoutedKindName(ScoutedObjectKind kind)
+    {
+        return kind switch
+        {
+            ScoutedObjectKind.GasCloud => "облако",
+            ScoutedObjectKind.MiningRock => "глыба",
+            ScoutedObjectKind.Leviathan => "левиафан",
+            _ => "объект"
+        };
     }
 
     private void DrawDockedDebugUi()
@@ -2859,26 +2994,160 @@ public partial class MetaGameState : MonoBehaviour
 
         IslandProductionConfig production = worldConfig.GetProduction(island.productionId);
         IslandProductionState state = progress.GetIslandProductionState(island.id, true);
-        if (production == null || state == null)
+        if (state == null)
         {
-            GUILayout.Label(GetIslandDisplayName(island) + ": производство не задано.");
+            GUILayout.Label(GetIslandDisplayName(island) + ": склад не найден.");
             return;
         }
 
-        string producedName = worldConfig.GetItemNameRu(production.productionItemId);
-        int producedStored = state.GetResourceAmount(production.productionItemId);
-        float multiplier = GetCurrentIslandProductionMultiplier(state, production);
-        float currentRate = production.productionCountBasePerMinute * multiplier;
-
         GUILayout.Label(GetIslandDisplayName(island));
-        GUILayout.Label($"Производит: {producedName}");
-        GUILayout.Label($"Склад: {producedStored} кг");
-        GUILayout.Label($"База: {production.productionCountBasePerMinute:F2} кг/мин");
-        GUILayout.Label($"Бонусы: x{multiplier:F2}, сейчас {currentRate:F2} кг/мин");
         GUILayout.Label($"Коорд.: X {island.position.x:F0}  Y {island.position.y:F0}  Z {island.position.z:F0}");
         GUILayout.Label($"Док: {island.dockingRadius:F0} м, погрузка {island.timeForOneItemLoadSeconds:F1} сек/кг");
 
-        DrawCurrentIslandConsumption(state, production);
+        if (production != null)
+        {
+            string producedName = worldConfig.GetItemNameRu(production.productionItemId);
+            int producedStored = state.GetResourceAmount(production.productionItemId);
+            float multiplier = GetCurrentIslandProductionMultiplier(state, production);
+            float currentRate = production.productionCountBasePerMinute * multiplier;
+
+            GUILayout.Label($"Базовая генерация: {producedName}");
+            GUILayout.Label($"Склад: {producedStored} кг");
+            GUILayout.Label($"База: {production.productionCountBasePerMinute:F2} кг/мин");
+            GUILayout.Label($"Бонусы: x{multiplier:F2}, сейчас {currentRate:F2} кг/мин");
+            DrawCurrentIslandConsumption(state, production);
+        }
+        else
+        {
+            GUILayout.Label("Базовая генерация: не задана.");
+        }
+
+        DrawIslandStorageDebugControls(state);
+        DrawCurrentIslandIndustries(island, state);
+    }
+
+    private void DrawIslandStorageDebugControls(IslandProductionState state)
+    {
+        if (state == null) return;
+
+        GUILayout.Space(6f);
+        GUILayout.Label("Отладка склада");
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Ресурс", GUILayout.Width(60f));
+        productionDebugResourceId = GUILayout.TextField(productionDebugResourceId ?? "", GUILayout.Width(140f));
+        GUILayout.Label("кг", GUILayout.Width(24f));
+        string amountText = GUILayout.TextField(Mathf.Max(0, productionDebugAmount).ToString(), GUILayout.Width(60f));
+        if (int.TryParse(amountText, out int parsedAmount))
+        {
+            productionDebugAmount = Mathf.Max(0, parsedAmount);
+        }
+        GUILayout.EndHorizontal();
+
+        GUILayout.BeginHorizontal();
+        GUI.enabled = !string.IsNullOrWhiteSpace(productionDebugResourceId) && productionDebugAmount > 0;
+        if (GUILayout.Button("Добавить"))
+        {
+            state.AddResource(productionDebugResourceId, productionDebugAmount);
+            lastSaveMessage = "На склад добавлено: " + productionDebugResourceId + " x" + productionDebugAmount + ".";
+        }
+
+        GUI.enabled = !string.IsNullOrWhiteSpace(productionDebugResourceId) && productionDebugAmount > 0 && state.GetResourceAmount(productionDebugResourceId) >= productionDebugAmount;
+        if (GUILayout.Button("Списать"))
+        {
+            state.TrySpendResource(productionDebugResourceId, productionDebugAmount);
+            lastSaveMessage = "Со склада списано: " + productionDebugResourceId + " x" + productionDebugAmount + ".";
+        }
+
+        GUI.enabled = !string.IsNullOrWhiteSpace(productionDebugResourceId);
+        if (GUILayout.Button("Обнулить"))
+        {
+            state.SetResourceAmount(productionDebugResourceId, 0);
+            lastSaveMessage = "Ресурс на складе обнулен: " + productionDebugResourceId + ".";
+        }
+
+        GUI.enabled = true;
+        GUILayout.EndHorizontal();
+    }
+
+    private void DrawCurrentIslandIndustries(IslandConfig island, IslandProductionState state)
+    {
+        if (island == null || state == null || worldConfig == null) return;
+
+        GUILayout.Space(6f);
+        GUILayout.Label("Производственные линии");
+
+        int shown = 0;
+        for (int i = 0; i < worldConfig.islandIndustries.Count; i++)
+        {
+            IslandIndustryConfig industry = worldConfig.islandIndustries[i];
+            if (industry == null || industry.islandId != island.id) continue;
+
+            IndustryRecipeConfig recipe = worldConfig.GetIndustryRecipe(industry.recipeId);
+            IslandIndustryState runtime = state.GetIndustryState(industry.id, true);
+            shown++;
+
+            GUILayout.Space(4f);
+            GUILayout.Label(industry.DisplayNameRu + " [" + industry.kind + "]");
+            if (recipe == null)
+            {
+                GUILayout.Label("Нет рецепта: " + industry.recipeId);
+                continue;
+            }
+
+            GUILayout.Label("Рецепт: " + recipe.DisplayNameRu);
+            GUILayout.Label(runtime.active ? "Идет цикл, осталось " + FormatRemaining(runtime.nextCompletionUtcTicks) : "Ожидание");
+            GUILayout.Label("Циклов: " + runtime.completedCycles + ", срывов: " + runtime.failedCycles);
+
+            if (industry.kind == IslandIndustryKind.Conversion)
+            {
+                GUILayout.Label("Маховик: x" + runtime.conversionMultiplier.ToString("0.##"));
+            }
+
+            if (industry.kind == IslandIndustryKind.Assembly)
+            {
+                GUILayout.Label("Этап: " + (runtime.activeStepIndex + 1) + "/" + Mathf.Max(1, recipe.assemblySteps.Count));
+            }
+
+            if (industry.kind == IslandIndustryKind.Reaction)
+            {
+                GUILayout.Label("Скорость реакции: x" + runtime.reactionSpeedMultiplier.ToString("0.#") + ", шанс текущей партии " + (runtime.activeReactionSuccessChance * 100f).ToString("0") + "%");
+                GUILayout.BeginHorizontal();
+                DrawReactionSpeedButton(runtime, 1f);
+                DrawReactionSpeedButton(runtime, 5f);
+                DrawReactionSpeedButton(runtime, 10f);
+                DrawReactionSpeedButton(runtime, 25f);
+                DrawReactionSpeedButton(runtime, 50f);
+                GUILayout.EndHorizontal();
+            }
+
+            if (runtime.active && GUILayout.Button("Прервать цикл"))
+            {
+                IslandIndustrySimulator.CancelCycle(progress, island.id, industry.id, out lastSaveMessage);
+            }
+
+            if (!string.IsNullOrWhiteSpace(runtime.lastMessage))
+            {
+                GUILayout.Label(runtime.lastMessage);
+            }
+        }
+
+        if (shown == 0)
+        {
+            GUILayout.Label("На острове нет производственных линий из Production_industry.csv.");
+        }
+    }
+
+    private void DrawReactionSpeedButton(IslandIndustryState runtime, float speed)
+    {
+        bool previous = GUI.enabled;
+        GUI.enabled = previous && runtime != null && !Mathf.Approximately(runtime.reactionSpeedMultiplier, speed);
+        if (GUILayout.Button("x" + speed.ToString("0")))
+        {
+            runtime.reactionSpeedMultiplier = speed;
+            runtime.lastMessage = "Скорость реакции изменена на x" + speed.ToString("0") + ".";
+        }
+
+        GUI.enabled = previous;
     }
 
     private float GetCurrentIslandProductionRate(IslandProductionState state, IslandProductionConfig production)

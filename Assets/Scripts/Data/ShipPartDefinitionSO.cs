@@ -221,5 +221,15 @@ public enum ShipStatId
     [InspectorName("Харвестер: длительность цикла, сек")]
     GasHarvesterCycleSeconds = 53,
     [InspectorName("Майнинг: вместимость противоударного кузова, кг")]
-    MiningImpactHoldCapacityKg = 60
+    MiningImpactHoldCapacityKg = 60,
+    [InspectorName("Разведка: радиус наблюдения, м")]
+    ObservationRadiusMeters = 70,
+    [InspectorName("Разведка: скорость сведений на 50% радиуса")]
+    ObservationFactsAtHalfRadiusPerSecond = 71,
+    [InspectorName("Разведка: эффективность информации по глыбам")]
+    ObservationRockInfoEfficiency = 72,
+    [InspectorName("Разведка: эффективность информации по облакам")]
+    ObservationCloudInfoEfficiency = 73,
+    [InspectorName("Разведка: эффективность информации по левиафанам")]
+    ObservationLeviathanInfoEfficiency = 74
 }

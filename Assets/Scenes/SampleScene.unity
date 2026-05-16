@@ -194,7 +194,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d0d8c4bb6a74dcf96f65f17a2b61f0e, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipSocket
   slotId: utility_01
   slotTypeId: utility
@@ -269,8 +269,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_RenderShadows: 1
   m_RequiresDepthTextureOption: 2
   m_RequiresOpaqueTextureOption: 2
@@ -436,7 +436,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a17f6c20c5a546f4a99e9ad9e2f9f7d8, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::MeshArmorBody
   owner: {fileID: 855601458}
   meshCollider: {fileID: 526168663}
@@ -470,14 +470,14 @@ MonoScript:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: 
+  m_Name:
   serializedVersion: 7
   m_DefaultReferences: {}
   m_Icon: {fileID: 0}
   m_Type: 0
   m_ExecutionOrder: 0
   m_ClassName: LeviathanManager
-  m_Namespace: 
+  m_Namespace:
   m_AssemblyName: Assembly-CSharp
 --- !u!1 &619394800
 GameObject:
@@ -507,8 +507,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 073797afb82c5a1438f328866b10b3f0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_ComponentVersion: 2
   m_LightType: 4
   m_BlendStyleIndex: 0
@@ -627,7 +627,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 42b7984f466445c5b71526ea8d1d2b50, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipCrashDetector
   metaGameState: {fileID: 1497055332}
   crashRelativeSpeed: 14
@@ -664,7 +664,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 91ee23d7452c4e1db20b663c2edac29b, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipAssemblyRuntime
   shipPhysics: {fileID: 855601455}
   moduleRoot: {fileID: 0}
@@ -683,7 +683,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 39c28ffc5291a3d4db6c8d13cfb709b6, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipPhysics
   baseMass: 1585
   hullMaxTakeoffMassKg: 3000
@@ -714,19 +714,28 @@ MonoBehaviour:
   gasHarvesterPowerDrawActualKw: 0
   gasHarvesterCycleProgressSeconds: 0
   gasHarvesterBufferKg: 0
-  gasHarvesterActiveCloudId: 
-  gasHarvesterLastMessage: 
+  gasHarvesterActiveCloudId:
+  gasHarvesterLastMessage:
   miningImpactHoldCapacityKg: 60
   miningCatchRadiusMeters: 10
   miningManualShotRangeMeters: 180
-  miningLastMessage: 
+  miningLastMessage:
+  baseObservationRadiusMeters: 100
+  observationRadiusMeters: 100
+  observationFactsAtHalfRadiusPerSecond: 1
+  observationRockInfoEfficiency: 0
+  observationCloudInfoEfficiency: 0
+  observationLeviathanInfoEfficiency: 0
+  surveyLastMessage:
   weaponResourceId: weapon
   weaponShotCostKg: 0.1
   leviathanWeaponShotFlightDamage: 25
-  weaponLastMessage: 
+  weaponShotAlarmRadiusMeters: 450
+  weaponLastMessage:
   harpoonRangeMeters: 280
   harpoonRopeLengthMeters: 160
   harpoonMaxTensionKg: 4500
+  harpoonMaxTensionLifetimeSeconds: 5
   harpoonStiffnessNPerMeter: 360
   harpoonDampingNsPerMeter: 110
   harpoonReelForceN: 600
@@ -740,7 +749,9 @@ MonoBehaviour:
   leviathanHuntMinimumAltitudeMeters: 45
   leviathanHuntShotCooldownSeconds: 4
   leviathanHuntBrokenTargetCooldownSeconds: 25
-  leviathanHuntAutopilotMessage: 
+  leviathanHuntMaxTargetMassKg: 7000
+  leviathanHuntMaxTetherDriftMeters: 1500
+  leviathanHuntAutopilotMessage:
   harpoonLastMessage: "\u0413\u0430\u0440\u043F\u0443\u043D \u0433\u043E\u0442\u043E\u0432
     \u043A \u0442\u0435\u0441\u0442\u043E\u0432\u043E\u0439 \u043E\u0445\u043E\u0442\u0435."
   activeHarpoon: {fileID: 0}
@@ -753,7 +764,7 @@ MonoBehaviour:
   sideResistance: 2
   verticalAreaFactor: 4
   maxStructuralVerticalSpeed: 5
-  maxAutoVerticalSpeed: 1
+  maxAutoVerticalSpeed: 5
   windVelocity: {x: 0, y: 0, z: 0}
   autoStabilizeAtStart: 1
   altitudeHold: 0
@@ -767,7 +778,7 @@ MonoBehaviour:
   targetHeading: 0
   headingStiffness: 0.5
   headingDamping: 0.5
-  maxAutoTurnRateDeg: 5
+  maxAutoTurnRateDeg: 15
   maxStructuralTurnRateDeg: 15
   routeEnabled: 0
   waypoints: []
@@ -854,40 +865,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d7a59abc68fa3e746beb16cff559a1e0, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DamageableShip
   shipId: target_ship
   displayNameRu: "\u0426\u0435\u043B\u044C"
   maxStructureHp: 500
   structureHp: 500
-  modules:
-  - moduleId: hull
-    displayNameRu: "\u041A\u043E\u0440\u043F\u0443\u0441"
-    maxHp: 220
-    hp: 220
-    damageWeight: 0.6
-  - moduleId: engine
-    displayNameRu: "\u0414\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C"
-    maxHp: 120
-    hp: 120
-    damageWeight: 1
-  - moduleId: propeller
-    displayNameRu: "\u0412\u0438\u043D\u0442"
-    maxHp: 90
-    hp: 90
-    damageWeight: 1
-  - moduleId: claudium_loop
-    displayNameRu: "\u041A\u043B\u0430\u0432\u0434\u0438\u0435\u0432\u044B\u0439
-      \u043A\u043E\u043D\u0442\u0443\u0440"
-    maxHp: 130
-    hp: 130
-    damageWeight: 1
-  - moduleId: cargo
-    displayNameRu: "\u0413\u0440\u0443\u0437\u043E\u0432\u043E\u0439 \u043E\u0442\u0441\u0435\u043A"
-    maxHp: 80
-    hp: 80
-    damageWeight: 0.8
-  applyModuleEffectsToShipPhysics: 1
   shipPhysics: {fileID: 855601455}
   ramDamageTakenMultiplier: 1
   ramDamageDealtMultiplier: 1
@@ -895,7 +878,7 @@ MonoBehaviour:
   lastDamageMessage: "\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u044F
     \u0441\u0431\u0440\u043E\u0448\u0435\u043D\u044B."
   lastHitOutcome: 5
-  lastHitZoneId: 
+  lastHitZoneId:
   lastHitArmorMm: 0
   lastHitEffectiveArmorMm: 0
   lastHitImpactAngleDeg: 0
@@ -936,7 +919,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 577c3c7629dd40d9a4e2dc734d1d2996, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::MissionController
   mission: {fileID: 11400000, guid: f6d4b324fe9b4ba6aff23dc90e15163a, type: 2}
   targetShip: {fileID: 855601455}
@@ -1093,7 +1076,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d0d8c4bb6a74dcf96f65f17a2b61f0e, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipSocket
   slotId: propeller_main
   slotTypeId: propeller_main
@@ -1380,7 +1363,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: abef2b6f61b141a8b3afd5d6a7838f01, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::MetaGameState
   catalog: {fileID: 11400000, guid: 67a70c9cbb9d438398b8a835864d71a1, type: 2}
   techTree: {fileID: 11400000, guid: 94035a180d6f44a7a934773e0d8e32d4, type: 2}
@@ -1392,6 +1375,7 @@ MonoBehaviour:
   miningRockManager: {fileID: 1497055339}
   miningFleet: {fileID: 1497055338}
   leviathanManager: {fileID: 1497055340}
+  scoutFleet: {fileID: 0}
   startingMoney: 0
   progress:
     money: 0
@@ -1409,7 +1393,7 @@ MonoBehaviour:
     - starter_propeller_node
     - starter_claudium_loop_node
     - basic_airship
-    activeResearchTechnologyId: 
+    activeResearchTechnologyId:
     technologyResearchProgress:
     - technologyId: basic_airship
       completedCycles: 1
@@ -1423,15 +1407,13 @@ MonoBehaviour:
       moduleId: starter_propeller
     - slotId: claudium_loop
       moduleId: starter_claudium_loop
-    - slotId: utility_01
-      moduleId: starter_mining_hold
     logisticsShips:
     - shipId: logi_01
       displayName: Cargo Hauler 01
       routeId: starter_food_wood_tools
       status: 0
       currentIslandId: Island1
-      targetIslandId: 
+      targetIslandId:
       currentStopIndex: 0
       targetStopIndex: -1
       needsStopService: 1
@@ -1447,7 +1429,7 @@ MonoBehaviour:
       displayName: Gas Harvester 01
       homeIslandId: capital
       status: 0
-      targetCloudId: 
+      targetCloudId:
       nextEventUtcTicks: 0
       flightStartedUtcTicks: 0
       flightArrivesUtcTicks: 0
@@ -1463,8 +1445,8 @@ MonoBehaviour:
       displayName: Mining Kamaz 01
       homeIslandId: capital
       status: 0
-      targetRockId: 
-      targetOreTypeId: 
+      targetRockId:
+      targetOreTypeId:
       nextEventUtcTicks: 0
       flightStartedUtcTicks: 0
       flightArrivesUtcTicks: 0
@@ -1477,7 +1459,8 @@ MonoBehaviour:
       pendingFuelConsumptionKg: 0
       pendingClaudiumConsumptionKg: 0
       completedTrips: 0
-      lastError: 
+      lastError:
+    scoutShips: []
     currentMode: 0
     currentDockKind: 0
     currentDockId: capital
@@ -1486,41 +1469,187 @@ MonoBehaviour:
     hasCurrentFlightPose: 0
     currentFlightPosition: {x: 0, y: 0, z: 0}
     currentFlightRotation: {x: 0, y: 0, z: 0, w: 1}
-    activeFlightMissionId: 
+    activeFlightMissionId:
     lastSavedUtcTicks: 0
-    lastProcessUtcTicks: 639143778155923240
-    nextShopRefreshUtcTicks: 639143814155923240
-    shopSeed: 1764612168
+    lastProcessUtcTicks: 639145396442317794
+    nextShopRefreshUtcTicks: 639145432442317794
+    shopSeed: 844963914
     receivedStartingInventory: 1
+    receivedStartingPaper: 1
     shipWeaponSpendBufferKg: 0
     inventory:
     - resourceId: ore
       amount: 4
     shipCargo:
     - resourceId: wood
-      amount: 100
-    - resourceId: claudium
       amount: 50
+    - resourceId: claudium
+      amount: 25
     shipImpactCargo: []
     islandProductions:
     - islandId: capital
       storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      - resourceId: paper
+        amount: 120
+      - resourceId: windshale_ore
+        amount: 30
+      - resourceId: dawnspar_ore
+        amount: 20
+      - resourceId: mist_condensate
+        amount: 20
+      - resourceId: cloud_condensate
+        amount: 20
       - resourceId: charcoal
-        amount: 500
+        amount: 120
+      - resourceId: wood
+        amount: 160
+      - resourceId: metal
+        amount: 120
+      - resourceId: mechanisms
+        amount: 40
+      - resourceId: sulfur
+        amount: 80
+      - resourceId: alcohol
+        amount: 40
+      - resourceId: claudite
+        amount: 120
+      - resourceId: tools
+        amount: 40
+      - resourceId: cloth
+        amount: 80
       productionProgress: 0
       consumptions: []
+      industries:
+      - industryId: capital_generation_paper
+        recipeId: recipe_generation_paper
+        kind: 0
+        active: 0
+        activeStepIndex: 0
+        cycleStartedUtcTicks: 0
+        nextCompletionUtcTicks: 0
+        productionProgress: 0
+        activeInputResourceId:
+        reactionSpeedMultiplier: 1
+        activeReactionSuccessChance: 1
+        conversionMultiplier: 1
+        completedCycles: 0
+        failedCycles: 0
+        lastMessage:
+        outputBuffers: []
+      - industryId: capital_ore_crusher
+        recipeId: recipe_processing_ore
+        kind: 1
+        active: 0
+        activeStepIndex: 0
+        cycleStartedUtcTicks: 0
+        nextCompletionUtcTicks: 0
+        productionProgress: 0
+        activeInputResourceId:
+        reactionSpeedMultiplier: 1
+        activeReactionSuccessChance: 1
+        conversionMultiplier: 1
+        completedCycles: 0
+        failedCycles: 0
+        lastMessage:
+        outputBuffers: []
+      - industryId: capital_condensate_still
+        recipeId: recipe_processing_gas
+        kind: 1
+        active: 0
+        activeStepIndex: 0
+        cycleStartedUtcTicks: 0
+        nextCompletionUtcTicks: 0
+        productionProgress: 0
+        activeInputResourceId:
+        reactionSpeedMultiplier: 1
+        activeReactionSuccessChance: 1
+        conversionMultiplier: 1
+        completedCycles: 0
+        failedCycles: 0
+        lastMessage:
+        outputBuffers: []
+      - industryId: capital_tools_workshop
+        recipeId: recipe_manufacturing_tools_economy
+        kind: 2
+        active: 0
+        activeStepIndex: 0
+        cycleStartedUtcTicks: 0
+        nextCompletionUtcTicks: 0
+        productionProgress: 0
+        activeInputResourceId:
+        reactionSpeedMultiplier: 1
+        activeReactionSuccessChance: 1
+        conversionMultiplier: 1
+        completedCycles: 0
+        failedCycles: 0
+        lastMessage:
+        outputBuffers: []
+      - industryId: capital_precision_tools
+        recipeId: recipe_manufacturing_tools_quality
+        kind: 2
+        active: 0
+        activeStepIndex: 0
+        cycleStartedUtcTicks: 0
+        nextCompletionUtcTicks: 0
+        productionProgress: 0
+        activeInputResourceId:
+        reactionSpeedMultiplier: 1
+        activeReactionSuccessChance: 1
+        conversionMultiplier: 1
+        completedCycles: 0
+        failedCycles: 0
+        lastMessage:
+        outputBuffers: []
+      - industryId: capital_gunpowder_reaction
+        recipeId: recipe_reaction_gunpowder_safe
+        kind: 3
+        active: 0
+        activeStepIndex: 0
+        cycleStartedUtcTicks: 0
+        nextCompletionUtcTicks: 0
+        productionProgress: 0
+        activeInputResourceId:
+        reactionSpeedMultiplier: 1
+        activeReactionSuccessChance: 1
+        conversionMultiplier: 1
+        completedCycles: 0
+        failedCycles: 0
+        lastMessage:
+        outputBuffers: []
+      - industryId: capital_claudium_flywheel
+        recipeId: recipe_conversion_claudium
+        kind: 4
+        active: 0
+        activeStepIndex: 0
+        cycleStartedUtcTicks: 0
+        nextCompletionUtcTicks: 0
+        productionProgress: 0
+        activeInputResourceId:
+        reactionSpeedMultiplier: 1
+        activeReactionSuccessChance: 1
+        conversionMultiplier: 1
+        completedCycles: 0
+        failedCycles: 0
+        lastMessage:
+        outputBuffers: []
+      - industryId: capital_airframe_assembly
+        recipeId: recipe_assembly_airframe
+        kind: 5
+        active: 0
+        activeStepIndex: 0
+        cycleStartedUtcTicks: 0
+        nextCompletionUtcTicks: 0
+        productionProgress: 0
+        activeInputResourceId:
+        reactionSpeedMultiplier: 1
+        activeReactionSuccessChance: 1
+        conversionMultiplier: 1
+        completedCycles: 0
+        failedCycles: 0
+        lastMessage:
+        outputBuffers: []
     - islandId: Island1
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: water
@@ -1535,14 +1664,9 @@ MonoBehaviour:
       - itemId: mechanisms
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island2
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: food
@@ -1557,14 +1681,9 @@ MonoBehaviour:
       - itemId: medicines
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island3
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: food
@@ -1579,14 +1698,9 @@ MonoBehaviour:
       - itemId: medicines
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island4
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: food
@@ -1601,14 +1715,9 @@ MonoBehaviour:
       - itemId: cloth
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island5
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: fat
@@ -1623,14 +1732,9 @@ MonoBehaviour:
       - itemId: mechanisms
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island6
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: tools
@@ -1645,14 +1749,9 @@ MonoBehaviour:
       - itemId: metal
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island7
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: alcohol
@@ -1667,14 +1766,9 @@ MonoBehaviour:
       - itemId: cloth
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island8
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: food
@@ -1689,14 +1783,9 @@ MonoBehaviour:
       - itemId: wood
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island9
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: sulfur
@@ -1711,14 +1800,9 @@ MonoBehaviour:
       - itemId: medicines
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island10
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: metal
@@ -1733,14 +1817,9 @@ MonoBehaviour:
       - itemId: medicines
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island11
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: water
@@ -1755,14 +1834,9 @@ MonoBehaviour:
       - itemId: gunpowder
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island12
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: charcoal
@@ -1777,14 +1851,9 @@ MonoBehaviour:
       - itemId: metal
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island13
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: sulfur
@@ -1799,14 +1868,9 @@ MonoBehaviour:
       - itemId: alcohol
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island14
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: water
@@ -1821,14 +1885,9 @@ MonoBehaviour:
       - itemId: mechanisms
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island15
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: food
@@ -1843,14 +1902,9 @@ MonoBehaviour:
       - itemId: medicines
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island16
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: food
@@ -1865,14 +1919,9 @@ MonoBehaviour:
       - itemId: medicines
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island17
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: food
@@ -1887,14 +1936,9 @@ MonoBehaviour:
       - itemId: cloth
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island18
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: fat
@@ -1909,14 +1953,9 @@ MonoBehaviour:
       - itemId: mechanisms
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island19
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: tools
@@ -1931,14 +1970,9 @@ MonoBehaviour:
       - itemId: metal
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island20
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: alcohol
@@ -1953,14 +1987,9 @@ MonoBehaviour:
       - itemId: cloth
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island21
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: food
@@ -1975,14 +2004,9 @@ MonoBehaviour:
       - itemId: wood
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island22
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: sulfur
@@ -1997,14 +2021,9 @@ MonoBehaviour:
       - itemId: medicines
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island23
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: metal
@@ -2019,14 +2038,9 @@ MonoBehaviour:
       - itemId: medicines
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island24
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: water
@@ -2041,14 +2055,9 @@ MonoBehaviour:
       - itemId: gunpowder
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island25
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: charcoal
@@ -2063,14 +2072,9 @@ MonoBehaviour:
       - itemId: metal
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     - islandId: Island26
-      storage:
-      - resourceId: wood
-        amount: 500
-      - resourceId: charcoal
-        amount: 500
-      - resourceId: claudium
-        amount: 250
+      storage: []
       productionProgress: 0
       consumptions:
       - itemId: sulfur
@@ -2085,12 +2089,14 @@ MonoBehaviour:
       - itemId: alcohol
         consumptionProgress: 0
         isSatisfied: 0
+      industries: []
     gasClouds: []
     miningRocks: []
     miningZones: []
+    scoutedObjects: []
     cargoTransfer:
       active: 0
-      islandId: 
+      islandId:
       startedUtcTicks: 0
       nextOperationUtcTicks: 0
       secondsPerItem: 1
@@ -2103,13 +2109,14 @@ MonoBehaviour:
   startingDockId: capital
   startingDockKind: 0
   autoSaveOnDock: 1
-  loadSavedGameOnAwake: 1
-  saveFileName: wild_wind_save.json
+  loadSavedGameOnAwake: 0
+  saveFileName: wild_wind_production_debug_save.json
   startingOre: 4
   startingIron: 0
   startingFuelKg: 50
   startingClaudiumKg: 25
-  processRealTimeWhilePlaying: 1
+  startingPaperKg: 120
+  processRealTimeWhilePlaying: 0
   idleMiningIntervalSeconds: 60
   idleMiningOrePerCycle: 1
   ironSmeltingDurationSeconds: 120
@@ -2121,14 +2128,16 @@ MonoBehaviour:
   capitalIslandId: capital
   islandProductionEnabled: 1
   spawnConfigIslandsOnPlay: 1
-  configIslandVisualRadius: 80
+  configIslandVisualRadius: 20
   showDockingDebugUI: 1
   debugUiWidth: 380
+  productionDebugResourceId: wood
+  productionDebugAmount: 25
   autoInstallCrashDetector: 1
   gameTimeScale: 1
-  accelerateUnityTimeScale: 1
+  accelerateUnityTimeScale: 0
   maxUnityTimeScale: 4
-  maxAcceleratedProcessStepSeconds: 15
+  maxAcceleratedProcessStepSeconds: 10
   processOfflineProgressOnLoad: 1
   maxOfflineCatchUpHours: 240
 --- !u!114 &1497055333
@@ -2141,7 +2150,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcb3cf2e8c934b20b324bf48b3c44f9b, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipLoader
   catalog: {fileID: 11400000, guid: 67a70c9cbb9d438398b8a835864d71a1, type: 2}
   targetShip: {fileID: 855601455}
@@ -2176,7 +2185,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 58ac28f3e1c94017ae1f3dfe94ecb3e9, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::LogisticsFleetController
   metaGameState: {fileID: 1497055332}
   simulationEnabled: 1
@@ -2248,7 +2257,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 83024f541e6c4664a8011bc49870d9bd, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GasHarvesterFleetController
   metaGameState: {fileID: 1497055332}
   simulationEnabled: 1
@@ -2257,8 +2266,8 @@ MonoBehaviour:
   cruisePowerLever: 0.7
   defaultClaudiumResourceId: claudium
   unloadSecondsPerKg: 0.5
-  debugLogging: 1
-  debugStockAllIslandFuelAndClaudium: 1
+  debugLogging: 0
+  debugStockAllIslandFuelAndClaudium: 0
   debugMinIslandWoodKg: 500
   debugMinIslandCharcoalKg: 500
   debugMinIslandClaudiumKg: 250
@@ -2286,7 +2295,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a93a8499e0dc4f638cc6b2077dcd8410, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GasCloudManager
   metaGameState: {fileID: 1497055332}
   spawnConfigCloudsOnPlay: 1
@@ -2301,7 +2310,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6d6c73436e0946fd9456d4162a42fc73, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::MiningFleetController
   metaGameState: {fileID: 1497055332}
   simulationEnabled: 1
@@ -2314,8 +2323,8 @@ MonoBehaviour:
   maxMiningWatchSeconds: 300
   unloadSecondsPerKg: 0.5
   miningOffsetBelowRockMeters: 24
-  debugLogging: 1
-  debugStockAllIslandFuelAndClaudium: 1
+  debugLogging: 0
+  debugStockAllIslandFuelAndClaudium: 0
   debugMinIslandWoodKg: 500
   debugMinIslandCharcoalKg: 500
   debugMinIslandClaudiumKg: 250
@@ -2344,7 +2353,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ddcf59352cb544159b530768696a2196, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::MiningRockManager
   metaGameState: {fileID: 1497055332}
   spawnRocksOnPlay: 1
@@ -2359,7 +2368,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 607515703}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::LeviathanManager
   metaGameState: {fileID: 1497055332}
   spawnLeviathansOnPlay: 1
@@ -2406,7 +2415,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1b5d2e5b8cb14b2ba267ef009e33429a, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DockingPort
   metaGameState: {fileID: 1497055332}
   targetShip: {fileID: 855601455}
@@ -2461,7 +2470,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d0d8c4bb6a74dcf96f65f17a2b61f0e, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipSocket
   slotId: engine_main
   slotTypeId: engine_main
@@ -2542,7 +2551,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d0d8c4bb6a74dcf96f65f17a2b61f0e, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipSocket
   slotId: claudium_loop
   slotTypeId: claudium_loop

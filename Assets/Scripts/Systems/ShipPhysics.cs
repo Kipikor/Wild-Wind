@@ -130,6 +130,10 @@ public class Leviathan : MonoBehaviour
     public float routeRandomRadiusMeters = 1000f;
     [TextArea(2, 4)] public string routeStatus = "";
     [TextArea(2, 4)] public string behaviorStatus = "";
+    [Header("Разведка")]
+    [InspectorName("Паспорт разведки")]
+    [Tooltip("Автоматически обновляемая отладочная сводка: известность левиафана, прогресс сведений и научной информации.")]
+    public SurveyObjectInspectorState survey = new SurveyObjectInspectorState();
 
     private Rigidbody rb;
     private Vector3 wanderTarget;
@@ -153,6 +157,8 @@ public class Leviathan : MonoBehaviour
     private Transform visualHead;
     private Transform visualTail;
     private Transform visualDorsal;
+    private MetaGameState cachedSurveyMeta;
+    private float nextSurveyInspectorRefreshTime;
 
     public Rigidbody Body
     {
@@ -231,6 +237,7 @@ public class Leviathan : MonoBehaviour
 
         PickNewWanderTarget(true);
         EnsureVisual();
+        RefreshSurveyInspectorState(true);
     }
 
     private void Start()
@@ -247,6 +254,8 @@ public class Leviathan : MonoBehaviour
         {
             BecomeCarcass();
         }
+
+        RefreshSurveyInspectorState();
 
         if (isCarcass)
         {
@@ -1269,7 +1278,6 @@ public class Leviathan : MonoBehaviour
                     ricochetAngleDeg = 89f,
                     overmatchCaliberMultiplier = 1f,
                     structureDamageMultiplier = 1f,
-                    moduleDamageMultiplier = 1f,
                     highExplosiveSurfaceDamageMultiplier = 1f,
                     ramDamageMultiplier = 1f
                 }, context);
@@ -1318,6 +1326,44 @@ public class Leviathan : MonoBehaviour
         }
     }
 
+    private void RefreshSurveyInspectorState(bool force = false)
+    {
+        if (survey == null)
+        {
+            survey = new SurveyObjectInspectorState();
+        }
+
+        if (!force && Application.isPlaying && Time.unscaledTime < nextSurveyInspectorRefreshTime)
+        {
+            return;
+        }
+
+        nextSurveyInspectorRefreshTime = Time.unscaledTime + 0.5f;
+        MetaGameState meta = ResolveSurveyMeta();
+        float potentialKg = SurveySystem.CalculateLeviathanInformationPotentialKg(massKg);
+
+        SurveyObjectRuntimeInfo info = SurveySystem.BuildObjectRuntimeInfo(
+            meta != null ? meta.WorldConfig : null,
+            meta != null ? meta.progress : null,
+            ScoutedObjectKind.Leviathan,
+            leviathanId,
+            displayName,
+            transform.position,
+            potentialKg);
+
+        survey.Apply(info);
+    }
+
+    private MetaGameState ResolveSurveyMeta()
+    {
+        if (cachedSurveyMeta == null)
+        {
+            cachedSurveyMeta = FindFirstObjectByType<MetaGameState>();
+        }
+
+        return cachedSurveyMeta;
+    }
+
     public static Leviathan FindNearest(Vector3 position, float rangeMeters, bool requireAlive, string ignoredLeviathanId = "", float maxMassKg = 0f)
     {
         Leviathan best = null;
@@ -1350,6 +1396,20 @@ public class Leviathan : MonoBehaviour
         }
 
         return null;
+    }
+
+    public static void GetActiveLeviathans(List<Leviathan> results, bool requireAlive = false)
+    {
+        if (results == null) return;
+        results.Clear();
+
+        for (int i = 0; i < ActiveLeviathans.Count; i++)
+        {
+            Leviathan leviathan = ActiveLeviathans[i];
+            if (leviathan == null) continue;
+            if (requireAlive && leviathan.CanBeClaimed) continue;
+            results.Add(leviathan);
+        }
     }
 
     public static int CountInZone(string zoneId)
@@ -1700,7 +1760,7 @@ public class ShipPhysics : MonoBehaviour
     [Tooltip("Максимальная взлетная масса, которую допускает корпус, в килограммах.")]
     public float hullMaxTakeoffMassKg = 2000f;
     [HideInInspector] public float cargoMassKg;
-    
+
     [Header("Двигатель")]
     [Tooltip("Мощность, которую двигатель выдает на ручке 100%, в киловаттах.")]
     public float enginePowerKwAt100 = 80f;
@@ -1710,7 +1770,7 @@ public class ShipPhysics : MonoBehaviour
     public float engineFuelEfficiency = 0.32f;
     [HideInInspector] public float engineFuelEnergyKwhPerKg = 4f;
     [HideInInspector] public float engineFuelStockKg = 0f;
-    
+
     [Header("Параметры винта")]
     [Tooltip("Скорость, после которой винт больше не может разгонять корабль, м/с.")]
     public float propellerMaxSpeedMS = 30f;
@@ -1718,7 +1778,7 @@ public class ShipPhysics : MonoBehaviour
     public float propellerEfficiency = 0.8f;
     [Tooltip("Максимальная статическая тяга винта, кгс.")]
     public float propellerMaxThrustKgf = 220f;
-    
+
     [Header("Клавдиевый контур")]
     [Tooltip("Ресурс клавдия в грузовом списке корабля.")]
     public string claudiumResourceId = "claudium";
@@ -1761,6 +1821,21 @@ public class ShipPhysics : MonoBehaviour
     [Tooltip("Дальность временной кнопки выстрела по глыбе.")]
     public float miningManualShotRangeMeters = 180f;
     [HideInInspector] public string miningLastMessage = "";
+
+    [Header("Разведка")]
+    [Tooltip("Базовый радиус, в котором любой корабль замечает координаты и постепенно собирает сведения без специальных приборов.")]
+    public float baseObservationRadiusMeters = 100f;
+    [Tooltip("Текущий радиус наблюдения после модулей. Если приборов нет, используется базовый радиус корабля.")]
+    public float observationRadiusMeters = 100f;
+    [Tooltip("Сколько единиц сведений в секунду собирается на половине радиуса наблюдения. У центра быстрее, у края медленнее.")]
+    public float observationFactsAtHalfRadiusPerSecond = 1f;
+    [Tooltip("Доля потенциальной научной информации о глыбах, которую прибор может снять, перерабатывая бумагу.")]
+    [Range(0f, 1f)] public float observationRockInfoEfficiency;
+    [Tooltip("Доля потенциальной научной информации об облаках, которую прибор может снять, перерабатывая бумагу.")]
+    [Range(0f, 1f)] public float observationCloudInfoEfficiency;
+    [Tooltip("Доля потенциальной научной информации о левиафанах, которую прибор может снять, перерабатывая бумагу.")]
+    [Range(0f, 1f)] public float observationLeviathanInfoEfficiency;
+    [HideInInspector] public string surveyLastMessage = "";
 
     [Header("Оружие")]
     [Tooltip("Ресурс в грузовом списке корабля, который тратится на ручные выстрелы.")]
@@ -1816,7 +1891,7 @@ public class ShipPhysics : MonoBehaviour
     [HideInInspector] public string leviathanHuntAutopilotMessage = "";
     [HideInInspector] public string harpoonLastMessage = "";
     [HideInInspector] public HarpoonTether activeHarpoon;
-    
+
     [Header("Гироскопический поворот")]
     public float gyroTurnTorque = 12000f; // Максимальный внутренний момент поворота корпуса, Н*м
     public float gyroTurnDamping = 0.8f; // Демпфирование, которое гасит лишнюю угловую скорость
@@ -1828,11 +1903,11 @@ public class ShipPhysics : MonoBehaviour
     public float frontalArea = 6.3f; // Лобовая площадь (кв.м)
     public float sideResistance = 2.0f; // Сопротивление боковому сносу (эффект киля)
     public float verticalAreaFactor = 4.0f; // Во сколько раз площадь "пуза" больше лобовой площади
-    
+
     [Header("Лимиты скорости подъема")]
     public float maxStructuralVerticalSpeed = 5.0f; // Предел прочности (конструкционный)
     public float maxAutoVerticalSpeed = 1.0f;        // Лимит автопилота
-    
+
     [Header("Окружающая среда")]
     public Vector3 windVelocity = Vector3.zero; // Глобальный вектор ветра (м/с)
 
@@ -1856,7 +1931,7 @@ public class ShipPhysics : MonoBehaviour
     public float headingDamping = 0.5f;   // D-терм (Демпфирование по угловой скорости)
     public float maxAutoTurnRateDeg = 5.0f; // Лимит угловой скорости для автопилота (°/сек)
     public float maxStructuralTurnRateDeg = 15.0f; // Конструкционный лимит угловой скорости (°/сек)
-    
+
     [Header("Путевая машина")]
     public bool routeEnabled = false;
     public System.Collections.Generic.List<Vector3> waypoints = new System.Collections.Generic.List<Vector3>();
@@ -1872,7 +1947,7 @@ public class ShipPhysics : MonoBehaviour
     public float positionHoldMaxSpeedMS = 8f;
     public float positionHoldStiffness = 0.35f;
     public float positionHoldDamping = 0.9f;
-    
+
     [Header("Настройки тяги винта")]
     public float propellerPitch = 0f;    // Текущее задание тяги (-1..1)
     public float speedStiffness = 0.8f;  // Насколько активно круиз меняет тягу
@@ -1883,15 +1958,15 @@ public class ShipPhysics : MonoBehaviour
     [HideInInspector] public float turnInput;   // -1 влево, 1 вправо
     [HideInInspector] public float targetTrimMass = 1000f; // Масса для триммирования (кг)
     [HideInInspector] public float liftInput;   // -1 вниз, 1 вверх (Точная доводка +-10%)
-    
+
     // ==========================================
     // МОДУЛИ (Дочерние объекты)
     // ==========================================
     [Header("Установленные модули")]
-    
-    [HideInInspector] public float currentGasLift; 
-    [HideInInspector] public float activeLiftForce; 
-    
+
+    [HideInInspector] public float currentGasLift;
+    [HideInInspector] public float activeLiftForce;
+
     [FormerlySerializedAs("targetMainEngineRPM")]
     [HideInInspector] public float enginePowerLever = 0.88f;
     [HideInInspector] public float engineEfficiencyCurrent;
@@ -1921,8 +1996,10 @@ public class ShipPhysics : MonoBehaviour
     private Vector3 leviathanHuntCapturePosition;
     private Vector3 leviathanHuntTetherDirection;
     private string gasHarvesterCycleCloudId = "";
+    private float surveyTickAccumulator;
     private MetaGameState cachedMetaGameState;
-    
+    private readonly List<Leviathan> huntTargetBuffer = new List<Leviathan>();
+
     // Единая ручка управления мощностью (Обороты для CSU / Газ для Manual)
     void Awake()
     {
@@ -1932,9 +2009,9 @@ public class ShipPhysics : MonoBehaviour
         rb.useGravity = true;
         ConfigureYawOnlyRigidbody();
         EnforceYawOnlyRotation(true);
-        
-        rb.angularDamping = 2f; 
-        rb.linearDamping = 0f; 
+
+        rb.angularDamping = 2f;
+        rb.linearDamping = 0f;
     }
 
     public void RefreshRuntimeShipSettings()
@@ -2130,7 +2207,7 @@ public class ShipPhysics : MonoBehaviour
         return spent;
     }
 
-    public bool TryFireHarpoonAtNearestLeviathan(out string reason, float maxTargetMassKg = 0f)
+    public bool TryFireHarpoonAtNearestLeviathan(out string reason, float maxTargetMassKg = 0f, bool requireSurveyed = false)
     {
         reason = "";
         if (activeHarpoon != null && activeHarpoon.IsAttached)
@@ -2140,7 +2217,9 @@ public class ShipPhysics : MonoBehaviour
             return false;
         }
 
-        Leviathan target = Leviathan.FindNearest(transform.position, Mathf.Max(0f, harpoonRangeMeters), true, "", maxTargetMassKg);
+        Leviathan target = requireSurveyed
+            ? FindNearestSurveyedLeviathan(Mathf.Max(0f, harpoonRangeMeters), "", maxTargetMassKg)
+            : Leviathan.FindNearest(transform.position, Mathf.Max(0f, harpoonRangeMeters), true, "", maxTargetMassKg);
         if (target == null)
         {
             reason = maxTargetMassKg > 0f
@@ -2179,6 +2258,33 @@ public class ShipPhysics : MonoBehaviour
         reason = activeHarpoon.lastMessage;
         harpoonLastMessage = reason;
         return activeHarpoon.IsAttached;
+    }
+
+    private Leviathan FindNearestSurveyedLeviathan(float rangeMeters, string ignoredLeviathanId, float maxMassKg)
+    {
+        MetaGameState meta = ResolveMetaGameState();
+        PlayerProgress progress = meta != null ? meta.progress : null;
+        if (progress == null) return null;
+
+        Leviathan best = null;
+        float bestSqr = Mathf.Max(0f, rangeMeters) * Mathf.Max(0f, rangeMeters);
+        Leviathan.GetActiveLeviathans(huntTargetBuffer, true);
+        for (int i = 0; i < huntTargetBuffer.Count; i++)
+        {
+            Leviathan leviathan = huntTargetBuffer[i];
+            if (leviathan == null) continue;
+            if (!string.IsNullOrWhiteSpace(ignoredLeviathanId) && leviathan.leviathanId == ignoredLeviathanId) continue;
+            if (maxMassKg > 0f && leviathan.massKg > maxMassKg) continue;
+            if (!progress.HasObjectFacts(ScoutedObjectKind.Leviathan, leviathan.leviathanId)) continue;
+
+            float sqr = (leviathan.transform.position - transform.position).sqrMagnitude;
+            if (sqr > bestSqr) continue;
+
+            best = leviathan;
+            bestSqr = sqr;
+        }
+
+        return best;
     }
 
     public void DetachHarpoon(string reason = "Гарпун отцеплен.")
@@ -2459,7 +2565,7 @@ public class ShipPhysics : MonoBehaviour
             ? leviathanHuntIgnoredTargetId
             : "";
         float maxAutoTargetMassKg = Mathf.Max(0f, leviathanHuntMaxTargetMassKg);
-        Leviathan nearest = Leviathan.FindNearest(transform.position, Mathf.Max(0f, leviathanHuntSearchRangeMeters), true, ignoredTarget, maxAutoTargetMassKg);
+        Leviathan nearest = FindNearestSurveyedLeviathan(Mathf.Max(0f, leviathanHuntSearchRangeMeters), ignoredTarget, maxAutoTargetMassKg);
         if (nearest == null)
         {
             routeEnabled = false;
@@ -2511,7 +2617,7 @@ public class ShipPhysics : MonoBehaviour
                 return;
             }
 
-            TryFireHarpoonAtNearestLeviathan(out string fireMessage, maxAutoTargetMassKg);
+            TryFireHarpoonAtNearestLeviathan(out string fireMessage, maxAutoTargetMassKg, true);
             leviathanHuntAutopilotMessage = fireMessage;
             return;
         }
@@ -2713,14 +2819,15 @@ public class ShipPhysics : MonoBehaviour
         UpdateHeadingAutopilot(); // Автопилот курса
         UpdateClaudium(); // Магия Клавдия
         UpdateGasHarvester();
-        
+        UpdateSurvey();
+
         // --- АЭРОДИНАМИКА (с учетом ветра) ---
         Vector3 airVelocity = rb.linearVelocity - windVelocity;
         float airspeed = airVelocity.magnitude;
-        
+
         float aeroMultiplier = 1.0f;
         float currentDrag = CurrentAeroDrag * aeroMultiplier;
-        
+
         if (airspeed > 0.01f)
         {
             Vector3 dragForce = -airVelocity.normalized * (airspeed * airspeed) * currentDrag;
@@ -2845,17 +2952,17 @@ public class ShipPhysics : MonoBehaviour
         {
             float currentHeading = transform.eulerAngles.y;
             float headingError = Mathf.DeltaAngle(currentHeading, targetHeading);
-            
+
             // P-терм: требуемая угловая скорость (градусов в секунду)
             float targetTurnRate = headingError * headingStiffness;
-            
+
             // Ограничение скорости поворота автопилотом
             targetTurnRate = Mathf.Clamp(targetTurnRate, -maxAutoTurnRateDeg, maxAutoTurnRateDeg);
-            
+
             // D-терм: компенсация по текущей угловой скорости
             float currentTurnRate = rb.angularVelocity.y * Mathf.Rad2Deg;
             float rateError = targetTurnRate - currentTurnRate;
-            
+
             // Вывод на штурвал (turnInput)
             float turnCommand = rateError * headingDamping;
             turnInput = Mathf.Clamp(turnCommand, -1f, 1f);
@@ -2876,11 +2983,11 @@ public class ShipPhysics : MonoBehaviour
             horizontalVelocity.y = 0f;
             float currentSpeed = Vector3.Dot(horizontalVelocity, forward.normalized);
             float speedError = targetSpeedMS - currentSpeed;
-            
+
             // Жесткость (P-терм)
             float desiredOutput = speedError * speedStiffness;
             desiredOutput = Mathf.Clamp(desiredOutput, -1f, 1f);
-            
+
             float response = 1f - Mathf.Exp(-Mathf.Max(0.01f, speedDamping) * 6f * Time.fixedDeltaTime);
             thrustInput = Mathf.Lerp(thrustInput, desiredOutput, response);
             enginePowerLever = Mathf.Lerp(enginePowerLever, Mathf.Clamp01(Mathf.Abs(desiredOutput)), response);
@@ -3300,6 +3407,46 @@ public class ShipPhysics : MonoBehaviour
         UpdateSimplifiedClaudium();
     }
 
+    private void UpdateSurvey()
+    {
+        surveyTickAccumulator += Time.fixedDeltaTime;
+        if (surveyTickAccumulator < 1f) return;
+
+        float deltaSeconds = surveyTickAccumulator;
+        surveyTickAccumulator = 0f;
+
+        MetaGameState meta = ResolveMetaGameState();
+        if (meta == null || meta.progress == null || meta.WorldConfig == null)
+        {
+            surveyLastMessage = "Разведка ждет MetaGameState.";
+            return;
+        }
+
+        float radius = Mathf.Max(0f, observationRadiusMeters, baseObservationRadiusMeters);
+        float speed = Mathf.Max(0.01f, observationFactsAtHalfRadiusPerSecond);
+        int changed = SurveySystem.ObserveAndExtractWorldFromPoint(
+            meta.WorldConfig,
+            meta.progress,
+            transform.position,
+            radius,
+            speed,
+            deltaSeconds,
+            meta.CurrentProcessUtcNow.Ticks,
+            meta.progress.shipCargo,
+            observationRockInfoEfficiency,
+            observationCloudInfoEfficiency,
+            observationLeviathanInfoEfficiency);
+
+        bool hasScientificGear = observationRockInfoEfficiency > 0f
+            || observationCloudInfoEfficiency > 0f
+            || observationLeviathanInfoEfficiency > 0f;
+        surveyLastMessage = changed > 0
+            ? "Разведка обновила сведения или научную информацию."
+            : hasScientificGear
+                ? "Разведка активна. Для научной информации нужна бумага и объект в радиусе."
+                : "Пассивная разведка активна: собирает координаты и сведения в базовом радиусе.";
+    }
+
     private void UpdateGasHarvester()
     {
         gasHarvesterPowerDrawActualKw = 0f;
@@ -3461,7 +3608,7 @@ public class ShipPhysics : MonoBehaviour
         {
             // Рисуем сферу (радиус достижения точки)
             Gizmos.DrawWireSphere(waypoints[i], waypointRadius);
-            
+
             // Соединяем точки линией
             if (i > 0)
             {

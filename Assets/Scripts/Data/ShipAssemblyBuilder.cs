@@ -202,6 +202,40 @@ public static class ShipAssemblyBuilder
         return null;
     }
 
+    public static int ApplySpecialModuleConfigs(ShipCatalogSO catalog, WorldConfigDatabase config)
+    {
+        if (catalog == null || catalog.parts == null || config == null || config.specialModules == null) return 0;
+
+        int applied = 0;
+        for (int i = 0; i < config.specialModules.Count; i++)
+        {
+            SpecialModuleConfig moduleConfig = config.specialModules[i];
+            if (moduleConfig == null || string.IsNullOrWhiteSpace(moduleConfig.id)) continue;
+
+            ShipPartDefinitionSO part = catalog.GetPartById(moduleConfig.id);
+            if (part == null || !part.IsModule) continue;
+
+            part.displayName = moduleConfig.DisplayNameRu;
+            if (!string.IsNullOrWhiteSpace(moduleConfig.descriptionRu))
+            {
+                part.description = moduleConfig.descriptionRu;
+            }
+
+            part.completedTechId = moduleConfig.completedTechId ?? "";
+            part.engineFuelId = "";
+            part.compatibleSlotTypeIds = new List<string>();
+            if (moduleConfig.compatibleSlotTypeIds != null)
+            {
+                part.compatibleSlotTypeIds.AddRange(moduleConfig.compatibleSlotTypeIds);
+            }
+
+            part.statModifiers = BuildSpecialModuleStatModifiers(moduleConfig);
+            applied++;
+        }
+
+        return applied;
+    }
+
     private static void AddSlots(List<ShipSlotDefinition> target, List<ShipSlotDefinition> source, string prefix)
     {
         if (target == null || source == null) return;
@@ -240,6 +274,37 @@ public static class ShipAssemblyBuilder
         }
 
         return true;
+    }
+
+    private static List<ShipStatModifier> BuildSpecialModuleStatModifiers(SpecialModuleConfig moduleConfig)
+    {
+        List<ShipStatModifier> modifiers = new List<ShipStatModifier>();
+        if (moduleConfig == null) return modifiers;
+
+        AddSpecialModuleStat(modifiers, ShipStatId.BaseMass, ShipStatOperation.Add, moduleConfig.baseMassKg);
+        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterVolumeM3PerSecond, ShipStatOperation.Set, moduleConfig.gasHarvesterVolumeM3PerSecond);
+        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterPowerDrawKw, ShipStatOperation.Set, moduleConfig.gasHarvesterPowerDrawKw);
+        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterRadiusMeters, ShipStatOperation.Set, moduleConfig.gasHarvesterRadiusMeters);
+        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterCycleSeconds, ShipStatOperation.Set, moduleConfig.gasHarvesterCycleSeconds);
+        AddSpecialModuleStat(modifiers, ShipStatId.MiningImpactHoldCapacityKg, ShipStatOperation.Set, moduleConfig.miningImpactHoldCapacityKg);
+        AddSpecialModuleStat(modifiers, ShipStatId.ObservationRadiusMeters, ShipStatOperation.Set, moduleConfig.observationRadiusMeters);
+        AddSpecialModuleStat(modifiers, ShipStatId.ObservationFactsAtHalfRadiusPerSecond, ShipStatOperation.Set, moduleConfig.observationFactsAtHalfRadiusPerSecond);
+        AddSpecialModuleStat(modifiers, ShipStatId.ObservationRockInfoEfficiency, ShipStatOperation.Set, moduleConfig.observationRockInfoEfficiency);
+        AddSpecialModuleStat(modifiers, ShipStatId.ObservationCloudInfoEfficiency, ShipStatOperation.Set, moduleConfig.observationCloudInfoEfficiency);
+        AddSpecialModuleStat(modifiers, ShipStatId.ObservationLeviathanInfoEfficiency, ShipStatOperation.Set, moduleConfig.observationLeviathanInfoEfficiency);
+        return modifiers;
+    }
+
+    private static void AddSpecialModuleStat(List<ShipStatModifier> modifiers, ShipStatId stat, ShipStatOperation operation, float value)
+    {
+        if (value <= 0f) return;
+
+        modifiers.Add(new ShipStatModifier
+        {
+            stat = stat,
+            operation = operation,
+            value = value
+        });
     }
 }
 
@@ -364,6 +429,11 @@ public class ShipStatBlock
         ship.gasHarvesterRadiusMeters = Mathf.Max(0f, Get(ShipStatId.GasHarvesterRadiusMeters, 0f));
         ship.gasHarvesterCycleSeconds = Mathf.Max(0.1f, Get(ShipStatId.GasHarvesterCycleSeconds, 5f));
         ship.miningImpactHoldCapacityKg = Mathf.Max(0f, Get(ShipStatId.MiningImpactHoldCapacityKg, 0f));
+        ship.observationRadiusMeters = Mathf.Max(ship.baseObservationRadiusMeters, Get(ShipStatId.ObservationRadiusMeters, ship.baseObservationRadiusMeters));
+        ship.observationFactsAtHalfRadiusPerSecond = Mathf.Max(0.01f, Get(ShipStatId.ObservationFactsAtHalfRadiusPerSecond, 1f));
+        ship.observationRockInfoEfficiency = Mathf.Clamp01(Get(ShipStatId.ObservationRockInfoEfficiency, 0f));
+        ship.observationCloudInfoEfficiency = Mathf.Clamp01(Get(ShipStatId.ObservationCloudInfoEfficiency, 0f));
+        ship.observationLeviathanInfoEfficiency = Mathf.Clamp01(Get(ShipStatId.ObservationLeviathanInfoEfficiency, 0f));
 
         Rigidbody body = ship.GetComponent<Rigidbody>();
         if (body != null)

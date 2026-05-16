@@ -612,6 +612,7 @@ public class GasHarvesterFleetController : MonoBehaviour
         {
             GasCloudConfig cloud = config.gasClouds[i];
             if (cloud == null || string.IsNullOrWhiteSpace(cloud.id)) continue;
+            if (!SurveySystem.IsFullySurveyedForWork(progress, ScoutedObjectKind.GasCloud, cloud.id)) continue;
 
             float remaining = GetCloudRemainingLiters(progress, config, cloud.id);
             if (remaining <= 0.001f) continue;

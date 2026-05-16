@@ -16,9 +16,16 @@ public class GasCloud : MonoBehaviour
     public float remainingVolumeLiters = 100f;
     public Color visualColor = new Color(0.75f, 0.85f, 1f, 0.35f);
 
+    [Header("Разведка")]
+    [InspectorName("Паспорт разведки")]
+    [Tooltip("Автоматически обновляемая отладочная сводка: известность объекта, прогресс сведений и научной информации.")]
+    public SurveyObjectInspectorState survey = new SurveyObjectInspectorState();
+
     private GasCloudManager manager;
     private GasCloudState state;
     private Transform visual;
+    private MetaGameState cachedSurveyMeta;
+    private float nextSurveyInspectorRefreshTime;
 
     public bool IsDepleted => remainingVolumeLiters <= 0.001f;
     public float CurrentRadiusMeters => CalculateRadiusMeters(remainingVolumeLiters, condensateLitersPerCubicMeter);
@@ -45,6 +52,20 @@ public class GasCloud : MonoBehaviour
         }
 
         return null;
+    }
+
+    public static void GetActiveClouds(List<GasCloud> results, bool includeDepleted = false)
+    {
+        if (results == null) return;
+        results.Clear();
+
+        for (int i = 0; i < ActiveClouds.Count; i++)
+        {
+            GasCloud cloud = ActiveClouds[i];
+            if (cloud == null) continue;
+            if (!includeDepleted && cloud.IsDepleted) continue;
+            results.Add(cloud);
+        }
     }
 
     public static GasCloud FindRandomOverlapping(Vector3 position, float harvesterRadius)
@@ -97,6 +118,7 @@ public class GasCloud : MonoBehaviour
         }
 
         ApplyVisual();
+        RefreshSurveyInspectorState(true);
     }
 
     public bool IntersectsHarvestRadius(Vector3 position, float harvesterRadius)
@@ -123,6 +145,11 @@ public class GasCloud : MonoBehaviour
 
         ApplyVisual();
         return harvestedLiters;
+    }
+
+    private void Update()
+    {
+        RefreshSurveyInspectorState();
     }
 
     private void OnEnable()
@@ -161,5 +188,45 @@ public class GasCloud : MonoBehaviour
 
         gameObject.SetActive(!IsDepleted);
         manager?.NotifyCloudChanged(this);
+    }
+
+    private void RefreshSurveyInspectorState(bool force = false)
+    {
+        if (survey == null)
+        {
+            survey = new SurveyObjectInspectorState();
+        }
+
+        if (!force && Application.isPlaying && Time.unscaledTime < nextSurveyInspectorRefreshTime)
+        {
+            return;
+        }
+
+        nextSurveyInspectorRefreshTime = Time.unscaledTime + 0.5f;
+        MetaGameState meta = ResolveSurveyMeta();
+        WorldConfigDatabase config = meta != null ? meta.WorldConfig : null;
+        PlayerProgress progress = meta != null ? meta.progress : null;
+        float potentialKg = SurveySystem.CalculateGasCloudInformationPotentialKg(initialVolumeLiters);
+
+        SurveyObjectRuntimeInfo info = SurveySystem.BuildObjectRuntimeInfo(
+            config,
+            progress,
+            ScoutedObjectKind.GasCloud,
+            cloudId,
+            displayName,
+            transform.position,
+            potentialKg);
+
+        survey.Apply(info);
+    }
+
+    private MetaGameState ResolveSurveyMeta()
+    {
+        if (cachedSurveyMeta == null)
+        {
+            cachedSurveyMeta = FindFirstObjectByType<MetaGameState>();
+        }
+
+        return cachedSurveyMeta;
     }
 }

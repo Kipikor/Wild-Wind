@@ -5,7 +5,7 @@ using System.IO;
 using System.Text;
 using UnityEngine;
 
-public class WorldConfigDatabase
+public partial class WorldConfigDatabase
 {
     private readonly Dictionary<string, ItemConfig> itemsById = new Dictionary<string, ItemConfig>();
     private readonly Dictionary<string, IslandConfig> islandsById = new Dictionary<string, IslandConfig>();
@@ -17,6 +17,9 @@ public class WorldConfigDatabase
     private readonly Dictionary<string, LeviathanTypeConfig> leviathanTypesById = new Dictionary<string, LeviathanTypeConfig>();
     private readonly Dictionary<string, LeviathanZoneConfig> leviathanZonesById = new Dictionary<string, LeviathanZoneConfig>();
     private readonly Dictionary<string, TechnologyConfig> technologiesById = new Dictionary<string, TechnologyConfig>();
+    private readonly Dictionary<string, SpecialModuleConfig> specialModulesById = new Dictionary<string, SpecialModuleConfig>();
+    private readonly Dictionary<string, IslandIndustryConfig> islandIndustriesById = new Dictionary<string, IslandIndustryConfig>();
+    private readonly Dictionary<string, IndustryRecipeConfig> industryRecipesById = new Dictionary<string, IndustryRecipeConfig>();
 
     public List<ItemConfig> items = new List<ItemConfig>();
     public List<IslandConfig> islands = new List<IslandConfig>();
@@ -28,6 +31,9 @@ public class WorldConfigDatabase
     public List<LeviathanTypeConfig> leviathanTypes = new List<LeviathanTypeConfig>();
     public List<LeviathanZoneConfig> leviathanZones = new List<LeviathanZoneConfig>();
     public List<TechnologyConfig> technologies = new List<TechnologyConfig>();
+    public List<SpecialModuleConfig> specialModules = new List<SpecialModuleConfig>();
+    public List<IslandIndustryConfig> islandIndustries = new List<IslandIndustryConfig>();
+    public List<IndustryRecipeConfig> industryRecipes = new List<IndustryRecipeConfig>();
 
     public bool isLoaded;
     public string lastError = "";
@@ -54,6 +60,10 @@ public class WorldConfigDatabase
             LoadLeviathanTypes(Path.Combine(folder, "Leviathan_type.csv"));
             LoadLeviathanZones(Path.Combine(folder, "Leviathan_zone.csv"));
             LoadTechnologies(Path.Combine(folder, "Technology.csv"));
+            LoadSpecialModules(Path.Combine(folder, "Special_module.csv"));
+            LoadIndustryRecipes(Path.Combine(folder, "Production_recipe.csv"));
+            LoadAssemblySteps(Path.Combine(folder, "Assembly_step.csv"));
+            LoadIslandIndustries(Path.Combine(folder, "Production_industry.csv"));
             isLoaded = true;
             lastError = "";
         }
@@ -135,6 +145,27 @@ public class WorldConfigDatabase
         return zone;
     }
 
+    public SpecialModuleConfig GetSpecialModule(string moduleId)
+    {
+        if (string.IsNullOrWhiteSpace(moduleId)) return null;
+        specialModulesById.TryGetValue(moduleId, out SpecialModuleConfig module);
+        return module;
+    }
+
+    public IslandIndustryConfig GetIslandIndustry(string industryId)
+    {
+        if (string.IsNullOrWhiteSpace(industryId)) return null;
+        islandIndustriesById.TryGetValue(industryId, out IslandIndustryConfig industry);
+        return industry;
+    }
+
+    public IndustryRecipeConfig GetIndustryRecipe(string recipeId)
+    {
+        if (string.IsNullOrWhiteSpace(recipeId)) return null;
+        industryRecipesById.TryGetValue(recipeId, out IndustryRecipeConfig recipe);
+        return recipe;
+    }
+
     public string GetItemNameRu(string itemId)
     {
         ItemConfig item = GetItem(itemId);
@@ -161,6 +192,9 @@ public class WorldConfigDatabase
         leviathanTypes.Clear();
         leviathanZones.Clear();
         technologies.Clear();
+        specialModules.Clear();
+        islandIndustries.Clear();
+        industryRecipes.Clear();
         itemsById.Clear();
         islandsById.Clear();
         productionsById.Clear();
@@ -171,6 +205,9 @@ public class WorldConfigDatabase
         leviathanTypesById.Clear();
         leviathanZonesById.Clear();
         technologiesById.Clear();
+        specialModulesById.Clear();
+        islandIndustriesById.Clear();
+        industryRecipesById.Clear();
         isLoaded = false;
         lastError = "";
     }
@@ -478,6 +515,38 @@ public class WorldConfigDatabase
         }
     }
 
+    private void LoadSpecialModules(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            SpecialModuleConfig module = new SpecialModuleConfig
+            {
+                id = Get(row, "id_special_module"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                descriptionRu = Get(row, "description_ru"),
+                completedTechId = Get(row, "complited_tech"),
+                baseMassKg = Mathf.Max(0f, ParseFloat(Get(row, "base_mass_kg"))),
+                gasHarvesterVolumeM3PerSecond = Mathf.Max(0f, ParseFloat(Get(row, "gas_harvester_volume_m3_per_second"))),
+                gasHarvesterPowerDrawKw = Mathf.Max(0f, ParseFloat(Get(row, "gas_harvester_power_draw_kw"))),
+                gasHarvesterRadiusMeters = Mathf.Max(0f, ParseFloat(Get(row, "gas_harvester_radius_m"))),
+                gasHarvesterCycleSeconds = Mathf.Max(0f, ParseFloat(Get(row, "gas_harvester_cycle_seconds"))),
+                miningImpactHoldCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "mining_impact_hold_capacity_kg"))),
+                observationRadiusMeters = Mathf.Max(0f, ParseFloat(Get(row, "observation_radius_m"))),
+                observationFactsAtHalfRadiusPerSecond = Mathf.Max(0f, ParseFloat(Get(row, "observation_facts_at_half_radius_per_second"))),
+                observationRockInfoEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "observation_rock_info_efficiency"))),
+                observationCloudInfoEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "observation_cloud_info_efficiency"))),
+                observationLeviathanInfoEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "observation_leviathan_info_efficiency")))
+            };
+
+            module.compatibleSlotTypeIds.AddRange(SplitInlineList(Get(row, "compatible_slot_type")));
+
+            if (string.IsNullOrWhiteSpace(module.id)) continue;
+            specialModules.Add(module);
+            specialModulesById[module.id] = module;
+        }
+    }
+
     private static IEnumerable<Dictionary<string, string>> ReadCsv(string path)
     {
         if (!File.Exists(path))
@@ -758,6 +827,29 @@ public class TechnologyCostConfig
 {
     public string itemId = "";
     public int amount;
+}
+
+public class SpecialModuleConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public string descriptionRu = "";
+    public string completedTechId = "";
+    public float baseMassKg;
+    public List<string> compatibleSlotTypeIds = new List<string>();
+    public float gasHarvesterVolumeM3PerSecond;
+    public float gasHarvesterPowerDrawKw;
+    public float gasHarvesterRadiusMeters;
+    public float gasHarvesterCycleSeconds;
+    public float miningImpactHoldCapacityKg;
+    public float observationRadiusMeters;
+    public float observationFactsAtHalfRadiusPerSecond;
+    public float observationRockInfoEfficiency;
+    public float observationCloudInfoEfficiency;
+    public float observationLeviathanInfoEfficiency;
+
+    public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }
 
 public static class IslandProductionSimulator

@@ -9,10 +9,16 @@ public class MiningRock : MonoBehaviour
     public string oreTypeId = "";
     public string displayName = "";
 
+    [Header("Разведка")]
+    [InspectorName("Паспорт разведки")]
+    [Tooltip("Автоматически обновляемая отладочная сводка: известность глыбы, прогресс сведений и научной информации.")]
+    public SurveyObjectInspectorState survey = new SurveyObjectInspectorState();
+
     private MetaGameState meta;
     private MiningRockState state;
     private Renderer cachedRenderer;
     private long lastVisualNaturalShedUtcTicks;
+    private float nextSurveyInspectorRefreshTime;
 
     public bool IsDepleted => state == null || state.remainingOreKg <= 0.001f;
     public MetaGameState Meta => meta;
@@ -34,6 +40,20 @@ public class MiningRock : MonoBehaviour
         }
 
         return null;
+    }
+
+    public static void GetActiveRocks(List<MiningRock> results, bool includeDepleted = false)
+    {
+        if (results == null) return;
+        results.Clear();
+
+        for (int i = 0; i < ActiveRocks.Count; i++)
+        {
+            MiningRock rock = ActiveRocks[i];
+            if (rock == null) continue;
+            if (!includeDepleted && rock.IsDepleted) continue;
+            results.Add(rock);
+        }
     }
 
     public static bool ShootNearest(Vector3 origin, float rangeMeters, out string message)
@@ -83,6 +103,7 @@ public class MiningRock : MonoBehaviour
         lastVisualNaturalShedUtcTicks = state != null ? state.lastNaturalShedUtcTicks : 0;
         ApplyVisual();
         UpdatePosition();
+        RefreshSurveyInspectorState(true);
     }
 
     private void Update()
@@ -103,6 +124,7 @@ public class MiningRock : MonoBehaviour
         UpdatePosition();
         SpawnNewNaturalShedFragments();
         ApplyVisual();
+        RefreshSurveyInspectorState();
     }
 
     public bool BreakOffByShot(out string message)
@@ -215,6 +237,35 @@ public class MiningRock : MonoBehaviour
     private OreTypeConfig GetOreType()
     {
         return meta != null && meta.WorldConfig != null && state != null ? meta.WorldConfig.GetOreType(state.oreTypeId) : null;
+    }
+
+    private void RefreshSurveyInspectorState(bool force = false)
+    {
+        if (survey == null)
+        {
+            survey = new SurveyObjectInspectorState();
+        }
+
+        if (!force && Application.isPlaying && Time.unscaledTime < nextSurveyInspectorRefreshTime)
+        {
+            return;
+        }
+
+        nextSurveyInspectorRefreshTime = Time.unscaledTime + 0.5f;
+        MiningZoneConfig zone = GetZone();
+        float rockOreKg = zone != null ? zone.rockOreKg : (state != null ? state.remainingOreKg : 0f);
+        float potentialKg = SurveySystem.CalculateMiningRockInformationPotentialKg(rockOreKg);
+
+        SurveyObjectRuntimeInfo info = SurveySystem.BuildObjectRuntimeInfo(
+            meta != null ? meta.WorldConfig : null,
+            meta != null ? meta.progress : null,
+            ScoutedObjectKind.MiningRock,
+            rockId,
+            displayName,
+            transform.position,
+            potentialKg);
+
+        survey.Apply(info);
     }
 
     private void OnEnable()

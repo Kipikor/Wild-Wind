@@ -8,7 +8,12 @@
 /[Bb]uild/
 /[Bb]uilds/
 /[Ll]ogs/
-/[Уу]serSettings/
+/[Uu]serSettings/
+
+# Local Unity recovery scenes and Codex scratch context.
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+/CODEX_CONTEXT.md
 
 # Memory Dumps
 *.lldmp

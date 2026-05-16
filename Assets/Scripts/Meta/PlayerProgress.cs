@@ -44,6 +44,7 @@ public class PlayerProgress
     public List<LogisticsShipState> logisticsShips = new List<LogisticsShipState>();
     public List<GasHarvesterShipState> gasHarvesterShips = new List<GasHarvesterShipState>();
     public List<MiningShipState> miningShips = new List<MiningShipState>();
+    public List<ScoutShipState> scoutShips = new List<ScoutShipState>();
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
     public DockingLocationKind currentDockKind = DockingLocationKind.Island;
@@ -59,6 +60,7 @@ public class PlayerProgress
     public long nextShopRefreshUtcTicks;
     public int shopSeed;
     public bool receivedStartingInventory;
+    public bool receivedStartingPaper;
     public float shipWeaponSpendBufferKg;
 
     public List<ResourceStack> inventory = new List<ResourceStack>();
@@ -68,6 +70,7 @@ public class PlayerProgress
     public List<GasCloudState> gasClouds = new List<GasCloudState>();
     public List<MiningRockState> miningRocks = new List<MiningRockState>();
     public List<MiningZoneState> miningZones = new List<MiningZoneState>();
+    public List<ScoutedObjectState> scoutedObjects = new List<ScoutedObjectState>();
     public CargoTransferState cargoTransfer = new CargoTransferState();
     public List<TimedProcessState> activeProcesses = new List<TimedProcessState>();
     public List<string> acceptedMissionIds = new List<string>();
@@ -95,6 +98,7 @@ public class PlayerProgress
         logisticsShips ??= new List<LogisticsShipState>();
         gasHarvesterShips ??= new List<GasHarvesterShipState>();
         miningShips ??= new List<MiningShipState>();
+        scoutShips ??= new List<ScoutShipState>();
         inventory ??= new List<ResourceStack>();
         shipCargo ??= new List<ResourceStack>();
         shipImpactCargo ??= new List<ResourceStack>();
@@ -102,6 +106,7 @@ public class PlayerProgress
         gasClouds ??= new List<GasCloudState>();
         miningRocks ??= new List<MiningRockState>();
         miningZones ??= new List<MiningZoneState>();
+        scoutedObjects ??= new List<ScoutedObjectState>();
         cargoTransfer ??= new CargoTransferState();
         activeProcesses ??= new List<TimedProcessState>();
         acceptedMissionIds ??= new List<string>();
@@ -204,6 +209,18 @@ public class PlayerProgress
             ship.Normalize();
         }
 
+        for (int i = scoutShips.Count - 1; i >= 0; i--)
+        {
+            ScoutShipState ship = scoutShips[i];
+            if (ship == null || string.IsNullOrWhiteSpace(ship.shipId))
+            {
+                scoutShips.RemoveAt(i);
+                continue;
+            }
+
+            ship.Normalize();
+        }
+
         for (int i = activeProcesses.Count - 1; i >= 0; i--)
         {
             if (activeProcesses[i] == null)
@@ -266,6 +283,18 @@ public class PlayerProgress
             }
 
             zone.Normalize();
+        }
+
+        for (int i = scoutedObjects.Count - 1; i >= 0; i--)
+        {
+            ScoutedObjectState scouted = scoutedObjects[i];
+            if (scouted == null || string.IsNullOrWhiteSpace(scouted.objectId))
+            {
+                scoutedObjects.RemoveAt(i);
+                continue;
+            }
+
+            scouted.Normalize();
         }
     }
 
@@ -453,6 +482,74 @@ public class PlayerProgress
         MiningShipState newState = new MiningShipState { shipId = shipId };
         miningShips.Add(newState);
         return newState;
+    }
+
+    public ScoutShipState GetScoutShipState(string shipId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(shipId)) return null;
+        scoutShips ??= new List<ScoutShipState>();
+
+        for (int i = 0; i < scoutShips.Count; i++)
+        {
+            ScoutShipState state = scoutShips[i];
+            if (state != null && state.shipId == shipId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ScoutShipState newState = new ScoutShipState { shipId = shipId };
+        scoutShips.Add(newState);
+        return newState;
+    }
+
+    public ScoutedObjectState GetScoutedObjectState(ScoutedObjectKind kind, string objectId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(objectId)) return null;
+        scoutedObjects ??= new List<ScoutedObjectState>();
+
+        for (int i = 0; i < scoutedObjects.Count; i++)
+        {
+            ScoutedObjectState state = scoutedObjects[i];
+            if (state != null && state.kind == kind && state.objectId == objectId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ScoutedObjectState newState = new ScoutedObjectState
+        {
+            kind = kind,
+            objectId = objectId
+        };
+        scoutedObjects.Add(newState);
+        return newState;
+    }
+
+    public bool HasObjectCoordinates(ScoutedObjectKind kind, string objectId)
+    {
+        ScoutedObjectState state = GetScoutedObjectState(kind, objectId, false);
+        return state != null && state.coordinatesKnown;
+    }
+
+    public bool HasObjectFacts(ScoutedObjectKind kind, string objectId)
+    {
+        ScoutedObjectState state = GetScoutedObjectState(kind, objectId, false);
+        return state != null && state.factsComplete;
+    }
+
+    public bool HasFreshObjectFacts(ScoutedObjectKind kind, string objectId, long currentTicks, float maxAgeSeconds = 0f)
+    {
+        ScoutedObjectState state = GetScoutedObjectState(kind, objectId, false);
+        if (state == null || !state.factsComplete) return false;
+        if (maxAgeSeconds <= 0f || currentTicks <= 0 || state.factsUpdatedUtcTicks <= 0) return true;
+
+        long maxAgeTicks = TimeSpan.FromSeconds(maxAgeSeconds).Ticks;
+        return currentTicks - state.factsUpdatedUtcTicks <= maxAgeTicks;
     }
 
     public bool PurchaseNode(string nodeId)
@@ -977,6 +1074,175 @@ public class PlayerProgress
     }
 }
 
+public enum ScoutedObjectKind
+{
+    [InspectorName("Облако")]
+    GasCloud,
+    [InspectorName("Глыба")]
+    MiningRock,
+    [InspectorName("Левиафан")]
+    Leviathan
+}
+
+[Serializable]
+public class ScoutedObjectState
+{
+    public ScoutedObjectKind kind;
+    public string objectId = "";
+    public string displayName = "";
+    public bool coordinatesKnown;
+    public Vector3 lastKnownPosition;
+    public float factsProgress;
+    public float factsRequired = 10f;
+    public bool factsComplete;
+    public long factsUpdatedUtcTicks;
+    public float informationPotentialKg;
+    public float informationExtractedKg;
+    public float informationBufferKg;
+    public long informationUpdatedUtcTicks;
+    public string typeId = "";
+    public string zoneId = "";
+    public string resourceId = "";
+    public string summaryRu = "";
+
+    public void Normalize()
+    {
+        objectId ??= "";
+        displayName ??= "";
+        factsRequired = Mathf.Max(1f, factsRequired);
+        factsProgress = Mathf.Clamp(factsProgress, 0f, factsRequired);
+        informationPotentialKg = Mathf.Max(0f, informationPotentialKg);
+        informationExtractedKg = Mathf.Clamp(informationExtractedKg, 0f, Mathf.Max(informationExtractedKg, informationPotentialKg));
+        informationBufferKg = Mathf.Clamp(informationBufferKg, 0f, 0.999f);
+        if (factsUpdatedUtcTicks < 0) factsUpdatedUtcTicks = 0;
+        if (informationUpdatedUtcTicks < 0) informationUpdatedUtcTicks = 0;
+        typeId ??= "";
+        zoneId ??= "";
+        resourceId ??= "";
+        summaryRu ??= "";
+        if (factsProgress >= factsRequired - 0.001f)
+        {
+            factsComplete = true;
+        }
+    }
+}
+
+public enum ScoutShipStatus
+{
+    Idle,
+    Traveling,
+    Observing,
+    ReturningHome,
+    Unloading,
+    WaitingForPaper,
+    Fleeing,
+    Error
+}
+
+[Serializable]
+public class ScoutShipState
+{
+    public string shipId = "";
+    public string displayName = "";
+    public string homeIslandId = "capital";
+    public ScoutShipStatus status = ScoutShipStatus.Idle;
+    public ScoutedObjectKind targetKind = ScoutedObjectKind.GasCloud;
+    public string targetObjectId = "";
+    public Vector3 lastKnownPosition;
+    public Vector3 targetPosition;
+    public long nextEventUtcTicks;
+    public List<ResourceStack> cargo = new List<ResourceStack>();
+    public int completedSurveyRuns;
+    public string lastError = "";
+
+    public void Normalize()
+    {
+        shipId ??= "";
+        displayName ??= "";
+        homeIslandId ??= "";
+        targetObjectId ??= "";
+        cargo ??= new List<ResourceStack>();
+        completedSurveyRuns = Mathf.Max(0, completedSurveyRuns);
+        lastError ??= "";
+        if (nextEventUtcTicks < 0) nextEventUtcTicks = 0;
+
+        for (int i = cargo.Count - 1; i >= 0; i--)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0)
+            {
+                cargo.RemoveAt(i);
+                continue;
+            }
+
+            stack.amount = Mathf.Max(0, stack.amount);
+        }
+    }
+
+    public int GetCargoAmount(string itemId)
+    {
+        ResourceStack stack = GetCargoStack(itemId, false);
+        return stack != null ? stack.amount : 0;
+    }
+
+    public int GetCargoMassKg()
+    {
+        int total = 0;
+        if (cargo == null) return total;
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null) continue;
+            total += Mathf.Max(0, stack.amount);
+        }
+
+        return total;
+    }
+
+    public void AddCargo(string itemId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0) return;
+        ResourceStack stack = GetCargoStack(itemId, true);
+        stack.amount += amount;
+    }
+
+    public bool TrySpendCargo(string itemId, int amount)
+    {
+        if (amount <= 0) return true;
+        ResourceStack stack = GetCargoStack(itemId, false);
+        if (stack == null || stack.amount < amount) return false;
+
+        stack.amount -= amount;
+        if (stack.amount <= 0)
+        {
+            cargo.Remove(stack);
+        }
+
+        return true;
+    }
+
+    private ResourceStack GetCargoStack(string itemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return null;
+        cargo ??= new List<ResourceStack>();
+
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack != null && stack.resourceId == itemId)
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ResourceStack newStack = new ResourceStack { resourceId = itemId };
+        cargo.Add(newStack);
+        return newStack;
+    }
+}
+
 [Serializable]
 public class GasCloudState
 {
@@ -1294,12 +1560,14 @@ public class IslandProductionState
     public List<ResourceStack> storage = new List<ResourceStack>();
     public float productionProgress;
     public List<IslandConsumptionState> consumptions = new List<IslandConsumptionState>();
+    public List<IslandIndustryState> industries = new List<IslandIndustryState>();
 
     public void Normalize()
     {
         islandId ??= "";
         storage ??= new List<ResourceStack>();
         consumptions ??= new List<IslandConsumptionState>();
+        industries ??= new List<IslandIndustryState>();
         productionProgress = Mathf.Max(0f, productionProgress);
 
         for (int i = storage.Count - 1; i >= 0; i--)
@@ -1324,6 +1592,18 @@ public class IslandProductionState
             }
 
             consumption.Normalize();
+        }
+
+        for (int i = industries.Count - 1; i >= 0; i--)
+        {
+            IslandIndustryState industry = industries[i];
+            if (industry == null || string.IsNullOrWhiteSpace(industry.industryId))
+            {
+                industries.RemoveAt(i);
+                continue;
+            }
+
+            industry.Normalize();
         }
     }
 
@@ -1419,6 +1699,27 @@ public class IslandProductionState
         return newState;
     }
 
+    public IslandIndustryState GetIndustryState(string industryId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(industryId)) return null;
+        industries ??= new List<IslandIndustryState>();
+
+        for (int i = 0; i < industries.Count; i++)
+        {
+            IslandIndustryState state = industries[i];
+            if (state != null && state.industryId == industryId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        IslandIndustryState newState = new IslandIndustryState { industryId = industryId };
+        industries.Add(newState);
+        return newState;
+    }
+
     private ResourceStack GetResourceStack(string resourceId, bool createIfMissing)
     {
         if (string.IsNullOrWhiteSpace(resourceId)) return null;
@@ -1452,6 +1753,91 @@ public class IslandConsumptionState
     {
         itemId ??= "";
         consumptionProgress = Mathf.Max(0f, consumptionProgress);
+    }
+}
+
+[Serializable]
+public class IslandIndustryState
+{
+    public string industryId = "";
+    public string recipeId = "";
+    public IslandIndustryKind kind = IslandIndustryKind.Generation;
+    public bool active;
+    public int activeStepIndex;
+    public long cycleStartedUtcTicks;
+    public long nextCompletionUtcTicks;
+    public float productionProgress;
+    public string activeInputResourceId = "";
+    public float reactionSpeedMultiplier = 1f;
+    public float activeReactionSuccessChance = 1f;
+    public float conversionMultiplier = 1f;
+    public int completedCycles;
+    public int failedCycles;
+    public string lastMessage = "";
+    public List<ProductionOutputBufferState> outputBuffers = new List<ProductionOutputBufferState>();
+
+    public void Normalize()
+    {
+        industryId ??= "";
+        recipeId ??= "";
+        activeStepIndex = Mathf.Max(0, activeStepIndex);
+        if (cycleStartedUtcTicks < 0) cycleStartedUtcTicks = 0;
+        if (nextCompletionUtcTicks < 0) nextCompletionUtcTicks = 0;
+        productionProgress = Mathf.Max(0f, productionProgress);
+        activeInputResourceId ??= "";
+        reactionSpeedMultiplier = Mathf.Clamp(reactionSpeedMultiplier <= 0f ? 1f : reactionSpeedMultiplier, 1f, 50f);
+        activeReactionSuccessChance = Mathf.Clamp01(activeReactionSuccessChance);
+        conversionMultiplier = Mathf.Max(1f, conversionMultiplier <= 0f ? 1f : conversionMultiplier);
+        completedCycles = Mathf.Max(0, completedCycles);
+        failedCycles = Mathf.Max(0, failedCycles);
+        lastMessage ??= "";
+        outputBuffers ??= new List<ProductionOutputBufferState>();
+
+        for (int i = outputBuffers.Count - 1; i >= 0; i--)
+        {
+            ProductionOutputBufferState buffer = outputBuffers[i];
+            if (buffer == null || string.IsNullOrWhiteSpace(buffer.itemId))
+            {
+                outputBuffers.RemoveAt(i);
+                continue;
+            }
+
+            buffer.Normalize();
+        }
+    }
+
+    public ProductionOutputBufferState GetOutputBuffer(string itemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return null;
+        outputBuffers ??= new List<ProductionOutputBufferState>();
+
+        for (int i = 0; i < outputBuffers.Count; i++)
+        {
+            ProductionOutputBufferState buffer = outputBuffers[i];
+            if (buffer != null && buffer.itemId == itemId)
+            {
+                return buffer;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ProductionOutputBufferState newBuffer = new ProductionOutputBufferState { itemId = itemId };
+        outputBuffers.Add(newBuffer);
+        return newBuffer;
+    }
+}
+
+[Serializable]
+public class ProductionOutputBufferState
+{
+    public string itemId = "";
+    public float amount;
+
+    public void Normalize()
+    {
+        itemId ??= "";
+        amount = Mathf.Max(0f, amount);
     }
 }
 

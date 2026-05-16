@@ -74,6 +74,8 @@ public class MetaGameStateEditor : Editor
         LocalizedInspector.Property(serializedObject, "gasHarvesterFleet", "Газовые автопилоты", "Виртуальные сборщики газа, привязанные к островам.");
         LocalizedInspector.Property(serializedObject, "miningRockManager", "Майнинговые глыбы", "Создает и синхронизирует короткоживущие рудные глыбы из CSV-конфигов.");
         LocalizedInspector.Property(serializedObject, "miningFleet", "Майнинговые автопилоты", "Виртуальные корабли с противоударными кузовами для сбора руды.");
+        LocalizedInspector.Property(serializedObject, "leviathanManager", "Левиафаны", "Создает и синхронизирует левиафанов из CSV-конфигов.");
+        LocalizedInspector.Property(serializedObject, "scoutFleet", "Разведывательный флот", "Виртуальные разведчики, которые открывают объекты мира.");
         LocalizedInspector.Property(serializedObject, "startingMoney", "Стартовые деньги", "Сколько денег получает новая игра.");
         LocalizedInspector.DrawPlayerProgress(serializedObject.FindProperty("progress"), "Прогресс игрока");
 
@@ -88,9 +90,13 @@ public class MetaGameStateEditor : Editor
         LocalizedInspector.Section("Стартовые ресурсы");
         LocalizedInspector.Property(serializedObject, "startingOre", "Стартовая руда", "Сколько руды получает новая игра.");
         LocalizedInspector.Property(serializedObject, "startingIron", "Стартовое железо", "Сколько железа получает новая игра.");
+        LocalizedInspector.Property(serializedObject, "startingFuelKg", "Стартовое топливо", "Сколько топлива получает корабль новой игры.");
+        LocalizedInspector.Property(serializedObject, "startingClaudiumKg", "Стартовый клавдий", "Сколько клавдия получает корабль новой игры.");
+        LocalizedInspector.Property(serializedObject, "startingPaperKg", "Бумага в столице", "Сколько бумаги лежит на складе столицы у новой игры.");
 
         LocalizedInspector.Section("Процессы реального времени");
         LocalizedInspector.Property(serializedObject, "processRealTimeWhilePlaying", "Обновлять процессы во время игры", "Если включено, добыча, производство, миссии и магазин обновляются во время Play Mode.");
+        LocalizedInspector.Property(serializedObject, "skipInitialProcessCatchUp", "Пропустить стартовую догонку", "Для изолированных тестовых сцен: не прокручивает логистику, разведку и другие процессы в Awake.");
         LocalizedInspector.Property(serializedObject, "idleMiningIntervalSeconds", "Интервал добычи руды, сек", "Как часто пассивная добыча добавляет руду.");
         LocalizedInspector.Property(serializedObject, "idleMiningOrePerCycle", "Руды за цикл добычи", "Сколько руды добавляется за один цикл пассивной добычи.");
         LocalizedInspector.Property(serializedObject, "ironSmeltingDurationSeconds", "Длительность плавки железа, сек", "Сколько реальных секунд длится переплавка руды в железо.");
@@ -117,6 +123,8 @@ public class MetaGameStateEditor : Editor
         LocalizedInspector.Section("Отладочный интерфейс стыковки");
         LocalizedInspector.Property(serializedObject, "showDockingDebugUI", "Показывать интерфейс", "Показывает временное окно управления мета-игрой во время Play Mode.");
         LocalizedInspector.Property(serializedObject, "debugUiWidth", "Ширина интерфейса", "Ширина временного отладочного окна в пикселях.");
+        LocalizedInspector.Property(serializedObject, "productionDebugResourceId", "Ресурс склада", "Идентификатор ресурса для быстрых складских операций в отладочном окне.");
+        LocalizedInspector.Property(serializedObject, "productionDebugAmount", "Количество склада", "Сколько единиц добавить, списать или обнулить через отладочное окно.");
 
         LocalizedInspector.Section("Аварии");
         LocalizedInspector.Property(serializedObject, "autoInstallCrashDetector", "Автоматически добавить детектор крушений", "Если включено, на корабль будет добавлен детектор крушений: при аварии текущий корабль и груз теряются, игрок возвращается в город.");
@@ -458,6 +466,38 @@ public static class LocalizedInspector
             Property(element, "productionProgress", "Прогресс производства", "Дробная часть уже произведенной единицы товара.");
             DrawResourceList(element.FindPropertyRelative("storage"), "Склад");
             DrawIslandConsumptionList(element.FindPropertyRelative("consumptions"), "Потребление");
+            DrawIslandIndustryList(element.FindPropertyRelative("industries"), "Производственные линии");
+        });
+    }
+
+    private static void DrawIslandIndustryList(SerializedProperty list, string label)
+    {
+        DrawList(list, new GUIContent(label, "Состояния конфигурируемых линий Generation, Processing, Manufacturing, Reaction, Conversion и Assembly."), (element, index) =>
+        {
+            Property(element, "industryId", "Идентификатор линии", "Производственная линия из Production_industry.csv.");
+            Property(element, "recipeId", "Рецепт", "Рецепт из Production_recipe.csv.");
+            Property(element, "kind", "Тип", "Тип производства.");
+            Property(element, "active", "Активна", "Идет ли сейчас цикл.");
+            Property(element, "activeStepIndex", "Этап сборки", "Текущий этап Assembly.");
+            Property(element, "nextCompletionUtcTicks", "Завершение", "UTC ticks завершения текущего цикла.");
+            Property(element, "productionProgress", "Дробный прогресс", "Накопитель генерации.");
+            Property(element, "activeInputResourceId", "Активное сырье", "Руда или конденсат, уже загруженные в Processing.");
+            Property(element, "reactionSpeedMultiplier", "Скорость реакции", "Множитель скорости Reaction от x1 до x50.");
+            Property(element, "activeReactionSuccessChance", "Шанс партии", "Шанс успеха текущей реакции.");
+            Property(element, "conversionMultiplier", "Маховик", "Текущий множитель Conversion.");
+            Property(element, "completedCycles", "Завершено", "Успешные циклы.");
+            Property(element, "failedCycles", "Срывы", "Проваленные реакции или партии.");
+            Property(element, "lastMessage", "Последнее сообщение", "Краткий статус линии.");
+            DrawOutputBufferList(element.FindPropertyRelative("outputBuffers"), "Фракционные выходы");
+        });
+    }
+
+    private static void DrawOutputBufferList(SerializedProperty list, string label)
+    {
+        DrawList(list, new GUIContent(label, "Накопленные дробные минералы или газовые компоненты до целых единиц."), (element, index) =>
+        {
+            Property(element, "itemId", "Ресурс", "Ресурс из Item.csv.");
+            Property(element, "amount", "Накоплено", "Дробная часть до целой единицы.");
         });
     }
 

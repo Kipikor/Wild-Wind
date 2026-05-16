@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,15 +15,10 @@ public class DamageableShip : MonoBehaviour
     public float maxStructureHp = 500f;
     [InspectorName("Текущая прочность корпуса")]
     public float structureHp = 500f;
-    [InspectorName("Модули")]
-    [Tooltip("Оставлено для отладки геометрии. Боевой урон по модулям отключен.")]
-    public List<ShipDamageModuleState> modules = new List<ShipDamageModuleState>();
 
     [Header("Связь с физикой")]
-    [InspectorName("Влиять повреждениями на полёт")]
-    [Tooltip("Устаревшее поле. Боевой урон по модулям отключен и больше не меняет характеристики ShipPhysics.")]
-    public bool applyModuleEffectsToShipPhysics = false;
     [InspectorName("Физика корабля")]
+    [Tooltip("Необязательная ссылка на ShipPhysics. Нужна только для оценки массы цели в таранах.")]
     public ShipPhysics shipPhysics;
 
     [Header("Таран")]
@@ -70,13 +64,6 @@ public class DamageableShip : MonoBehaviour
     [InspectorName("Размер истории событий")]
     public int maxRecentEvents = 8;
 
-    private float baseEnginePowerKwAt100;
-    private float basePropellerMaxThrustKgf;
-    private float basePropellerMaxSpeedMS;
-    private float baseClaudiumMaxLiftKg;
-    private float baseClaudiumLiftEfficiency;
-    private bool baselinesCaptured;
-
     public float StructureRatio
     {
         get
@@ -100,7 +87,6 @@ public class DamageableShip : MonoBehaviour
     private void Reset()
     {
         shipPhysics = GetComponent<ShipPhysics>();
-        EnsureDefaultModules();
         ResetDamageState();
     }
 
@@ -110,9 +96,6 @@ public class DamageableShip : MonoBehaviour
         {
             shipPhysics = GetComponent<ShipPhysics>();
         }
-
-        EnsureDefaultModules();
-        CaptureShipPhysicsBaselines();
     }
 
     private void OnValidate()
@@ -124,33 +107,9 @@ public class DamageableShip : MonoBehaviour
         maxRecentEvents = Mathf.Clamp(maxRecentEvents, 1, 20);
     }
 
-    public void EnsureDefaultModules()
-    {
-        if (modules == null)
-        {
-            modules = new List<ShipDamageModuleState>();
-        }
-
-        EnsureModule("hull", "Корпус", 220f, 0.6f);
-        EnsureModule("engine", "Двигатель", 120f, 1f);
-        EnsureModule("propeller", "Винт", 90f, 1f);
-        EnsureModule("claudium_loop", "Клавдиевый контур", 130f, 1f);
-        EnsureModule("cargo", "Грузовой отсек", 80f, 0.8f);
-    }
-
     public void ResetDamageState()
     {
         structureHp = Mathf.Max(1f, maxStructureHp);
-        EnsureDefaultModules();
-
-        for (int i = 0; i < modules.Count; i++)
-        {
-            if (modules[i] != null)
-            {
-                modules[i].ResetHp();
-            }
-        }
-
         hitCount = 0;
         penetrationCount = 0;
         ricochetCount = 0;
@@ -165,6 +124,7 @@ public class DamageableShip : MonoBehaviour
         lastHitPenetrationMm = 0f;
         recentEvents.Clear();
         lastDamageMessage = "Повреждения сброшены.";
+
         PaintedArmorBody[] armorBodies = GetComponentsInChildren<PaintedArmorBody>();
         for (int i = 0; i < armorBodies.Length; i++)
         {
@@ -183,8 +143,6 @@ public class DamageableShip : MonoBehaviour
             }
         }
 
-        CaptureShipPhysicsBaselines();
-        ApplyModuleEffects();
         LogEvent(lastDamageMessage);
     }
 
@@ -212,7 +170,6 @@ public class DamageableShip : MonoBehaviour
     public DamageHitResult ApplyHit(ArmorSurface surface, DamageHitContext context)
     {
         hitCount++;
-        CaptureShipPhysicsBaselines();
 
         Vector3 incoming = context.incomingDirection;
         if (incoming.sqrMagnitude < 0.001f && context.velocity.sqrMagnitude > 0.001f)
@@ -256,11 +213,11 @@ public class DamageableShip : MonoBehaviour
         }
         else if (context.shellType == DamageShellType.HighExplosive)
         {
-            ResolveHighExplosiveHit(surface, context, effectiveArmor, rawAngle, ref result);
+            ResolveHighExplosiveHit(surface, context, effectiveArmor, ref result);
         }
         else
         {
-            ResolveImpactHit(surface, context, rawAngle, ref result);
+            ResolveImpactHit(surface, context, ref result);
         }
 
         result.remainingStructureHp = structureHp;
@@ -273,29 +230,6 @@ public class DamageableShip : MonoBehaviour
         return result;
     }
 
-    public DamageHitResult ApplyExternalModuleHit(DamageableModuleHitbox moduleHitbox, DamageHitContext context)
-    {
-        hitCount++;
-        CaptureShipPhysicsBaselines();
-
-        string moduleId = moduleHitbox != null ? moduleHitbox.moduleId : "";
-        string moduleName = moduleHitbox != null ? moduleHitbox.displayNameRu : "модуль";
-        DamageHitResult result = new DamageHitResult
-        {
-            outcome = DamageHitOutcome.Miss,
-            message = $"[Урон] Попадание в модуль {moduleName} проигнорировано: урон по модулям отключен.",
-            zoneId = moduleId,
-            moduleId = moduleId,
-            moduleNameRu = moduleName,
-            structureDamage = 0f,
-            moduleDamage = 0f,
-            remainingStructureHp = structureHp
-        };
-
-        FinalizeHitResult(result);
-        return result;
-    }
-
     public void FinalizeHitResult(DamageHitResult result)
     {
         lastHitOutcome = result.outcome;
@@ -304,7 +238,6 @@ public class DamageableShip : MonoBehaviour
         lastHitEffectiveArmorMm = result.effectiveArmorMm;
         lastHitImpactAngleDeg = result.impactAngleDeg;
         lastHitPenetrationMm = result.penetrationMm;
-        ApplyModuleEffects();
 
         string message = result.message;
         if (structureHp <= 0.001f)
@@ -352,39 +285,6 @@ public class DamageableShip : MonoBehaviour
         return bounds.center;
     }
 
-    public ShipDamageModuleState GetModule(string moduleId)
-    {
-        if (string.IsNullOrWhiteSpace(moduleId) || modules == null) return null;
-
-        for (int i = 0; i < modules.Count; i++)
-        {
-            ShipDamageModuleState module = modules[i];
-            if (module != null && module.moduleId == moduleId)
-            {
-                return module;
-            }
-        }
-
-        return null;
-    }
-
-    public ShipDamageModuleState GetOrCreateModule(string moduleId, string nameRu, float maxHp, float damageWeight)
-    {
-        ShipDamageModuleState module = GetModule(moduleId);
-        if (module != null) return module;
-
-        module = new ShipDamageModuleState
-        {
-            moduleId = moduleId,
-            displayNameRu = string.IsNullOrWhiteSpace(nameRu) ? moduleId : nameRu,
-            maxHp = Mathf.Max(1f, maxHp),
-            hp = Mathf.Max(1f, maxHp),
-            damageWeight = Mathf.Max(0f, damageWeight)
-        };
-        modules.Add(module);
-        return module;
-    }
-
     private void ResolveArmorPiercingHit(
         ArmorSurface surface,
         DamageHitContext context,
@@ -409,9 +309,8 @@ public class DamageableShip : MonoBehaviour
         }
 
         penetrationCount++;
-        float hullDamage = ApplyHullDamage(context.hullDamageOnPenetration);
+        float hullDamage = ApplyHullDamage(context.hullDamageOnPenetration * Mathf.Max(0f, surface.structureDamageMultiplier));
         result.structureDamage = hullDamage;
-        result.moduleDamage = 0f;
         result.outcome = DamageHitOutcome.Penetration;
         result.message = $"[Урон] Пробитие: {context.shellName} пробил {surface.displayNameRu}, корпус -{hullDamage:0.0}.";
     }
@@ -430,13 +329,12 @@ public class DamageableShip : MonoBehaviour
         ArmorSurface surface,
         DamageHitContext context,
         float effectiveArmor,
-        float rawAngle,
         ref DamageHitResult result)
     {
         if (context.penetrationMm >= effectiveArmor)
         {
             penetrationCount++;
-            float hullDamage = ApplyHullDamage(context.hullDamageOnPenetration);
+            float hullDamage = ApplyHullDamage(context.hullDamageOnPenetration * Mathf.Max(0f, surface.structureDamageMultiplier));
             result.structureDamage = hullDamage;
             result.outcome = DamageHitOutcome.Penetration;
             result.message = $"[Урон] Фугас пробил {surface.displayNameRu}: корпус -{hullDamage:0.0}.";
@@ -451,7 +349,6 @@ public class DamageableShip : MonoBehaviour
     private void ResolveImpactHit(
         ArmorSurface surface,
         DamageHitContext context,
-        float rawAngle,
         ref DamageHitResult result)
     {
         impactCount++;
@@ -466,7 +363,6 @@ public class DamageableShip : MonoBehaviour
             * Mathf.Max(0f, surface.ramDamageMultiplier);
 
         result.structureDamage = ApplyHullDamage(totalDamage);
-        result.moduleDamage = 0f;
         result.outcome = DamageHitOutcome.ImpactDamage;
         result.message = $"[Урон] Таран/удар в {surface.displayNameRu}: скорость {context.impactSpeedMS:0.0} м/с, массы {context.impactSourceMassKg:0}/{context.impactTargetMassKg:0} кг, энергия {context.impactEnergyKJ:0.0} кДж, урон {totalDamage:0.0}: корпус -{result.structureDamage:0.0}.";
     }
@@ -476,102 +372,6 @@ public class DamageableShip : MonoBehaviour
         float previous = structureHp;
         structureHp = Mathf.Clamp(structureHp - Mathf.Max(0f, amount), 0f, maxStructureHp);
         return previous - structureHp;
-    }
-
-    private int ApplyDistributedImpactDamage(float totalDamage, ref DamageHitResult result)
-    {
-        totalDamage = Mathf.Max(0f, totalDamage);
-        result.structureDamage = ApplyHullDamage(totalDamage);
-        result.moduleDamage = 0f;
-        result.moduleNameRu = "";
-        return 0;
-    }
-
-    private static bool IsHullModule(ShipDamageModuleState module)
-    {
-        return module != null && string.Equals(module.moduleId, "hull", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static float ApplyModuleRawDamage(ShipDamageModuleState module, float amount)
-    {
-        return 0f;
-    }
-
-    private void TryDamageFirstInternalModule(DamageHitContext context, ref DamageHitResult result)
-    {
-        result.moduleDamage = 0f;
-        result.moduleId = "";
-        result.moduleNameRu = "";
-    }
-
-    private DamageableModuleHitbox FindFirstModuleOnPath(Vector3 origin, Vector3 direction, float distance, bool includeExternal)
-    {
-        RaycastHit[] hits = Physics.RaycastAll(origin, direction, distance, ~0, QueryTriggerInteraction.Collide);
-        DamageableModuleHitbox best = null;
-        float bestDistance = float.PositiveInfinity;
-        for (int i = 0; i < hits.Length; i++)
-        {
-            DamageableModuleHitbox module = hits[i].collider != null ? hits[i].collider.GetComponentInParent<DamageableModuleHitbox>() : null;
-            DamageableShip moduleOwner = module != null && module.owner != null
-                ? module.owner
-                : (module != null ? module.GetComponentInParent<DamageableShip>() : null);
-            if (module == null || moduleOwner != this || !module.BlocksProjectile) continue;
-            if (!includeExternal && module.externalModule) continue;
-
-            if (hits[i].distance < bestDistance)
-            {
-                bestDistance = hits[i].distance;
-                best = module;
-            }
-        }
-
-        return best;
-    }
-
-    private void CaptureShipPhysicsBaselines()
-    {
-        if (baselinesCaptured) return;
-        if (shipPhysics == null) return;
-
-        baseEnginePowerKwAt100 = shipPhysics.enginePowerKwAt100;
-        basePropellerMaxThrustKgf = shipPhysics.propellerMaxThrustKgf;
-        basePropellerMaxSpeedMS = shipPhysics.propellerMaxSpeedMS;
-        baseClaudiumMaxLiftKg = shipPhysics.claudiumMaxLiftKg;
-        baseClaudiumLiftEfficiency = shipPhysics.claudiumLiftEfficiency;
-        baselinesCaptured = true;
-    }
-
-    private void ApplyModuleEffects()
-    {
-        if (shipPhysics == null || !baselinesCaptured) return;
-
-        shipPhysics.enginePowerKwAt100 = baseEnginePowerKwAt100;
-        shipPhysics.propellerMaxThrustKgf = basePropellerMaxThrustKgf;
-        shipPhysics.propellerMaxSpeedMS = basePropellerMaxSpeedMS;
-        shipPhysics.claudiumMaxLiftKg = baseClaudiumMaxLiftKg;
-        shipPhysics.claudiumLiftEfficiency = baseClaudiumLiftEfficiency;
-        shipPhysics.RefreshRuntimeShipSettings();
-    }
-
-    private static float DamageToPerformanceFactor(ShipDamageModuleState module, float destroyedFloor)
-    {
-        if (module == null) return 1f;
-        return Mathf.Lerp(Mathf.Clamp01(destroyedFloor), 1f, module.HpRatio);
-    }
-
-    private void EnsureModule(string moduleId, string nameRu, float maxHp, float damageWeight)
-    {
-        ShipDamageModuleState module = GetModule(moduleId);
-        if (module != null) return;
-
-        modules.Add(new ShipDamageModuleState
-        {
-            moduleId = moduleId,
-            displayNameRu = nameRu,
-            maxHp = maxHp,
-            hp = maxHp,
-            damageWeight = damageWeight
-        });
     }
 
     private void LogEvent(string message)

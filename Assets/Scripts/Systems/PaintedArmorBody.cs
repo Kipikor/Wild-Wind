@@ -62,10 +62,8 @@ public class PaintedArmorFace
             ricochetAngleDeg = ricochetAngleDeg,
             overmatchCaliberMultiplier = 0f,
             structureDamageMultiplier = 1f,
-            moduleDamageMultiplier = 1f,
             highExplosiveSurfaceDamageMultiplier = 1f,
-            ramDamageMultiplier = 1f,
-            protectedModuleIds = null
+            ramDamageMultiplier = 1f
         };
     }
 
@@ -410,15 +408,15 @@ public class PaintedArmorBody : MonoBehaviour
             faces = new List<PaintedArmorFace>();
         }
 
-        EnsureFace(PaintedArmorBoxFace.FrontNegativeZ, "front", "Лобовая плита", 65f, Color.red, "hull", "cargo");
-        EnsureFace(PaintedArmorBoxFace.RearPositiveZ, "rear", "Корма и винтовой отсек", 28f, Color.yellow, "engine", "propeller");
-        EnsureFace(PaintedArmorBoxFace.LeftNegativeX, "left", "Левый борт", 38f, new Color(1f, 0.5f, 0.1f), "claudium_loop", "cargo");
-        EnsureFace(PaintedArmorBoxFace.RightPositiveX, "right", "Правый борт", 38f, new Color(1f, 0.5f, 0.1f), "engine", "cargo");
-        EnsureFace(PaintedArmorBoxFace.TopPositiveY, "top", "Верхняя палуба", 22f, Color.cyan, "claudium_loop");
-        EnsureFace(PaintedArmorBoxFace.BottomNegativeY, "bottom", "Нижняя броня", 18f, Color.blue, "cargo", "hull");
+        EnsureFace(PaintedArmorBoxFace.FrontNegativeZ, "front", "Лобовая плита", 65f, Color.red);
+        EnsureFace(PaintedArmorBoxFace.RearPositiveZ, "rear", "Корма", 28f, Color.yellow);
+        EnsureFace(PaintedArmorBoxFace.LeftNegativeX, "left", "Левый борт", 38f, new Color(1f, 0.5f, 0.1f));
+        EnsureFace(PaintedArmorBoxFace.RightPositiveX, "right", "Правый борт", 38f, new Color(1f, 0.5f, 0.1f));
+        EnsureFace(PaintedArmorBoxFace.TopPositiveY, "top", "Верхняя палуба", 22f, Color.cyan);
+        EnsureFace(PaintedArmorBoxFace.BottomNegativeY, "bottom", "Нижняя броня", 18f, Color.blue);
     }
 
-    private void EnsureFace(PaintedArmorBoxFace side, string id, string nameRu, float armorMm, Color color, params string[] modules)
+    private void EnsureFace(PaintedArmorBoxFace side, string id, string nameRu, float armorMm, Color color)
     {
         if (GetFace(side) != null) return;
 

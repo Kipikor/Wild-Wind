@@ -92,12 +92,7 @@ public class DamageProjectile : MonoBehaviour
         {
             Collider hitCollider = hits[i].collider;
             if (hitCollider == null || hitCollider == ownCollider) continue;
-            DamageableModuleHitbox moduleHitbox = hitCollider.GetComponentInParent<DamageableModuleHitbox>();
-            if (moduleHitbox != null)
-            {
-                if (!moduleHitbox.BlocksProjectile) continue;
-            }
-            else if (hitCollider.GetComponentInParent<PaintedArmorBody>() == null
+            if (hitCollider.GetComponentInParent<PaintedArmorBody>() == null
                 && hitCollider.GetComponentInParent<MeshArmorBody>() == null
                 && hitCollider.GetComponentInParent<ArmorZone>() == null)
             {
@@ -138,7 +133,6 @@ public class DamageProjectile : MonoBehaviour
             damagePoints = shell.damagePoints,
             hullDamageOnPenetration = shell.hullDamageOnPenetration > 0.001f ? shell.hullDamageOnPenetration : shell.damagePoints,
             armorPlateDamage = shell.armorPlateDamage,
-            moduleDamage = shell.moduleDamage,
             penetrationMm = RollPenetration(shell),
             explosiveRadiusMeters = shell.explosiveRadiusMeters,
             normalizationDegrees = shell.normalizationDegrees,
@@ -147,17 +141,6 @@ public class DamageProjectile : MonoBehaviour
             incomingDirection = direction,
             velocity = velocity
         };
-
-        DamageableModuleHitbox moduleHitbox = hitCollider.GetComponentInParent<DamageableModuleHitbox>();
-        if (moduleHitbox != null)
-        {
-            if (!moduleHitbox.BlocksProjectile) return false;
-
-            DamageHitResult result = moduleHitbox.ReceiveDirectHit(context);
-            ApplyHighExplosiveImpulse(hitCollider, hitPoint, hitNormal, direction, result);
-            hasHit = true;
-            return true;
-        }
 
         PaintedArmorBody paintedArmor = hitCollider.GetComponentInParent<PaintedArmorBody>();
         if (paintedArmor != null)
@@ -240,13 +223,6 @@ public class DamageProjectile : MonoBehaviour
         if (meshArmor != null && meshArmor.owner != null)
         {
             body = meshArmor.owner.GetComponentInParent<Rigidbody>();
-            if (body != null) return body;
-        }
-
-        DamageableModuleHitbox module = hitCollider.GetComponentInParent<DamageableModuleHitbox>();
-        if (module != null && module.owner != null)
-        {
-            body = module.owner.GetComponentInParent<Rigidbody>();
             if (body != null) return body;
         }
 

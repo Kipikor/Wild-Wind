@@ -5,6 +5,10 @@ sulfur,Сера,Sulfur,0
 metal,Металл,Metal,0
 tools,Инструменты,Tools,0
 weapon,Оружие,Weapons,0
+paper,Бумага,Paper,0
+rock_info,Информация о глыбах,Rock Survey Data,0
+cloud_info,Информация об облаках,Cloud Survey Data,0
+leviathan_info,Информация о левиафанах,Leviathan Survey Data,0
 wood,Древесина,Wood,4
 claudium,Клавдий,Claudium,0
 medicines,Медикаменты,Medicines,0
@@ -76,3 +80,5 @@ leviathan_fat,Левиафанов жир,Leviathan Fat,10
 leviathan_hide,Шкура левиафана,Leviathan Hide,0
 claudium_gland,Клавдиевая железа,Claudium Gland,0
 flexbone,Гибкокость,Flexbone,0
+airframe_kit,Набор корпуса,Airframe Kit,0
+chemical_batch,Химическая партия,Chemical Batch,0

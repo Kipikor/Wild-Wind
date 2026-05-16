@@ -19,6 +19,7 @@ public static class ShipAssemblySetupEditor
     private const string StarterCargoRackPath = "Assets/Data/ShipParts/StarterCargoRack.asset";
     private const string StarterGasHarvesterPath = "Assets/Data/ShipParts/StarterGasHarvester.asset";
     private const string StarterMiningHoldPath = "Assets/Data/ShipParts/StarterMiningHold.asset";
+    private const string StarterObservationPostPath = "Assets/Data/ShipParts/StarterObservationPost.asset";
 
     private const string StarterHullPrefabPath = "Assets/Data/ShipPrefabs/StarterHull.prefab";
     private const string StarterEnginePrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterEngine.prefab";
@@ -27,6 +28,7 @@ public static class ShipAssemblySetupEditor
     private const string StarterCargoRackPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterCargoRack.prefab";
     private const string StarterGasHarvesterPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterGasHarvester.prefab";
     private const string StarterMiningHoldPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterMiningHold.prefab";
+    private const string StarterObservationPostPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterObservationPost.prefab";
 
     [MenuItem("Wild Wind/Корабли/Собрать базовый сетап сборки")]
     public static void BuildStarterAssemblySetup()
@@ -44,6 +46,7 @@ public static class ShipAssemblySetupEditor
         ShipPartDefinitionSO cargoRack = CreateOrLoadPart(StarterCargoRackPath);
         ShipPartDefinitionSO gasHarvester = CreateOrLoadPart(StarterGasHarvesterPath);
         ShipPartDefinitionSO miningHold = CreateOrLoadPart(StarterMiningHoldPath);
+        ShipPartDefinitionSO observationPost = CreateOrLoadPart(StarterObservationPostPath);
 
         GameObject hullPrefab = CreateStarterHullPrefab();
         GameObject enginePrefab = CreateModulePrefab(StarterEnginePrefabPath, "Паровой двигатель I", PrimitiveType.Cube, new Vector3(1.2f, 0.8f, 1.6f));
@@ -52,6 +55,7 @@ public static class ShipAssemblySetupEditor
         GameObject cargoRackPrefab = CreateModulePrefab(StarterCargoRackPrefabPath, "Грузовая полка", PrimitiveType.Cube, new Vector3(1.7f, 0.25f, 1.1f));
         GameObject gasHarvesterPrefab = CreateModulePrefab(StarterGasHarvesterPrefabPath, "Харвестер облаков I", PrimitiveType.Cylinder, new Vector3(0.9f, 0.6f, 0.9f));
         GameObject miningHoldPrefab = CreateModulePrefab(StarterMiningHoldPrefabPath, "Противоударный кузов I", PrimitiveType.Cube, new Vector3(1.8f, 0.55f, 1.25f));
+        GameObject observationPostPrefab = CreateModulePrefab(StarterObservationPostPrefabPath, "Наблюдательный пост I", PrimitiveType.Sphere, new Vector3(0.85f, 0.85f, 0.85f));
 
         ConfigureStarterHull(hull, hullPrefab);
         ConfigureStarterEngine(engine, enginePrefab);
@@ -60,12 +64,14 @@ public static class ShipAssemblySetupEditor
         ConfigureStarterCargoRack(cargoRack, cargoRackPrefab);
         ConfigureStarterGasHarvester(gasHarvester, gasHarvesterPrefab);
         ConfigureStarterMiningHold(miningHold, miningHoldPrefab);
+        ConfigureStarterObservationPost(observationPost, observationPostPrefab);
 
         ShipCatalogSO catalog = CreateOrLoadAsset<ShipCatalogSO>(CatalogPath);
-        ConfigureCatalog(catalog, hull, engine, propeller, claudiumLoop, cargoRack, gasHarvester, miningHold);
+        ConfigureCatalog(catalog, hull, engine, propeller, claudiumLoop, cargoRack, gasHarvester, miningHold, observationPost);
+        ApplyCsvSpecialModuleConfigsToCatalog(catalog);
 
         TechTreeDefinitionSO techTree = CreateOrLoadAsset<TechTreeDefinitionSO>(TechTreePath);
-        ConfigureTechTree(techTree, hull, engine, propeller, claudiumLoop, cargoRack, gasHarvester, miningHold);
+        ConfigureTechTree(techTree, hull, engine, propeller, claudiumLoop, cargoRack, gasHarvester, miningHold, observationPost);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -316,6 +322,32 @@ public static class ShipAssemblySetupEditor
         EditorUtility.SetDirty(hold);
     }
 
+    private static void ConfigureStarterObservationPost(ShipPartDefinitionSO post, GameObject prefab)
+    {
+        Undo.RecordObject(post, "Configure starter observation post");
+        post.partId = "starter_observation_post";
+        post.displayName = "Наблюдательный пост I";
+        post.description = "Простой научно-разведывательный модуль: расширяет радиус наблюдения и перерабатывает бумагу в информацию.";
+        post.completedTechId = "";
+        post.kind = ShipPartKind.Module;
+        post.prefab = prefab;
+        post.engineFuelId = "";
+        post.slots.Clear();
+        post.compatibleSlotTypeIds = new List<string> { "utility" };
+        post.grantedSlots.Clear();
+        post.statModifiers = new List<ShipStatModifier>
+        {
+            Add(ShipStatId.BaseMass, 80f),
+            Set(ShipStatId.ObservationRadiusMeters, 550f),
+            Set(ShipStatId.ObservationFactsAtHalfRadiusPerSecond, 2f),
+            Set(ShipStatId.ObservationRockInfoEfficiency, 0.75f),
+            Set(ShipStatId.ObservationCloudInfoEfficiency, 0.7f),
+            Set(ShipStatId.ObservationLeviathanInfoEfficiency, 0.45f)
+        };
+
+        EditorUtility.SetDirty(post);
+    }
+
     private static void ConfigureCatalog(ShipCatalogSO catalog, params ShipPartDefinitionSO[] parts)
     {
         Undo.RecordObject(catalog, "Настроить каталог кораблей");
@@ -326,6 +358,34 @@ public static class ShipAssemblySetupEditor
         EditorUtility.SetDirty(catalog);
     }
 
+    private static void ApplyCsvSpecialModuleConfigsToCatalog(ShipCatalogSO catalog)
+    {
+        if (catalog == null) return;
+
+        WorldConfigDatabase config = new WorldConfigDatabase();
+        config.LoadFromAssetsConfigFolder("Data/Config");
+        if (!config.isLoaded)
+        {
+            Debug.LogWarning("Не удалось прочитать CSV спец-модулей: " + config.lastError);
+            return;
+        }
+
+        int applied = ShipAssemblyBuilder.ApplySpecialModuleConfigs(catalog, config);
+        if (catalog.parts != null)
+        {
+            for (int i = 0; i < catalog.parts.Count; i++)
+            {
+                if (catalog.parts[i] != null)
+                {
+                    EditorUtility.SetDirty(catalog.parts[i]);
+                }
+            }
+        }
+
+        EditorUtility.SetDirty(catalog);
+        Debug.Log("CSV спец-модулей применён к каталогу кораблей. Обновлено модулей: " + applied + ".");
+    }
+
     private static void ConfigureTechTree(
         TechTreeDefinitionSO techTree,
         ShipPartDefinitionSO hull,
@@ -334,7 +394,8 @@ public static class ShipAssemblySetupEditor
         ShipPartDefinitionSO claudiumLoop,
         ShipPartDefinitionSO cargoRack,
         ShipPartDefinitionSO gasHarvester,
-        ShipPartDefinitionSO miningHold)
+        ShipPartDefinitionSO miningHold,
+        ShipPartDefinitionSO observationPost)
     {
         Undo.RecordObject(techTree, "Настроить базовое древо техники");
         techTree.nodes ??= new List<TechTreeNode>();
@@ -365,6 +426,7 @@ public static class ShipAssemblySetupEditor
 
         techTree.nodes.Add(CreatePartNode("starter_gas_harvester_node", "Харвестер облаков I", TechTreeNodeKind.Module, gasHarvester, 1, 0, 0, true, true, 660f, -120f));
         techTree.nodes.Add(CreatePartNode("starter_mining_hold_node", "Противоударный кузов I", TechTreeNodeKind.Module, miningHold, 1, 0, 0, true, true, 660f, -240f));
+        techTree.nodes.Add(CreatePartNode("starter_observation_post_node", "Наблюдательный пост I", TechTreeNodeKind.Module, observationPost, 1, 0, 0, true, true, 660f, 240f));
 
         EditorUtility.SetDirty(techTree);
     }

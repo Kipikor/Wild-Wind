@@ -1,0 +1,9 @@
+id_recipe,production_type,local_name_ru,local_name_en,duration_seconds,generation_count_per_minute,input_item,input_amount,output_item,output_amount,fuel_item,energy_kwh,processing_source,reaction_base_success,reaction_risk_per_speed,catalyst_item,catalyst_amount,catalyst_success_bonus,conversion_growth_per_cycle,conversion_decay_per_minute,conversion_max_multiplier
+recipe_generation_paper,Generation,Бумажная мастерская,Paper Workshop,60,6,,,"paper",1,,,,,,,,,,
+recipe_processing_ore,Processing,Дробилка руды,Ore Crusher,20,,"","",,,charcoal,4,ore,,,,,,,
+recipe_processing_gas,Processing,Перегонка конденсата,Condensate Still,18,,"","",,,charcoal,2,gas,,,,,,,
+recipe_manufacturing_tools_economy,Manufacturing,Инструменты из дерева и металла,Wood-Metal Tools,45,,"wood,metal","2,1","tools",1,charcoal,1,,,,,,,
+recipe_manufacturing_tools_quality,Manufacturing,Точные инструменты,Precision Tools,30,,"metal,mechanisms","1,1","tools",2,charcoal,1,,,,,,,
+recipe_reaction_gunpowder_safe,Reaction,Пороховая реакция,Gunpowder Reaction,240,,"sulfur,charcoal","1,2","gunpowder",2,,,,0.92,0.015,alcohol,1,0.12,,,
+recipe_conversion_claudium,Conversion,Клавдиевый маховик,Claudium Flywheel,60,,"claudite","1","claudium",1,,,,,,,,,0.12,0.55,6
+recipe_assembly_airframe,Assembly,Пошаговая сборка корпуса,Stepwise Airframe Assembly,60,,"","",,,,,,,,,,,,

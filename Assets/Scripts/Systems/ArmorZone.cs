@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
@@ -20,14 +19,10 @@ public class ArmorZone : MonoBehaviour
     [Header("Урон")]
     [InspectorName("Множитель урона корпусу")]
     [Range(0f, 3f)] public float structureDamageMultiplier = 1f;
-    [InspectorName("Множитель урона модулям")]
-    [Range(0f, 3f)] public float moduleDamageMultiplier = 0.65f;
     [InspectorName("Доля поверхностного урона фугаса")]
     [Range(0f, 1f)] public float highExplosiveSurfaceDamageMultiplier = 0.35f;
     [InspectorName("Множитель урона тарана")]
     [Range(0f, 3f)] public float ramDamageMultiplier = 1f;
-    [InspectorName("Защищённые модули")]
-    public List<string> protectedModuleIds = new List<string>();
 
     [Header("Таран")]
     [InspectorName("Получать урон от тарана")]
