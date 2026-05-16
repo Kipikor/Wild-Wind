@@ -1750,6 +1750,55 @@ public partial class MetaGameState : MonoBehaviour
         return true;
     }
 
+    public bool TrySpendFractionalShipCargoFromRuntime(string resourceId, float amountKg, ref float spendBufferKg, out string reason)
+    {
+        reason = "";
+        if (string.IsNullOrWhiteSpace(resourceId))
+        {
+            reason = "Нельзя потратить ресурс без id.";
+            return false;
+        }
+
+        if (amountKg <= 0f) return true;
+
+        EnsureProgressInitialized();
+        progress.Normalize();
+
+        spendBufferKg = Mathf.Clamp(spendBufferKg, 0f, 0.999f);
+        int stockKg = progress.GetShipCargoAmount(resourceId);
+        string resourceName = worldConfig != null ? worldConfig.GetItemNameRu(resourceId) : resourceId;
+        if (stockKg <= 0)
+        {
+            spendBufferKg = 0f;
+            reason = "На борту нет " + resourceName + ".";
+            return false;
+        }
+
+        float availableKg = Mathf.Max(0f, stockKg - spendBufferKg);
+        if (availableKg + 0.0001f < amountKg)
+        {
+            reason = $"Не хватает {resourceName}: нужно {amountKg:0.0} кг, доступно {availableKg:0.0} кг.";
+            return false;
+        }
+
+        spendBufferKg += amountKg;
+        int wholeKg = Mathf.FloorToInt(spendBufferKg + 0.0001f);
+        if (wholeKg > 0)
+        {
+            if (!progress.TrySpendShipCargo(resourceId, wholeKg))
+            {
+                reason = "Не удалось списать " + resourceName + ".";
+                return false;
+            }
+
+            spendBufferKg -= wholeKg;
+            ApplyCargoMassToShip(GetActiveShip());
+            ResetCargoPlan();
+        }
+
+        return true;
+    }
+
     public float GetRemainingShipImpactCargoCapacityKg(float impactHoldCapacityKg)
     {
         return GetRemainingShipCargoCapacityKg();

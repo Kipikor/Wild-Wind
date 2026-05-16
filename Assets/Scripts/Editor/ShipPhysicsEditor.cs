@@ -358,19 +358,25 @@ public class ShipPhysicsEditor : Editor
             EditorGUILayout.LabelField("Угловая (°/с)", GUILayout.Width(100));
             
             EditorGUILayout.LabelField("X", GUILayout.Width(12));
-            float ax_deg = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.x * Mathf.Rad2Deg, 2));
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.FloatField(0f);
+            }
             
             EditorGUILayout.LabelField("Y", GUILayout.Width(12));
             float ay_deg = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.y * Mathf.Rad2Deg, 2));
             
             EditorGUILayout.LabelField("Z", GUILayout.Width(12));
-            float az_deg = EditorGUILayout.FloatField((float)System.Math.Round(rb.angularVelocity.z * Mathf.Rad2Deg, 2));
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.FloatField(0f);
+            }
             EditorGUILayout.EndHorizontal();
             
             if (EditorGUI.EndChangeCheck())
             {
                 rb.linearVelocity = new Vector3(vx, vy, vz);
-                rb.angularVelocity = new Vector3(ax_deg * Mathf.Deg2Rad, ay_deg * Mathf.Deg2Rad, az_deg * Mathf.Deg2Rad);
+                rb.angularVelocity = new Vector3(0f, ay_deg * Mathf.Deg2Rad, 0f);
             }
 
             EditorGUILayout.Space(5);
@@ -399,6 +405,11 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("miningImpactHoldCapacityKg"), new GUIContent("Противоударный кузов, кг"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("miningCatchRadiusMeters"), new GUIContent("Радиус сбора кусков, м"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("miningManualShotRangeMeters"), new GUIContent("Дальность выстрела, м"));
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("Оружие", EditorStyles.miniBoldLabel);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("weaponResourceId"), new GUIContent("Ресурс оружия"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("weaponShotCostKg"), new GUIContent("Расход за выстрел, кг"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("weaponShotAlarmRadiusMeters"), new GUIContent("Радиус тревоги выстрела, м"));
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
@@ -410,6 +421,7 @@ public class ShipPhysicsEditor : Editor
                 meta.EnsureProgressInitialized();
                 EditorGUILayout.LabelField("Груз", FormatCargo(meta.progress.shipCargo));
                 EditorGUILayout.LabelField("Запас грузоподъемности", meta.GetRemainingShipCargoCapacityKg().ToString("0") + " кг");
+                DrawWeaponStock(meta, ship);
                 DrawCargoCapacityBreakdown(ship, meta);
             }
             else
@@ -425,8 +437,7 @@ public class ShipPhysicsEditor : Editor
                 if (GUILayout.Button("Выстрел"))
                 {
                     Undo.RecordObject(ship, "Mining Shot");
-                    MiningRock.ShootNearest(ship.transform.position, ship.miningManualShotRangeMeters, out string message);
-                    ship.miningLastMessage = message;
+                    ship.TryShootNearestMiningRock(out _);
                     EditorUtility.SetDirty(ship);
                 }
                 EditorGUILayout.EndHorizontal();
@@ -441,10 +452,12 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonRangeMeters"), new GUIContent("Дальность гарпуна, м"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonRopeLengthMeters"), new GUIContent("Длина троса, м"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonMaxTensionKg"), new GUIContent("Предел троса, кгс"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonMaxTensionLifetimeSeconds"), new GUIContent("Жизнь троса на пределе, сек"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonStiffnessNPerMeter"), new GUIContent("Жесткость троса, Н/м"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonDampingNsPerMeter"), new GUIContent("Демпфер рывка, Н·с/м"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonReelForceN"), new GUIContent("Подтяжка лебедки, Н"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonFatiguePerSecond"), new GUIContent("Усталость цели в секунду"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonFatiguePerSecond"), new GUIContent("Урон здоровью в секунду"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanWeaponShotFlightDamage"), new GUIContent("Урон здоровью от выстрела"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonCarcassCollectionRadiusMeters"), new GUIContent("Радиус сбора туши, м"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("harpoonCarcassWinchSpeedMS"), new GUIContent("Скорость лебедки, м/с"));
         EditorGUILayout.Space(4);
@@ -455,9 +468,18 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntMinimumAltitudeMeters"), new GUIContent("Мин. высота подхода, м"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntShotCooldownSeconds"), new GUIContent("Пауза выстрела, сек"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntBrokenTargetCooldownSeconds"), new GUIContent("Игнор после обрыва, сек"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntMaxTargetMassKg"), new GUIContent("Макс. масса цели, кг"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("leviathanHuntMaxTetherDriftMeters"), new GUIContent("Макс. отход от захвата, м"));
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             EditorGUILayout.LabelField("Состояние гарпуна", EditorStyles.miniBoldLabel);
+            MetaGameState meta = Application.isPlaying ? FindFirstObjectByType<MetaGameState>() : null;
+            if (Application.isPlaying && meta != null)
+            {
+                meta.EnsureProgressInitialized();
+                DrawWeaponStock(meta, ship);
+            }
+
             EditorGUILayout.LabelField(ship.GetHarpoonStatusRu(), EditorStyles.wordWrappedLabel);
             if (!string.IsNullOrWhiteSpace(ship.leviathanHuntAutopilotMessage))
             {
@@ -481,6 +503,13 @@ public class ShipPhysicsEditor : Editor
                     EditorUtility.SetDirty(ship);
                 }
                 EditorGUILayout.EndHorizontal();
+
+                if (GUILayout.Button("Выстрел оружием"))
+                {
+                    Undo.RecordObject(ship, "Shoot Leviathan");
+                    ship.TryShootLeviathan(out _);
+                    EditorUtility.SetDirty(ship);
+                }
 
                 if (GUILayout.Button("Забрать тушу в груз"))
                 {
@@ -510,6 +539,18 @@ public class ShipPhysicsEditor : Editor
         }
 
         return text.Length > 0 ? text : "пусто";
+    }
+
+    private static void DrawWeaponStock(MetaGameState meta, ShipPhysics ship)
+    {
+        if (meta == null || meta.progress == null || ship == null) return;
+
+        string resourceId = string.IsNullOrWhiteSpace(ship.weaponResourceId) ? "weapon" : ship.weaponResourceId;
+        int stockKg = meta.progress.GetShipCargoAmount(resourceId);
+        float availableKg = Mathf.Max(0f, stockKg - Mathf.Clamp(meta.progress.shipWeaponSpendBufferKg, 0f, 0.999f));
+        float costKg = Mathf.Max(0.01f, ship.weaponShotCostKg);
+        int shots = Mathf.FloorToInt(availableKg / costKg);
+        EditorGUILayout.LabelField("Оружие", $"{availableKg:0.0} кг, выстрелов {shots}");
     }
 
     private static void DrawCargoCapacityBreakdown(ShipPhysics ship, MetaGameState meta)
@@ -812,6 +853,8 @@ public static class LeviathanHuntingSetupEditor
         ShipAssemblyBuilder.AutoInstallRequiredModules(meta.CurrentCatalog, meta.techTree, meta.progress, out _);
         meta.progress.SetShipCargoAmount("wood", 18);
         meta.progress.SetShipCargoAmount("claudium", 8);
+        meta.progress.SetShipCargoAmount("weapon", 5);
+        meta.progress.shipWeaponSpendBufferKg = 0f;
         meta.ApplySelectedShip();
 
         ShipPhysics ship = meta.shipLoader != null ? meta.shipLoader.targetShip : UnityEngine.Object.FindFirstObjectByType<ShipPhysics>();
@@ -821,6 +864,7 @@ public static class LeviathanHuntingSetupEditor
             ship.harpoonRangeMeters = 280f;
             ship.harpoonRopeLengthMeters = 160f;
             ship.harpoonMaxTensionKg = 4500f;
+            ship.harpoonMaxTensionLifetimeSeconds = 5f;
             ship.harpoonStiffnessNPerMeter = 360f;
             ship.harpoonDampingNsPerMeter = 110f;
             ship.harpoonReelForceN = 600f;
@@ -833,6 +877,12 @@ public static class LeviathanHuntingSetupEditor
             ship.leviathanHuntMinimumAltitudeMeters = 45f;
             ship.leviathanHuntShotCooldownSeconds = 4f;
             ship.leviathanHuntBrokenTargetCooldownSeconds = 25f;
+            ship.leviathanHuntMaxTargetMassKg = 7000f;
+            ship.leviathanHuntMaxTetherDriftMeters = 1500f;
+            ship.weaponResourceId = "weapon";
+            ship.weaponShotCostKg = 0.1f;
+            ship.weaponShotAlarmRadiusMeters = 450f;
+            ship.leviathanWeaponShotFlightDamage = 25f;
             ship.harpoonLastMessage = "Гарпун готов к тестовой охоте.";
             ship.RefreshRuntimeShipSettings();
             EditorUtility.SetDirty(ship);
@@ -939,6 +989,7 @@ public class LeviathanEditor : Editor
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
+        Leviathan leviathan = (Leviathan)target;
 
         LocalizedInspector.Section("Идентификация");
         LocalizedInspector.Property(serializedObject, "leviathanId", "id левиафана", "Уникальный id конкретного существа в сцене.");
@@ -959,34 +1010,160 @@ public class LeviathanEditor : Editor
         LocalizedInspector.Property(serializedObject, "massKg", "Масса, кг", "Физическая масса живого левиафана.");
         LocalizedInspector.Property(serializedObject, "carcassMassKg", "Масса туши, кг", "Сколько килограммов ресурса туши попадет в груз корабля.");
 
-        LocalizedInspector.Section("Живучесть и полет");
+        LocalizedInspector.Section("Живучесть");
         LocalizedInspector.Property(serializedObject, "maxHealth", "Макс. здоровье", "Полное здоровье существа.");
         LocalizedInspector.Property(serializedObject, "health", "Здоровье", "Текущее здоровье. При нуле левиафан становится добычей.");
-        LocalizedInspector.Property(serializedObject, "maxFlightCapability", "Макс. полетоспособность", "Запас способности держаться в воздухе.");
-        LocalizedInspector.Property(serializedObject, "flightCapability", "Полетоспособность", "Текущий запас полета. Гарпун снижает эту величину.");
-        LocalizedInspector.Property(serializedObject, "claudiumLiftKg", "Клавдиевый подъем, кг", "Сколько подъема дает природный клавдий левиафана.");
-        LocalizedInspector.Property(serializedObject, "isCarcass", "Туша", "Если включено, левиафан уже потерял полетоспособность или здоровье.");
+        LocalizedInspector.Property(serializedObject, "claudiumLiftKg", "Клавдиевая компенсация, кг", "Сколько массы компенсирует природная клавдиевая система. У живого левиафана обычная гравитация выключена.");
+        LocalizedInspector.Property(serializedObject, "isCarcass", "Туша", "Если включено, левиафан уже потерял здоровье.");
 
         LocalizedInspector.Section("Движение");
-        LocalizedInspector.Property(serializedObject, "swimForceN", "Сила плавания, Н", "Максимальная сила, которой левиафан разгоняется к выбранной точке.");
-        LocalizedInspector.Property(serializedObject, "maxSpeedMS", "Макс. скорость, м/с", "Ограничение скорости живого левиафана.");
+        LocalizedInspector.Property(serializedObject, "cruiseSpeedMS", "Крейсерская скорость, м/с", "Желаемая скорость поведения. Фактическая скорость ограничивается тягой и сопротивлением воздуха.");
         LocalizedInspector.Property(serializedObject, "wanderRadiusMeters", "Радиус блуждания, м", "Как далеко от центра зоны выбираются случайные цели.");
-        LocalizedInspector.Property(serializedObject, "turnTorque", "Поворотливость", "Насколько быстро визуально доворачивается тело к направлению движения.");
+        LocalizedInspector.Property(serializedObject, "forwardThrustKgf", "Маршевая тяга, кгс", "Основная тяга строго вперед вдоль тела. Чем сильнее цель сбоку или сзади, тем меньше эта тяга помогает.");
+        LocalizedInspector.Property(serializedObject, "omniThrustKgf", "Всенаправленная тяга, кгс", "Тяга для подъема, снижения, бокового сноса и торможения.");
+        LocalizedInspector.Property(serializedObject, "turnTorqueNm", "Момент поворота, Н*м", "Сила поворота автопилота и ручного управления.");
+        LocalizedInspector.Property(serializedObject, "turnDamping", "Демпфирование поворота", "Гасит лишнюю угловую скорость.");
+        LocalizedInspector.Property(serializedObject, "stationaryTurnEffectiveness", "Поворот на месте", "Доля поворотного усилия, когда левиафан почти не движется. Делает поворот по дуге удобнее, чем разворот на месте.");
+        LocalizedInspector.Property(serializedObject, "fullTurnEffectSpeedMS", "Полный поворот от скорости, м/с", "На этой скорости левиафан получает полный момент поворота.");
+        LocalizedInspector.Property(serializedObject, "autoCalculateDragArea", "Авто площадь сопротивления", "Если включено, лобовая площадь считается из радиуса тела.");
+        LocalizedInspector.Property(serializedObject, "airDensity", "Плотность воздуха", "Плотность среды для расчета сопротивления.");
+        LocalizedInspector.Property(serializedObject, "dragCoefficient", "Коэф. сопротивления", "Насколько сильно тело тормозится воздухом.");
+        LocalizedInspector.Property(serializedObject, "frontalArea", "Лобовая площадь, м²", "Площадь сопротивления при движении вперед.");
+        LocalizedInspector.Property(serializedObject, "sideAreaMultiplier", "Боковая площадь x", "Во сколько раз боковое сопротивление больше лобового.");
+        LocalizedInspector.Property(serializedObject, "verticalAreaMultiplier", "Вертикальная площадь x", "Во сколько раз сопротивление вверх/вниз больше лобового.");
+        LocalizedInspector.Property(serializedObject, "bellyDownStabilization", "Пузом вниз", "Если включено, левиафан мягко прокручивает себя вокруг продольной оси, чтобы спина была сверху.");
+        LocalizedInspector.Property(serializedObject, "bellyDownTorqueNm", "Момент выравнивания, Н*м", "Сила системы, которая возвращает пузо вниз без запрета свободных вращений.");
+        LocalizedInspector.Property(serializedObject, "bellyDownDamping", "Демпфер выравнивания", "Гасит раскачку вокруг продольной оси.");
+        LocalizedInspector.Property(serializedObject, "autopilotVelocityGain", "Жесткость автопилота", "Как резко автопилот добирает нужную скорость и тормозит перед точкой.");
+        LocalizedInspector.Property(serializedObject, "autopilotArrivalRadiusMeters", "Радиус остановки, м", "Внутри этого радиуса автопилот старается остановиться.");
+        LocalizedInspector.Property(serializedObject, "fishLookAheadSeconds", "Рыбье упреждение, сек", "На сколько секунд вперед автопилот смотрит по текущей скорости, чтобы заходить в точку дугой.");
+        LocalizedInspector.Property(serializedObject, "fishFullArcAngleDeg", "Полная дуга от угла", "При таком угле до цели левиафан максимально сохраняет движение вперед и не пытается боком прыгнуть к точке.");
+        LocalizedInspector.Property(serializedObject, "fishArcForwardBias", "Сохранение хода в дуге", "Чем выше значение, тем сильнее левиафан держит нос по текущему ходу при резком развороте.");
+        LocalizedInspector.Property(serializedObject, "fishTurnSpeedRetention", "Скорость в развороте", "Минимальная доля крейсерской скорости, которую левиафан старается сохранить на широкой дуге.");
+        LocalizedInspector.Property(serializedObject, "fishLateralCorrection", "Боковая коррекция", "Сколько боковой всенаправленной тяги автопилот разрешает во время резкого разворота.");
+        LocalizedInspector.Property(serializedObject, "fishTurnBrakePermission", "Торможение в развороте", "Сколько тормозного усилия разрешено, пока левиафан еще не смотрит на цель.");
+        LocalizedInspector.Property(serializedObject, "organicSwimMotion", "Живое виляние", "Включает плавную живую поправку к автопилоту и визуальному телу. Левиафан все еще идет к цели, но не летит идеально прямой линией.");
+        LocalizedInspector.Property(serializedObject, "swimSwayFrequency", "Частота виляния, Гц", "Сколько полных покачиваний в секунду делает тело. Маленьким быстрым видам можно ставить больше, большим китам меньше.");
+        LocalizedInspector.Property(serializedObject, "swimSwayAngleDeg", "Угол виляния курса", "На сколько градусов автопилот мягко отклоняет желаемое направление влево-вправо. Это не мгновенный поворот тела, а живая поправка к цели.");
+        LocalizedInspector.Property(serializedObject, "swimSwaySideForceKgf", "Боковой толчок, кгс", "Небольшая физическая боковая тяга от движения тела. Делает траекторию не идеально рельсовой, но при больших значениях может мешать точному заходу.");
+        LocalizedInspector.Property(serializedObject, "swimNoiseRadiusMeters", "Случайность курса, м", "Плавный шум цели по горизонтали. Значение задает радиус живого блуждания вокруг настоящей точки.");
+        LocalizedInspector.Property(serializedObject, "swimNoiseFrequency", "Частота случайности", "Скорость изменения плавного шума. Низкие значения дают медленное дыхание траектории, высокие делают движение нервнее.");
+        LocalizedInspector.Property(serializedObject, "swimVerticalNoiseMeters", "Вертикальное дыхание, м", "Насколько сильно левиафан слегка уходит выше-ниже относительно выбранной цели. Рядом с точкой эффект сам затухает.");
+        LocalizedInspector.Property(serializedObject, "visualBodySwayDeg", "Визуальное виляние тела", "Только визуальный поворот модели влево-вправо. Не меняет физический коллайдер и не ломает попадания.");
+        LocalizedInspector.Property(serializedObject, "visualTailSwayMeters", "Визуальное виляние хвоста", "Насколько сильно хвост и голова визуально смещаются при плавании. Это декоративное движение без физического урона и столкновений.");
+        LocalizedInspector.Property(serializedObject, "failureGravityRampSeconds", "Отказ систем, сек", "За сколько секунд после смерти гравитация вырастает до полной.");
+        LocalizedInspector.Property(serializedObject, "failureStartGravity01", "Начальная гравитация", "Доля полной гравитации сразу после отказа систем.");
         LocalizedInspector.Property(serializedObject, "harpoonStruggleForceMultiplier", "Сила рывков на гарпуне", "Множитель силы, с которой живой левиафан сопротивляется натянутому тросу.");
         LocalizedInspector.Property(serializedObject, "harpoonDiveBias", "Стремление вниз", "Насколько сильно пойманный левиафан пытается уйти вниз.");
         LocalizedInspector.Property(serializedObject, "harpoonPanicTurnIntervalSeconds", "Интервал рывков, сек", "Как часто левиафан меняет направление панического рывка.");
+
+        LocalizedInspector.Section("Путевая машинка");
+        LocalizedInspector.Property(serializedObject, "routeEnabled", "Маршрут включён", "Если включено, свободный левиафан идёт по заданным точкам вместо обычного блуждания.");
+        LocalizedInspector.Property(serializedObject, "routeLoop", "Зациклить маршрут", "После последней точки снова идти к первой.");
+        LocalizedInspector.Property(serializedObject, "routeWaypointRadiusMeters", "Радиус точки, м", "Точка считается достигнутой, когда левиафан вошёл в этот радиус.");
+        LocalizedInspector.Property(serializedObject, "routeCruiseSpeedMS", "Скорость маршрута, м/с", "Желаемая скорость движения по точкам. Фактическая скорость зависит от тяги и сопротивления воздуха.");
+        LocalizedInspector.Property(serializedObject, "routeRandomPointCount", "Сколько точек генерировать", "Количество случайных точек для кнопки генерации маршрута.");
+        LocalizedInspector.Property(serializedObject, "routeRandomRadiusMeters", "Радиус генерации, м", "Случайные точки создаются вокруг текущей позиции левиафана в этом радиусе.");
+        LocalizedInspector.Property(serializedObject, "routeWaypointIndex", "Текущая точка", "Индекс точки, к которой сейчас идёт путевая машинка.");
+        LocalizedInspector.Property(serializedObject, "routeWaypoints", "Точки маршрута", "Список мировых координат маршрута левиафана.");
+        LocalizedInspector.Property(serializedObject, "routeStatus", "Статус маршрута", "Последнее сообщение путевой машинки.");
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Сгенерировать 1 км"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.RecordObject(leviathan, "Generate leviathan route");
+            leviathan.GenerateRandomRoute(1000f, Mathf.Max(1, leviathan.routeRandomPointCount));
+            EditorUtility.SetDirty(leviathan);
+            SceneView.RepaintAll();
+            serializedObject.Update();
+        }
+
+        if (GUILayout.Button("Сгенерировать по настройкам"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.RecordObject(leviathan, "Generate leviathan route");
+            leviathan.GenerateRandomRoute(leviathan.routeRandomRadiusMeters, leviathan.routeRandomPointCount);
+            EditorUtility.SetDirty(leviathan);
+            SceneView.RepaintAll();
+            serializedObject.Update();
+        }
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Запустить"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.RecordObject(leviathan, "Start leviathan route");
+            leviathan.RestartRoute();
+            EditorUtility.SetDirty(leviathan);
+            SceneView.RepaintAll();
+            serializedObject.Update();
+        }
+
+        if (GUILayout.Button("Остановить"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.RecordObject(leviathan, "Stop leviathan route");
+            leviathan.StopRoute();
+            EditorUtility.SetDirty(leviathan);
+            SceneView.RepaintAll();
+            serializedObject.Update();
+        }
+
+        if (GUILayout.Button("Очистить"))
+        {
+            serializedObject.ApplyModifiedProperties();
+            Undo.RecordObject(leviathan, "Clear leviathan route");
+            leviathan.ClearRoute();
+            EditorUtility.SetDirty(leviathan);
+            SceneView.RepaintAll();
+            serializedObject.Update();
+        }
+        EditorGUILayout.EndHorizontal();
+
+        LocalizedInspector.Section("Питание");
+        LocalizedInspector.Property(serializedObject, "satietyKg", "Сытость, кг", "Текущий запас сытости. Голодный левиафан ищет глыбы и падающие куски руды.");
+        LocalizedInspector.Property(serializedObject, "maxSatietyKg", "Макс. сытость, кг", "Верхний предел сытости.");
+        LocalizedInspector.Property(serializedObject, "hungerDecayKgPerSecond", "Расход сытости, кг/с", "Как быстро левиафан снова голодает.");
+        LocalizedInspector.Property(serializedObject, "feedingSearchRadiusMeters", "Радиус поиска глыб, м", "На какой дистанции левиафан замечает глыбы для кормления.");
+        LocalizedInspector.Property(serializedObject, "feedingBiteKg", "Укус глыбы, кг", "Сколько руды левиафан поглощает за один укус.");
+        LocalizedInspector.Property(serializedObject, "feedingBiteIntervalSeconds", "Пауза укуса, сек", "Как часто он может грызть одну глыбу.");
+        LocalizedInspector.Property(serializedObject, "feedingApproachDistanceMeters", "Дистанция укуса, м", "Насколько близко надо подойти к глыбе, чтобы начать есть.");
+        LocalizedInspector.Property(serializedObject, "fragmentEatRadiusMeters", "Радиус перехвата кусков, м", "Падающие куски руды в этом радиусе левиафан может съесть раньше корабля.");
 
         LocalizedInspector.Section("Бой");
         LocalizedInspector.Property(serializedObject, "headArmorMm", "Броня головы, мм", "Пока справочная величина для будущей боевой модели.");
         LocalizedInspector.Property(serializedObject, "bodyArmorMm", "Броня тела, мм", "Пока справочная величина для будущей боевой модели.");
         LocalizedInspector.Property(serializedObject, "ramDamageMultiplier", "Множитель тарана", "Сколько урона левиафан наносит/получает тараном относительно базовой модели.");
+        LocalizedInspector.Property(serializedObject, "passiveAggressionRangeMeters", "Радиус раздражения, м", "В этом радиусе корабль постепенно поднимает тревогу левиафана.");
+        LocalizedInspector.Property(serializedObject, "ramChargeForceMultiplier", "Сила тарана", "Множитель силы плавания во время тарана.");
+        LocalizedInspector.Property(serializedObject, "harpoonedRamMassRatio", "Таран на гарпуне от массы", "Если левиафан тяжелее корабля во столько раз, он на гарпуне пытается таранить, а не убегать.");
+        LocalizedInspector.Property(serializedObject, "harpoonedRamRetreatDistanceMeters", "Отход на гарпуне, м", "На какую дистанцию левиафан старается отойти перед новым ударом.");
+        LocalizedInspector.Property(serializedObject, "harpoonedRamChargeDistanceMeters", "Дистанция удара на гарпуне, м", "Когда при сближении дистанция меньше этой, левиафан считает заход завершенным и снова отходит.");
+        LocalizedInspector.Property(serializedObject, "harpoonedRamChargeSeconds", "Рывок на гарпуне, сек", "Сколько длится один заход на таран, если контакт не случился раньше.");
+        LocalizedInspector.Property(serializedObject, "harpoonedRamRetreatSeconds", "Отход на гарпуне, сек", "Минимальное время отхода после удара или сорванного захода.");
+        LocalizedInspector.Property(serializedObject, "harpoonedSmallRamForceMultiplier", "Сила малого на гарпуне", "Множитель силы тарана для левиафана, который легче корабля. Он все равно пробует ударить, но слабее.");
+        LocalizedInspector.Property(serializedObject, "harpoonAlarmAggressionRangeMultiplier", "Радиус тревоги гарпуна", "Во сколько раз увеличивается радиус агрессии свободных левиафанов, если кто-то пойман гарпуном.");
+        LocalizedInspector.Property(serializedObject, "ramMinDamageSpeedMS", "Мин. скорость урона, м/с", "Ниже этой скорости столкновение считается мягким и урон не наносится.");
+        LocalizedInspector.Property(serializedObject, "ramDamageScale", "Масштаб урона тарана", "Урон считается по корню из энергии столкновения, как в модели корабельного тарана.");
+
+        LocalizedInspector.Section("Тревога");
+        LocalizedInspector.Property(serializedObject, "alarm01", "Текущая тревога", "0 - спокойно, 1 - немедленный заход на таран. Во время тарана тревога сгорает и не растет.");
+        LocalizedInspector.Property(serializedObject, "alarmNearGainPerSecond", "Рост рядом, /с", "Сколько тревоги в секунду добавляет корабль в радиусе раздражения.");
+        LocalizedInspector.Property(serializedObject, "alarmHarpoonedGainPerSecond", "Рост от гарпуна, /с", "Базовый рост тревоги, пока левиафан на гарпуне.");
+        LocalizedInspector.Property(serializedObject, "alarmTensionGainPerSecond", "Рост от натяжения, /с", "Добавка тревоги от натяжения троса. На пределе прочности добавляется полностью.");
+        LocalizedInspector.Property(serializedObject, "alarmOtherHarpoonedGainPerSecond", "Рост от чужой охоты, /с", "Как быстро тревожится свободный левиафан, если рядом гарпуном поймали другого.");
+        LocalizedInspector.Property(serializedObject, "alarmShotNearAdd", "Выстрел рядом", "Сколько тревоги добавляет выстрел рядом.");
+        LocalizedInspector.Property(serializedObject, "alarmShotAtSelfAdd", "Выстрел по нему", "Дополнительная тревога, если выстрелили именно по этому левиафану.");
+        LocalizedInspector.Property(serializedObject, "alarmRamDecaySeconds", "Сгорание тарана, сек", "За сколько секунд тревога падает от максимума до нуля. Это же окно, за которое левиафан пытается успеть ударить.");
 
         LocalizedInspector.Section("Отладка");
+        LocalizedInspector.Property(serializedObject, "behaviorStatus", "Поведение", "Последнее поведенческое сообщение.");
         LocalizedInspector.Property(serializedObject, "debugLogging", "Писать лог", "Если включено, левиафан периодически пишет состояние в Console.");
 
         serializedObject.ApplyModifiedProperties();
 
-        Leviathan leviathan = (Leviathan)target;
         EditorGUILayout.Space(6);
         EditorGUILayout.HelpBox(leviathan.GetStatusRu(), MessageType.Info);
     }
@@ -1006,12 +1183,14 @@ public class HarpoonTetherEditor : Editor
         LocalizedInspector.Section("Трос");
         LocalizedInspector.Property(serializedObject, "ropeLengthMeters", "Длина троса, м", "После этой дистанции трос начинает натягиваться.");
         LocalizedInspector.Property(serializedObject, "maxTensionKg", "Прочность троса, кгс", "Если натяжение выше этого значения, гарпун обрывается.");
+        LocalizedInspector.Property(serializedObject, "maxTensionLifetimeSeconds", "Жизнь на пределе, сек", "Сколько секунд трос выдерживает натяжение ровно на пределе. При 10% натяжения живет примерно в 10 раз дольше, при 200% - вдвое меньше.");
+        LocalizedInspector.Property(serializedObject, "wear01", "Износ троса", "0 = новый трос, 1 = обрыв.");
         LocalizedInspector.Property(serializedObject, "stiffnessNPerMeter", "Жесткость, Н/м", "Сколько силы добавляется за метр растяжения.");
         LocalizedInspector.Property(serializedObject, "dampingNsPerMeter", "Демпфер, Н·с/м", "Гасит рывки, когда корабль и цель расходятся.");
         LocalizedInspector.Property(serializedObject, "reelForceN", "Подтяжка лебедки, Н", "Постоянная сила подтягивания при натянутом тросе.");
-        LocalizedInspector.Property(serializedObject, "fatiguePerSecond", "Усталость в секунду", "Сколько полетоспособности цель теряет при полном натяжении.");
+        LocalizedInspector.Property(serializedObject, "fatiguePerSecond", "Урон здоровью в секунду", "Сколько здоровья цель теряет при полном натяжении.");
         LocalizedInspector.Property(serializedObject, "collectionRadiusMeters", "Радиус сбора туши, м", "Когда туша входит в этот радиус, ее можно погрузить в трюм.");
-        LocalizedInspector.Property(serializedObject, "carcassWinchSpeedMetersPerSecond", "Скорость лебедки, м/с", "Как быстро лебедка укорачивает трос после потери полетоспособности цели.");
+        LocalizedInspector.Property(serializedObject, "carcassWinchSpeedMetersPerSecond", "Скорость лебедки, м/с", "Как быстро лебедка укорачивает трос после смерти цели.");
 
         LocalizedInspector.Section("Состояние");
         LocalizedInspector.Property(serializedObject, "currentTensionN", "Натяжение, Н", "Текущее физическое натяжение троса.");

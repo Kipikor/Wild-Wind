@@ -59,6 +59,7 @@ public class PlayerProgress
     public long nextShopRefreshUtcTicks;
     public int shopSeed;
     public bool receivedStartingInventory;
+    public float shipWeaponSpendBufferKg;
 
     public List<ResourceStack> inventory = new List<ResourceStack>();
     public List<ResourceStack> shipCargo = new List<ResourceStack>();
@@ -117,6 +118,12 @@ public class PlayerProgress
             }
 
             stack.amount = Mathf.Max(0, stack.amount);
+        }
+
+        shipWeaponSpendBufferKg = Mathf.Clamp(shipWeaponSpendBufferKg, 0f, 0.999f);
+        if (GetShipCargoAmount("weapon") <= 0)
+        {
+            shipWeaponSpendBufferKg = 0f;
         }
 
         for (int i = shipImpactCargo.Count - 1; i >= 0; i--)

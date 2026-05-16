@@ -39,9 +39,15 @@ public class MiningRock : MonoBehaviour
     public static bool ShootNearest(Vector3 origin, float rangeMeters, out string message)
     {
         message = "Нет глыбы в дальности выстрела.";
+        MiningRock best = FindNearestShootTarget(origin, rangeMeters);
+        if (best == null) return false;
+        return best.BreakOffByShot(out message);
+    }
+
+    public static MiningRock FindNearestShootTarget(Vector3 origin, float rangeMeters)
+    {
         MiningRock best = null;
         float bestDistance = Mathf.Max(0f, rangeMeters);
-
         for (int i = 0; i < ActiveRocks.Count; i++)
         {
             MiningRock rock = ActiveRocks[i];
@@ -55,8 +61,12 @@ public class MiningRock : MonoBehaviour
             }
         }
 
-        if (best == null) return false;
-        return best.BreakOffByShot(out message);
+        return best;
+    }
+
+    public static MiningRock FindNearestFeedTarget(Vector3 origin, float rangeMeters)
+    {
+        return FindNearestShootTarget(origin, rangeMeters);
     }
 
     public void Initialize(MetaGameState owner, MiningRockState progressState)
@@ -110,6 +120,18 @@ public class MiningRock : MonoBehaviour
             ? "Выстрел отколол " + spawned + " кг: " + oreType.oreItemId + "."
             : "Выстрел попал, но глыба уже почти пуста.";
         return spawned > 0;
+    }
+
+    public bool TryLeviathanBite(int requestedKg, out int eatenKg, out string oreItemId)
+    {
+        eatenKg = 0;
+        oreItemId = "";
+        OreTypeConfig oreType = GetOreType();
+        if (oreType == null || state == null || requestedKg <= 0) return false;
+
+        oreItemId = oreType.oreItemId;
+        eatenKg = Mathf.FloorToInt(MiningWorldSimulator.HarvestRock(state, requestedKg));
+        return eatenKg > 0;
     }
 
     private void UpdatePosition()

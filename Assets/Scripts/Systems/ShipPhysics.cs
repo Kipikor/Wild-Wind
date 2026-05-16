@@ -42,13 +42,44 @@ public class Leviathan : MonoBehaviour
     public float massKg = 5000f;
     public float maxHealth = 300f;
     public float health = 300f;
-    public float maxFlightCapability = 240f;
-    public float flightCapability = 240f;
     public float claudiumLiftKg = 5500f;
-    public float swimForceN = 9000f;
-    public float maxSpeedMS = 9f;
+    public float cruiseSpeedMS = 9f;
     public float wanderRadiusMeters = 220f;
-    public float turnTorque = 1200f;
+    [Header("Физика плавания")]
+    public float forwardThrustKgf = 920f;
+    public float omniThrustKgf = 660f;
+    public float turnTorqueNm = 1200f;
+    public float turnDamping = 0.85f;
+    public float stationaryTurnEffectiveness = 0.28f;
+    public float fullTurnEffectSpeedMS = 7f;
+    public bool autoCalculateDragArea = true;
+    public float airDensity = 1.225f;
+    public float dragCoefficient = 0.55f;
+    public float frontalArea = 12f;
+    public float sideAreaMultiplier = 3.2f;
+    public float verticalAreaMultiplier = 2.6f;
+    public bool bellyDownStabilization = true;
+    public float bellyDownTorqueNm = 900f;
+    public float bellyDownDamping = 0.65f;
+    public float autopilotVelocityGain = 0.85f;
+    public float autopilotArrivalRadiusMeters = 8f;
+    public float fishLookAheadSeconds = 2.4f;
+    public float fishFullArcAngleDeg = 105f;
+    [Range(0f, 1f)] public float fishArcForwardBias = 0.35f;
+    [Range(0f, 1f)] public float fishTurnSpeedRetention = 0.35f;
+    [Range(0f, 1f)] public float fishLateralCorrection = 0.45f;
+    [Range(0f, 1f)] public float fishTurnBrakePermission = 0.18f;
+    public bool organicSwimMotion = true;
+    public float swimSwayFrequency = 0.22f;
+    public float swimSwayAngleDeg = 5f;
+    public float swimSwaySideForceKgf = 18f;
+    public float swimNoiseRadiusMeters = 12f;
+    public float swimNoiseFrequency = 0.08f;
+    public float swimVerticalNoiseMeters = 4f;
+    public float visualBodySwayDeg = 4f;
+    public float visualTailSwayMeters = 1.2f;
+    public float failureGravityRampSeconds = 20f;
+    [Range(0f, 1f)] public float failureStartGravity01 = 0.12f;
     public float headArmorMm = 28f;
     public float bodyArmorMm = 5f;
     public float ramDamageMultiplier = 1f;
@@ -58,6 +89,47 @@ public class Leviathan : MonoBehaviour
     public float harpoonStruggleForceMultiplier = 1.15f;
     public float harpoonDiveBias = 0.35f;
     public float harpoonPanicTurnIntervalSeconds = 2.4f;
+    [Header("Питание")]
+    public float satietyKg = 120f;
+    public float maxSatietyKg = 300f;
+    public float hungerDecayKgPerSecond = 0.04f;
+    public float feedingSearchRadiusMeters = 260f;
+    public int feedingBiteKg = 25;
+    public float feedingBiteIntervalSeconds = 5f;
+    public float feedingApproachDistanceMeters = 16f;
+    public float fragmentEatRadiusMeters = 18f;
+    [Header("Агрессия")]
+    public float passiveAggressionRangeMeters = 170f;
+    public float ramChargeForceMultiplier = 1.65f;
+    public float harpoonedRamMassRatio = 1.08f;
+    public float harpoonedRamRetreatDistanceMeters = 90f;
+    public float harpoonedRamChargeDistanceMeters = 32f;
+    public float harpoonedRamChargeSeconds = 3.2f;
+    public float harpoonedRamRetreatSeconds = 2.8f;
+    public float harpoonedSmallRamForceMultiplier = 0.72f;
+    public float harpoonAlarmAggressionRangeMultiplier = 3f;
+    public float ramMinDamageSpeedMS = 4f;
+    public float ramDamageScale = 10f;
+    [Header("Тревога")]
+    [Range(0f, 1f)] public float alarm01;
+    public float alarmNearGainPerSecond = 0.06f;
+    public float alarmHarpoonedGainPerSecond = 0.28f;
+    public float alarmTensionGainPerSecond = 0.35f;
+    public float alarmOtherHarpoonedGainPerSecond = 0.14f;
+    public float alarmShotNearAdd = 0.16f;
+    public float alarmShotAtSelfAdd = 0.45f;
+    public float alarmRamDecaySeconds = 10f;
+    [Header("Путевая машинка")]
+    public bool routeEnabled;
+    public bool routeLoop = true;
+    public List<Vector3> routeWaypoints = new List<Vector3>();
+    public int routeWaypointIndex;
+    public float routeWaypointRadiusMeters = 18f;
+    public float routeCruiseSpeedMS = 10f;
+    public int routeRandomPointCount = 8;
+    public float routeRandomRadiusMeters = 1000f;
+    [TextArea(2, 4)] public string routeStatus = "";
+    [TextArea(2, 4)] public string behaviorStatus = "";
 
     private Rigidbody rb;
     private Vector3 wanderTarget;
@@ -65,8 +137,22 @@ public class Leviathan : MonoBehaviour
     private float nextHarpoonPanicTurnTime;
     private float nextWanderChangeTime;
     private float nextStatusLogTime;
+    private float nextFeedingBiteTime;
+    private float ramUntilTime;
+    private float lastRamDamageTime;
+    private bool harpoonRamCharging;
+    private float harpoonRamPhaseUntilTime;
+    private bool alarmRamActive;
+    private ShipPhysics ramTarget;
+    private MiningRock feedingTarget;
+    private float carcassStartTime = -1f;
     private Color visualColor = new Color(0.35f, 0.55f, 0.7f, 1f);
     private HarpoonTether activeTether;
+    private float swimSeed;
+    private Transform visualRoot;
+    private Transform visualHead;
+    private Transform visualTail;
+    private Transform visualDorsal;
 
     public Rigidbody Body
     {
@@ -77,9 +163,7 @@ public class Leviathan : MonoBehaviour
         }
     }
 
-    public float HealthFraction => maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;
-    public float FlightFraction => maxFlightCapability > 0f ? Mathf.Clamp01(flightCapability / maxFlightCapability) : 0f;
-    public bool CanBeClaimed => isCarcass || health <= 0f || flightCapability <= 0f;
+    public bool CanBeClaimed => isCarcass || health <= 0f;
 
     private void OnEnable()
     {
@@ -106,13 +190,12 @@ public class Leviathan : MonoBehaviour
         massKg = type != null ? type.massKg : massKg;
         maxHealth = type != null ? type.maxHealth : maxHealth;
         health = maxHealth;
-        maxFlightCapability = type != null ? type.maxFlightCapability : maxFlightCapability;
-        flightCapability = maxFlightCapability;
         claudiumLiftKg = type != null ? type.claudiumLiftKg : claudiumLiftKg;
-        swimForceN = type != null ? type.swimForceN : swimForceN;
-        maxSpeedMS = type != null ? type.maxSpeedMS : maxSpeedMS;
+        forwardThrustKgf = type != null ? Mathf.Max(0f, type.forwardThrustKgf) : forwardThrustKgf;
+        omniThrustKgf = type != null ? Mathf.Max(0f, type.omniThrustKgf) : omniThrustKgf;
+        cruiseSpeedMS = type != null ? type.cruiseSpeedMS : cruiseSpeedMS;
         wanderRadiusMeters = type != null ? type.wanderRadiusMeters : wanderRadiusMeters;
-        turnTorque = type != null ? type.turnTorque : turnTorque;
+        turnTorqueNm = type != null ? Mathf.Max(0f, type.turnTorque) : turnTorqueNm;
         headArmorMm = type != null ? type.headArmorMm : headArmorMm;
         bodyArmorMm = type != null ? type.bodyArmorMm : bodyArmorMm;
         ramDamageMultiplier = type != null ? type.ramDamageMultiplier : ramDamageMultiplier;
@@ -122,16 +205,21 @@ public class Leviathan : MonoBehaviour
         zoneRadiusMeters = zone != null ? zone.radiusMeters : zoneRadiusMeters;
         minY = zone != null ? zone.minY : minY;
         maxY = zone != null ? zone.maxY : maxY;
+        if (autoCalculateDragArea)
+        {
+            RecalculateDragAreaFromBody();
+        }
 
         transform.position = position;
         name = displayName;
 
         rb = GetComponent<Rigidbody>();
         rb.mass = Mathf.Max(1f, massKg);
-        rb.useGravity = true;
-        rb.linearDamping = 0.4f;
-        rb.angularDamping = 1.6f;
+        rb.useGravity = false;
+        rb.linearDamping = 0f;
+        rb.angularDamping = 0.45f;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
+        carcassStartTime = -1f;
 
         CapsuleCollider capsule = GetComponent<CapsuleCollider>();
         if (capsule != null)
@@ -155,28 +243,41 @@ public class Leviathan : MonoBehaviour
         if (rb == null) rb = GetComponent<Rigidbody>();
         EnsureVisual();
 
-        if (health <= 0f || flightCapability <= 0f)
+        if (health <= 0f)
         {
             BecomeCarcass();
         }
 
         if (isCarcass)
         {
-            ClampCarcassSpeed();
+            UpdateCarcassFailurePhysics();
+            ApplyLeviathanAirResistance();
             return;
         }
 
-        UpdateLift();
+        rb.useGravity = false;
+        UpdateHunger();
+        UpdateAlarm();
         if (activeTether != null && activeTether.IsAttached)
         {
             UpdateHarpoonedStruggle();
+        }
+        else if (UpdateRamAttack())
+        {
+        }
+        else if (UpdateRouteMachine())
+        {
+        }
+        else if (UpdateFeeding())
+        {
         }
         else
         {
             UpdateWander();
         }
 
-        ClampAliveSpeed();
+        ApplyBellyDownStabilization();
+        ApplyLeviathanAirResistance();
 
         if (debugLogging && Time.time >= nextStatusLogTime)
         {
@@ -185,19 +286,29 @@ public class Leviathan : MonoBehaviour
         }
     }
 
+    private void LateUpdate()
+    {
+        AnimateSwimVisual();
+    }
+
     private void EnsureVisual()
     {
-        if (transform.Find("Визуал левиафана") != null) return;
+        Transform existingRoot = transform.Find("Визуал левиафана");
+        if (existingRoot != null)
+        {
+            CacheVisualParts(existingRoot);
+            return;
+        }
 
-        Transform visualRoot = new GameObject("Визуал левиафана").transform;
-        visualRoot.SetParent(transform, false);
-        visualRoot.localPosition = Vector3.zero;
-        visualRoot.localRotation = Quaternion.identity;
-        visualRoot.localScale = Vector3.one;
+        Transform root = new GameObject("Визуал левиафана").transform;
+        root.SetParent(transform, false);
+        root.localPosition = Vector3.zero;
+        root.localRotation = Quaternion.identity;
+        root.localScale = Vector3.one;
 
         GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         body.name = "Тело";
-        body.transform.SetParent(visualRoot, false);
+        body.transform.SetParent(root, false);
         body.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
         body.transform.localScale = new Vector3(bodyRadiusMeters * 2f, bodyLengthMeters * 0.5f, bodyRadiusMeters * 2f);
         RemoveVisualCollider(body);
@@ -205,7 +316,7 @@ public class Leviathan : MonoBehaviour
 
         GameObject head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         head.name = "Бронированная голова";
-        head.transform.SetParent(visualRoot, false);
+        head.transform.SetParent(root, false);
         head.transform.localPosition = Vector3.forward * bodyLengthMeters * 0.48f;
         head.transform.localScale = Vector3.one * bodyRadiusMeters * 2.2f;
         RemoveVisualCollider(head);
@@ -213,7 +324,7 @@ public class Leviathan : MonoBehaviour
 
         GameObject tail = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         tail.name = "Хвост";
-        tail.transform.SetParent(visualRoot, false);
+        tail.transform.SetParent(root, false);
         tail.transform.localPosition = Vector3.back * bodyLengthMeters * 0.52f;
         tail.transform.localScale = new Vector3(bodyRadiusMeters * 1.2f, bodyRadiusMeters * 0.8f, bodyRadiusMeters * 1.8f);
         RemoveVisualCollider(tail);
@@ -221,12 +332,105 @@ public class Leviathan : MonoBehaviour
 
         GameObject dorsal = GameObject.CreatePrimitive(PrimitiveType.Cube);
         dorsal.name = "Спинной плавник";
-        dorsal.transform.SetParent(visualRoot, false);
+        dorsal.transform.SetParent(root, false);
         dorsal.transform.localPosition = new Vector3(0f, bodyRadiusMeters * 0.75f, -bodyLengthMeters * 0.05f);
         dorsal.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
         dorsal.transform.localScale = new Vector3(bodyRadiusMeters * 0.35f, bodyRadiusMeters * 1.2f, bodyLengthMeters * 0.32f);
         RemoveVisualCollider(dorsal);
         SetVisualColor(dorsal, Color.Lerp(visualColor, Color.black, 0.2f));
+        CacheVisualParts(root);
+    }
+
+    private void CacheVisualParts(Transform root)
+    {
+        visualRoot = root;
+        visualHead = root != null ? root.Find("Бронированная голова") : null;
+        visualTail = root != null ? root.Find("Хвост") : null;
+        visualDorsal = root != null ? root.Find("Спинной плавник") : null;
+    }
+
+    private void EnsureSwimSeed()
+    {
+        if (swimSeed > 0.001f) return;
+
+        int hash = Mathf.Abs(GetInstanceID());
+        swimSeed = 13.37f + hash * 0.173f;
+    }
+
+    private float GetSwimSway()
+    {
+        EnsureSwimSeed();
+        float frequency = Mathf.Max(0f, swimSwayFrequency);
+        if (frequency <= 0.0001f) return 0f;
+
+        float phase = (Time.time + swimSeed) * frequency * Mathf.PI * 2f;
+        return Mathf.Sin(phase) + Mathf.Sin(phase * 0.47f + swimSeed * 1.91f) * 0.35f;
+    }
+
+    private float GetSwimNoise(float channel, float frequency)
+    {
+        EnsureSwimSeed();
+        float time = Time.time * Mathf.Max(0f, frequency);
+        return Mathf.PerlinNoise(swimSeed + channel * 31.7f, time + channel * 7.3f) * 2f - 1f;
+    }
+
+    private void AnimateSwimVisual()
+    {
+        if (visualRoot == null) CacheVisualParts(transform.Find("Визуал левиафана"));
+        if (visualRoot == null) return;
+        if (!organicSwimMotion || isCarcass)
+        {
+            ResetSwimVisual();
+            return;
+        }
+
+        float speed = rb != null ? rb.linearVelocity.magnitude : Mathf.Max(0.1f, cruiseSpeedMS);
+        float speed01 = Mathf.InverseLerp(0.2f, Mathf.Max(0.3f, cruiseSpeedMS), speed);
+        float sway = Mathf.Clamp(GetSwimSway(), -1.35f, 1.35f) * speed01;
+        float bodyYawDeg = sway * Mathf.Max(0f, visualBodySwayDeg);
+        float bodyRollDeg = -bodyYawDeg * 0.35f;
+
+        visualRoot.localPosition = Vector3.zero;
+        visualRoot.localRotation = Quaternion.Euler(0f, bodyYawDeg, bodyRollDeg);
+
+        if (visualHead != null)
+        {
+            visualHead.localPosition = Vector3.forward * bodyLengthMeters * 0.48f + Vector3.right * (-sway * Mathf.Max(0f, visualTailSwayMeters) * 0.25f);
+        }
+
+        if (visualTail != null)
+        {
+            visualTail.localPosition = Vector3.back * bodyLengthMeters * 0.52f + Vector3.right * (-sway * Mathf.Max(0f, visualTailSwayMeters));
+        }
+
+        if (visualDorsal != null)
+        {
+            visualDorsal.localRotation = Quaternion.Euler(0f, 0f, 45f + bodyRollDeg * 0.35f);
+        }
+    }
+
+    private void ResetSwimVisual()
+    {
+        if (visualRoot != null)
+        {
+            visualRoot.localPosition = Vector3.zero;
+            visualRoot.localRotation = Quaternion.identity;
+        }
+
+        if (visualHead != null)
+        {
+            visualHead.localPosition = Vector3.forward * bodyLengthMeters * 0.48f;
+        }
+
+        if (visualTail != null)
+        {
+            visualTail.localPosition = Vector3.back * bodyLengthMeters * 0.52f;
+        }
+
+        if (visualDorsal != null)
+        {
+            visualDorsal.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        }
     }
 
     private static void RemoveVisualCollider(GameObject obj)
@@ -260,15 +464,15 @@ public class Leviathan : MonoBehaviour
 
     public void ApplyHarpoonFatigue(float amount)
     {
-        if (amount <= 0f || isCarcass) return;
-        flightCapability = Mathf.Max(0f, flightCapability - amount);
-        if (flightCapability <= 0f) BecomeCarcass();
+        ApplyDamage(amount);
     }
 
     public void SetHarpoonTether(HarpoonTether tether)
     {
         activeTether = tether;
         nextHarpoonPanicTurnTime = 0f;
+        harpoonRamCharging = false;
+        harpoonRamPhaseUntilTime = 0f;
     }
 
     public void ClearHarpoonTether(HarpoonTether tether)
@@ -276,6 +480,8 @@ public class Leviathan : MonoBehaviour
         if (activeTether == tether)
         {
             activeTether = null;
+            harpoonRamCharging = false;
+            harpoonRamPhaseUntilTime = 0f;
         }
     }
 
@@ -289,17 +495,472 @@ public class Leviathan : MonoBehaviour
     public string GetStatusRu()
     {
         string state = isCarcass ? "туша" : "жив";
-        return $"{displayName}: {state}, здоровье {health:F0}/{maxHealth:F0}, полет {flightCapability:F0}/{maxFlightCapability:F0}, масса туши {carcassMassKg} кг.";
+        string behavior = string.IsNullOrWhiteSpace(behaviorStatus) ? "" : " " + behaviorStatus;
+        return $"{displayName}: {state}, здоровье {health:F0}/{maxHealth:F0}, тревога {alarm01:P0}, сытость {satietyKg:F0}/{maxSatietyKg:F0}, масса туши {carcassMassKg} кг.{behavior}";
     }
 
-    private void UpdateLift()
+    private void UpdateHunger()
     {
-        float liftKg = Mathf.Min(Mathf.Max(0f, claudiumLiftKg), massKg * 1.08f) * FlightFraction;
-        rb.AddForce(Vector3.up * liftKg * 9.81f, ForceMode.Force);
-        if (rb.position.y < minY + 10f)
+        maxSatietyKg = Mathf.Max(1f, maxSatietyKg);
+        satietyKg = Mathf.Clamp(satietyKg - Mathf.Max(0f, hungerDecayKgPerSecond) * Time.fixedDeltaTime, 0f, maxSatietyKg);
+    }
+
+    private void UpdateAlarm()
+    {
+        if (isCarcass) return;
+
+        if (alarmRamActive)
         {
-            rb.AddForce(Vector3.up * massKg * 5f, ForceMode.Force);
+            alarm01 = Mathf.Max(0f, alarm01 - Time.fixedDeltaTime / Mathf.Max(0.1f, alarmRamDecaySeconds));
+            if (alarm01 <= 0.001f || Time.time >= ramUntilTime)
+            {
+                alarm01 = 0f;
+                alarmRamActive = false;
+                ramTarget = null;
+                harpoonRamCharging = false;
+                behaviorStatus = "Тревога выгорела, таран не удался.";
+            }
+
+            return;
         }
+
+        ShipPhysics ship = FindFirstObjectByType<ShipPhysics>();
+        if (ship != null)
+        {
+            float distance = Vector3.Distance(transform.position, ship.transform.position);
+            if (distance <= Mathf.Max(0f, passiveAggressionRangeMeters))
+            {
+                AddAlarm(alarmNearGainPerSecond * Time.fixedDeltaTime, "корабль слишком близко", ship);
+            }
+        }
+
+        if (activeTether != null && activeTether.IsAttached)
+        {
+            float maxTensionN = Mathf.Max(1f, activeTether.maxTensionKg) * 9.81f;
+            float tensionRatio = Mathf.Max(0f, activeTether.currentTensionN / maxTensionN);
+            float gain = alarmHarpoonedGainPerSecond + alarmTensionGainPerSecond * tensionRatio;
+            AddAlarm(gain * Time.fixedDeltaTime, "гарпун и натяжение троса", activeTether.ownerShip);
+        }
+        else
+        {
+            ShipPhysics harpooningShip = FindHarpooningShip();
+            if (harpooningShip != null)
+            {
+                float alarmRange = Mathf.Max(0f, passiveAggressionRangeMeters) * Mathf.Max(1f, harpoonAlarmAggressionRangeMultiplier);
+                if (Vector3.Distance(transform.position, harpooningShip.transform.position) <= alarmRange)
+                {
+                    AddAlarm(alarmOtherHarpoonedGainPerSecond * Time.fixedDeltaTime, "тревога от чужого гарпуна", harpooningShip);
+                }
+            }
+        }
+    }
+
+    public void AddAlarm(float amount, string reason, ShipPhysics sourceShip = null)
+    {
+        if (isCarcass || amount <= 0f || alarmRamActive) return;
+
+        alarm01 = Mathf.Clamp01(alarm01 + amount);
+        if (alarm01 >= 1f)
+        {
+            StartAlarmRamAttack(sourceShip != null ? sourceShip : FindFirstObjectByType<ShipPhysics>(), reason);
+        }
+    }
+
+    public static void AddAlarmNear(Vector3 position, float radiusMeters, float amount, string reason, Leviathan primary = null, float primaryAmount = 0f, ShipPhysics sourceShip = null)
+    {
+        float radiusSqr = Mathf.Max(0f, radiusMeters) * Mathf.Max(0f, radiusMeters);
+        for (int i = 0; i < ActiveLeviathans.Count; i++)
+        {
+            Leviathan leviathan = ActiveLeviathans[i];
+            if (leviathan == null || leviathan.isCarcass) continue;
+
+            float sqr = (leviathan.transform.position - position).sqrMagnitude;
+            if (sqr <= radiusSqr)
+            {
+                leviathan.AddAlarm(amount, reason, sourceShip);
+            }
+        }
+
+        if (primary != null && primaryAmount > 0f)
+        {
+            primary.AddAlarm(primaryAmount, reason, sourceShip);
+        }
+    }
+
+    private void StartAlarmRamAttack(ShipPhysics target, string reason)
+    {
+        if (target == null)
+        {
+            alarm01 = 0f;
+            return;
+        }
+
+        ramTarget = target;
+        alarmRamActive = true;
+        alarm01 = 1f;
+        ramUntilTime = Time.time + Mathf.Max(0.1f, alarmRamDecaySeconds);
+        harpoonRamCharging = true;
+        harpoonRamPhaseUntilTime = Time.time + Mathf.Max(0.2f, harpoonedRamChargeSeconds);
+        behaviorStatus = $"Тревога на максимуме: таран из-за {reason}.";
+    }
+
+    private bool WantsFood()
+    {
+        return satietyKg < maxSatietyKg * 0.72f;
+    }
+
+    public bool TryEatOre(string oreItemId, int amountKg)
+    {
+        if (isCarcass || amountKg <= 0 || satietyKg >= maxSatietyKg) return false;
+
+        satietyKg = Mathf.Clamp(satietyKg + amountKg, 0f, Mathf.Max(1f, maxSatietyKg));
+        behaviorStatus = $"Перехватил кусок руды {oreItemId}: +{amountKg} кг сытости ({satietyKg:0}/{maxSatietyKg:0}).";
+        if (debugLogging)
+        {
+            Debug.Log("[Левиафан] " + displayName + " " + behaviorStatus, this);
+        }
+
+        return true;
+    }
+
+    public static Leviathan FindFragmentEater(Vector3 position)
+    {
+        Leviathan best = null;
+        float bestSqr = float.PositiveInfinity;
+        for (int i = 0; i < ActiveLeviathans.Count; i++)
+        {
+            Leviathan leviathan = ActiveLeviathans[i];
+            if (leviathan == null || leviathan.isCarcass || !leviathan.WantsFood()) continue;
+
+            float radius = Mathf.Max(0.1f, leviathan.fragmentEatRadiusMeters);
+            float sqr = (leviathan.transform.position - position).sqrMagnitude;
+            if (sqr > radius * radius || sqr >= bestSqr) continue;
+
+            best = leviathan;
+            bestSqr = sqr;
+        }
+
+        return best;
+    }
+
+    public static ShipPhysics FindHarpooningShip()
+    {
+        for (int i = 0; i < ActiveLeviathans.Count; i++)
+        {
+            Leviathan leviathan = ActiveLeviathans[i];
+            if (leviathan == null || leviathan.activeTether == null || !leviathan.activeTether.IsAttached) continue;
+            if (leviathan.activeTether.ownerShip != null) return leviathan.activeTether.ownerShip;
+        }
+
+        return null;
+    }
+
+    private bool UpdateFeeding()
+    {
+        if (!WantsFood()) return false;
+
+        if (feedingTarget == null || feedingTarget.IsDepleted)
+        {
+            feedingTarget = MiningRock.FindNearestFeedTarget(transform.position, Mathf.Max(0f, feedingSearchRadiusMeters));
+        }
+
+        if (feedingTarget == null || feedingTarget.IsDepleted) return false;
+
+        Vector3 targetPosition = feedingTarget.transform.position;
+        float distance = Vector3.Distance(rb.worldCenterOfMass, targetPosition);
+        float biteDistance = Mathf.Max(bodyRadiusMeters + 1f, feedingApproachDistanceMeters);
+        if (distance > biteDistance)
+        {
+            SteerToward(targetPosition, 1f, Mathf.Max(0.1f, cruiseSpeedMS * 0.75f));
+            behaviorStatus = $"Идет к глыбе {feedingTarget.displayName}: {distance:0} м, сытость {satietyKg:0}/{maxSatietyKg:0}.";
+            return true;
+        }
+
+        if (Time.time >= nextFeedingBiteTime)
+        {
+            nextFeedingBiteTime = Time.time + Mathf.Max(0.2f, feedingBiteIntervalSeconds);
+            if (feedingTarget.TryLeviathanBite(Mathf.Max(1, feedingBiteKg), out int eatenKg, out string oreItemId))
+            {
+                TryEatOre(oreItemId, eatenKg);
+            }
+            else
+            {
+                feedingTarget = null;
+            }
+        }
+
+        SteerToward(targetPosition, 0.35f, Mathf.Max(0.1f, cruiseSpeedMS * 0.25f));
+        return true;
+    }
+
+    private bool UpdateRamAttack()
+    {
+        if (ramTarget == null || Time.time > ramUntilTime)
+        {
+            ramTarget = null;
+            if (alarmRamActive)
+            {
+                alarmRamActive = false;
+                alarm01 = 0f;
+                behaviorStatus = "Тревога спала, таран не успел дойти до цели.";
+            }
+
+            return false;
+        }
+
+        float rangeLimit = Mathf.Max(passiveAggressionRangeMeters * 1.8f, bodyLengthMeters * 4f);
+        if (Vector3.Distance(transform.position, ramTarget.transform.position) > rangeLimit)
+        {
+            ramTarget = null;
+            alarmRamActive = false;
+            alarm01 = 0f;
+            behaviorStatus = "Цель ушла слишком далеко, тревога спала.";
+            return false;
+        }
+
+        SteerToward(ramTarget.transform.position, Mathf.Max(1f, ramChargeForceMultiplier), Mathf.Max(0.1f, cruiseSpeedMS * 1.15f));
+        behaviorStatus = $"Таранит корабль {ramTarget.name}, тревога {alarm01:P0}.";
+        return true;
+    }
+
+    private void SteerToward(Vector3 targetPosition, float forceMultiplier, float desiredSpeed)
+    {
+        Vector3 directToTarget = targetPosition - rb.worldCenterOfMass;
+        if (directToTarget.sqrMagnitude < 0.01f) return;
+
+        float distance = directToTarget.magnitude;
+        float arrivalRadius = Mathf.Max(0.1f, autopilotArrivalRadiusMeters);
+        float desiredSpeedAbs = Mathf.Max(0.1f, desiredSpeed);
+        Vector3 steeringTarget = GetOrganicSwimTarget(targetPosition, desiredSpeedAbs, distance, arrivalRadius);
+        Vector3 toTarget = steeringTarget - rb.worldCenterOfMass;
+        if (toTarget.sqrMagnitude < 0.01f) return;
+
+        Vector3 direction = toTarget.normalized;
+        float remainingDistance = Mathf.Max(0f, distance - arrivalRadius);
+        Vector3 forward = transform.forward;
+        if (forward.sqrMagnitude < 0.001f) forward = direction;
+        forward.Normalize();
+
+        float turnAngleDeg = Vector3.Angle(forward, direction);
+        float fullArcAngle = Mathf.Max(1f, fishFullArcAngleDeg);
+        float turn01 = Mathf.InverseLerp(12f, fullArcAngle, turnAngleDeg);
+        float far01 = Mathf.InverseLerp(arrivalRadius * 1.5f, arrivalRadius + Mathf.Max(bodyLengthMeters, desiredSpeedAbs * 4f), remainingDistance);
+        float fish01 = turn01 * far01;
+
+        Vector3 leadDirection = direction;
+        float lookAheadSeconds = Mathf.Max(0f, fishLookAheadSeconds) * fish01;
+        if (lookAheadSeconds > 0.001f && rb.linearVelocity.sqrMagnitude > 0.25f)
+        {
+            Vector3 futureToTarget = targetPosition - (rb.worldCenterOfMass + rb.linearVelocity * lookAheadSeconds);
+            if (futureToTarget.sqrMagnitude > 0.01f)
+            {
+                leadDirection = futureToTarget.normalized;
+            }
+        }
+
+        if (Vector3.Dot(forward, leadDirection) < -0.985f)
+        {
+            Vector3 side = Vector3.Cross(Vector3.up, forward);
+            if (side.sqrMagnitude < 0.01f) side = transform.right;
+            if (side.sqrMagnitude > 0.01f)
+            {
+                leadDirection = Vector3.Slerp(forward, side.normalized, 0.85f).normalized;
+            }
+        }
+
+        float arcBlend = Mathf.Lerp(1f, 1f - Mathf.Clamp01(fishArcForwardBias), fish01);
+        Vector3 swimDirection = Vector3.Slerp(forward, leadDirection, arcBlend);
+        if (swimDirection.sqrMagnitude < 0.001f)
+        {
+            swimDirection = leadDirection;
+        }
+        else
+        {
+            swimDirection.Normalize();
+        }
+
+        float maxAcceleration = Mathf.Max(0.1f, (Mathf.Max(0f, forwardThrustKgf) + Mathf.Max(0f, omniThrustKgf)) * 9.81f / Mathf.Max(1f, rb.mass));
+        float brakingSpeed = Mathf.Sqrt(2f * maxAcceleration * remainingDistance);
+        float speedLimit = Mathf.Min(desiredSpeedAbs, brakingSpeed);
+        if (remainingDistance <= 0.001f)
+        {
+            speedLimit = 0f;
+        }
+        else
+        {
+            float retainedTurnSpeed = desiredSpeedAbs * Mathf.Clamp01(fishTurnSpeedRetention) * fish01;
+            speedLimit = Mathf.Min(desiredSpeedAbs, Mathf.Max(speedLimit, retainedTurnSpeed));
+        }
+
+        Vector3 desiredVelocity = speedLimit <= 0.001f ? Vector3.zero : swimDirection * speedLimit;
+        Vector3 velocityError = desiredVelocity - rb.linearVelocity;
+        float lateralCorrection = Mathf.Lerp(1f, Mathf.Clamp01(fishLateralCorrection), fish01);
+        Vector3 forwardError = Vector3.Project(velocityError, forward);
+        Vector3 lateralError = velocityError - forwardError;
+        velocityError = forwardError + lateralError * lateralCorrection;
+
+        Vector3 currentVelocity = rb.linearVelocity;
+        if (currentVelocity.sqrMagnitude > 0.01f)
+        {
+            Vector3 velocityAxis = currentVelocity.normalized;
+            Vector3 brakingError = Vector3.Project(velocityError, velocityAxis);
+            if (Vector3.Dot(brakingError, currentVelocity) < 0f)
+            {
+                float alignment01 = Mathf.InverseLerp(0.15f, 0.85f, Vector3.Dot(forward, direction));
+                float near01 = 1f - Mathf.InverseLerp(arrivalRadius * 2f, arrivalRadius + Mathf.Max(bodyLengthMeters, desiredSpeedAbs * 4f), remainingDistance);
+                float brakePermission = Mathf.Lerp(Mathf.Clamp01(fishTurnBrakePermission), 1f, Mathf.Max(alignment01, near01));
+                velocityError += brakingError * (brakePermission - 1f);
+            }
+        }
+
+        Vector3 desiredForce = velocityError * rb.mass * Mathf.Max(0.05f, autopilotVelocityGain);
+        ApplyLeviathanThrust(desiredForce, forceMultiplier);
+        ApplySwimSideSwayForce(forceMultiplier, far01);
+        ApplyLeviathanTurn(swimDirection, forceMultiplier);
+    }
+
+    private Vector3 GetOrganicSwimTarget(Vector3 targetPosition, float desiredSpeed, float distance, float arrivalRadius)
+    {
+        if (!organicSwimMotion || isCarcass || rb == null) return targetPosition;
+
+        float nearFade = Mathf.InverseLerp(arrivalRadius * 1.5f, arrivalRadius + Mathf.Max(bodyLengthMeters, desiredSpeed * 5f), distance);
+        if (nearFade <= 0.001f) return targetPosition;
+
+        float speedFade = Mathf.InverseLerp(0.25f, Mathf.Max(0.5f, desiredSpeed * 0.5f), rb.linearVelocity.magnitude);
+        float fade = nearFade * Mathf.Lerp(0.35f, 1f, speedFade);
+        Vector3 right = transform.right;
+        if (right.sqrMagnitude < 0.001f) right = Vector3.right;
+        right.Normalize();
+
+        float angleOffsetMeters = Mathf.Tan(Mathf.Max(0f, swimSwayAngleDeg) * Mathf.Deg2Rad)
+            * Mathf.Min(distance, Mathf.Max(bodyLengthMeters, desiredSpeed * 4f));
+        float swayOffset = GetSwimSway() * angleOffsetMeters;
+        float noiseFrequency = Mathf.Max(0f, swimNoiseFrequency);
+        float noiseOffset = GetSwimNoise(1f, noiseFrequency) * Mathf.Max(0f, swimNoiseRadiusMeters);
+        float verticalOffset = GetSwimNoise(2f, noiseFrequency * 0.73f + 0.0001f) * Mathf.Max(0f, swimVerticalNoiseMeters);
+
+        return targetPosition + right * ((swayOffset + noiseOffset) * fade) + Vector3.up * (verticalOffset * fade);
+    }
+
+    private void ApplySwimSideSwayForce(float forceMultiplier, float fade)
+    {
+        if (!organicSwimMotion || isCarcass || rb == null) return;
+
+        float sideForce = Mathf.Max(0f, swimSwaySideForceKgf) * 9.81f;
+        if (sideForce <= 0.001f) return;
+
+        float speedFade = Mathf.InverseLerp(0.25f, Mathf.Max(0.5f, cruiseSpeedMS * 0.5f), rb.linearVelocity.magnitude);
+        float sway = Mathf.Clamp(GetSwimSway(), -1.35f, 1.35f);
+        rb.AddForce(transform.right * (sway * sideForce * Mathf.Max(0f, forceMultiplier) * Mathf.Clamp01(fade) * speedFade), ForceMode.Force);
+    }
+
+    private bool UpdateRouteMachine()
+    {
+        if (!routeEnabled)
+        {
+            return false;
+        }
+
+        if (routeWaypoints == null || routeWaypoints.Count == 0)
+        {
+            routeStatus = "Маршрут пуст.";
+            behaviorStatus = routeStatus;
+            return false;
+        }
+
+        routeWaypointIndex = Mathf.Clamp(routeWaypointIndex, 0, routeWaypoints.Count - 1);
+        Vector3 target = routeWaypoints[routeWaypointIndex];
+        float distance = Vector3.Distance(rb.worldCenterOfMass, target);
+        float arrivalRadius = Mathf.Max(0.5f, routeWaypointRadiusMeters);
+
+        if (distance <= arrivalRadius)
+        {
+            routeWaypointIndex++;
+            if (routeWaypointIndex >= routeWaypoints.Count)
+            {
+                if (routeLoop)
+                {
+                    routeWaypointIndex = 0;
+                }
+                else
+                {
+                    routeWaypointIndex = routeWaypoints.Count - 1;
+                    routeStatus = "Маршрут завершён, держит последнюю точку.";
+                    behaviorStatus = routeStatus;
+                    SteerToward(target, 1f, Mathf.Max(0.1f, routeCruiseSpeedMS * 0.2f));
+                    return true;
+                }
+            }
+
+            target = routeWaypoints[routeWaypointIndex];
+            distance = Vector3.Distance(rb.worldCenterOfMass, target);
+        }
+
+        float speed = routeCruiseSpeedMS > 0f ? routeCruiseSpeedMS : cruiseSpeedMS;
+        speed = Mathf.Max(0.1f, speed);
+        SteerToward(target, 1f, speed);
+        routeStatus = $"Идёт к точке {routeWaypointIndex + 1}/{routeWaypoints.Count}: {distance:0} м.";
+        behaviorStatus = routeStatus;
+        return true;
+    }
+
+    public void GenerateRandomRoute(float radiusMeters, int pointCount)
+    {
+        if (routeWaypoints == null)
+        {
+            routeWaypoints = new List<Vector3>();
+        }
+
+        routeWaypoints.Clear();
+        int count = Mathf.Clamp(pointCount, 1, 64);
+        float radius = Mathf.Max(1f, radiusMeters);
+        float minHeight = Mathf.Min(minY, maxY);
+        float maxHeight = Mathf.Max(minY, maxY);
+        float verticalSpread = Mathf.Max(20f, radius * 0.18f);
+        Vector3 center = transform.position;
+
+        for (int i = 0; i < count; i++)
+        {
+            Vector2 offset = Random.insideUnitCircle * radius;
+            float y = Mathf.Clamp(center.y + Random.Range(-verticalSpread, verticalSpread), minHeight, maxHeight);
+            routeWaypoints.Add(new Vector3(center.x + offset.x, y, center.z + offset.y));
+        }
+
+        routeWaypointIndex = 0;
+        routeEnabled = routeWaypoints.Count > 0;
+        routeRandomRadiusMeters = radius;
+        routeRandomPointCount = count;
+        routeStatus = $"Сгенерировано {count} точек в радиусе {radius:0} м.";
+        behaviorStatus = routeStatus;
+    }
+
+    public void RestartRoute()
+    {
+        routeWaypointIndex = 0;
+        routeEnabled = routeWaypoints != null && routeWaypoints.Count > 0;
+        routeStatus = routeEnabled ? "Маршрут запущен с первой точки." : "Маршрут пуст.";
+        behaviorStatus = routeStatus;
+    }
+
+    public void StopRoute()
+    {
+        routeEnabled = false;
+        routeStatus = "Маршрут остановлен.";
+        behaviorStatus = routeStatus;
+    }
+
+    public void ClearRoute()
+    {
+        if (routeWaypoints == null)
+        {
+            routeWaypoints = new List<Vector3>();
+        }
+
+        routeWaypoints.Clear();
+        routeWaypointIndex = 0;
+        routeEnabled = false;
+        routeStatus = "Маршрут очищен.";
+        behaviorStatus = routeStatus;
     }
 
     private void UpdateWander()
@@ -309,20 +970,102 @@ public class Leviathan : MonoBehaviour
             PickNewWanderTarget(false);
         }
 
-        Vector3 toTarget = wanderTarget - rb.position;
-        Vector3 desiredDirection = toTarget.sqrMagnitude > 1f ? toTarget.normalized : transform.forward;
-        Vector3 desiredVelocity = desiredDirection * Mathf.Max(0.1f, maxSpeedMS);
-        Vector3 velocityError = desiredVelocity - rb.linearVelocity;
-        Vector3 force = Vector3.ClampMagnitude(velocityError * rb.mass * 0.35f, Mathf.Max(0f, swimForceN));
-        rb.AddForce(force, ForceMode.Force);
+        SteerToward(wanderTarget, 1f, Mathf.Max(0.1f, cruiseSpeedMS));
+    }
 
-        Vector3 flatDirection = Vector3.ProjectOnPlane(desiredDirection, Vector3.up);
-        if (flatDirection.sqrMagnitude > 0.01f)
+    private void ApplyLeviathanThrust(Vector3 desiredForce, float forceMultiplier)
+    {
+        if (isCarcass || rb == null) return;
+
+        float multiplier = Mathf.Max(0f, forceMultiplier);
+        float maxForward = Mathf.Max(0f, forwardThrustKgf) * 9.81f * multiplier;
+        float maxOmni = Mathf.Max(0f, omniThrustKgf) * 9.81f * multiplier;
+        Vector3 forward = transform.forward;
+        Vector3 desiredDirection = desiredForce.sqrMagnitude > 0.001f ? desiredForce.normalized : forward;
+        float forwardAlignment = Mathf.Clamp01(Vector3.Dot(desiredDirection, forward));
+        float effectiveForwardLimit = maxForward * forwardAlignment;
+        float forwardAmount = Mathf.Clamp(Vector3.Dot(desiredForce, forward), 0f, effectiveForwardLimit);
+        Vector3 forwardForce = forward * forwardAmount;
+        Vector3 omniForce = Vector3.ClampMagnitude(desiredForce - forwardForce, maxOmni);
+        rb.AddForce(forwardForce + omniForce, ForceMode.Force);
+    }
+
+    private void ApplyLeviathanTurn(Vector3 desiredDirection, float forceMultiplier)
+    {
+        if (isCarcass || rb == null || desiredDirection.sqrMagnitude < 0.001f) return;
+
+        Vector3 direction = desiredDirection.normalized;
+        Quaternion targetRotation = Quaternion.FromToRotation(transform.forward, direction) * rb.rotation;
+        Quaternion delta = targetRotation * Quaternion.Inverse(rb.rotation);
+        delta.ToAngleAxis(out float angleDeg, out Vector3 axis);
+        if (angleDeg > 180f) angleDeg -= 360f;
+        if (axis.sqrMagnitude < 0.001f) return;
+
+        float speedEffect = Mathf.InverseLerp(0f, Mathf.Max(0.1f, fullTurnEffectSpeedMS), rb.linearVelocity.magnitude);
+        float livingTurnEffectiveness = Mathf.Lerp(Mathf.Clamp01(stationaryTurnEffectiveness), 1f, speedEffect);
+        Vector3 torque = axis.normalized * (angleDeg * Mathf.Deg2Rad * Mathf.Max(0f, turnTorqueNm) * Mathf.Max(0f, forceMultiplier) * livingTurnEffectiveness)
+            - rb.angularVelocity * Mathf.Max(0f, turnDamping) * Mathf.Max(0f, turnTorqueNm);
+        rb.AddTorque(Vector3.ClampMagnitude(torque, Mathf.Max(0f, turnTorqueNm) * Mathf.Max(0.1f, forceMultiplier) * Mathf.Max(0.1f, livingTurnEffectiveness)), ForceMode.Force);
+    }
+
+    private void ApplyLeviathanAirResistance()
+    {
+        if (rb == null) return;
+
+        Vector3 velocity = rb.linearVelocity;
+        if (velocity.sqrMagnitude < 0.0001f) return;
+
+        ApplyAxisDrag(transform.forward, Vector3.Dot(velocity, transform.forward), Mathf.Max(0.01f, frontalArea));
+        ApplyAxisDrag(transform.right, Vector3.Dot(velocity, transform.right), Mathf.Max(0.01f, frontalArea * Mathf.Max(0.01f, sideAreaMultiplier)));
+        ApplyAxisDrag(transform.up, Vector3.Dot(velocity, transform.up), Mathf.Max(0.01f, frontalArea * Mathf.Max(0.01f, verticalAreaMultiplier)));
+    }
+
+    private void ApplyAxisDrag(Vector3 axis, float axisSpeed, float area)
+    {
+        if (Mathf.Abs(axisSpeed) < 0.001f) return;
+
+        float force = 0.5f * Mathf.Max(0f, airDensity) * Mathf.Max(0f, dragCoefficient) * area * axisSpeed * axisSpeed;
+        rb.AddForce(-axis.normalized * Mathf.Sign(axisSpeed) * force, ForceMode.Force);
+    }
+
+    private void RecalculateDragAreaFromBody()
+    {
+        float radius = Mathf.Max(0.1f, bodyRadiusMeters);
+        float length = Mathf.Max(radius * 2f, bodyLengthMeters);
+        frontalArea = Mathf.PI * radius * radius;
+        float sideArea = length * radius * 2f;
+        float areaRatio = sideArea / Mathf.Max(0.01f, frontalArea);
+        sideAreaMultiplier = Mathf.Max(1f, areaRatio);
+        verticalAreaMultiplier = Mathf.Max(1f, areaRatio * 0.85f);
+    }
+
+    private void OnValidate()
+    {
+        if (autoCalculateDragArea)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(flatDirection.normalized, Vector3.up);
-            Quaternion newRotation = Quaternion.RotateTowards(rb.rotation, targetRotation, Mathf.Max(5f, turnTorque * 0.01f) * Time.fixedDeltaTime);
-            rb.MoveRotation(newRotation);
+            RecalculateDragAreaFromBody();
         }
+    }
+
+    private void ApplyBellyDownStabilization()
+    {
+        if (!bellyDownStabilization || isCarcass || rb == null) return;
+
+        Vector3 forward = transform.forward;
+        if (forward.sqrMagnitude < 0.001f) return;
+
+        forward.Normalize();
+        Vector3 desiredUp = Vector3.ProjectOnPlane(Vector3.up, forward);
+        Vector3 currentUp = Vector3.ProjectOnPlane(transform.up, forward);
+        if (desiredUp.sqrMagnitude < 0.001f || currentUp.sqrMagnitude < 0.001f) return;
+
+        desiredUp.Normalize();
+        currentUp.Normalize();
+        float rollErrorDeg = Vector3.SignedAngle(currentUp, desiredUp, forward);
+        float rollAngularVelocity = Vector3.Dot(rb.angularVelocity, forward);
+        float torque = rollErrorDeg * Mathf.Deg2Rad * Mathf.Max(0f, bellyDownTorqueNm)
+            - rollAngularVelocity * Mathf.Max(0f, bellyDownDamping) * Mathf.Max(0f, bellyDownTorqueNm);
+        rb.AddTorque(forward * torque, ForceMode.Force);
     }
 
     private void PickNewWanderTarget(bool immediate)
@@ -343,12 +1086,13 @@ public class Leviathan : MonoBehaviour
             return;
         }
 
-        Vector3 awayFromShip = rb.worldCenterOfMass - activeTether.ShipPoint;
-        awayFromShip.y = 0f;
-        if (awayFromShip.sqrMagnitude < 0.1f)
+        Vector3 toShip = activeTether.ShipPoint - rb.worldCenterOfMass;
+        Vector3 awayFromShip = -toShip;
+        Vector3 flatToShip = Vector3.ProjectOnPlane(toShip, Vector3.up);
+        Vector3 flatAway = -flatToShip;
+        if (flatAway.sqrMagnitude < 0.1f)
         {
-            awayFromShip = transform.forward;
-            awayFromShip.y = 0f;
+            flatAway = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
         }
 
         if (Time.time >= nextHarpoonPanicTurnTime || harpoonPanicDirection.sqrMagnitude < 0.1f)
@@ -364,10 +1108,59 @@ public class Leviathan : MonoBehaviour
             dive = Vector3.up * 0.4f;
         }
 
-        Vector3 direction = awayFromShip.normalized + harpoonPanicDirection * 0.35f + dive;
+        ShipPhysics ship = activeTether.ownerShip;
+        float shipMass = ship != null ? ship.GetTotalMassKg() : 1000f;
+        if (!alarmRamActive)
+        {
+            Vector3 calmDirection = flatAway.normalized + harpoonPanicDirection * 0.16f + dive * 0.3f;
+            if (calmDirection.sqrMagnitude < 0.1f)
+            {
+                calmDirection = transform.forward;
+            }
+
+            calmDirection.Normalize();
+            float maxTensionN = Mathf.Max(1f, activeTether.maxTensionKg) * 9.81f;
+            float tensionRatio = Mathf.Clamp01(activeTether.CurrentTensionKg * 9.81f / maxTensionN);
+            float baseSwimForce = Mathf.Max(0f, Mathf.Max(forwardThrustKgf, omniThrustKgf)) * 9.81f;
+            float calmForce = baseSwimForce
+                * Mathf.Max(0f, harpoonStruggleForceMultiplier)
+                * Mathf.Lerp(0.55f, 0.9f, tensionRatio);
+            ApplyLeviathanThrust(calmDirection * calmForce, 1f);
+            ApplyLeviathanTurn(calmDirection, 1f);
+            behaviorStatus = $"На гарпуне тянет прочь, тревога {alarm01:P0}, натяжение {activeTether.CurrentTensionKg:0}/{activeTether.maxTensionKg:0} кг.";
+
+            return;
+        }
+
+        float distanceToShip = toShip.magnitude;
+        float retreatDistance = Mathf.Max(bodyLengthMeters * 1.8f, harpoonedRamRetreatDistanceMeters);
+        float chargeDistance = Mathf.Max(bodyRadiusMeters * 2.5f, harpoonedRamChargeDistanceMeters);
+        if (harpoonRamPhaseUntilTime <= 0f)
+        {
+            harpoonRamCharging = false;
+            harpoonRamPhaseUntilTime = Time.time + Mathf.Max(0.2f, harpoonedRamRetreatSeconds);
+        }
+
+        if (harpoonRamCharging)
+        {
+            if (distanceToShip <= chargeDistance || Time.time >= harpoonRamPhaseUntilTime)
+            {
+                harpoonRamCharging = false;
+                harpoonRamPhaseUntilTime = Time.time + Mathf.Max(0.2f, harpoonedRamRetreatSeconds);
+            }
+        }
+        else if (distanceToShip >= retreatDistance || Time.time >= harpoonRamPhaseUntilTime)
+        {
+            harpoonRamCharging = true;
+            harpoonRamPhaseUntilTime = Time.time + Mathf.Max(0.2f, harpoonedRamChargeSeconds);
+        }
+
+        Vector3 direction = harpoonRamCharging
+            ? flatToShip.normalized + harpoonPanicDirection * 0.06f
+            : flatAway.normalized + harpoonPanicDirection * 0.12f + dive * 0.25f;
         if (direction.sqrMagnitude < 0.1f)
         {
-            direction = awayFromShip.normalized;
+            direction = transform.forward;
         }
 
         direction.Normalize();
@@ -375,47 +1168,157 @@ public class Leviathan : MonoBehaviour
         float panicFromTension = activeTether.maxTensionKg > 0f
             ? Mathf.Clamp01(activeTether.CurrentTensionKg / activeTether.maxTensionKg)
             : 0f;
-        float panic = Mathf.Lerp(0.65f, 1.35f, panicFromTension);
-        float force = Mathf.Max(0f, swimForceN) * Mathf.Max(0f, harpoonStruggleForceMultiplier) * panic;
-        rb.AddForce(direction * force, ForceMode.Force);
-
-        Vector3 flatDirection = Vector3.ProjectOnPlane(direction, Vector3.up);
-        if (flatDirection.sqrMagnitude > 0.01f)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(flatDirection.normalized, Vector3.up);
-            Quaternion newRotation = Quaternion.RotateTowards(rb.rotation, targetRotation, Mathf.Max(8f, turnTorque * 0.014f) * Time.fixedDeltaTime);
-            rb.MoveRotation(newRotation);
-        }
+        float panic = Mathf.Lerp(0.8f, 1.12f, panicFromTension);
+        float massRatio = shipMass > 0.001f ? massKg / shipMass : 1f;
+        float massRamFactor = Mathf.Lerp(
+            Mathf.Max(0.1f, harpoonedSmallRamForceMultiplier),
+            1f,
+            Mathf.Clamp01(massRatio / Mathf.Max(0.1f, harpoonedRamMassRatio)));
+        float ramMultiplier = harpoonRamCharging
+            ? Mathf.Max(0.1f, ramChargeForceMultiplier) * massRamFactor
+            : Mathf.Max(0.25f, harpoonStruggleForceMultiplier);
+        float force = Mathf.Max(0f, Mathf.Max(forwardThrustKgf, omniThrustKgf)) * 9.81f * panic * ramMultiplier;
+        ApplyLeviathanThrust(direction * force, 1f);
+        ApplyLeviathanTurn(direction, ramMultiplier);
+        behaviorStatus = harpoonRamCharging
+            ? $"На гарпуне идет в таран: дистанция {distanceToShip:0}/{chargeDistance:0} м, масса {massKg:0}/{shipMass:0} кг, натяжение {activeTether.CurrentTensionKg:0}/{activeTether.maxTensionKg:0} кг."
+            : $"На гарпуне отходит для нового тарана: дистанция {distanceToShip:0}/{retreatDistance:0} м, натяжение {activeTether.CurrentTensionKg:0}/{activeTether.maxTensionKg:0} кг.";
     }
 
-    private void ClampAliveSpeed()
+    private void UpdateCarcassFailurePhysics()
     {
-        float speedLimit = Mathf.Max(0.1f, maxSpeedMS);
-        if (rb.linearVelocity.magnitude > speedLimit)
-        {
-            rb.linearVelocity = rb.linearVelocity.normalized * speedLimit;
-        }
-    }
+        if (rb == null) return;
 
-    private void ClampCarcassSpeed()
-    {
-        float speedLimit = Mathf.Max(12f, maxSpeedMS * 1.5f);
-        if (rb.linearVelocity.magnitude > speedLimit)
-        {
-            rb.linearVelocity = rb.linearVelocity.normalized * speedLimit;
-        }
+        rb.useGravity = false;
+        float elapsed = carcassStartTime >= 0f ? Time.time - carcassStartTime : 0f;
+        float ramp = Mathf.Clamp01(elapsed / Mathf.Max(0.1f, failureGravityRampSeconds));
+        float gravity01 = Mathf.Lerp(Mathf.Clamp01(failureStartGravity01), 1f, ramp);
+        rb.AddForce(Physics.gravity * rb.mass * gravity01, ForceMode.Force);
     }
 
     private void BecomeCarcass()
     {
         if (isCarcass) return;
         isCarcass = true;
-        rb.linearDamping = 0.15f;
-        rb.angularDamping = 0.6f;
-        Debug.Log("[Левиафан] " + displayName + " потерял полетоспособность и стал добычей.", this);
+        health = 0f;
+        carcassStartTime = Time.time;
+        rb.useGravity = false;
+        rb.linearDamping = 0f;
+        rb.angularDamping = 0.12f;
+        behaviorStatus = $"Системы отказали: гравитация растет до полной за {failureGravityRampSeconds:0} сек.";
+        Debug.Log("[Левиафан] " + displayName + " потерял здоровье: тяга и поворот отказали, гравитация возвращается постепенно.", this);
     }
 
-    public static Leviathan FindNearest(Vector3 position, float rangeMeters, bool requireAlive, string ignoredLeviathanId = "")
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (isCarcass || Time.time < lastRamDamageTime + 1.2f) return;
+
+        ShipPhysics ship = collision.collider.GetComponentInParent<ShipPhysics>();
+        if (ship == null) return;
+
+        if (activeTether != null && activeTether.IsAttached && activeTether.ownerShip == ship)
+        {
+            harpoonRamCharging = false;
+            harpoonRamPhaseUntilTime = Time.time + Mathf.Max(0.2f, harpoonedRamRetreatSeconds);
+        }
+
+        float speed = collision.relativeVelocity.magnitude;
+        if (speed < Mathf.Max(0f, ramMinDamageSpeedMS)) return;
+
+        Rigidbody shipBody = ship.GetComponent<Rigidbody>();
+        float targetMass = shipBody != null ? Mathf.Max(1f, shipBody.mass) : Mathf.Max(1f, ship.GetTotalMassKg());
+        float sourceMass = Body != null ? Mathf.Max(1f, Body.mass) : Mathf.Max(1f, massKg);
+        float reducedMass = sourceMass * targetMass / Mathf.Max(1f, sourceMass + targetMass);
+        float energyKJ = 0.5f * reducedMass * speed * speed / 1000f;
+        ContactPoint contact = collision.GetContact(0);
+
+        DamageHitContext context = new DamageHitContext
+        {
+            shellType = DamageShellType.Impact,
+            shellName = "Таран левиафана",
+            sourceName = displayName,
+            impactEnergyKJ = energyKJ,
+            impactDamagePerKJ = Mathf.Max(0f, ramDamageScale),
+            impactSpeedMS = speed,
+            impactSourceMassKg = sourceMass,
+            impactTargetMassKg = targetMass,
+            impactSourceDamageMultiplier = Mathf.Max(0f, ramDamageMultiplier),
+            hitPoint = contact.point,
+            hitNormal = contact.normal,
+            incomingDirection = collision.relativeVelocity.sqrMagnitude > 0.001f ? collision.relativeVelocity.normalized : -contact.normal,
+            velocity = collision.relativeVelocity
+        };
+
+        DamageableShip damageableShip = ship.GetComponentInParent<DamageableShip>();
+        if (damageableShip != null)
+        {
+            ArmorZone zone = collision.collider.GetComponentInParent<ArmorZone>();
+            if (zone != null)
+            {
+                zone.ReceiveHit(context);
+            }
+            else
+            {
+                damageableShip.ApplyHit(new ArmorSurface
+                {
+                    zoneId = "leviathan_ram",
+                    displayNameRu = "таран левиафана",
+                    armorMm = 0f,
+                    baseArmorMm = 0f,
+                    armorIntegrity01 = 1f,
+                    ricochetAngleDeg = 89f,
+                    overmatchCaliberMultiplier = 1f,
+                    structureDamageMultiplier = 1f,
+                    moduleDamageMultiplier = 1f,
+                    highExplosiveSurfaceDamageMultiplier = 1f,
+                    ramDamageMultiplier = 1f
+                }, context);
+            }
+        }
+
+        float selfDamage = Mathf.Sqrt(Mathf.Max(0f, energyKJ)) * Mathf.Max(0f, ramDamageScale) * 0.12f;
+        ApplyDamage(selfDamage);
+        lastRamDamageTime = Time.time;
+        alarm01 = 0f;
+        alarmRamActive = false;
+        ramTarget = null;
+        behaviorStatus = $"Столкнулся с кораблем: скорость {speed:0.0} м/с, энергия {energyKJ:0} кДж.";
+        if (debugLogging)
+        {
+            Debug.Log("[Левиафан] " + displayName + " " + behaviorStatus, this);
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (routeWaypoints == null || routeWaypoints.Count == 0) return;
+
+        Gizmos.color = new Color(0.9f, 0.25f, 1f, 0.9f);
+        for (int i = 0; i < routeWaypoints.Count; i++)
+        {
+            Vector3 point = routeWaypoints[i];
+            float radius = Mathf.Max(1f, routeWaypointRadiusMeters);
+            Gizmos.DrawWireSphere(point, radius);
+
+            if (i < routeWaypoints.Count - 1)
+            {
+                Gizmos.DrawLine(point, routeWaypoints[i + 1]);
+            }
+            else if (routeLoop && routeWaypoints.Count > 1)
+            {
+                Gizmos.DrawLine(point, routeWaypoints[0]);
+            }
+        }
+
+        if (routeEnabled && routeWaypointIndex >= 0 && routeWaypointIndex < routeWaypoints.Count)
+        {
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(transform.position, routeWaypoints[routeWaypointIndex]);
+            Gizmos.DrawWireSphere(routeWaypoints[routeWaypointIndex], Mathf.Max(2f, routeWaypointRadiusMeters * 1.3f));
+        }
+    }
+
+    public static Leviathan FindNearest(Vector3 position, float rangeMeters, bool requireAlive, string ignoredLeviathanId = "", float maxMassKg = 0f)
     {
         Leviathan best = null;
         float bestSqr = Mathf.Max(0f, rangeMeters) * Mathf.Max(0f, rangeMeters);
@@ -425,6 +1328,7 @@ public class Leviathan : MonoBehaviour
             if (leviathan == null) continue;
             if (requireAlive && leviathan.CanBeClaimed) continue;
             if (!string.IsNullOrWhiteSpace(ignoredLeviathanId) && leviathan.leviathanId == ignoredLeviathanId) continue;
+            if (maxMassKg > 0f && leviathan.massKg > maxMassKg) continue;
 
             float sqr = (leviathan.transform.position - position).sqrMagnitude;
             if (sqr > bestSqr) continue;
@@ -474,7 +1378,9 @@ public class HarpoonTether : MonoBehaviour
     public float fatiguePerSecond = 14f;
     public float collectionRadiusMeters = 14f;
     public float carcassWinchSpeedMetersPerSecond = 6f;
+    public float maxTensionLifetimeSeconds = 5f;
     public float currentTensionN;
+    [Range(0f, 1f)] public float wear01;
     public string lastMessage = "";
 
     private Rigidbody shipBody;
@@ -484,6 +1390,7 @@ public class HarpoonTether : MonoBehaviour
 
     public bool IsAttached => attached && ownerShip != null && target != null;
     public float CurrentTensionKg => currentTensionN / 9.81f;
+    public float WearPercent => Mathf.Clamp01(wear01) * 100f;
     public Vector3 ShipPoint => shipBody != null ? shipBody.worldCenterOfMass : transform.position;
     public Vector3 TargetPoint => targetBody != null ? targetBody.worldCenterOfMass : transform.position;
     public float DistanceToTargetMeters
@@ -565,39 +1472,46 @@ public class HarpoonTether : MonoBehaviour
         if (stretch > 0.01f) currentTensionN += Mathf.Max(0f, reelForceN) * (winchingCarcass ? 1.8f : 1f);
 
         float maxTensionN = Mathf.Max(1f, maxTensionKg) * 9.81f;
-        if (currentTensionN > maxTensionN)
+        if (currentTensionN > 0.001f)
         {
-            Detach($"Гарпун оборвался: натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг.");
-            return;
+            float tensionRatio = currentTensionN / maxTensionN;
+            wear01 += tensionRatio * Time.fixedDeltaTime / Mathf.Max(0.1f, maxTensionLifetimeSeconds);
+            if (wear01 >= 1f)
+            {
+                Detach($"Гарпун изношен и оборвался: натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг, износ 100%.");
+                return;
+            }
         }
+
+        float appliedTensionN = Mathf.Min(currentTensionN, maxTensionN * 2.5f);
 
         if (winchingCarcass)
         {
-            if (currentTensionN > 0f)
+            if (appliedTensionN > 0f)
             {
-                shipBody.AddForce(direction * currentTensionN, ForceMode.Force);
-                targetBody.AddForce(-direction * currentTensionN, ForceMode.Force);
+                shipBody.AddForce(direction * appliedTensionN, ForceMode.Force);
+                targetBody.AddForce(-direction * appliedTensionN, ForceMode.Force);
             }
 
             lastMessage = TargetInCollectionRadius
                 ? $"Туша в радиусе сбора: {distance:F1}/{collectionRadiusMeters:F1} м. Можно грузить."
-                : $"Лебедка тянет тушу: {distance:F1}/{collectionRadiusMeters:F1} м, трос {ropeLengthMeters:F1} м, натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг.";
+                : $"Лебедка тянет тушу: {distance:F1}/{collectionRadiusMeters:F1} м, трос {ropeLengthMeters:F1} м, натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг, износ {WearPercent:F0}%.";
             UpdateLine(shipPoint, targetPoint);
             return;
         }
 
-        if (currentTensionN > 0f)
+        if (appliedTensionN > 0f)
         {
-            shipBody.AddForce(direction * currentTensionN, ForceMode.Force);
-            targetBody.AddForce(-direction * currentTensionN, ForceMode.Force);
+            shipBody.AddForce(direction * appliedTensionN, ForceMode.Force);
+            targetBody.AddForce(-direction * appliedTensionN, ForceMode.Force);
 
             float fatigueScale = Mathf.Clamp01(currentTensionN / maxTensionN);
             target.ApplyHarpoonFatigue(Mathf.Max(0f, fatiguePerSecond) * fatigueScale * Time.fixedDeltaTime);
-            lastMessage = $"Натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг, полет цели {target.flightCapability:F0}/{target.maxFlightCapability:F0}.";
+            lastMessage = $"Натяжение {CurrentTensionKg:F0}/{maxTensionKg:F0} кг, износ {WearPercent:F0}%, здоровье цели {target.health:F0}/{target.maxHealth:F0}.";
         }
         else
         {
-            lastMessage = "Трос провис, натяжения нет.";
+            lastMessage = $"Трос провис, натяжения нет. Износ {WearPercent:F0}%.";
         }
 
         UpdateLine(shipPoint, targetPoint);
@@ -722,7 +1636,7 @@ public class LeviathanManager : MonoBehaviour
 
         Rigidbody body = leviathanObject.AddComponent<Rigidbody>();
         body.mass = Mathf.Max(1f, type.massKg);
-        body.useGravity = true;
+        body.useGravity = false;
 
         CapsuleCollider collider = leviathanObject.AddComponent<CapsuleCollider>();
         collider.direction = 2;
@@ -848,6 +1762,17 @@ public class ShipPhysics : MonoBehaviour
     public float miningManualShotRangeMeters = 180f;
     [HideInInspector] public string miningLastMessage = "";
 
+    [Header("Оружие")]
+    [Tooltip("Ресурс в грузовом списке корабля, который тратится на ручные выстрелы.")]
+    public string weaponResourceId = "weapon";
+    [Tooltip("Сколько килограммов оружия тратит один ручной выстрел.")]
+    public float weaponShotCostKg = 0.1f;
+    [Tooltip("Сколько здоровья левиафан теряет от одного ручного выстрела оружием.")]
+    public float leviathanWeaponShotFlightDamage = 25f;
+    [Tooltip("В каком радиусе выстрел тревожит ближайших левиафанов.")]
+    public float weaponShotAlarmRadiusMeters = 450f;
+    [HideInInspector] public string weaponLastMessage = "";
+
     [Header("Охота на левиафанов")]
     [Tooltip("Дальность ручного выстрела гарпуном по ближайшему левиафану.")]
     public float harpoonRangeMeters = 280f;
@@ -855,17 +1780,19 @@ public class ShipPhysics : MonoBehaviour
     public float harpoonRopeLengthMeters = 160f;
     [Tooltip("Максимальное натяжение, которое выдерживает гарпун, в килограммах силы.")]
     public float harpoonMaxTensionKg = 4500f;
+    [Tooltip("Сколько секунд трос живет при натяжении ровно на пределе прочности. При 10% натяжения живет в 10 раз дольше, при 200% - вдвое меньше.")]
+    public float harpoonMaxTensionLifetimeSeconds = 5f;
     [Tooltip("Жесткость троса: сколько ньютонов появляется за каждый метр растяжения.")]
     public float harpoonStiffnessNPerMeter = 360f;
     [Tooltip("Демпфер троса: гасит рывок, если цель и корабль расходятся.")]
     public float harpoonDampingNsPerMeter = 110f;
     [Tooltip("Постоянная подтяжка лебедкой, когда трос уже натянут.")]
     public float harpoonReelForceN = 600f;
-    [Tooltip("Сколько полетоспособности левиафан теряет в секунду при полном натяжении троса.")]
+    [Tooltip("Сколько здоровья левиафан теряет в секунду при полном натяжении троса.")]
     public float harpoonFatiguePerSecond = 18f;
-    [Tooltip("Р Р°РґРёСѓСЃ, РІ РєРѕС‚РѕСЂРѕРј С‚СѓС€Сѓ РјРѕР¶РЅРѕ РїРѕРіСЂСѓР·РёС‚СЊ РІ С‚СЂСЋРј.")]
+    [Tooltip("Радиус, в котором тушу можно погрузить в трюм.")]
     public float harpoonCarcassCollectionRadiusMeters = 14f;
-    [Tooltip("РЎРєРѕСЂРѕСЃС‚СЊ, СЃ РєРѕС‚РѕСЂРѕР№ Р»РµР±РµРґРєР° СѓРєРѕСЂР°С‡РёРІР°РµС‚ С‚СЂРѕСЃ РїРѕСЃР»Рµ С‚РѕРіРѕ, РєР°Рє С†РµР»СЊ СЃС‚Р°Р»Р° С‚СѓС€РµР№.")]
+    [Tooltip("Скорость, с которой лебедка укорачивает трос после того, как цель стала тушей.")]
     public float harpoonCarcassWinchSpeedMS = 7f;
     [Header("Охотничий автопилот")]
     [Tooltip("Если включено, корабль сам подходит к ближайшему левиафану, стреляет гарпуном и забирает тушу после подтяжки.")]
@@ -882,6 +1809,10 @@ public class ShipPhysics : MonoBehaviour
     public float leviathanHuntShotCooldownSeconds = 4f;
     [Tooltip("На сколько секунд автоохота игнорирует цель, которая только что оборвала трос.")]
     public float leviathanHuntBrokenTargetCooldownSeconds = 25f;
+    [Tooltip("Максимальная масса левиафана для автоохоты. 0 или меньше - без ограничения.")]
+    public float leviathanHuntMaxTargetMassKg = 7000f;
+    [Tooltip("Максимальный радиус отхода автоохоты от точки захвата при натяжении троса.")]
+    public float leviathanHuntMaxTetherDriftMeters = 1500f;
     [HideInInspector] public string leviathanHuntAutopilotMessage = "";
     [HideInInspector] public string harpoonLastMessage = "";
     [HideInInspector] public HarpoonTether activeHarpoon;
@@ -986,6 +1917,9 @@ public class ShipPhysics : MonoBehaviour
     private float leviathanHuntIgnoreUntilTime;
     private bool leviathanHuntHasTetherHoldPosition;
     private Vector3 leviathanHuntTetherHoldPosition;
+    private bool leviathanHuntHasCapturePosition;
+    private Vector3 leviathanHuntCapturePosition;
+    private Vector3 leviathanHuntTetherDirection;
     private string gasHarvesterCycleCloudId = "";
     private MetaGameState cachedMetaGameState;
     
@@ -996,6 +1930,8 @@ public class ShipPhysics : MonoBehaviour
 
         rb.mass = GetTotalMassKg();
         rb.useGravity = true;
+        ConfigureYawOnlyRigidbody();
+        EnforceYawOnlyRotation(true);
         
         rb.angularDamping = 2f; 
         rb.linearDamping = 0f; 
@@ -1011,6 +1947,42 @@ public class ShipPhysics : MonoBehaviour
         if (rb != null)
         {
             rb.mass = GetTotalMassKg();
+            ConfigureYawOnlyRigidbody();
+            EnforceYawOnlyRotation(true);
+        }
+    }
+
+    private void ConfigureYawOnlyRigidbody()
+    {
+        if (rb == null) return;
+
+        RigidbodyConstraints preservedConstraints = rb.constraints & ~RigidbodyConstraints.FreezeRotationY;
+        rb.constraints = preservedConstraints | RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+    }
+
+    private void EnforceYawOnlyRotation(bool immediate)
+    {
+        if (rb == null) return;
+
+        ConfigureYawOnlyRigidbody();
+
+        Vector3 angularVelocity = rb.angularVelocity;
+        if (Mathf.Abs(angularVelocity.x) > 0.0001f || Mathf.Abs(angularVelocity.z) > 0.0001f)
+        {
+            rb.angularVelocity = new Vector3(0f, angularVelocity.y, 0f);
+        }
+
+        Quaternion yawOnlyRotation = Quaternion.Euler(0f, rb.rotation.eulerAngles.y, 0f);
+        if (Quaternion.Angle(rb.rotation, yawOnlyRotation) <= 0.01f) return;
+
+        if (immediate)
+        {
+            rb.rotation = yawOnlyRotation;
+            transform.rotation = yawOnlyRotation;
+        }
+        else
+        {
+            rb.MoveRotation(yawOnlyRotation);
         }
     }
 
@@ -1061,7 +2033,104 @@ public class ShipPhysics : MonoBehaviour
         return true;
     }
 
-    public bool TryFireHarpoonAtNearestLeviathan(out string reason)
+    public bool TryShootNearestMiningRock(out string reason)
+    {
+        MiningRock target = MiningRock.FindNearestShootTarget(transform.position, Mathf.Max(0f, miningManualShotRangeMeters));
+        if (target == null)
+        {
+            reason = "Нет глыбы в дальности выстрела.";
+            miningLastMessage = reason;
+            return false;
+        }
+
+        if (!TrySpendWeaponForShot(out reason))
+        {
+            miningLastMessage = reason;
+            return false;
+        }
+
+        bool success = target.BreakOffByShot(out string shotMessage);
+        Leviathan.AddAlarmNear(
+            target.transform.position,
+            Mathf.Max(0f, weaponShotAlarmRadiusMeters),
+            0.16f,
+            "выстрел по глыбе",
+            null,
+            0f,
+            this);
+        reason = shotMessage + $" Оружие -{Mathf.Max(0f, weaponShotCostKg):0.0} кг.";
+        miningLastMessage = reason;
+        weaponLastMessage = reason;
+        return success;
+    }
+
+    public bool TryShootLeviathan(out string reason)
+    {
+        Leviathan target = activeHarpoon != null && activeHarpoon.IsAttached ? activeHarpoon.target : null;
+        if (target == null || target.CanBeClaimed)
+        {
+            float range = Mathf.Max(Mathf.Max(0f, harpoonRangeMeters), Mathf.Max(0f, leviathanHuntEngageRangeMeters));
+            target = Leviathan.FindNearest(transform.position, range, true);
+        }
+
+        if (target == null)
+        {
+            reason = "Нет живого левиафана в дальности выстрела.";
+            harpoonLastMessage = reason;
+            weaponLastMessage = reason;
+            return false;
+        }
+
+        if (!TrySpendWeaponForShot(out reason))
+        {
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        float damage = Mathf.Max(0f, leviathanWeaponShotFlightDamage);
+        target.ApplyHarpoonFatigue(damage);
+        Leviathan.AddAlarmNear(
+            target.transform.position,
+            Mathf.Max(0f, weaponShotAlarmRadiusMeters),
+            Mathf.Max(0f, target.alarmShotNearAdd),
+            "выстрел рядом",
+            target,
+            Mathf.Max(0f, target.alarmShotAtSelfAdd),
+            this);
+        reason = $"Выстрел по {target.displayName}: здоровье -{damage:0.#}. Оружие -{Mathf.Max(0f, weaponShotCostKg):0.0} кг.";
+        if (target.CanBeClaimed)
+        {
+            reason += " Цель потеряла здоровье и стала добычей.";
+        }
+
+        harpoonLastMessage = reason;
+        weaponLastMessage = reason;
+        return true;
+    }
+
+    private bool TrySpendWeaponForShot(out string reason)
+    {
+        reason = "";
+        MetaGameState meta = ResolveMetaGameState();
+        if (meta == null || meta.progress == null)
+        {
+            reason = "Стрельба ждет MetaGameState.";
+            weaponLastMessage = reason;
+            return false;
+        }
+
+        string resourceId = string.IsNullOrWhiteSpace(weaponResourceId) ? "weapon" : weaponResourceId;
+        float costKg = Mathf.Max(0f, weaponShotCostKg);
+        bool spent = meta.TrySpendFractionalShipCargoFromRuntime(resourceId, costKg, ref meta.progress.shipWeaponSpendBufferKg, out reason);
+        if (!spent)
+        {
+            weaponLastMessage = reason;
+        }
+
+        return spent;
+    }
+
+    public bool TryFireHarpoonAtNearestLeviathan(out string reason, float maxTargetMassKg = 0f)
     {
         reason = "";
         if (activeHarpoon != null && activeHarpoon.IsAttached)
@@ -1071,10 +2140,12 @@ public class ShipPhysics : MonoBehaviour
             return false;
         }
 
-        Leviathan target = Leviathan.FindNearest(transform.position, Mathf.Max(0f, harpoonRangeMeters), true);
+        Leviathan target = Leviathan.FindNearest(transform.position, Mathf.Max(0f, harpoonRangeMeters), true, "", maxTargetMassKg);
         if (target == null)
         {
-            reason = "В радиусе гарпуна нет живого левиафана.";
+            reason = maxTargetMassKg > 0f
+                ? $"В радиусе гарпуна нет живого левиафана не тяжелее {maxTargetMassKg:0} кг."
+                : "В радиусе гарпуна нет живого левиафана.";
             harpoonLastMessage = reason;
             return false;
         }
@@ -1084,6 +2155,7 @@ public class ShipPhysics : MonoBehaviour
         activeHarpoon = tetherObject.AddComponent<HarpoonTether>();
         activeHarpoon.ropeLengthMeters = Mathf.Max(1f, harpoonRopeLengthMeters);
         activeHarpoon.maxTensionKg = Mathf.Max(1f, harpoonMaxTensionKg);
+        activeHarpoon.maxTensionLifetimeSeconds = Mathf.Max(0.1f, harpoonMaxTensionLifetimeSeconds);
         activeHarpoon.stiffnessNPerMeter = Mathf.Max(0f, harpoonStiffnessNPerMeter);
         activeHarpoon.dampingNsPerMeter = Mathf.Max(0f, harpoonDampingNsPerMeter);
         activeHarpoon.reelForceN = Mathf.Max(0f, harpoonReelForceN);
@@ -1091,6 +2163,18 @@ public class ShipPhysics : MonoBehaviour
         activeHarpoon.collectionRadiusMeters = Mathf.Max(0.1f, harpoonCarcassCollectionRadiusMeters);
         activeHarpoon.carcassWinchSpeedMetersPerSecond = Mathf.Max(0.1f, harpoonCarcassWinchSpeedMS);
         activeHarpoon.Attach(this, target);
+        if (activeHarpoon.IsAttached)
+        {
+            float alarmRange = Mathf.Max(harpoonRangeMeters, target.passiveAggressionRangeMeters * Mathf.Max(1f, target.harpoonAlarmAggressionRangeMultiplier));
+            Leviathan.AddAlarmNear(
+                target.transform.position,
+                alarmRange,
+                Mathf.Max(0f, target.alarmOtherHarpoonedGainPerSecond) * 1.5f,
+                "гарпун рядом",
+                target,
+                Mathf.Max(0.1f, target.alarmHarpoonedGainPerSecond) * 1.5f,
+                this);
+        }
 
         reason = activeHarpoon.lastMessage;
         harpoonLastMessage = reason;
@@ -1121,7 +2205,7 @@ public class ShipPhysics : MonoBehaviour
             DetachHarpoon("Гарпун отцеплен перед стыковкой.");
         }
 
-        leviathanHuntHasTetherHoldPosition = false;
+        ClearLeviathanHuntTetherHold();
         routeEnabled = false;
         routeWasEnabled = false;
         positionHold = true;
@@ -1147,11 +2231,18 @@ public class ShipPhysics : MonoBehaviour
         }
     }
 
+    private void ClearLeviathanHuntTetherHold()
+    {
+        leviathanHuntHasTetherHoldPosition = false;
+        leviathanHuntHasCapturePosition = false;
+        leviathanHuntTetherDirection = Vector3.zero;
+    }
+
     private void RegisterLeviathanHuntTetherLoss(HarpoonTether tether, string reason)
     {
         if (!leviathanHuntAutopilotEnabled || tether == null) return;
 
-        leviathanHuntHasTetherHoldPosition = false;
+        ClearLeviathanHuntTetherHold();
         nextLeviathanHuntShotTime = Time.time + Mathf.Max(0.1f, leviathanHuntShotCooldownSeconds);
 
         Leviathan target = tether.target;
@@ -1180,7 +2271,7 @@ public class ShipPhysics : MonoBehaviour
 
         if (!target.CanBeClaimed)
         {
-            reason = "Левиафан еще держится в воздухе: ослабь здоровье или полетоспособность.";
+            reason = "Левиафан еще держится в воздухе: ослабь здоровье.";
             harpoonLastMessage = reason;
             return false;
         }
@@ -1241,7 +2332,7 @@ public class ShipPhysics : MonoBehaviour
         {
             if (leviathanHuntAutopilotWasEnabled)
             {
-                leviathanHuntHasTetherHoldPosition = false;
+                ClearLeviathanHuntTetherHold();
                 routeEnabled = false;
                 routeWasEnabled = false;
                 positionHold = true;
@@ -1263,46 +2354,101 @@ public class ShipPhysics : MonoBehaviour
         HarpoonTether tether = activeHarpoon;
         if (tether != null && tether.IsAttached)
         {
+            Leviathan target = tether.target;
             if (!leviathanHuntHasTetherHoldPosition)
             {
                 leviathanHuntTetherHoldPosition = transform.position;
+                leviathanHuntCapturePosition = transform.position;
                 leviathanHuntHasTetherHoldPosition = true;
+                leviathanHuntHasCapturePosition = true;
+
+                Vector3 initialDirection = target != null
+                    ? FlattenHorizontal(transform.position - target.transform.position)
+                    : FlattenHorizontal(transform.forward);
+                if (initialDirection.sqrMagnitude < 0.04f) initialDirection = FlattenHorizontal(transform.forward);
+                if (initialDirection.sqrMagnitude < 0.04f) initialDirection = Vector3.forward;
+                leviathanHuntTetherDirection = initialDirection.normalized;
             }
 
             routeEnabled = false;
             routeWasEnabled = false;
             positionHold = true;
             positionHoldWasEnabled = true;
-            targetHoldPosition = leviathanHuntTetherHoldPosition;
             altitudeHold = true;
-            targetAltitude = Mathf.Max(leviathanHuntTetherHoldPosition.y, leviathanHuntMinimumAltitudeMeters);
             cruiseControl = true;
             headingHold = true;
 
-            Leviathan target = tether.target;
             if (target != null && !target.CanBeClaimed)
             {
-                Vector3 away = FlattenHorizontal(transform.position - target.transform.position);
-                if (away.sqrMagnitude > 0.04f)
+                Vector3 anchor = leviathanHuntHasCapturePosition ? leviathanHuntCapturePosition : transform.position;
+                Vector3 sideDirection = leviathanHuntTetherDirection;
+                if (sideDirection.sqrMagnitude < 0.04f)
                 {
-                    targetHeading = HeadingFromVector(away);
+                    sideDirection = FlattenHorizontal(transform.position - target.transform.position);
                 }
+
+                if (sideDirection.sqrMagnitude < 0.04f)
+                {
+                    sideDirection = FlattenHorizontal(transform.forward);
+                }
+
+                if (sideDirection.sqrMagnitude < 0.04f)
+                {
+                    sideDirection = Vector3.forward;
+                }
+
+                sideDirection.Normalize();
+
+                Vector3 targetToAnchor = FlattenHorizontal(anchor - target.transform.position);
+                if (targetToAnchor.sqrMagnitude > 25f)
+                {
+                    float turnToAnchor = Mathf.Clamp01(Time.fixedDeltaTime * 0.28f);
+                    Vector3 blended = Vector3.Slerp(sideDirection, targetToAnchor.normalized, turnToAnchor);
+                    if (blended.sqrMagnitude > 0.04f)
+                    {
+                        sideDirection = blended.normalized;
+                    }
+                }
+
+                leviathanHuntTetherDirection = sideDirection;
+                targetHeading = HeadingFromVector(sideDirection);
+
+                float ropeLength = Mathf.Max(1f, tether.ropeLengthMeters);
+                float desiredDistance = ropeLength * 1.12f;
+                Vector3 desiredHoldPosition = target.transform.position + sideDirection * desiredDistance;
+                Vector3 offsetFromCapture = FlattenHorizontal(desiredHoldPosition - anchor);
+                float maxDrift = Mathf.Max(desiredDistance, leviathanHuntMaxTetherDriftMeters);
+                if (offsetFromCapture.magnitude > maxDrift)
+                {
+                    desiredHoldPosition = anchor + offsetFromCapture.normalized * maxDrift;
+                }
+
+                desiredHoldPosition.y = Mathf.Max(leviathanHuntMinimumAltitudeMeters, Mathf.Lerp(transform.position.y, target.transform.position.y, 0.2f));
+                leviathanHuntTetherHoldPosition = desiredHoldPosition;
             }
+
+            leviathanHuntTetherHoldPosition.y = Mathf.Max(leviathanHuntTetherHoldPosition.y, leviathanHuntMinimumAltitudeMeters);
+            targetHoldPosition = leviathanHuntTetherHoldPosition;
+            targetAltitude = Mathf.Max(leviathanHuntTetherHoldPosition.y, leviathanHuntMinimumAltitudeMeters);
 
             if (target != null && target.CanBeClaimed && tether.TargetInCollectionRadius)
             {
                 TryClaimHarpoonedLeviathan(out string claimMessage);
-                leviathanHuntHasTetherHoldPosition = false;
+                ClearLeviathanHuntTetherHold();
                 leviathanHuntAutopilotMessage = claimMessage;
                 return;
             }
 
             float drift = Vector3.Distance(FlattenHorizontal(transform.position), FlattenHorizontal(leviathanHuntTetherHoldPosition));
-            leviathanHuntAutopilotMessage = $"{tether.lastMessage} Удерживаю точку захвата, снос {drift:F1} м.";
+            float captureDrift = leviathanHuntHasCapturePosition
+                ? Vector3.Distance(FlattenHorizontal(transform.position), FlattenHorizontal(leviathanHuntCapturePosition))
+                : 0f;
+            float driftLimit = Mathf.Max(tether.ropeLengthMeters * 1.12f, leviathanHuntMaxTetherDriftMeters);
+            leviathanHuntAutopilotMessage = $"{tether.lastMessage} Держу трос натянутым, снос от расчетной точки {drift:F1} м, от точки захвата {captureDrift:F0}/{driftLimit:F0} м.";
             return;
         }
 
-        leviathanHuntHasTetherHoldPosition = false;
+        ClearLeviathanHuntTetherHold();
 
         if (!string.IsNullOrWhiteSpace(leviathanHuntIgnoredTargetId) && Time.time >= leviathanHuntIgnoreUntilTime)
         {
@@ -1312,9 +2458,23 @@ public class ShipPhysics : MonoBehaviour
         string ignoredTarget = !string.IsNullOrWhiteSpace(leviathanHuntIgnoredTargetId) && Time.time < leviathanHuntIgnoreUntilTime
             ? leviathanHuntIgnoredTargetId
             : "";
-        Leviathan nearest = Leviathan.FindNearest(transform.position, Mathf.Max(0f, leviathanHuntSearchRangeMeters), true, ignoredTarget);
+        float maxAutoTargetMassKg = Mathf.Max(0f, leviathanHuntMaxTargetMassKg);
+        Leviathan nearest = Leviathan.FindNearest(transform.position, Mathf.Max(0f, leviathanHuntSearchRangeMeters), true, ignoredTarget, maxAutoTargetMassKg);
         if (nearest == null)
         {
+            routeEnabled = false;
+            routeWasEnabled = false;
+            positionHold = true;
+            positionHoldWasEnabled = true;
+            targetHoldPosition = transform.position;
+            altitudeHold = true;
+            cruiseControl = true;
+            headingHold = true;
+            targetAltitude = transform.position.y;
+            targetSpeedMS = 0f;
+            thrustInput = 0f;
+            turnInput = 0f;
+
             if (!string.IsNullOrWhiteSpace(ignoredTarget))
             {
                 float wait = Mathf.Max(0f, leviathanHuntIgnoreUntilTime - Time.time);
@@ -1322,7 +2482,9 @@ public class ShipPhysics : MonoBehaviour
             }
             else
             {
-                leviathanHuntAutopilotMessage = "В радиусе поиска нет живого левиафана.";
+                leviathanHuntAutopilotMessage = maxAutoTargetMassKg > 0f
+                    ? $"В радиусе поиска нет живого левиафана не тяжелее {maxAutoTargetMassKg:0} кг."
+                    : "В радиусе поиска нет живого левиафана.";
             }
 
             return;
@@ -1332,13 +2494,6 @@ public class ShipPhysics : MonoBehaviour
         float engageDistance = Mathf.Min(Mathf.Max(1f, harpoonRangeMeters), Mathf.Max(1f, leviathanHuntEngageRangeMeters));
         if (distance <= engageDistance)
         {
-            if (Time.time < nextLeviathanHuntShotTime)
-            {
-                float wait = Mathf.Max(0f, nextLeviathanHuntShotTime - Time.time);
-                leviathanHuntAutopilotMessage = $"Гарпун перезаряжается: {wait:F1} сек. Цель {nearest.displayName} в {distance:F0} м.";
-                return;
-            }
-
             routeEnabled = false;
             routeWasEnabled = false;
             positionHold = true;
@@ -1348,7 +2503,15 @@ public class ShipPhysics : MonoBehaviour
             targetAltitude = Mathf.Max(transform.position.y, leviathanHuntMinimumAltitudeMeters);
             cruiseControl = true;
             headingHold = true;
-            TryFireHarpoonAtNearestLeviathan(out string fireMessage);
+
+            if (Time.time < nextLeviathanHuntShotTime)
+            {
+                float wait = Mathf.Max(0f, nextLeviathanHuntShotTime - Time.time);
+                leviathanHuntAutopilotMessage = $"Гарпун перезаряжается: {wait:F1} сек. Цель {nearest.displayName} в {distance:F0} м.";
+                return;
+            }
+
+            TryFireHarpoonAtNearestLeviathan(out string fireMessage, maxAutoTargetMassKg);
             leviathanHuntAutopilotMessage = fireMessage;
             return;
         }
@@ -1539,6 +2702,7 @@ public class ShipPhysics : MonoBehaviour
 
     void FixedUpdate()
     {
+        EnforceYawOnlyRotation(false);
         UpdateLeviathanHuntAutopilot();
         UpdateRouteModeState();
         UpdateWaypointNavigation(); // Мастер-автопилот
@@ -1577,6 +2741,7 @@ public class ShipPhysics : MonoBehaviour
         Vector3 localAirVel = transform.InverseTransformDirection(airVelocity);
         Vector3 sideAirVelocity = transform.right * localAirVel.x;
         rb.AddForce(-sideAirVelocity * rb.mass * sideResistance, ForceMode.Force);
+        EnforceYawOnlyRotation(false);
     }
 
     private void ApplyGyroTurn()
@@ -1600,7 +2765,7 @@ public class ShipPhysics : MonoBehaviour
         }
 
         currentGyroTurnTorque = finalTorque;
-        rb.AddTorque(transform.up * finalTorque, ForceMode.Force);
+        rb.AddTorque(Vector3.up * finalTorque, ForceMode.Force);
     }
 
     private void ApplyPropellerThrust()
@@ -1888,6 +3053,7 @@ public class ShipPhysics : MonoBehaviour
         if (speed > 0.15f && (distance <= holdRadius || stoppingDistance >= remainingToHold))
         {
             headingVector = -horizontalVelocity;
+            desiredSpeed = Mathf.Clamp(speed, 0f, maxHoldSpeed);
         }
         else
         {

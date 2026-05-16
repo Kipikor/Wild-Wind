@@ -393,7 +393,6 @@ public class DamageTestBenchEditor : Editor
         DrawRelative(shell, "damagePoints", "Старый общий урон");
         DrawRelative(shell, "hullDamageOnPenetration", "Урон корпусу при пробитии");
         DrawRelative(shell, "armorPlateDamage", "Урон бронелисту");
-        DrawRelative(shell, "moduleDamage", "Урон модулю");
         DrawRelative(shell, "penetrationMm", "Пробитие, мм");
         DrawRelative(shell, "explosiveRadiusMeters", "Радиус фугаса, м");
         DrawRelative(shell, "normalizationDegrees", "Нормализация, град");
@@ -438,16 +437,7 @@ public class DamageTestBenchEditor : Editor
         EditorGUILayout.LabelField("Последнее попадание", $"{ship.lastHitOutcome} / {ship.lastHitZoneId}");
         EditorGUILayout.LabelField("Угол и броня", $"{ship.lastHitImpactAngleDeg:0}°, {ship.lastHitArmorMm:0}->{ship.lastHitEffectiveArmorMm:0} мм, пробитие {ship.lastHitPenetrationMm:0} мм");
 
-        if (ship.modules != null)
-        {
-            for (int i = 0; i < ship.modules.Count; i++)
-            {
-                ShipDamageModuleState module = ship.modules[i];
-                if (module == null) continue;
-                string status = module.IsDestroyed ? " уничтожен" : "";
-                EditorGUILayout.LabelField(module.displayNameRu, $"{module.hp:0.0} / {module.maxHp:0.0}{status}");
-            }
-        }
+        EditorGUILayout.LabelField("Модули", "урон по модулям отключен");
 
         if (ship.recentEvents != null && ship.recentEvents.Count > 0)
         {

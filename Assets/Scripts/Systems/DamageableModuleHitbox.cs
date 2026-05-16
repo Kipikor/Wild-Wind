@@ -9,19 +9,19 @@ public class DamageableModuleHitbox : MonoBehaviour
     [Tooltip("Корабль, которому принадлежит этот модуль.")]
     public DamageableShip owner;
     [InspectorName("ID модуля")]
-    [Tooltip("Технический id состояния модуля в DamageableShip. Например: engine, propeller, claudium_loop, cargo.")]
+    [Tooltip("Технический id модуля. Сейчас используется только для отладочной геометрии, боевой урон отключен.")]
     public string moduleId = "module";
     [InspectorName("Название")]
     [Tooltip("Название модуля для логов и инспектора.")]
     public string displayNameRu = "Модуль";
     [InspectorName("Максимальная прочность")]
-    [Tooltip("Если такого модуля еще нет в DamageableShip, он будет создан с этой прочностью.")]
+    [Tooltip("Устаревшее поле для старых тестовых сцен. Боевой урон по модулям отключен.")]
     public float defaultMaxHp = 100f;
     [InspectorName("Внешний модуль")]
-    [Tooltip("Внешний модуль ловит прямые попадания до брони. При попадании получает урон модуль и корпус.")]
+    [Tooltip("Устаревшее поле. Модульные hitbox сейчас не ловят боевые попадания.")]
     public bool externalModule;
     [InspectorName("Прозрачен после уничтожения")]
-    [Tooltip("Если модуль уничтожен, последующие снаряды проходят сквозь его hitbox и могут попасть дальше.")]
+    [Tooltip("Устаревшее поле. Снаряды проходят сквозь модульные hitbox, потому что урон по модулям отключен.")]
     public bool transparentWhenDestroyed = true;
 
     [Header("Отладка")]
@@ -39,7 +39,7 @@ public class DamageableModuleHitbox : MonoBehaviour
         }
     }
 
-    public bool BlocksProjectile => !(transparentWhenDestroyed && IsDestroyed);
+    public bool BlocksProjectile => false;
 
     private void Reset()
     {
@@ -66,23 +66,16 @@ public class DamageableModuleHitbox : MonoBehaviour
 
     public DamageHitResult ReceiveDirectHit(DamageHitContext context)
     {
-        DamageableShip target = owner != null ? owner : GetComponentInParent<DamageableShip>();
-        if (target == null)
+        return new DamageHitResult
         {
-            return new DamageHitResult
-            {
-                outcome = DamageHitOutcome.Miss,
-                message = "Попадание в модуль без DamageableShip."
-            };
-        }
-
-        return target.ApplyExternalModuleHit(this, context);
+            outcome = DamageHitOutcome.Miss,
+            message = "Попадание в модуль проигнорировано: урон по модулям отключен."
+        };
     }
 
     public float ApplyModuleDamage(float amount)
     {
-        ShipDamageModuleState state = ResolveState(true);
-        return state != null ? state.ApplyDamage(amount) : 0f;
+        return 0f;
     }
 
     public ShipDamageModuleState ResolveState(bool create)
@@ -132,4 +125,3 @@ public class DamageableModuleHitbox : MonoBehaviour
         Gizmos.matrix = previous;
     }
 }
-

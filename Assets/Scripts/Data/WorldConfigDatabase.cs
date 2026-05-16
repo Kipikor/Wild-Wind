@@ -392,10 +392,10 @@ public class WorldConfigDatabase
                 bodyRadiusMeters = Mathf.Max(0.5f, ParseFloat(Get(row, "body_radius_m"), 5f)),
                 massKg = Mathf.Max(1f, ParseFloat(Get(row, "mass_kg"), 5000f)),
                 maxHealth = Mathf.Max(1f, ParseFloat(Get(row, "max_health"), 300f)),
-                maxFlightCapability = Mathf.Max(1f, ParseFloat(Get(row, "max_flight_capability"), 240f)),
                 claudiumLiftKg = Mathf.Max(0f, ParseFloat(Get(row, "claudium_lift_kg"), 5500f)),
-                swimForceN = Mathf.Max(0f, ParseFloat(Get(row, "swim_force_n"), 9000f)),
-                maxSpeedMS = Mathf.Max(0.1f, ParseFloat(Get(row, "max_speed_ms"), 9f)),
+                forwardThrustKgf = Mathf.Max(0f, ParseFloat(Get(row, "forward_thrust_kgf"), ParseFloat(Get(row, "swim_force_n"), 9000f) / 9.81f)),
+                omniThrustKgf = Mathf.Max(0f, ParseFloat(Get(row, "omni_thrust_kgf"), ParseFloat(Get(row, "swim_force_n"), 9000f) * 0.72f / 9.81f)),
+                cruiseSpeedMS = Mathf.Max(0.1f, ParseFloat(Get(row, "cruise_speed_ms"), ParseFloat(Get(row, "max_speed_ms"), 9f))),
                 wanderRadiusMeters = Mathf.Max(1f, ParseFloat(Get(row, "wander_radius_m"), 220f)),
                 turnTorque = Mathf.Max(0f, ParseFloat(Get(row, "turn_torque"), 1200f)),
                 headArmorMm = Mathf.Max(0f, ParseFloat(Get(row, "head_armor_mm"), 28f)),
@@ -695,10 +695,10 @@ public class LeviathanTypeConfig
     public float bodyRadiusMeters = 5f;
     public float massKg = 5000f;
     public float maxHealth = 300f;
-    public float maxFlightCapability = 240f;
     public float claudiumLiftKg = 5500f;
-    public float swimForceN = 9000f;
-    public float maxSpeedMS = 9f;
+    public float forwardThrustKgf = 920f;
+    public float omniThrustKgf = 660f;
+    public float cruiseSpeedMS = 9f;
     public float wanderRadiusMeters = 220f;
     public float turnTorque = 1200f;
     public float headArmorMm = 28f;

@@ -49,6 +49,8 @@ public static class MiningSetupEditor
         meta.progress.InstallModule("utility_01", "starter_mining_hold");
         meta.progress.SetShipCargoAmount("wood", 100);
         meta.progress.SetShipCargoAmount("claudium", 50);
+        meta.progress.SetShipCargoAmount("weapon", 5);
+        meta.progress.shipWeaponSpendBufferKg = 0f;
         meta.ApplySelectedShip();
 
         EditorUtility.SetDirty(meta);

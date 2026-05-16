@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class MiningFragment : MonoBehaviour
 {
+    private static readonly System.Collections.Generic.List<MiningFragment> ActiveFragments = new System.Collections.Generic.List<MiningFragment>();
+
     public string oreItemId = "";
     public int amountKg = 1;
     public float fallSpeedMS = 4f;
@@ -9,6 +11,25 @@ public class MiningFragment : MonoBehaviour
     public float spinSpeedDeg = 90f;
 
     private ShipPhysics cachedShip;
+
+    public static MiningFragment FindNearestForLeviathan(Vector3 position, float radiusMeters)
+    {
+        MiningFragment best = null;
+        float bestSqr = Mathf.Max(0f, radiusMeters) * Mathf.Max(0f, radiusMeters);
+        for (int i = 0; i < ActiveFragments.Count; i++)
+        {
+            MiningFragment fragment = ActiveFragments[i];
+            if (fragment == null || fragment.amountKg <= 0) continue;
+
+            float sqr = (fragment.transform.position - position).sqrMagnitude;
+            if (sqr > bestSqr) continue;
+
+            best = fragment;
+            bestSqr = sqr;
+        }
+
+        return best;
+    }
 
     public void Initialize(string itemId, int amount, float fallSpeed, float stormLevelY, Color color)
     {
@@ -35,6 +56,13 @@ public class MiningFragment : MonoBehaviour
             return;
         }
 
+        Leviathan eater = Leviathan.FindFragmentEater(transform.position);
+        if (eater != null && eater.TryEatOre(oreItemId, amountKg))
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         ShipPhysics ship = GetShip();
         if (ship == null || ship.miningImpactHoldCapacityKg <= 0f) return;
 
@@ -55,5 +83,18 @@ public class MiningFragment : MonoBehaviour
         }
 
         return cachedShip;
+    }
+
+    private void OnEnable()
+    {
+        if (!ActiveFragments.Contains(this))
+        {
+            ActiveFragments.Add(this);
+        }
+    }
+
+    private void OnDisable()
+    {
+        ActiveFragments.Remove(this);
     }
 }

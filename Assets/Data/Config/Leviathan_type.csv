@@ -1,5 +1,5 @@
-id_leviathan_type,local_name_ru,local_name_en,carcass_item,body_length_m,body_radius_m,mass_kg,max_health,max_flight_capability,claudium_lift_kg,swim_force_n,max_speed_ms,wander_radius_m,turn_torque,head_armor_mm,body_armor_mm,ram_damage_multiplier,carcass_mass_fraction,color_hex
-windcalf,Ветротеленок,Wind Calf,windcalf_carcass,9,1.6,360,80,70,430,4200,11,140,1800,8,2,0.45,0.22,#9FD2E0
-mistwhale,Дымный кит,Mist Whale,mistwhale_carcass,34,5.5,6200,360,280,7100,12000,8,260,1800,32,6,1.0,0.52,#5FA6C7
-sky_eel,Небесный угорь,Sky Eel,sky_eel_carcass,22,2.2,2100,170,150,2600,8500,13,340,2400,14,3,0.75,0.45,#81C3B4
-stoneback,Камнеспин,Stoneback,stoneback_carcass,46,7.5,11800,520,380,13200,16000,6,210,1600,58,10,1.35,0.58,#6F8E9D
+id_leviathan_type,local_name_ru,local_name_en,carcass_item,body_length_m,body_radius_m,mass_kg,max_health,claudium_lift_kg,forward_thrust_kgf,omni_thrust_kgf,cruise_speed_ms,wander_radius_m,turn_torque,head_armor_mm,body_armor_mm,ram_damage_multiplier,carcass_mass_fraction,color_hex
+windcalf,Ветротеленок,Wind Calf,windcalf_carcass,9,1.6,360,80,430,430,310,11,140,1800,8,2,0.45,0.22,#9FD2E0
+mistwhale,Дымный кит,Mist Whale,mistwhale_carcass,34,5.5,6200,360,7100,1220,880,8,260,1800,32,6,1.0,0.52,#5FA6C7
+sky_eel,Небесный угорь,Sky Eel,sky_eel_carcass,22,2.2,2100,170,2600,870,625,13,340,2400,14,3,0.75,0.45,#81C3B4
+stoneback,Камнеспин,Stoneback,stoneback_carcass,46,7.5,11800,520,13200,1630,1175,6,210,1600,58,10,1.35,0.58,#6F8E9D
