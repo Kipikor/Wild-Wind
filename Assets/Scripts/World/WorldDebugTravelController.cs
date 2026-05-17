@@ -1,5 +1,9 @@
 using UnityEngine;
 
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
+
 public sealed class WorldDebugTravelController : MonoBehaviour
 {
     [Header("References")]
@@ -36,7 +40,7 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         if (input.sqrMagnitude > 0.0001f)
         {
             float speed = cruiseSpeedMetersPerSecond;
-            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+            if (IsKeyPressed(DebugTravelKey.Sprint))
             {
                 speed *= sprintMultiplier;
             }
@@ -109,16 +113,75 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         float y = 0f;
         float z = 0f;
 
-        if (Input.GetKey(KeyCode.A)) x -= 1f;
-        if (Input.GetKey(KeyCode.D)) x += 1f;
-        if (Input.GetKey(KeyCode.S)) z -= 1f;
-        if (Input.GetKey(KeyCode.W)) z += 1f;
-        if (Input.GetKey(KeyCode.Q)) y -= verticalSpeedMetersPerSecond / Mathf.Max(1f, cruiseSpeedMetersPerSecond);
-        if (Input.GetKey(KeyCode.E)) y += verticalSpeedMetersPerSecond / Mathf.Max(1f, cruiseSpeedMetersPerSecond);
+        if (IsKeyPressed(DebugTravelKey.Left)) x -= 1f;
+        if (IsKeyPressed(DebugTravelKey.Right)) x += 1f;
+        if (IsKeyPressed(DebugTravelKey.Backward)) z -= 1f;
+        if (IsKeyPressed(DebugTravelKey.Forward)) z += 1f;
+        if (IsKeyPressed(DebugTravelKey.Down)) y -= verticalSpeedMetersPerSecond / Mathf.Max(1f, cruiseSpeedMetersPerSecond);
+        if (IsKeyPressed(DebugTravelKey.Up)) y += verticalSpeedMetersPerSecond / Mathf.Max(1f, cruiseSpeedMetersPerSecond);
 
         Vector3 input = new Vector3(x, y, z);
         return input.sqrMagnitude > 1f ? input.normalized : input;
     }
+
+    private static bool IsKeyPressed(DebugTravelKey key)
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (TryReadInputSystemKey(key))
+        {
+            return true;
+        }
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (TryReadLegacyInputKey(key))
+        {
+            return true;
+        }
+#endif
+
+        return false;
+    }
+
+#if ENABLE_INPUT_SYSTEM
+    private static bool TryReadInputSystemKey(DebugTravelKey key)
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null)
+        {
+            return false;
+        }
+
+        return key switch
+        {
+            DebugTravelKey.Forward => keyboard.wKey.isPressed,
+            DebugTravelKey.Backward => keyboard.sKey.isPressed,
+            DebugTravelKey.Left => keyboard.aKey.isPressed,
+            DebugTravelKey.Right => keyboard.dKey.isPressed,
+            DebugTravelKey.Down => keyboard.qKey.isPressed,
+            DebugTravelKey.Up => keyboard.eKey.isPressed,
+            DebugTravelKey.Sprint => keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed,
+            _ => false
+        };
+    }
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+    private static bool TryReadLegacyInputKey(DebugTravelKey key)
+    {
+        return key switch
+        {
+            DebugTravelKey.Forward => Input.GetKey(KeyCode.W),
+            DebugTravelKey.Backward => Input.GetKey(KeyCode.S),
+            DebugTravelKey.Left => Input.GetKey(KeyCode.A),
+            DebugTravelKey.Right => Input.GetKey(KeyCode.D),
+            DebugTravelKey.Down => Input.GetKey(KeyCode.Q),
+            DebugTravelKey.Up => Input.GetKey(KeyCode.E),
+            DebugTravelKey.Sprint => Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift),
+            _ => false
+        };
+    }
+#endif
 
     private void ResolveReferences()
     {
@@ -156,5 +219,16 @@ public sealed class WorldDebugTravelController : MonoBehaviour
             ? targetPosition
             : Vector3.Lerp(worldCamera.transform.position, targetPosition, followSharpness);
         worldCamera.transform.LookAt(focus.position + cameraLookOffset);
+    }
+
+    private enum DebugTravelKey
+    {
+        Forward,
+        Backward,
+        Left,
+        Right,
+        Down,
+        Up,
+        Sprint
     }
 }
