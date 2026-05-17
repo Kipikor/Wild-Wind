@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8686c273a75f29e47855c0c8a039d88b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231779
+  packageName: Space Cloud Waves
+  packageVersion: 1.0
+  assetPath: Assets/ShadowVision/SpaceCloudWaves/Examples/Assets/ExampleURPPostProcessingVolume.asset
+  uploadId: 531523

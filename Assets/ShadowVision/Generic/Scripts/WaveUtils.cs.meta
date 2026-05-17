@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: cba095643871bf742993daf02f1363fc
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231779
+  packageName: Space Cloud Waves
+  packageVersion: 1.0
+  assetPath: Assets/ShadowVision/Generic/Scripts/WaveUtils.cs
+  uploadId: 531523

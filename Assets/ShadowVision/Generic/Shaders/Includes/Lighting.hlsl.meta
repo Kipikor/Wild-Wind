@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 22a9ea66801344787ab70f5c6bcbe463
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  preprocessorOverride: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 231779
+  packageName: Space Cloud Waves
+  packageVersion: 1.0
+  assetPath: Assets/ShadowVision/Generic/Shaders/Includes/Lighting.hlsl
+  uploadId: 531523
