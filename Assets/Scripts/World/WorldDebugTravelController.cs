@@ -1,9 +1,5 @@
 using UnityEngine;
 
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
-
 public sealed class WorldDebugTravelController : MonoBehaviour
 {
     [Header("References")]
@@ -11,6 +7,7 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     [SerializeField, InspectorName("World Camera")] private Camera worldCamera;
     [SerializeField, InspectorName("Visual Tuner")] private VisualPlayModeTuner visualTuner;
     [SerializeField, InspectorName("Bubble Streamer")] private WorldBubbleStreamer bubbleStreamer;
+    [SerializeField, InspectorName("Control Settings")] private WildWindControlSettings controlSettings;
 
     [Header("Movement")]
     [SerializeField, Range(50f, 4000f), InspectorName("Cruise Speed, m/s")] private float cruiseSpeedMetersPerSecond = 650f;
@@ -39,10 +36,10 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         Vector3 input = ReadMovementInput();
         if (input.sqrMagnitude > 0.0001f)
         {
-            float speed = cruiseSpeedMetersPerSecond;
-            if (IsKeyPressed(DebugTravelKey.Sprint))
+            float speed = GetCruiseSpeed();
+            if (IsSprintPressed())
             {
-                speed *= sprintMultiplier;
+                speed *= GetSprintMultiplier();
             }
 
             focus.position += input * speed * Time.deltaTime;
@@ -53,12 +50,18 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         visualTuner?.ApplyNow();
     }
 
-    public void Configure(Transform newFocus, Camera newCamera, VisualPlayModeTuner newVisualTuner, WorldBubbleStreamer newStreamer)
+    public void Configure(
+        Transform newFocus,
+        Camera newCamera,
+        VisualPlayModeTuner newVisualTuner,
+        WorldBubbleStreamer newStreamer,
+        WildWindControlSettings newControlSettings)
     {
         focus = newFocus;
         worldCamera = newCamera;
         visualTuner = newVisualTuner;
         bubbleStreamer = newStreamer;
+        controlSettings = newControlSettings;
         ApplyCamera(true);
     }
 
@@ -109,79 +112,46 @@ public sealed class WorldDebugTravelController : MonoBehaviour
 
     private Vector3 ReadMovementInput()
     {
+        if (controlSettings != null)
+        {
+            return controlSettings.ReadDebugTravelInput();
+        }
+
         float x = 0f;
         float y = 0f;
         float z = 0f;
 
-        if (IsKeyPressed(DebugTravelKey.Left)) x -= 1f;
-        if (IsKeyPressed(DebugTravelKey.Right)) x += 1f;
-        if (IsKeyPressed(DebugTravelKey.Backward)) z -= 1f;
-        if (IsKeyPressed(DebugTravelKey.Forward)) z += 1f;
-        if (IsKeyPressed(DebugTravelKey.Down)) y -= verticalSpeedMetersPerSecond / Mathf.Max(1f, cruiseSpeedMetersPerSecond);
-        if (IsKeyPressed(DebugTravelKey.Up)) y += verticalSpeedMetersPerSecond / Mathf.Max(1f, cruiseSpeedMetersPerSecond);
+        if (WildWindControlSettings.IsKeyPressed(WildWindInputKey.A)) x -= 1f;
+        if (WildWindControlSettings.IsKeyPressed(WildWindInputKey.D)) x += 1f;
+        if (WildWindControlSettings.IsKeyPressed(WildWindInputKey.S)) z -= 1f;
+        if (WildWindControlSettings.IsKeyPressed(WildWindInputKey.W)) z += 1f;
+        if (WildWindControlSettings.IsKeyPressed(WildWindInputKey.Q)) y -= verticalSpeedMetersPerSecond / Mathf.Max(1f, cruiseSpeedMetersPerSecond);
+        if (WildWindControlSettings.IsKeyPressed(WildWindInputKey.E)) y += verticalSpeedMetersPerSecond / Mathf.Max(1f, cruiseSpeedMetersPerSecond);
 
         Vector3 input = new Vector3(x, y, z);
         return input.sqrMagnitude > 1f ? input.normalized : input;
     }
 
-    private static bool IsKeyPressed(DebugTravelKey key)
+    private bool IsSprintPressed()
     {
-#if ENABLE_INPUT_SYSTEM
-        if (TryReadInputSystemKey(key))
+        if (controlSettings != null)
         {
-            return true;
-        }
-#endif
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-        if (TryReadLegacyInputKey(key))
-        {
-            return true;
-        }
-#endif
-
-        return false;
-    }
-
-#if ENABLE_INPUT_SYSTEM
-    private static bool TryReadInputSystemKey(DebugTravelKey key)
-    {
-        Keyboard keyboard = Keyboard.current;
-        if (keyboard == null)
-        {
-            return false;
+            return controlSettings.IsSprintPressed();
         }
 
-        return key switch
-        {
-            DebugTravelKey.Forward => keyboard.wKey.isPressed,
-            DebugTravelKey.Backward => keyboard.sKey.isPressed,
-            DebugTravelKey.Left => keyboard.aKey.isPressed,
-            DebugTravelKey.Right => keyboard.dKey.isPressed,
-            DebugTravelKey.Down => keyboard.qKey.isPressed,
-            DebugTravelKey.Up => keyboard.eKey.isPressed,
-            DebugTravelKey.Sprint => keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed,
-            _ => false
-        };
+        return WildWindControlSettings.IsKeyPressed(WildWindInputKey.LeftShift) ||
+            WildWindControlSettings.IsKeyPressed(WildWindInputKey.RightShift);
     }
-#endif
 
-#if ENABLE_LEGACY_INPUT_MANAGER
-    private static bool TryReadLegacyInputKey(DebugTravelKey key)
+    private float GetCruiseSpeed()
     {
-        return key switch
-        {
-            DebugTravelKey.Forward => Input.GetKey(KeyCode.W),
-            DebugTravelKey.Backward => Input.GetKey(KeyCode.S),
-            DebugTravelKey.Left => Input.GetKey(KeyCode.A),
-            DebugTravelKey.Right => Input.GetKey(KeyCode.D),
-            DebugTravelKey.Down => Input.GetKey(KeyCode.Q),
-            DebugTravelKey.Up => Input.GetKey(KeyCode.E),
-            DebugTravelKey.Sprint => Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift),
-            _ => false
-        };
+        return controlSettings != null ? controlSettings.DebugCruiseSpeedMetersPerSecond : cruiseSpeedMetersPerSecond;
     }
-#endif
+
+    private float GetSprintMultiplier()
+    {
+        return controlSettings != null ? controlSettings.DebugSprintMultiplier : sprintMultiplier;
+    }
 
     private void ResolveReferences()
     {
@@ -205,6 +175,12 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         {
             bubbleStreamer = FindFirstObjectByType<WorldBubbleStreamer>();
         }
+
+        if (controlSettings == null)
+        {
+            WildWindSettingsRoot settings = FindFirstObjectByType<WildWindSettingsRoot>();
+            controlSettings = settings != null ? settings.Controls : FindFirstObjectByType<WildWindControlSettings>();
+        }
     }
 
     private void ApplyCamera(bool snap)
@@ -214,21 +190,14 @@ public sealed class WorldDebugTravelController : MonoBehaviour
             return;
         }
 
-        Vector3 targetPosition = focus.position + cameraOffset;
+        Vector3 effectiveCameraOffset = controlSettings != null ? controlSettings.DebugCameraOffset : cameraOffset;
+        Vector3 effectiveLookOffset = controlSettings != null ? controlSettings.DebugCameraLookOffset : cameraLookOffset;
+        float effectiveFollowSharpness = controlSettings != null ? controlSettings.DebugCameraFollowSharpness : followSharpness;
+
+        Vector3 targetPosition = focus.position + effectiveCameraOffset;
         worldCamera.transform.position = snap
             ? targetPosition
-            : Vector3.Lerp(worldCamera.transform.position, targetPosition, followSharpness);
-        worldCamera.transform.LookAt(focus.position + cameraLookOffset);
-    }
-
-    private enum DebugTravelKey
-    {
-        Forward,
-        Backward,
-        Left,
-        Right,
-        Down,
-        Up,
-        Sprint
+            : Vector3.Lerp(worldCamera.transform.position, targetPosition, effectiveFollowSharpness);
+        worldCamera.transform.LookAt(focus.position + effectiveLookOffset);
     }
 }

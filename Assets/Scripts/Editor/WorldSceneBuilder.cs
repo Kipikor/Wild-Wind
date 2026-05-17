@@ -20,6 +20,7 @@ public static class WorldSceneBuilder
         scene.name = "WildWindWorldScene";
 
         Transform root = new GameObject("Wild Wind World").transform;
+        WildWindSettingsRoot settings = WorldSettingsPrefabBuilder.InstantiateSettingsPrefab(root);
         Transform focus = CreatePlayerFocus(root);
         WorldRegionRuntime runtime = CreateWorldRuntime(root, focus);
 
@@ -31,7 +32,7 @@ public static class WorldSceneBuilder
         CreateWorldDataPreview(root, runtime, focus.position);
         WorldBubbleStreamer streamer = CreateWorldBubbleStreamer(root, runtime, focus);
         VisualPlayModeTuner tuner = CreateVisualTuner(root, focus);
-        CreateDebugTravelController(root, focus, camera, tuner, streamer);
+        CreateDebugTravelController(root, focus, camera, tuner, streamer, settings != null ? settings.Controls : null);
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.SaveAssets();
@@ -274,12 +275,18 @@ public static class WorldSceneBuilder
         return tuner;
     }
 
-    private static void CreateDebugTravelController(Transform root, Transform focus, Camera camera, VisualPlayModeTuner tuner, WorldBubbleStreamer streamer)
+    private static void CreateDebugTravelController(
+        Transform root,
+        Transform focus,
+        Camera camera,
+        VisualPlayModeTuner tuner,
+        WorldBubbleStreamer streamer,
+        WildWindControlSettings controls)
     {
         GameObject controllerObject = new GameObject("World Debug Travel Controller");
         controllerObject.transform.SetParent(root, false);
         WorldDebugTravelController controller = controllerObject.AddComponent<WorldDebugTravelController>();
-        controller.Configure(focus, camera, tuner, streamer);
+        controller.Configure(focus, camera, tuner, streamer, controls);
         EditorUtility.SetDirty(controller);
     }
 
