@@ -35,6 +35,9 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
     private Material leviathanMaterial;
     private Material icebergMaterial;
 
+    public int ActiveProxyCount => activeProxies.Count;
+    public Transform MaterializedRoot => materializedRoot;
+
     public void Configure(WorldRegionRuntime newWorld, Transform newFocus)
     {
         world = newWorld;
