@@ -47,6 +47,7 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     public float WorldSizeMeters => worldSizeMeters;
     public float ChunkSizeMeters => chunkSizeMeters;
     public float ActiveBubbleRadiusMeters => activeBubbleRadiusMeters;
+    public float DetailedBubbleRadiusMeters => detailedBubbleRadiusMeters;
     public Transform Focus => focus;
     public IReadOnlyList<WorldChunkRecord> Chunks => chunks;
     public IReadOnlyList<WorldIslandRecord> Islands => islands;
@@ -81,7 +82,15 @@ public sealed class WorldRegionRuntime : MonoBehaviour
         activeBubbleRadiusMeters = 5000f;
         detailedBubbleRadiusMeters = 1600f;
         regionSeed = 170517;
+        drawAllChunks = false;
+        drawDistantRecords = true;
         GenerateStarterRegion();
+    }
+
+    public void ConfigureDebugDraw(bool showAllChunks, bool showDistantRecords)
+    {
+        drawAllChunks = showAllChunks;
+        drawDistantRecords = showDistantRecords;
     }
 
     [ContextMenu("Сгенерировать стартовый регион")]

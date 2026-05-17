@@ -24,18 +24,19 @@ public static class WorldSceneBuilder
         WorldRegionRuntime runtime = CreateWorldRuntime(root, focus);
 
         CreateAtmosphereDefaults();
-        CreateCameraAndLight(focus);
+        Camera camera = CreateCameraAndLight(focus);
         CreateLocalStormSurface(root);
         CreateStarterIsland(root);
         CreateStarterShipProxy(root, focus);
         CreateWorldDataPreview(root, runtime, focus.position);
-        CreateVisualTuner(root, focus);
+        WorldBubbleStreamer streamer = CreateWorldBubbleStreamer(root, runtime, focus);
+        VisualPlayModeTuner tuner = CreateVisualTuner(root, focus);
+        CreateDebugTravelController(root, focus, camera, tuner, streamer);
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.SaveAssets();
         VisualAeroSceneSetup.ApplyToActiveScene();
 
-        VisualPlayModeTuner tuner = Object.FindFirstObjectByType<VisualPlayModeTuner>();
         if (tuner != null)
         {
             tuner.ApplyNow();
@@ -87,6 +88,7 @@ public static class WorldSceneBuilder
         runtimeObject.transform.SetParent(root, false);
         WorldRegionRuntime runtime = runtimeObject.AddComponent<WorldRegionRuntime>();
         runtime.ConfigureFinalRegion(focus);
+        runtime.ConfigureDebugDraw(false, true);
         EditorUtility.SetDirty(runtime);
         return runtime;
     }
@@ -103,7 +105,7 @@ public static class WorldSceneBuilder
         RenderSettings.fogEndDistance = 9000f;
     }
 
-    private static void CreateCameraAndLight(Transform focus)
+    private static Camera CreateCameraAndLight(Transform focus)
     {
         GameObject cameraObject = new GameObject("World Camera");
         cameraObject.tag = "MainCamera";
@@ -122,6 +124,8 @@ public static class WorldSceneBuilder
         light.type = LightType.Directional;
         light.color = new Color(0.54f, 0.66f, 0.86f, 1f);
         light.intensity = 0.84f;
+
+        return camera;
     }
 
     private static void CreateLocalStormSurface(Transform root)
@@ -246,7 +250,17 @@ public static class WorldSceneBuilder
         }
     }
 
-    private static void CreateVisualTuner(Transform root, Transform focus)
+    private static WorldBubbleStreamer CreateWorldBubbleStreamer(Transform root, WorldRegionRuntime runtime, Transform focus)
+    {
+        GameObject streamerObject = new GameObject("World Bubble Streamer");
+        streamerObject.transform.SetParent(root, false);
+        WorldBubbleStreamer streamer = streamerObject.AddComponent<WorldBubbleStreamer>();
+        streamer.Configure(runtime, focus);
+        EditorUtility.SetDirty(streamer);
+        return streamer;
+    }
+
+    private static VisualPlayModeTuner CreateVisualTuner(Transform root, Transform focus)
     {
         GameObject tunerObject = new GameObject("Visual Play Mode Tuner");
         tunerObject.transform.SetParent(root, false);
@@ -257,6 +271,16 @@ public static class WorldSceneBuilder
             new Vector3(-80f, 2560f, -80f),
             42f);
         EditorUtility.SetDirty(tuner);
+        return tuner;
+    }
+
+    private static void CreateDebugTravelController(Transform root, Transform focus, Camera camera, VisualPlayModeTuner tuner, WorldBubbleStreamer streamer)
+    {
+        GameObject controllerObject = new GameObject("World Debug Travel Controller");
+        controllerObject.transform.SetParent(root, false);
+        WorldDebugTravelController controller = controllerObject.AddComponent<WorldDebugTravelController>();
+        controller.Configure(focus, camera, tuner, streamer);
+        EditorUtility.SetDirty(controller);
     }
 
     private static GameObject CreatePrimitive(string name, PrimitiveType type, Transform parent, Vector3 localPosition, Vector3 localScale, Material material)
