@@ -25,6 +25,10 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     [SerializeField, InspectorName("Размер чанка, м")] private float chunkSizeMeters = DefaultChunkSizeMeters;
     [SerializeField, InspectorName("Сид региона")] private int regionSeed = 170517;
 
+    [Header("Данные мира")]
+    [SerializeField, InspectorName("Профиль региона")] private WorldRegionProfile profile;
+    [SerializeField, InspectorName("Манифест региона")] private WorldRegionManifest manifest;
+
     [Header("Активный пузырь")]
     [SerializeField, InspectorName("Центр пузыря игрока")] private Transform focus;
     [SerializeField, Range(1000f, 15000f), InspectorName("Радиус активного пузыря, м")] private float activeBubbleRadiusMeters = 5000f;
@@ -49,6 +53,8 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     public float ActiveBubbleRadiusMeters => activeBubbleRadiusMeters;
     public float DetailedBubbleRadiusMeters => detailedBubbleRadiusMeters;
     public Transform Focus => focus;
+    public WorldRegionProfile Profile => profile;
+    public WorldRegionManifest Manifest => manifest;
     public IReadOnlyList<WorldChunkRecord> Chunks => chunks;
     public IReadOnlyList<WorldIslandRecord> Islands => islands;
     public IReadOnlyList<WorldCloudFieldRecord> CloudFields => cloudFields;
@@ -57,6 +63,14 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     public IReadOnlyList<WorldIcebergFieldRecord> IcebergFields => icebergFields;
 
     private int ChunkCountPerAxis => Mathf.Max(1, Mathf.RoundToInt(worldSizeMeters / Mathf.Max(1f, chunkSizeMeters)));
+    private int TargetIslandCount => profile != null ? profile.IslandCount : 15;
+    private int TargetCloudFieldCount => profile != null ? profile.CloudFieldCount : 34;
+    private int TargetHighCloudFieldCount => profile != null ? profile.HighCloudFieldCount : 8;
+    private int TargetResourceFieldCount => profile != null ? profile.ResourceFieldCount : 11;
+    private int TargetHighResourceFieldCount => profile != null ? profile.HighResourceFieldCount : 3;
+    private int TargetLeviathanRegionCount => profile != null ? profile.LeviathanRegionCount : 5;
+    private int TargetHighLeviathanRegionCount => profile != null ? profile.HighLeviathanRegionCount : 2;
+    private int TargetIcebergFieldCount => profile != null ? profile.IcebergFieldCount : 4;
 
     private void Awake()
     {
@@ -68,6 +82,7 @@ public sealed class WorldRegionRuntime : MonoBehaviour
 
     private void OnValidate()
     {
+        ApplyProfileDefaults();
         worldSizeMeters = Mathf.Max(DefaultChunkSizeMeters, worldSizeMeters);
         chunkSizeMeters = Mathf.Clamp(chunkSizeMeters, 1000f, worldSizeMeters);
         activeBubbleRadiusMeters = Mathf.Max(1000f, activeBubbleRadiusMeters);
@@ -76,15 +91,55 @@ public sealed class WorldRegionRuntime : MonoBehaviour
 
     public void ConfigureFinalRegion(Transform newFocus)
     {
+        ConfigureFinalRegion(newFocus, profile, manifest);
+    }
+
+    public void ConfigureFinalRegion(Transform newFocus, WorldRegionProfile newProfile, WorldRegionManifest newManifest)
+    {
         focus = newFocus;
-        worldSizeMeters = DefaultWorldSizeMeters;
-        chunkSizeMeters = DefaultChunkSizeMeters;
-        activeBubbleRadiusMeters = 5000f;
-        detailedBubbleRadiusMeters = 1600f;
-        regionSeed = 170517;
+        ConfigureWorldData(newProfile, newManifest);
         drawAllChunks = false;
         drawDistantRecords = true;
         GenerateStarterRegion();
+    }
+
+    public void ConfigureWorldData(WorldRegionProfile newProfile, WorldRegionManifest newManifest)
+    {
+        profile = newProfile;
+        manifest = newManifest;
+        ApplyProfileDefaults();
+    }
+
+    private void ApplyProfileDefaults()
+    {
+        if (profile == null)
+        {
+            return;
+        }
+
+        worldSizeMeters = profile.WorldSizeMeters;
+        chunkSizeMeters = profile.ChunkSizeMeters;
+        activeBubbleRadiusMeters = profile.ActiveBubbleRadiusMeters;
+        detailedBubbleRadiusMeters = profile.DetailedBubbleRadiusMeters;
+        regionSeed = profile.Seed;
+    }
+
+    private void LoadFromManifest(WorldRegionManifest source)
+    {
+        if (source == null || !source.IsUsable)
+        {
+            return;
+        }
+
+        worldSizeMeters = source.WorldSizeMeters;
+        chunkSizeMeters = source.ChunkSizeMeters;
+        regionSeed = source.Seed;
+        chunks = WorldRegionManifest.CloneChunks(source.Chunks);
+        islands = WorldRegionManifest.CloneIslands(source.Islands);
+        cloudFields = WorldRegionManifest.CloneCloudFields(source.CloudFields);
+        resourceFields = WorldRegionManifest.CloneResourceFields(source.ResourceFields);
+        leviathanRegions = WorldRegionManifest.CloneLeviathanRegions(source.LeviathanRegions);
+        icebergFields = WorldRegionManifest.CloneIcebergFields(source.IcebergFields);
     }
 
     public void ConfigureDebugDraw(bool showAllChunks, bool showDistantRecords)
@@ -96,6 +151,14 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     [ContextMenu("Сгенерировать стартовый регион")]
     public void GenerateStarterRegion()
     {
+        ApplyProfileDefaults();
+
+        if (manifest != null && manifest.IsUsable)
+        {
+            LoadFromManifest(manifest);
+            return;
+        }
+
         chunks.Clear();
         islands.Clear();
         cloudFields.Clear();
@@ -247,11 +310,19 @@ public sealed class WorldRegionRuntime : MonoBehaviour
         };
 
         System.Random random = new System.Random(regionSeed + 11);
-        for (int i = 0; i < names.Length; i++)
+        int extraIslandCount = Mathf.Max(0, TargetIslandCount - 1);
+        for (int i = 0; i < extraIslandCount; i++)
         {
+            int nameIndex = i % names.Length;
+            string displayName = names[nameIndex];
+            if (i >= names.Length)
+            {
+                displayName += " " + ((i / names.Length) + 1);
+            }
+
             Vector3 position = PickSpacedHorizontalPosition(random, 8500f, 45500f, 4200f);
             position.y = NextFloat(random, 2300f, 8800f);
-            CreateIsland("island_" + (i + 1).ToString("00"), names[i], roles[i], position, NextFloat(random, 260f, 760f), true);
+            CreateIsland("island_" + (i + 1).ToString("00"), displayName, roles[nameIndex], position, NextFloat(random, 260f, 760f), true);
         }
     }
 
@@ -264,9 +335,11 @@ public sealed class WorldRegionRuntime : MonoBehaviour
         };
 
         System.Random random = new System.Random(regionSeed + 29);
-        for (int i = 0; i < 34; i++)
+        int cloudCount = Mathf.Max(0, TargetCloudFieldCount);
+        int highCloudStart = Mathf.Max(0, cloudCount - Mathf.Clamp(TargetHighCloudFieldCount, 0, cloudCount));
+        for (int i = 0; i < cloudCount; i++)
         {
-            bool highLayer = i >= 26;
+            bool highLayer = i >= highCloudStart;
             Vector3 center = PickSpacedHorizontalPosition(random, 2500f, 48000f, 0f);
             center.y = highLayer ? NextFloat(random, 11000f, 36000f) : NextFloat(random, 2200f, 9600f);
             float radius = highLayer ? NextFloat(random, 650f, 2100f) : NextFloat(random, 1200f, 5200f);
@@ -276,7 +349,7 @@ public sealed class WorldRegionRuntime : MonoBehaviour
             cloudFields.Add(new WorldCloudFieldRecord
             {
                 id = "cloud_field_" + i.ToString("00"),
-                displayNameRu = highLayer ? "Редкое высотное облако " + (i - 25) : "Облачное поле " + (i + 1),
+                displayNameRu = highLayer ? "Редкое высотное облако " + (i - highCloudStart + 1) : "Облачное поле " + (i + 1),
                 centerMeters = center,
                 radiusMeters = radius,
                 thicknessMeters = highLayer ? NextFloat(random, 180f, 620f) : NextFloat(random, 420f, 1900f),
@@ -293,16 +366,18 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     {
         string[] ores = { "windshale", "dawnspar", "bluebrass", "stormbone", "claudreef", "mirrorbasalt", "crownstone" };
         System.Random random = new System.Random(regionSeed + 43);
-        for (int i = 0; i < 11; i++)
+        int resourceCount = Mathf.Max(0, TargetResourceFieldCount);
+        int highResourceStart = Mathf.Max(0, resourceCount - Mathf.Clamp(TargetHighResourceFieldCount, 0, resourceCount));
+        for (int i = 0; i < resourceCount; i++)
         {
-            bool highValue = i >= 8;
+            bool highValue = i >= highResourceStart;
             Vector3 center = PickSpacedHorizontalPosition(random, 6000f, 47000f, 0f);
             center.y = highValue ? NextFloat(random, 12000f, 32000f) : NextFloat(random, 2600f, 9200f);
 
             resourceFields.Add(new WorldResourceFieldRecord
             {
                 id = "ore_field_" + i.ToString("00"),
-                displayNameRu = highValue ? "Высотная рудная глыба " + (i - 7) : "Рудное поле " + (i + 1),
+                displayNameRu = highValue ? "Высотная рудная глыба " + (i - highResourceStart + 1) : "Рудное поле " + (i + 1),
                 centerMeters = center,
                 radiusMeters = highValue ? NextFloat(random, 800f, 1900f) : NextFloat(random, 1200f, 3200f),
                 altitudeBand = EvaluateAltitudeBand(center.y),
@@ -317,9 +392,11 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     private void GenerateLeviathanRegions()
     {
         System.Random random = new System.Random(regionSeed + 61);
-        for (int i = 0; i < 5; i++)
+        int regionCount = Mathf.Max(0, TargetLeviathanRegionCount);
+        int highRegionStart = Mathf.Max(0, regionCount - Mathf.Clamp(TargetHighLeviathanRegionCount, 0, regionCount));
+        for (int i = 0; i < regionCount; i++)
         {
-            bool high = i >= 3;
+            bool high = i >= highRegionStart;
             Vector3 center = PickSpacedHorizontalPosition(random, 12000f, 47000f, 0f);
             center.y = high ? NextFloat(random, 13000f, 36000f) : NextFloat(random, 2800f, 9400f);
 
@@ -340,7 +417,7 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     private void GenerateIcebergFields()
     {
         System.Random random = new System.Random(regionSeed + 79);
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < Mathf.Max(0, TargetIcebergFieldCount); i++)
         {
             Vector3 center = PickSpacedHorizontalPosition(random, 18000f, 48000f, 0f);
             center.y = NextFloat(random, 43000f, 92000f);

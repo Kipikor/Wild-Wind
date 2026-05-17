@@ -26,6 +26,11 @@ public sealed class WorldRegionRuntimeEditor : Editor
             }
         }
 
+        if (GUILayout.Button("Пересобрать сидированный манифест мира", GUILayout.Height(26f)))
+        {
+            WorldRegionDataBuilder.EnsureAndRebuild(out _, out _, true);
+        }
+
         EditorGUILayout.HelpBox(
             "Это пока модель мира-данных: 100 чанков по 10 км. Детальные GameObject должны появляться только в активном пузыре вокруг корабля.",
             MessageType.Info);

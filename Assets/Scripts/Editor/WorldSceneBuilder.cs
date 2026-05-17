@@ -15,6 +15,7 @@ public static class WorldSceneBuilder
     public static void BuildFinalWorldScene()
     {
         EnsureFolders();
+        WorldRegionDataBuilder.EnsureAndRebuild(out WorldRegionProfile profile, out WorldRegionManifest manifest, false);
 
         Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         scene.name = "WildWindWorldScene";
@@ -22,7 +23,7 @@ public static class WorldSceneBuilder
         Transform root = new GameObject("Wild Wind World").transform;
         WildWindSettingsRoot settings = WorldSettingsPrefabBuilder.InstantiateSettingsPrefab(root);
         Transform focus = CreatePlayerFocus(root);
-        WorldRegionRuntime runtime = CreateWorldRuntime(root, focus);
+        WorldRegionRuntime runtime = CreateWorldRuntime(root, focus, profile, manifest);
 
         CreateAtmosphereDefaults();
         Camera camera = CreateCameraAndLight(focus);
@@ -30,7 +31,10 @@ public static class WorldSceneBuilder
         CreateStarterIsland(root);
         CreateStarterShipProxy(root, focus);
         CreateWorldDataPreview(root, runtime, focus.position);
-        WorldBubbleStreamer streamer = CreateWorldBubbleStreamer(root, runtime, focus);
+        WorldEntityIndex index = CreateWorldEntityIndex(root, runtime);
+        WorldRuntimeState runtimeState = CreateWorldRuntimeState(root, runtime, index, focus);
+        WorldBubbleStreamer streamer = CreateWorldBubbleStreamer(root, runtime, focus, index, runtimeState);
+        CreateWorldSimulationTick(root, runtime, index, runtimeState, focus, streamer);
         VisualPlayModeTuner tuner = CreateVisualTuner(root, focus);
         CreateDebugTravelController(root, focus, camera, tuner, streamer, settings != null ? settings.Controls : null);
 
@@ -83,12 +87,12 @@ public static class WorldSceneBuilder
         return focusObject.transform;
     }
 
-    private static WorldRegionRuntime CreateWorldRuntime(Transform root, Transform focus)
+    private static WorldRegionRuntime CreateWorldRuntime(Transform root, Transform focus, WorldRegionProfile profile, WorldRegionManifest manifest)
     {
         GameObject runtimeObject = new GameObject("World Region Runtime");
         runtimeObject.transform.SetParent(root, false);
         WorldRegionRuntime runtime = runtimeObject.AddComponent<WorldRegionRuntime>();
-        runtime.ConfigureFinalRegion(focus);
+        runtime.ConfigureFinalRegion(focus, profile, manifest);
         runtime.ConfigureDebugDraw(false, true);
         EditorUtility.SetDirty(runtime);
         return runtime;
@@ -251,14 +255,50 @@ public static class WorldSceneBuilder
         }
     }
 
-    private static WorldBubbleStreamer CreateWorldBubbleStreamer(Transform root, WorldRegionRuntime runtime, Transform focus)
+    private static WorldEntityIndex CreateWorldEntityIndex(Transform root, WorldRegionRuntime runtime)
+    {
+        GameObject indexObject = new GameObject("World Entity Index");
+        indexObject.transform.SetParent(root, false);
+        WorldEntityIndex index = indexObject.AddComponent<WorldEntityIndex>();
+        index.Configure(runtime);
+        EditorUtility.SetDirty(index);
+        return index;
+    }
+
+    private static WorldRuntimeState CreateWorldRuntimeState(Transform root, WorldRegionRuntime runtime, WorldEntityIndex index, Transform focus)
+    {
+        GameObject stateObject = new GameObject("World Runtime State");
+        stateObject.transform.SetParent(root, false);
+        WorldRuntimeState state = stateObject.AddComponent<WorldRuntimeState>();
+        state.Configure(runtime, index, focus);
+        EditorUtility.SetDirty(state);
+        return state;
+    }
+
+    private static WorldBubbleStreamer CreateWorldBubbleStreamer(Transform root, WorldRegionRuntime runtime, Transform focus, WorldEntityIndex index, WorldRuntimeState runtimeState)
     {
         GameObject streamerObject = new GameObject("World Bubble Streamer");
         streamerObject.transform.SetParent(root, false);
         WorldBubbleStreamer streamer = streamerObject.AddComponent<WorldBubbleStreamer>();
-        streamer.Configure(runtime, focus);
+        streamer.Configure(runtime, focus, index, runtimeState);
         EditorUtility.SetDirty(streamer);
         return streamer;
+    }
+
+    private static WorldSimulationTick CreateWorldSimulationTick(
+        Transform root,
+        WorldRegionRuntime runtime,
+        WorldEntityIndex index,
+        WorldRuntimeState runtimeState,
+        Transform focus,
+        WorldBubbleStreamer streamer)
+    {
+        GameObject tickObject = new GameObject("World Simulation Tick");
+        tickObject.transform.SetParent(root, false);
+        WorldSimulationTick tick = tickObject.AddComponent<WorldSimulationTick>();
+        tick.Configure(runtime, index, runtimeState, focus, streamer);
+        EditorUtility.SetDirty(tick);
+        return tick;
     }
 
     private static VisualPlayModeTuner CreateVisualTuner(Transform root, Transform focus)

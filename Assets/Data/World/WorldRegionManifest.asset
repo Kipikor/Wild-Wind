@@ -1,0 +1,2808 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1170ac5182cb4d0bb50f6f607a5f7bd1, type: 3}
+  m_Name: WorldRegionManifest
+  m_EditorClassIdentifier: Assembly-CSharp::WorldRegionManifest
+  schemaVersion: 1
+  seed: 170517
+  worldSizeMeters: 100000
+  chunkSizeMeters: 10000
+  generatedAtUtc: 2026-05-17 16:12:22
+  chunks:
+  - id: chunk_00_00
+    chunkX: 0
+    chunkZ: 0
+    minX: -50000
+    minZ: -50000
+    maxX: -40000
+    maxZ: -40000
+    centerX: -45000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 170517
+    cloudDensity01: 0.5733088
+    resourceScore01: 0.53125066
+    dangerScore01: 0.8056535
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_00
+    chunkX: 1
+    chunkZ: 0
+    minX: -40000
+    minZ: -50000
+    maxX: -30000
+    maxZ: -40000
+    centerX: -35000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 74026610
+    cloudDensity01: 0.5978689
+    resourceScore01: 0.67097974
+    dangerScore01: 0.7311943
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_00
+    chunkX: 2
+    chunkZ: 0
+    minX: -30000
+    minZ: -50000
+    maxX: -20000
+    maxZ: -40000
+    centerX: -25000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 147882703
+    cloudDensity01: 0.613129
+    resourceScore01: 0.4759066
+    dangerScore01: 0.557829
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_00
+    chunkX: 3
+    chunkZ: 0
+    minX: -20000
+    minZ: -50000
+    maxX: -10000
+    maxZ: -40000
+    centerX: -15000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 221738796
+    cloudDensity01: 0.5061985
+    resourceScore01: 0.40104532
+    dangerScore01: 0.55234295
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_00
+    chunkX: 4
+    chunkZ: 0
+    minX: -10000
+    minZ: -50000
+    maxX: 0
+    maxZ: -40000
+    centerX: -5000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 295594889
+    cloudDensity01: 0.3459435
+    resourceScore01: 0.48987904
+    dangerScore01: 0.688685
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_00
+    chunkX: 5
+    chunkZ: 0
+    minX: 0
+    minZ: -50000
+    maxX: 10000
+    maxZ: -40000
+    centerX: 5000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 369450982
+    cloudDensity01: 0.11111183
+    resourceScore01: 0.1762844
+    dangerScore01: 0.7748287
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_00
+    chunkX: 6
+    chunkZ: 0
+    minX: 10000
+    minZ: -50000
+    maxX: 20000
+    maxZ: -40000
+    centerX: 15000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 443307075
+    cloudDensity01: 0.21214493
+    resourceScore01: 0.17126963
+    dangerScore01: 0.6634187
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_00
+    chunkX: 7
+    chunkZ: 0
+    minX: 20000
+    minZ: -50000
+    maxX: 30000
+    maxZ: -40000
+    centerX: 25000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 517163168
+    cloudDensity01: 0.47527087
+    resourceScore01: 0.4890801
+    dangerScore01: 0.27975073
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_00
+    chunkX: 8
+    chunkZ: 0
+    minX: 30000
+    minZ: -50000
+    maxX: 40000
+    maxZ: -40000
+    centerX: 35000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 591019261
+    cloudDensity01: 0.64571184
+    resourceScore01: 0.4020283
+    dangerScore01: 0.61781484
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_00
+    chunkX: 9
+    chunkZ: 0
+    minX: 40000
+    minZ: -50000
+    maxX: 50000
+    maxZ: -40000
+    centerX: 45000
+    centerZ: -45000
+    dominantBand: 3
+    weatherSeed: 664875354
+    cloudDensity01: 0.6217881
+    resourceScore01: 0.46138194
+    dangerScore01: 0.80113214
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_01
+    chunkX: 0
+    chunkZ: 1
+    minX: -50000
+    minZ: -40000
+    maxX: -40000
+    maxZ: -30000
+    centerX: -45000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 19257994
+    cloudDensity01: 0.7591854
+    resourceScore01: 0.3956552
+    dangerScore01: 0.32045043
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_01
+    chunkX: 1
+    chunkZ: 1
+    minX: -40000
+    minZ: -40000
+    maxX: -30000
+    maxZ: -30000
+    centerX: -35000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 89050861
+    cloudDensity01: 0.7364423
+    resourceScore01: 0.63514066
+    dangerScore01: 0.33650193
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_01
+    chunkX: 2
+    chunkZ: 1
+    minX: -30000
+    minZ: -40000
+    maxX: -20000
+    maxZ: -30000
+    centerX: -25000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 167232080
+    cloudDensity01: 0.6935077
+    resourceScore01: 0.56837434
+    dangerScore01: 0.29797775
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_01
+    chunkX: 3
+    chunkZ: 1
+    minX: -20000
+    minZ: -40000
+    maxX: -10000
+    maxZ: -30000
+    centerX: -15000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 202389427
+    cloudDensity01: 0.5682862
+    resourceScore01: 0.5258787
+    dangerScore01: 0.35759154
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_01
+    chunkX: 4
+    chunkZ: 1
+    minX: -10000
+    minZ: -40000
+    maxX: 0
+    maxZ: -30000
+    centerX: -5000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 280570646
+    cloudDensity01: 0.42426482
+    resourceScore01: 0.6852419
+    dangerScore01: 0.5852859
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_01
+    chunkX: 5
+    chunkZ: 1
+    minX: 0
+    minZ: -40000
+    maxX: 10000
+    maxZ: -30000
+    centerX: 5000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 388112249
+    cloudDensity01: 0.24036421
+    resourceScore01: 0.48608014
+    dangerScore01: 0.3489148
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_01
+    chunkX: 6
+    chunkZ: 1
+    minX: 10000
+    minZ: -40000
+    maxX: 20000
+    maxZ: -30000
+    centerX: 15000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 457905372
+    cloudDensity01: 0.2706728
+    resourceScore01: 0.43767154
+    dangerScore01: 0.60932684
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_01
+    chunkX: 7
+    chunkZ: 1
+    minX: 20000
+    minZ: -40000
+    maxX: 30000
+    maxZ: -30000
+    centerX: 25000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 536086591
+    cloudDensity01: 0.39100444
+    resourceScore01: 0.7219196
+    dangerScore01: 0.3902471
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_01
+    chunkX: 8
+    chunkZ: 1
+    minX: 30000
+    minZ: -40000
+    maxX: 40000
+    maxZ: -30000
+    centerX: 35000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 572357730
+    cloudDensity01: 0.40007117
+    resourceScore01: 0.5529782
+    dangerScore01: 0.27664125
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_01
+    chunkX: 9
+    chunkZ: 1
+    minX: 40000
+    minZ: -40000
+    maxX: 50000
+    maxZ: -30000
+    centerX: 45000
+    centerZ: -35000
+    dominantBand: 3
+    weatherSeed: 646345157
+    cloudDensity01: 0.3499284
+    resourceScore01: 0.56311643
+    dangerScore01: 0.34269527
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_02
+    chunkX: 0
+    chunkZ: 2
+    minX: -50000
+    minZ: -30000
+    maxX: -40000
+    maxZ: -20000
+    centerX: -45000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 38542123
+    cloudDensity01: 0.71847874
+    resourceScore01: 0.56567657
+    dangerScore01: 0.15681878
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_02
+    chunkX: 1
+    chunkZ: 2
+    minX: -40000
+    minZ: -30000
+    maxX: -30000
+    maxZ: -20000
+    centerX: -35000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 103223116
+    cloudDensity01: 0.58243597
+    resourceScore01: 0.6057051
+    dangerScore01: 0.19574459
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_02
+    chunkX: 2
+    chunkZ: 2
+    minX: -30000
+    minZ: -30000
+    maxX: -20000
+    maxZ: -20000
+    centerX: -25000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 178127857
+    cloudDensity01: 0.61810416
+    resourceScore01: 0.60796803
+    dangerScore01: 0.54062265
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_02
+    chunkX: 3
+    chunkZ: 2
+    minX: -20000
+    minZ: -30000
+    maxX: -10000
+    maxZ: -20000
+    centerX: -15000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 259651090
+    cloudDensity01: 0.6298052
+    resourceScore01: 0.4424326
+    dangerScore01: 0.31642205
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_02
+    chunkX: 4
+    chunkZ: 2
+    minX: -10000
+    minZ: -30000
+    maxX: 0
+    maxZ: -20000
+    centerX: -5000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 332458679
+    cloudDensity01: 0.486492
+    resourceScore01: 0.4280092
+    dangerScore01: 0.5028487
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_02
+    chunkX: 5
+    chunkZ: 2
+    minX: 0
+    minZ: -30000
+    maxX: 10000
+    maxZ: -20000
+    centerX: 5000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 340516568
+    cloudDensity01: 0.43712357
+    resourceScore01: 0.5774375
+    dangerScore01: 0.40687945
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_02
+    chunkX: 6
+    chunkZ: 2
+    minX: 10000
+    minZ: -30000
+    maxX: 20000
+    maxZ: -20000
+    centerX: 15000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 404936061
+    cloudDensity01: 0.41497615
+    resourceScore01: 0.40231454
+    dangerScore01: 0.44004133
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_02
+    chunkX: 7
+    chunkZ: 2
+    minX: 20000
+    minZ: -30000
+    maxX: 30000
+    maxZ: -20000
+    centerX: 25000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 480102814
+    cloudDensity01: 0.35376403
+    resourceScore01: 0.590397
+    dangerScore01: 0.58309734
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_02
+    chunkX: 8
+    chunkZ: 2
+    minX: 30000
+    minZ: -30000
+    maxX: 40000
+    maxZ: -20000
+    centerX: 35000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 561298883
+    cloudDensity01: 0.2362107
+    resourceScore01: 0.53067154
+    dangerScore01: 0.15772444
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_02
+    chunkX: 9
+    chunkZ: 2
+    minX: 40000
+    minZ: -30000
+    maxX: 50000
+    maxZ: -20000
+    centerX: 45000
+    centerZ: -25000
+    dominantBand: 3
+    weatherSeed: 636465252
+    cloudDensity01: 0.28558517
+    resourceScore01: 0.6074051
+    dangerScore01: 0.5205823
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_03
+    chunkX: 0
+    chunkZ: 3
+    minX: -50000
+    minZ: -20000
+    maxX: -40000
+    maxZ: -10000
+    centerX: -45000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 58153928
+    cloudDensity01: 0.49448958
+    resourceScore01: 0.36895657
+    dangerScore01: 0.55794907
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_03
+    chunkX: 1
+    chunkZ: 3
+    minX: -40000
+    minZ: -20000
+    maxX: -30000
+    maxZ: -10000
+    centerX: -35000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 119295919
+    cloudDensity01: 0.3300287
+    resourceScore01: 0.34176624
+    dangerScore01: 0.39645955
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_03
+    chunkX: 2
+    chunkZ: 3
+    minX: -30000
+    minZ: -20000
+    maxX: -20000
+    maxZ: -10000
+    centerX: -25000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 195379986
+    cloudDensity01: 0.388803
+    resourceScore01: 0.30736816
+    dangerScore01: 0.71858495
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_03
+    chunkX: 3
+    chunkZ: 3
+    minX: -20000
+    minZ: -20000
+    maxX: -10000
+    maxZ: -10000
+    centerX: -15000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 239253233
+    cloudDensity01: 0.46585333
+    resourceScore01: 0.2332848
+    dangerScore01: 0.6632836
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_03
+    chunkX: 4
+    chunkZ: 3
+    minX: -10000
+    minZ: -20000
+    maxX: 0
+    maxZ: -10000
+    centerX: -5000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 317434452
+    cloudDensity01: 0.36637974
+    resourceScore01: 0.39784008
+    dangerScore01: 0.69022787
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_03
+    chunkX: 5
+    chunkZ: 3
+    minX: 0
+    minZ: -20000
+    maxX: 10000
+    maxZ: -10000
+    centerX: 5000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 359702075
+    cloudDensity01: 0.43217713
+    resourceScore01: 0.5783464
+    dangerScore01: 0.5471746
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_03
+    chunkX: 6
+    chunkZ: 3
+    minX: 10000
+    minZ: -20000
+    maxX: 20000
+    maxZ: -10000
+    centerX: 15000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 421107102
+    cloudDensity01: 0.5505907
+    resourceScore01: 0.35453928
+    dangerScore01: 0.24974568
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_03
+    chunkX: 7
+    chunkZ: 3
+    minX: 20000
+    minZ: -20000
+    maxX: 30000
+    maxZ: -10000
+    centerX: 25000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 497453437
+    cloudDensity01: 0.49295962
+    resourceScore01: 0.50693125
+    dangerScore01: 0.1860852
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_03
+    chunkX: 8
+    chunkZ: 3
+    minX: 30000
+    minZ: -20000
+    maxX: 40000
+    maxZ: -10000
+    centerX: 35000
+    centerZ: -15000
+    dominantBand: 3
+    weatherSeed: 542113056
+    cloudDensity01: 0.33140352
+    resourceScore01: 0.32679048
+    dangerScore01: 0.51063746
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_03
+    chunkX: 9
+    chunkZ: 3
+    minX: 40000
+    minZ: -20000
+    maxX: 50000
+    maxZ: -10000
+    centerX: 45000
+    centerZ: -15000
+    dominantBand: 2
+    weatherSeed: 617934983
+    cloudDensity01: 0.3914504
+    resourceScore01: 0.30697706
+    dangerScore01: 0.84134257
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_04
+    chunkX: 0
+    chunkZ: 4
+    minX: -50000
+    minZ: -10000
+    maxX: -40000
+    maxZ: 0
+    centerX: -45000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 77568105
+    cloudDensity01: 0.29530942
+    resourceScore01: 0.53586984
+    dangerScore01: 0.57603574
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_04
+    chunkX: 1
+    chunkZ: 4
+    minX: -40000
+    minZ: -10000
+    maxX: -30000
+    maxZ: 0
+    centerX: -35000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 16026638
+    cloudDensity01: 0.16855934
+    resourceScore01: 0.44405794
+    dangerScore01: 0.5889554
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_04
+    chunkX: 2
+    chunkZ: 4
+    minX: -30000
+    minZ: -10000
+    maxX: -20000
+    maxZ: 0
+    centerX: -25000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 206405811
+    cloudDensity01: 0.24829136
+    resourceScore01: 0.17391212
+    dangerScore01: 0.60576385
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_04
+    chunkX: 3
+    chunkZ: 4
+    minX: -20000
+    minZ: -10000
+    maxX: -10000
+    maxZ: 0
+    centerX: -15000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 162166096
+    cloudDensity01: 0.40242592
+    resourceScore01: 0.16667858
+    dangerScore01: 0.55843717
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_04
+    chunkX: 4
+    chunkZ: 4
+    minX: -10000
+    minZ: -10000
+    maxX: 0
+    maxZ: 0
+    centerX: -5000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 352545269
+    cloudDensity01: 0.40027815
+    resourceScore01: 0.5979297
+    dangerScore01: 0.3201576
+    discovered: 1
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_04
+    chunkX: 5
+    chunkZ: 4
+    minX: 0
+    minZ: -10000
+    maxX: 10000
+    maxZ: 0
+    centerX: 5000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 311975322
+    cloudDensity01: 0.44642976
+    resourceScore01: 0.62343496
+    dangerScore01: 0.53854495
+    discovered: 1
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_04
+    chunkX: 6
+    chunkZ: 4
+    minX: 10000
+    minZ: -10000
+    maxX: 20000
+    maxZ: 0
+    centerX: 15000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 519132735
+    cloudDensity01: 0.53294146
+    resourceScore01: 0.3121106
+    dangerScore01: 0.6190521
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_04
+    chunkX: 7
+    chunkZ: 4
+    minX: 20000
+    minZ: -10000
+    maxX: 30000
+    maxZ: 0
+    centerX: 25000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 441338588
+    cloudDensity01: 0.47889042
+    resourceScore01: 0.3104984
+    dangerScore01: 0.291942
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_04
+    chunkX: 8
+    chunkZ: 4
+    minX: 30000
+    minZ: -10000
+    maxX: 40000
+    maxZ: 0
+    centerX: 35000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 665271937
+    cloudDensity01: 0.40995806
+    resourceScore01: 0.3340654
+    dangerScore01: 0.45539635
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_04
+    chunkX: 9
+    chunkZ: 4
+    minX: 40000
+    minZ: -10000
+    maxX: 50000
+    maxZ: 0
+    centerX: 45000
+    centerZ: -5000
+    dominantBand: 3
+    weatherSeed: 591147814
+    cloudDensity01: 0.51157266
+    resourceScore01: 0.1689668
+    dangerScore01: 0.52397484
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_05
+    chunkX: 0
+    chunkZ: 5
+    minX: -50000
+    minZ: 0
+    maxX: -40000
+    maxZ: 10000
+    centerX: -45000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 96917774
+    cloudDensity01: 0.26838374
+    resourceScore01: 0.4380753
+    dangerScore01: 0.374612
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_05
+    chunkX: 1
+    chunkZ: 5
+    minX: -40000
+    minZ: 0
+    maxX: -30000
+    maxZ: 10000
+    centerX: -35000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 28167529
+    cloudDensity01: 0.28866917
+    resourceScore01: 0.6565703
+    dangerScore01: 0.4609217
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_05
+    chunkX: 2
+    chunkZ: 5
+    minX: -30000
+    minZ: 0
+    maxX: -20000
+    maxZ: 10000
+    centerX: -25000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 219464148
+    cloudDensity01: 0.3943802
+    resourceScore01: 0.5136282
+    dangerScore01: 0.51519406
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_05
+    chunkX: 3
+    chunkZ: 5
+    minX: -20000
+    minZ: 0
+    maxX: -10000
+    maxZ: 10000
+    centerX: -15000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 150156343
+    cloudDensity01: 0.50384974
+    resourceScore01: 0.29471263
+    dangerScore01: 0.66642517
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_05
+    chunkX: 4
+    chunkZ: 5
+    minX: -10000
+    minZ: 0
+    maxX: 0
+    maxZ: 10000
+    centerX: -5000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 341452946
+    cloudDensity01: 0.5191124
+    resourceScore01: 0.41166046
+    dangerScore01: 0.38867572
+    discovered: 1
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_05
+    chunkX: 5
+    chunkZ: 5
+    minX: 0
+    minZ: 0
+    maxX: 10000
+    maxZ: 10000
+    centerX: 5000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 331422973
+    cloudDensity01: 0.47706708
+    resourceScore01: 0.43663487
+    dangerScore01: 0.1292852
+    discovered: 1
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_05
+    chunkX: 6
+    chunkZ: 5
+    minX: 10000
+    minZ: 0
+    maxX: 20000
+    maxZ: 10000
+    centerX: 15000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 531109720
+    cloudDensity01: 0.43108755
+    resourceScore01: 0.49505988
+    dangerScore01: 0.43199268
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_05
+    chunkX: 7
+    chunkZ: 5
+    minX: 20000
+    minZ: 0
+    maxX: 30000
+    maxZ: 10000
+    centerX: 25000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 454495163
+    cloudDensity01: 0.39828506
+    resourceScore01: 0.5193987
+    dangerScore01: 0.62170166
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_05
+    chunkX: 8
+    chunkZ: 5
+    minX: 30000
+    minZ: 0
+    maxX: 40000
+    maxZ: 10000
+    centerX: 35000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 654213094
+    cloudDensity01: 0.401689
+    resourceScore01: 0.6876527
+    dangerScore01: 0.26180544
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_05
+    chunkX: 9
+    chunkZ: 5
+    minX: 40000
+    minZ: 0
+    maxX: 50000
+    maxZ: 10000
+    centerX: 45000
+    centerZ: 5000
+    dominantBand: 3
+    weatherSeed: 577073729
+    cloudDensity01: 0.47819632
+    resourceScore01: 0.50565153
+    dangerScore01: 0.16146837
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_06
+    chunkX: 0
+    chunkZ: 6
+    minX: -50000
+    minZ: 10000
+    maxX: -40000
+    maxZ: 20000
+    centerX: -45000
+    centerZ: 15000
+    dominantBand: 3
+    weatherSeed: 115939759
+    cloudDensity01: 0.46614584
+    resourceScore01: 0.4709654
+    dangerScore01: 0.4841795
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_06
+    chunkX: 1
+    chunkZ: 6
+    minX: -40000
+    minZ: 10000
+    maxX: -30000
+    maxZ: 20000
+    centerX: -35000
+    centerZ: 15000
+    dominantBand: 3
+    weatherSeed: 42077640
+    cloudDensity01: 0.5187373
+    resourceScore01: 0.7630767
+    dangerScore01: 0.44997144
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_06
+    chunkX: 2
+    chunkZ: 6
+    minX: -30000
+    minZ: 10000
+    maxX: -20000
+    maxZ: 20000
+    centerX: -25000
+    centerZ: 15000
+    dominantBand: 4
+    weatherSeed: 238748021
+    cloudDensity01: 0.526533
+    resourceScore01: 0.8056686
+    dangerScore01: 0.44493616
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_06
+    chunkX: 3
+    chunkZ: 6
+    minX: -20000
+    minZ: 10000
+    maxX: -10000
+    maxZ: 20000
+    centerX: -15000
+    centerZ: 15000
+    dominantBand: 3
+    weatherSeed: 199029910
+    cloudDensity01: 0.46472597
+    resourceScore01: 0.4615007
+    dangerScore01: 0.44521257
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_06
+    chunkX: 4
+    chunkZ: 6
+    minX: -10000
+    minZ: 10000
+    maxX: 0
+    maxZ: 20000
+    centerX: -5000
+    centerZ: 15000
+    dominantBand: 3
+    weatherSeed: 393603123
+    cloudDensity01: 0.4270524
+    resourceScore01: 0.252107
+    dangerScore01: 0.60752493
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_06
+    chunkX: 5
+    chunkZ: 6
+    minX: 0
+    minZ: 10000
+    maxX: 10000
+    maxZ: 20000
+    centerX: 5000
+    centerZ: 15000
+    dominantBand: 3
+    weatherSeed: 284089436
+    cloudDensity01: 0.46695822
+    resourceScore01: 0.47435722
+    dangerScore01: 0.47875044
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_06
+    chunkX: 6
+    chunkZ: 6
+    minX: 10000
+    minZ: 10000
+    maxX: 20000
+    maxZ: 20000
+    centerX: 15000
+    centerZ: 15000
+    dominantBand: 4
+    weatherSeed: 478664697
+    cloudDensity01: 0.5326937
+    resourceScore01: 0.84044397
+    dangerScore01: 0.15133786
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_06
+    chunkX: 7
+    chunkZ: 6
+    minX: 20000
+    minZ: 10000
+    maxX: 30000
+    maxZ: 20000
+    centerX: 25000
+    centerZ: 15000
+    dominantBand: 3
+    weatherSeed: 406375194
+    cloudDensity01: 0.5170544
+    resourceScore01: 0.75457966
+    dangerScore01: 0.5796878
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_06
+    chunkX: 8
+    chunkZ: 6
+    minX: 30000
+    minZ: 10000
+    maxX: 40000
+    maxZ: 20000
+    centerX: 35000
+    centerZ: 15000
+    dominantBand: 3
+    weatherSeed: 634502983
+    cloudDensity01: 0.41562393
+    resourceScore01: 0.6363029
+    dangerScore01: 0.71252733
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_06
+    chunkX: 9
+    chunkZ: 6
+    minX: 40000
+    minZ: 10000
+    maxX: 50000
+    maxZ: 20000
+    centerX: 45000
+    centerZ: 15000
+    dominantBand: 3
+    weatherSeed: 558543584
+    cloudDensity01: 0.34822387
+    resourceScore01: 0.6366724
+    dangerScore01: 0.3133465
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_07
+    chunkX: 0
+    chunkZ: 7
+    minX: -50000
+    minZ: 20000
+    maxX: -40000
+    maxZ: 30000
+    centerX: -45000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 135290444
+    cloudDensity01: 0.60076
+    resourceScore01: 0.5163143
+    dangerScore01: 0.508399
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_07
+    chunkX: 1
+    chunkZ: 7
+    minX: -40000
+    minZ: 20000
+    maxX: -30000
+    maxZ: 30000
+    centerX: -35000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 209406507
+    cloudDensity01: 0.621123
+    resourceScore01: 0.5204202
+    dangerScore01: 0.16593687
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_07
+    chunkX: 2
+    chunkZ: 7
+    minX: -30000
+    minZ: 20000
+    maxX: -20000
+    maxZ: 30000
+    centerX: -25000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 12732054
+    cloudDensity01: 0.51869124
+    resourceScore01: 0.5218115
+    dangerScore01: 0.21278521
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_07
+    chunkX: 3
+    chunkZ: 7
+    minX: -20000
+    minZ: 20000
+    maxX: -10000
+    maxZ: 30000
+    centerX: -15000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 86356853
+    cloudDensity01: 0.37306356
+    resourceScore01: 0.36278477
+    dangerScore01: 0.5143492
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_07
+    chunkX: 4
+    chunkZ: 7
+    minX: -10000
+    minZ: 20000
+    maxX: 0
+    maxZ: 30000
+    centerX: -5000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 428650448
+    cloudDensity01: 0.38527235
+    resourceScore01: 0.36596745
+    dangerScore01: 0.49564317
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_07
+    chunkX: 5
+    chunkZ: 7
+    minX: 0
+    minZ: 20000
+    maxX: 10000
+    maxZ: 30000
+    centerX: 5000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 504863679
+    cloudDensity01: 0.52890027
+    resourceScore01: 0.69923604
+    dangerScore01: 0.5961617
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_07
+    chunkX: 6
+    chunkZ: 7
+    minX: 10000
+    minZ: 20000
+    maxX: 20000
+    maxZ: 30000
+    centerX: 15000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 310284314
+    cloudDensity01: 0.6032039
+    resourceScore01: 0.7498615
+    dangerScore01: 0.49672413
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_07
+    chunkX: 7
+    chunkZ: 7
+    minX: 20000
+    minZ: 20000
+    maxX: 30000
+    maxZ: 30000
+    centerX: 25000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 381783289
+    cloudDensity01: 0.5271125
+    resourceScore01: 0.41604897
+    dangerScore01: 0.76650125
+    discovered: 0
+    hasSettlement: 1
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_07
+    chunkX: 8
+    chunkZ: 7
+    minX: 30000
+    minZ: 20000
+    maxX: 40000
+    maxZ: 30000
+    centerX: 35000
+    centerZ: 25000
+    dominantBand: 2
+    weatherSeed: 724105380
+    cloudDensity01: 0.33093295
+    resourceScore01: 0.16534556
+    dangerScore01: 0.9897754
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_07
+    chunkX: 9
+    chunkZ: 7
+    minX: 40000
+    minZ: 20000
+    maxX: 50000
+    maxZ: 30000
+    centerX: 45000
+    centerZ: 25000
+    dominantBand: 3
+    weatherSeed: 800322819
+    cloudDensity01: 0.18690614
+    resourceScore01: 0.4680805
+    dangerScore01: 0.51778543
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_08
+    chunkX: 0
+    chunkZ: 8
+    minX: -50000
+    minZ: 30000
+    maxX: -40000
+    maxZ: 40000
+    centerX: -45000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 154705645
+    cloudDensity01: 0.49056244
+    resourceScore01: 0.38414997
+    dangerScore01: 0.38718307
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_08
+    chunkX: 1
+    chunkZ: 8
+    minX: -40000
+    minZ: 30000
+    maxX: -30000
+    maxZ: 40000
+    centerX: -35000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 223578762
+    cloudDensity01: 0.57681185
+    resourceScore01: 0.2617961
+    dangerScore01: 0.480518
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_08
+    chunkX: 2
+    chunkZ: 8
+    minX: -30000
+    minZ: 30000
+    maxX: -20000
+    maxZ: 40000
+    centerX: -25000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 32146999
+    cloudDensity01: 0.49795514
+    resourceScore01: 0.18169372
+    dangerScore01: 0.53183943
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_08
+    chunkX: 3
+    chunkZ: 8
+    minX: -20000
+    minZ: 30000
+    maxX: -10000
+    maxZ: 40000
+    centerX: -15000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 67990484
+    cloudDensity01: 0.41889817
+    resourceScore01: 0.212551
+    dangerScore01: 0.37949118
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_08
+    chunkX: 4
+    chunkZ: 8
+    minX: -10000
+    minZ: 30000
+    maxX: 0
+    maxZ: 40000
+    centerX: -5000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 413429617
+    cloudDensity01: 0.56319654
+    resourceScore01: 0.4827589
+    dangerScore01: 0.27204004
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_08
+    chunkX: 5
+    chunkZ: 8
+    minX: 0
+    minZ: 30000
+    maxX: 10000
+    maxZ: 40000
+    centerX: 5000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 524245790
+    cloudDensity01: 0.7093938
+    resourceScore01: 0.6892377
+    dangerScore01: 0.49297056
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_08
+    chunkX: 6
+    chunkZ: 8
+    minX: 10000
+    minZ: 30000
+    maxX: 20000
+    maxZ: 40000
+    centerX: 15000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 324423867
+    cloudDensity01: 0.56225175
+    resourceScore01: 0.4703259
+    dangerScore01: 0.37617406
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_08
+    chunkX: 7
+    chunkZ: 8
+    minX: 20000
+    minZ: 30000
+    maxX: 30000
+    maxZ: 40000
+    centerX: 25000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 401165400
+    cloudDensity01: 0.3581401
+    resourceScore01: 0.23307921
+    dangerScore01: 0.48422992
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_08
+    chunkX: 8
+    chunkZ: 8
+    minX: 30000
+    minZ: 30000
+    maxX: 40000
+    maxZ: 40000
+    centerX: 35000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 704657413
+    cloudDensity01: 0.19826762
+    resourceScore01: 0.22630374
+    dangerScore01: 0.56078935
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_08
+    chunkX: 9
+    chunkZ: 8
+    minX: 40000
+    minZ: 30000
+    maxX: 50000
+    maxZ: 40000
+    centerX: 45000
+    centerZ: 35000
+    dominantBand: 3
+    weatherSeed: 781923746
+    cloudDensity01: 0.16063693
+    resourceScore01: 0.46527308
+    dangerScore01: 0.21611026
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_00_09
+    chunkX: 0
+    chunkZ: 9
+    minX: -50000
+    minZ: 40000
+    maxX: -40000
+    maxZ: 50000
+    centerX: -45000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 174317442
+    cloudDensity01: 0.4074752
+    resourceScore01: 0.5585117
+    dangerScore01: 0.5846206
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_01_09
+    chunkX: 1
+    chunkZ: 9
+    minX: -40000
+    minZ: 40000
+    maxX: -30000
+    maxZ: 50000
+    centerX: -35000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 235457509
+    cloudDensity01: 0.5287778
+    resourceScore01: 0.39552507
+    dangerScore01: 0.2508754
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_02_09
+    chunkX: 2
+    chunkZ: 9
+    minX: -30000
+    minZ: 40000
+    maxX: -20000
+    maxZ: 50000
+    centerX: -25000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 45205336
+    cloudDensity01: 0.46105966
+    resourceScore01: 0.28882134
+    dangerScore01: 0.5490338
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_03_09
+    chunkX: 3
+    chunkZ: 9
+    minX: -20000
+    minZ: 40000
+    maxX: -10000
+    maxZ: 50000
+    centerX: -15000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 123089595
+    cloudDensity01: 0.40696615
+    resourceScore01: 0.38917008
+    dangerScore01: 0.569278
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_04_09
+    chunkX: 4
+    chunkZ: 9
+    minX: -10000
+    minZ: 40000
+    maxX: 0
+    maxZ: 50000
+    centerX: -5000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 469708318
+    cloudDensity01: 0.58273315
+    resourceScore01: 0.586901
+    dangerScore01: 0.43893084
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_05_09
+    chunkX: 5
+    chunkZ: 9
+    minX: 0
+    minZ: 40000
+    maxX: 10000
+    maxZ: 50000
+    centerX: 5000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 476322417
+    cloudDensity01: 0.7491066
+    resourceScore01: 0.53352994
+    dangerScore01: 0.6272895
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_06_09
+    chunkX: 6
+    chunkZ: 9
+    minX: 10000
+    minZ: 40000
+    maxX: 20000
+    maxZ: 50000
+    centerX: 15000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 269291988
+    cloudDensity01: 0.59909236
+    resourceScore01: 0.31650415
+    dangerScore01: 0.700517
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_07_09
+    chunkX: 7
+    chunkZ: 9
+    minX: 20000
+    minZ: 40000
+    maxX: 30000
+    maxZ: 50000
+    centerX: 25000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 347213111
+    cloudDensity01: 0.42066202
+    resourceScore01: 0.516426
+    dangerScore01: 0.5682286
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_08_09
+    chunkX: 8
+    chunkZ: 9
+    minX: 30000
+    minZ: 40000
+    maxX: 40000
+    maxZ: 50000
+    centerX: 35000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 693860714
+    cloudDensity01: 0.32810268
+    resourceScore01: 0.7273249
+    dangerScore01: 0.32194716
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  - id: chunk_09_09
+    chunkX: 9
+    chunkZ: 9
+    minX: 40000
+    minZ: 40000
+    maxX: 50000
+    maxZ: 50000
+    centerX: 45000
+    centerZ: 45000
+    dominantBand: 3
+    weatherSeed: 767587533
+    cloudDensity01: 0.34108475
+    resourceScore01: 0.46527308
+    dangerScore01: 0.36132848
+    discovered: 0
+    hasSettlement: 0
+    notesRu: "\u0424\u043E\u043D\u043E\u0432\u0430\u044F \u044F\u0447\u0435\u0439\u043A\u0430
+      \u043C\u0438\u0440\u0430. \u0414\u0435\u0442\u0430\u043B\u044C\u043D\u044B\u0435
+      \u043E\u0431\u044A\u0435\u043A\u0442\u044B \u043F\u043E\u044F\u0432\u043B\u044F\u044E\u0442\u0441\u044F
+      \u0442\u043E\u043B\u044C\u043A\u043E \u0440\u044F\u0434\u043E\u043C \u0441
+      \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
+  islands:
+  - id: capital
+    displayNameRu: "\u0413\u0440\u0438\u043D\u0445\u0435\u0439\u0432\u0435\u043D"
+    roleRu: "\u0421\u0442\u043E\u043B\u0438\u0446\u0430 \u0438 \u0442\u043E\u0440\u0433\u043E\u0432\u044B\u0439
+      \u0443\u0437\u0435\u043B"
+    positionMeters: {x: 0, y: 2500, z: 0}
+    radiusMeters: 640
+    chunkId: chunk_05_05
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_01
+    displayNameRu: "\u0421\u043E\u043B\u044F\u043D\u043E\u0439 \u043F\u0440\u0438\u0447\u0430\u043B"
+    roleRu: "\u0415\u0434\u0430 \u0438 \u0432\u043E\u0434\u0430"
+    positionMeters: {x: 28842.75, y: 7448.4087, z: -30628.934}
+    radiusMeters: 537.114
+    chunkId: chunk_07_01
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_02
+    displayNameRu: "\u041C\u0435\u0434\u043D\u0430\u044F \u043C\u0430\u0440\u044C"
+    roleRu: "\u0420\u0443\u0434\u0430 \u0438 \u043C\u0435\u0442\u0430\u043B\u043B"
+    positionMeters: {x: 15492.726, y: 3070.5974, z: 26678.037}
+    radiusMeters: 600.01056
+    chunkId: chunk_06_07
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_03
+    displayNameRu: "\u0422\u0438\u0445\u0438\u0439 \u0434\u043E\u043A"
+    roleRu: "\u0414\u043E\u0441\u0442\u0430\u0432\u043A\u0430"
+    positionMeters: {x: 21157.92, y: 5389.938, z: 25263.047}
+    radiusMeters: 330.11115
+    chunkId: chunk_07_07
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_04
+    displayNameRu: "\u041B\u0435\u0441\u043D\u0430\u044F \u0431\u0430\u043D\u043A\u0430"
+    roleRu: "\u0414\u0440\u0435\u0432\u0435\u0441\u0438\u043D\u0430"
+    positionMeters: {x: -6700.965, y: 7399.0503, z: 28443.854}
+    radiusMeters: 424.88507
+    chunkId: chunk_04_07
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_05
+    displayNameRu: "\u041F\u043E\u0440\u043E\u0445\u043E\u0432\u043E\u0439 \u043F\u043E\u0441\u0442"
+    roleRu: "\u041F\u043E\u0440\u043E\u0445"
+    positionMeters: {x: 10569.009, y: 8384.157, z: -13824.652}
+    radiusMeters: 554.38916
+    chunkId: chunk_06_03
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_06
+    displayNameRu: "\u0412\u043E\u0441\u0442\u043E\u0447\u043D\u0430\u044F \u0432\u0435\u0440\u0444\u044C"
+    roleRu: "\u041A\u043E\u0440\u0430\u0431\u0435\u043B\u044C\u043D\u044B\u0435 \u0440\u0430\u0431\u043E\u0442\u044B"
+    positionMeters: {x: 30800.42, y: 2809.0027, z: -7078.033}
+    radiusMeters: 403.36746
+    chunkId: chunk_08_04
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_07
+    displayNameRu: "\u0421\u0443\u0445\u0430\u044F \u0433\u0430\u0432\u0430\u043D\u044C"
+    roleRu: "\u0422\u043E\u043F\u043B\u0438\u0432\u043E"
+    positionMeters: {x: -15095.064, y: 8369.464, z: 8516.117}
+    radiusMeters: 356.88574
+    chunkId: chunk_03_05
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_08
+    displayNameRu: "\u0411\u0430\u0448\u043D\u044F \u0430\u043F\u0442\u0435\u043A\u0430\u0440\u0435\u0439"
+    roleRu: "\u041C\u0435\u0434\u0438\u0446\u0438\u043D\u0430"
+    positionMeters: {x: -20396.6, y: 4438.827, z: -14162.854}
+    radiusMeters: 605.9444
+    chunkId: chunk_02_03
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_09
+    displayNameRu: "\u042F\u043D\u0442\u0430\u0440\u043D\u044B\u0439 \u0440\u044B\u043D\u043E\u043A"
+    roleRu: "\u0422\u043E\u0440\u0433\u043E\u0432\u043B\u044F"
+    positionMeters: {x: -5994.2246, y: 4737.615, z: -15991.132}
+    radiusMeters: 314.13147
+    chunkId: chunk_04_03
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_10
+    displayNameRu: "\u0421\u0435\u0440\u044B\u0439 \u043C\u0430\u044F\u043A"
+    roleRu: "\u041D\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u044F"
+    positionMeters: {x: 1720.2489, y: 6126.3696, z: -8755.595}
+    radiusMeters: 400.42093
+    chunkId: chunk_05_04
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_11
+    displayNameRu: "\u041F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u0430 \u0443\u0433\u043E\u043B\u044C\u0449\u0438\u043A\u043E\u0432"
+    roleRu: "\u0423\u0433\u043E\u043B\u044C"
+    positionMeters: {x: 13750.999, y: 3282.6848, z: 21469.887}
+    radiusMeters: 712.0841
+    chunkId: chunk_06_07
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_12
+    displayNameRu: "\u0413\u0440\u043E\u0437\u043E\u0432\u043E\u0439 \u0441\u043A\u043B\u0430\u0434"
+    roleRu: "\u041E\u043F\u0430\u0441\u043D\u044B\u0435 \u0442\u043E\u0432\u0430\u0440\u044B"
+    positionMeters: {x: -24106.984, y: 6205.6816, z: 16631.023}
+    radiusMeters: 725.46265
+    chunkId: chunk_02_06
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_13
+    displayNameRu: "\u041F\u0435\u0432\u0447\u0430\u044F \u043F\u0440\u0438\u0441\u0442\u0430\u043D\u044C"
+    roleRu: "\u041F\u0430\u0441\u0441\u0430\u0436\u0438\u0440\u044B"
+    positionMeters: {x: -20477.408, y: 3893.2112, z: -32121.482}
+    radiusMeters: 642.8868
+    chunkId: chunk_02_01
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  - id: island_14
+    displayNameRu: "\u0421\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u043C\u0435\u043B\u044C\u043D\u0438\u0446\u0430"
+    roleRu: "\u041C\u0435\u0445\u0430\u043D\u0438\u0437\u043C\u044B"
+    positionMeters: {x: 17011.26, y: 7688.7446, z: -4494.377}
+    radiusMeters: 512.66394
+    chunkId: chunk_06_04
+    permanentEntity: 1
+    materializesAsSceneObject: 1
+  cloudFields:
+  - id: cloud_field_00
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      1"
+    centerMeters: {x: -1658.1351, y: 4966.4653, z: 10969.467}
+    radiusMeters: 2784.8032
+    thicknessMeters: 914.65045
+    density01: 0.5258043
+    resourceId: water_vapor
+    resourceKgEstimate: 67356
+    chunkId: chunk_04_06
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_01
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      2"
+    centerMeters: {x: 14114.651, y: 4907.9453, z: 31831.475}
+    radiusMeters: 2393.6118
+    thicknessMeters: 705.76184
+    density01: 0.79191476
+    resourceId: claudium_trace
+    resourceKgEstimate: 87195
+    chunkId: chunk_06_08
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_02
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      3"
+    centerMeters: {x: -23659.73, y: 5041.325, z: -37774.27}
+    radiusMeters: 3484.585
+    thicknessMeters: 1012.85675
+    density01: 0.602208
+    resourceId: food_spores
+    resourceKgEstimate: 96528
+    chunkId: chunk_02_01
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_03
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      4"
+    centerMeters: {x: -24730.713, y: 4832.3247, z: 12937.2295}
+    radiusMeters: 1361.8894
+    thicknessMeters: 1270.9419
+    density01: 0.42223898
+    resourceId: sulfur_haze
+    resourceKgEstimate: 26452
+    chunkId: chunk_02_06
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_04
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      5"
+    centerMeters: {x: 16340.759, y: 5230.544, z: 36101.39}
+    radiusMeters: 2586.859
+    thicknessMeters: 1808.0428
+    density01: 0.69105875
+    resourceId: cloth_fiber
+    resourceKgEstimate: 82233
+    chunkId: chunk_06_08
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_05
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      6"
+    centerMeters: {x: 21921.047, y: 9090.529, z: -3577.9692}
+    radiusMeters: 3932.4011
+    thicknessMeters: 1734.7539
+    density01: 0.74613976
+    resourceId: cold_mist
+    resourceKgEstimate: 134970
+    chunkId: chunk_07_04
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_06
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      7"
+    centerMeters: {x: -5480.3047, y: 7166.9287, z: -14143.025}
+    radiusMeters: 3205.1892
+    thicknessMeters: 1101.067
+    density01: 0.9367184
+    resourceId: storm_charge
+    resourceKgEstimate: 138109
+    chunkId: chunk_04_03
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_07
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      8"
+    centerMeters: {x: -43087.195, y: 8816.586, z: 14052.915}
+    radiusMeters: 2853.3357
+    thicknessMeters: 735.1089
+    density01: 0.7849149
+    resourceId: crystal_dust
+    resourceKgEstimate: 103023
+    chunkId: chunk_00_06
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_08
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      9"
+    centerMeters: {x: -9262.912, y: 4688.901, z: 5232.6436}
+    radiusMeters: 4713.527
+    thicknessMeters: 860.898
+    density01: 0.47558162
+    resourceId: water_vapor
+    resourceKgEstimate: 103117
+    chunkId: chunk_04_05
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_09
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      10"
+    centerMeters: {x: -12104.605, y: 2706.771, z: -5060.69}
+    radiusMeters: 4395.5435
+    thicknessMeters: 1125.9902
+    density01: 0.47830912
+    resourceId: claudium_trace
+    resourceKgEstimate: 96712
+    chunkId: chunk_03_04
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_10
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      11"
+    centerMeters: {x: 36118.547, y: 3250.1267, z: -18491.92}
+    radiusMeters: 2912.2869
+    thicknessMeters: 868.9032
+    density01: 0.54449195
+    resourceId: food_spores
+    resourceKgEstimate: 72943
+    chunkId: chunk_08_03
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_11
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      12"
+    centerMeters: {x: -3519.0422, y: 4156.782, z: 46859.86}
+    radiusMeters: 3182.4624
+    thicknessMeters: 630.0652
+    density01: 0.8779893
+    resourceId: sulfur_haze
+    resourceKgEstimate: 128532
+    chunkId: chunk_04_09
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_12
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      13"
+    centerMeters: {x: -5745.038, y: 6496.456, z: -44077.9}
+    radiusMeters: 4782.1562
+    thicknessMeters: 685.33154
+    density01: 0.7043897
+    resourceId: cloth_fiber
+    resourceKgEstimate: 154951
+    chunkId: chunk_04_00
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_13
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      14"
+    centerMeters: {x: -15786.007, y: 2874.3518, z: -34004.812}
+    radiusMeters: 1986.4863
+    thicknessMeters: 996.5468
+    density01: 0.9071325
+    resourceId: cold_mist
+    resourceKgEstimate: 82892
+    chunkId: chunk_03_01
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_14
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      15"
+    centerMeters: {x: -5512.4688, y: 3856.9258, z: -4086.5186}
+    radiusMeters: 3732.9941
+    thicknessMeters: 1051.7059
+    density01: 0.4220455
+    resourceId: storm_charge
+    resourceKgEstimate: 72473
+    chunkId: chunk_04_04
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_15
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      16"
+    centerMeters: {x: 18317.361, y: 2677.7607, z: -39012.414}
+    radiusMeters: 1976.7448
+    thicknessMeters: 628.687
+    density01: 0.69596416
+    resourceId: crystal_dust
+    resourceKgEstimate: 63284
+    chunkId: chunk_06_01
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_16
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      17"
+    centerMeters: {x: -1451.4502, y: 6765.5557, z: 3173.504}
+    radiusMeters: 3563.281
+    thicknessMeters: 1525.584
+    density01: 0.4408425
+    resourceId: water_vapor
+    resourceKgEstimate: 72259
+    chunkId: chunk_04_05
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_17
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      18"
+    centerMeters: {x: 42165.934, y: 4411.7896, z: -14146.738}
+    radiusMeters: 1977.6083
+    thicknessMeters: 845.217
+    density01: 0.43940565
+    resourceId: claudium_trace
+    resourceKgEstimate: 39973
+    chunkId: chunk_09_03
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_18
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      19"
+    centerMeters: {x: -6705.7925, y: 6956.388, z: -32179.3}
+    radiusMeters: 4756.818
+    thicknessMeters: 1078.3486
+    density01: 0.42083502
+    resourceId: food_spores
+    resourceKgEstimate: 92084
+    chunkId: chunk_04_01
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_19
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      20"
+    centerMeters: {x: -26855.904, y: 8921.457, z: 23410.52}
+    radiusMeters: 4209.4014
+    thicknessMeters: 757.8623
+    density01: 0.84592575
+    resourceId: sulfur_haze
+    resourceKgEstimate: 163799
+    chunkId: chunk_02_07
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_20
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      21"
+    centerMeters: {x: 27313.43, y: 8547.469, z: 14882.783}
+    radiusMeters: 4550.4067
+    thicknessMeters: 1881.802
+    density01: 0.7554505
+    resourceId: cloth_fiber
+    resourceKgEstimate: 158130
+    chunkId: chunk_07_06
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_21
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      22"
+    centerMeters: {x: 23739.926, y: 4755.8633, z: 12545.526}
+    radiusMeters: 2958.3896
+    thicknessMeters: 1261.9696
+    density01: 0.6963606
+    resourceId: cold_mist
+    resourceKgEstimate: 94765
+    chunkId: chunk_07_06
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_22
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      23"
+    centerMeters: {x: -6096.2827, y: 6770.3447, z: -2516.6921}
+    radiusMeters: 2576.4497
+    thicknessMeters: 428.89383
+    density01: 0.4988841
+    resourceId: storm_charge
+    resourceKgEstimate: 59126
+    chunkId: chunk_04_04
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_23
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      24"
+    centerMeters: {x: 17703.926, y: 9206.753, z: 11339.793}
+    radiusMeters: 4946.4004
+    thicknessMeters: 1089.834
+    density01: 0.89956796
+    resourceId: crystal_dust
+    resourceKgEstimate: 204683
+    chunkId: chunk_06_06
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_24
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      25"
+    centerMeters: {x: 9527.611, y: 7929.2266, z: -43821.254}
+    radiusMeters: 3678.9282
+    thicknessMeters: 1675.8367
+    density01: 0.8349766
+    resourceId: water_vapor
+    resourceKgEstimate: 141304
+    chunkId: chunk_05_00
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_25
+    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      26"
+    centerMeters: {x: 3064.6804, y: 3644.5408, z: 28082.68}
+    radiusMeters: 2754.7266
+    thicknessMeters: 1193.6301
+    density01: 0.6568497
+    resourceId: claudium_trace
+    resourceKgEstimate: 83234
+    chunkId: chunk_05_07
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_26
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
+      \u043E\u0431\u043B\u0430\u043A\u043E 1"
+    centerMeters: {x: 5790.8174, y: 17169.852, z: -4836.7188}
+    radiusMeters: 1101.2203
+    thicknessMeters: 450.08228
+    density01: 0.15042739
+    resourceId: food_spores
+    resourceKgEstimate: 2982
+    chunkId: chunk_05_04
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_27
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
+      \u043E\u0431\u043B\u0430\u043A\u043E 2"
+    centerMeters: {x: 14138.936, y: 13255.44, z: -5401.433}
+    radiusMeters: 757.0923
+    thicknessMeters: 192.34247
+    density01: 0.20499228
+    resourceId: sulfur_haze
+    resourceKgEstimate: 2794
+    chunkId: chunk_06_04
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_28
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
+      \u043E\u0431\u043B\u0430\u043A\u043E 3"
+    centerMeters: {x: 2052.3997, y: 22998.213, z: -3893.0881}
+    radiusMeters: 1958.3287
+    thicknessMeters: 364.5431
+    density01: 0.29203737
+    resourceId: cloth_fiber
+    resourceKgEstimate: 10294
+    chunkId: chunk_05_04
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_29
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
+      \u043E\u0431\u043B\u0430\u043A\u043E 4"
+    centerMeters: {x: -1765.1422, y: 28818.365, z: 8822.739}
+    radiusMeters: 1237.5046
+    thicknessMeters: 507.8399
+    density01: 0.1339174
+    resourceId: cold_mist
+    resourceKgEstimate: 2983
+    chunkId: chunk_04_05
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_30
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
+      \u043E\u0431\u043B\u0430\u043A\u043E 5"
+    centerMeters: {x: 5304.222, y: 29172.293, z: 22711.52}
+    radiusMeters: 1370.4305
+    thicknessMeters: 184.99252
+    density01: 0.17379339
+    resourceId: storm_charge
+    resourceKgEstimate: 4287
+    chunkId: chunk_05_07
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_31
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
+      \u043E\u0431\u043B\u0430\u043A\u043E 6"
+    centerMeters: {x: -7293.242, y: 25464.78, z: 7414.2837}
+    radiusMeters: 787.5921
+    thicknessMeters: 240.39464
+    density01: 0.2382642
+    resourceId: crystal_dust
+    resourceKgEstimate: 3378
+    chunkId: chunk_04_05
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_32
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
+      \u043E\u0431\u043B\u0430\u043A\u043E 7"
+    centerMeters: {x: 2197.0806, y: 18252.459, z: -37902.797}
+    radiusMeters: 1132.9011
+    thicknessMeters: 460.82654
+    density01: 0.37861636
+    resourceId: water_vapor
+    resourceKgEstimate: 7721
+    chunkId: chunk_05_01
+    simulationOnlyWhenFar: 1
+  - id: cloud_field_33
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
+      \u043E\u0431\u043B\u0430\u043A\u043E 8"
+    centerMeters: {x: -22589.283, y: 26094.17, z: 26491.469}
+    radiusMeters: 1731.9447
+    thicknessMeters: 517.2666
+    density01: 0.32605416
+    resourceId: claudium_trace
+    resourceKgEstimate: 10165
+    chunkId: chunk_02_07
+    simulationOnlyWhenFar: 1
+  resourceFields:
+  - id: ore_field_00
+    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      1"
+    centerMeters: {x: -15469.607, y: 3653.8784, z: -9524.15}
+    radiusMeters: 1968.8037
+    altitudeBand: 3
+    resourceId: windshale
+    resourceKgEstimate: 127864
+    chunkId: chunk_03_04
+    materializesAsNodes: 1
+  - id: ore_field_01
+    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      2"
+    centerMeters: {x: -22438.43, y: 7443.8853, z: -10351.536}
+    radiusMeters: 1395.9447
+    altitudeBand: 3
+    resourceId: dawnspar
+    resourceKgEstimate: 107224
+    chunkId: chunk_02_03
+    materializesAsNodes: 1
+  - id: ore_field_02
+    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      3"
+    centerMeters: {x: 10489.568, y: 4482.697, z: 3463.1462}
+    radiusMeters: 1616.4735
+    altitudeBand: 3
+    resourceId: bluebrass
+    resourceKgEstimate: 69782
+    chunkId: chunk_06_05
+    materializesAsNodes: 1
+  - id: ore_field_03
+    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      4"
+    centerMeters: {x: -7295.327, y: 3131.7583, z: 17022.941}
+    radiusMeters: 2804.5532
+    altitudeBand: 3
+    resourceId: stormbone
+    resourceKgEstimate: 177210
+    chunkId: chunk_04_06
+    materializesAsNodes: 1
+  - id: ore_field_04
+    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      5"
+    centerMeters: {x: 5417.0376, y: 5810.692, z: 24900.205}
+    radiusMeters: 2131.6062
+    altitudeBand: 3
+    resourceId: claudreef
+    resourceKgEstimate: 119848
+    chunkId: chunk_05_07
+    materializesAsNodes: 1
+  - id: ore_field_05
+    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      6"
+    centerMeters: {x: 10420.472, y: 2740.0928, z: -21947.814}
+    radiusMeters: 2070.8267
+    altitudeBand: 3
+    resourceId: mirrorbasalt
+    resourceKgEstimate: 73742
+    chunkId: chunk_06_02
+    materializesAsNodes: 1
+  - id: ore_field_06
+    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      7"
+    centerMeters: {x: 6838.1064, y: 6301.8613, z: 8561.5625}
+    radiusMeters: 1268.1781
+    altitudeBand: 3
+    resourceId: crownstone
+    resourceKgEstimate: 119079
+    chunkId: chunk_05_05
+    materializesAsNodes: 1
+  - id: ore_field_07
+    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
+      8"
+    centerMeters: {x: -17801.719, y: 8008.0024, z: 550.5398}
+    radiusMeters: 1337.4667
+    altitudeBand: 3
+    resourceId: windshale
+    resourceKgEstimate: 105823
+    chunkId: chunk_03_05
+    materializesAsNodes: 1
+  - id: ore_field_08
+    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u0430\u044F \u0440\u0443\u0434\u043D\u0430\u044F
+      \u0433\u043B\u044B\u0431\u0430 1"
+    centerMeters: {x: -3104.9375, y: 21197.533, z: -20099.875}
+    radiusMeters: 1377.9579
+    altitudeBand: 4
+    resourceId: dawnspar
+    resourceKgEstimate: 301192
+    chunkId: chunk_04_02
+    materializesAsNodes: 1
+  - id: ore_field_09
+    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u0430\u044F \u0440\u0443\u0434\u043D\u0430\u044F
+      \u0433\u043B\u044B\u0431\u0430 2"
+    centerMeters: {x: -1258.8396, y: 20644.678, z: -25975.744}
+    radiusMeters: 1664.4596
+    altitudeBand: 4
+    resourceId: bluebrass
+    resourceKgEstimate: 192867
+    chunkId: chunk_04_02
+    materializesAsNodes: 1
+  - id: ore_field_10
+    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u0430\u044F \u0440\u0443\u0434\u043D\u0430\u044F
+      \u0433\u043B\u044B\u0431\u0430 3"
+    centerMeters: {x: 13343.736, y: 19678.162, z: -3172.6}
+    radiusMeters: 965.0889
+    altitudeBand: 4
+    resourceId: stormbone
+    resourceKgEstimate: 341145
+    chunkId: chunk_06_04
+    materializesAsNodes: 1
+  leviathanRegions:
+  - id: leviathan_region_00
+    displayNameRu: "\u041F\u0430\u0441\u0442\u0431\u0438\u0449\u0435 \u043B\u0435\u0432\u0438\u0430\u0444\u0430\u043D\u043E\u0432"
+    centerMeters: {x: 32193.574, y: 7693.6514, z: -1723.632}
+    radiusMeters: 8197.81
+    altitudeMinMeters: 2000
+    altitudeMaxMeters: 10000
+    rarity01: 0.3577322
+    chunkId: chunk_08_04
+  - id: leviathan_region_01
+    displayNameRu: "\u041F\u0430\u0441\u0442\u0431\u0438\u0449\u0435 \u043B\u0435\u0432\u0438\u0430\u0444\u0430\u043D\u043E\u0432"
+    centerMeters: {x: -9157.893, y: 7843.992, z: 28828.982}
+    radiusMeters: 8936.547
+    altitudeMinMeters: 2000
+    altitudeMaxMeters: 10000
+    rarity01: 0.20362514
+    chunkId: chunk_04_07
+  - id: leviathan_region_02
+    displayNameRu: "\u041F\u0430\u0441\u0442\u0431\u0438\u0449\u0435 \u043B\u0435\u0432\u0438\u0430\u0444\u0430\u043D\u043E\u0432"
+    centerMeters: {x: -6885.652, y: 7151.8823, z: 16801.871}
+    radiusMeters: 10796.236
+    altitudeMinMeters: 2000
+    altitudeMaxMeters: 10000
+    rarity01: 0.367935
+    chunkId: chunk_04_06
+  - id: leviathan_region_03
+    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u044B\u0439 \u043E\u0445\u043E\u0442\u043D\u0438\u0447\u0438\u0439
+      \u043A\u043E\u0440\u0438\u0434\u043E\u0440"
+    centerMeters: {x: -39926.617, y: 18532.818, z: -14605.839}
+    radiusMeters: 6302.9463
+    altitudeMinMeters: 10000
+    altitudeMaxMeters: 40000
+    rarity01: 0.114902236
+    chunkId: chunk_01_03
+  - id: leviathan_region_04
+    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u044B\u0439 \u043E\u0445\u043E\u0442\u043D\u0438\u0447\u0438\u0439
+      \u043A\u043E\u0440\u0438\u0434\u043E\u0440"
+    centerMeters: {x: -33696.598, y: 25156.848, z: -27022.754}
+    radiusMeters: 8393.13
+    altitudeMinMeters: 10000
+    altitudeMaxMeters: 40000
+    rarity01: 0.05185351
+    chunkId: chunk_01_02
+  icebergFields:
+  - id: iceberg_field_00
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u043F\u043E\u043B\u0435
+      \u0430\u0439\u0441\u0431\u0435\u0440\u0433\u043E\u0432 1"
+    centerMeters: {x: -34628.38, y: 58839.062, z: 26810.832}
+    radiusMeters: 3875.9104
+    altitudeMeters: 58839.062
+    icebergCountEstimate: 11
+    sublimateKgEstimate: 90
+    chunkId: chunk_01_07
+  - id: iceberg_field_01
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u043F\u043E\u043B\u0435
+      \u0430\u0439\u0441\u0431\u0435\u0440\u0433\u043E\u0432 2"
+    centerMeters: {x: -35820.777, y: 70036.91, z: -21614.604}
+    radiusMeters: 7547.768
+    altitudeMeters: 70036.91
+    icebergCountEstimate: 8
+    sublimateKgEstimate: 158
+    chunkId: chunk_01_02
+  - id: iceberg_field_02
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u043F\u043E\u043B\u0435
+      \u0430\u0439\u0441\u0431\u0435\u0440\u0433\u043E\u0432 3"
+    centerMeters: {x: 45105.125, y: 61745.25, z: 9635.343}
+    radiusMeters: 7884.551
+    altitudeMeters: 61745.25
+    icebergCountEstimate: 7
+    sublimateKgEstimate: 216
+    chunkId: chunk_09_05
+  - id: iceberg_field_03
+    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u043F\u043E\u043B\u0435
+      \u0430\u0439\u0441\u0431\u0435\u0440\u0433\u043E\u0432 4"
+    centerMeters: {x: 7638.81, y: 91963.08, z: -44916.383}
+    radiusMeters: 5190.1895
+    altitudeMeters: 91963.08
+    icebergCountEstimate: 8
+    sublimateKgEstimate: 94
+    chunkId: chunk_05_00

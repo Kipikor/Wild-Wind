@@ -137,11 +137,11 @@ Material:
     - _DiffuseScrollSpeed: 0
     - _DstBlend: 0
     - _EnvironmentReflections: 1
-    - _FadeDistance: 104.1
+    - _FadeDistance: 303.3
     - _FadeTransition: 3
     - _FogDensity: 100
-    - _FogDistance: 16790
-    - _FogDistortionMagnitude: 179.98
+    - _FogDistance: 16750
+    - _FogDistortionMagnitude: 180.94
     - _FogHeightPower: 62.9
     - _FogScrollSpeed: 0.01
     - _GlossMapScale: 0

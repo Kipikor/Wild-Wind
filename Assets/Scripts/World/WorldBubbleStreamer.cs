@@ -5,6 +5,8 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
 {
     [Header("References")]
     [SerializeField, InspectorName("World Runtime")] private WorldRegionRuntime world;
+    [SerializeField, InspectorName("World Entity Index")] private WorldEntityIndex worldIndex;
+    [SerializeField, InspectorName("World Runtime State")] private WorldRuntimeState runtimeState;
     [SerializeField, InspectorName("Focus")] private Transform focus;
     [SerializeField, InspectorName("Materialized Root")] private Transform materializedRoot;
 
@@ -37,11 +39,30 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
 
     public int ActiveProxyCount => activeProxies.Count;
     public Transform MaterializedRoot => materializedRoot;
+    public WorldEntityIndex Index => worldIndex;
+    public WorldRuntimeState RuntimeState => runtimeState;
 
     public void Configure(WorldRegionRuntime newWorld, Transform newFocus)
     {
+        Configure(newWorld, newFocus, null, null);
+    }
+
+    public void Configure(WorldRegionRuntime newWorld, Transform newFocus, WorldEntityIndex newIndex)
+    {
+        Configure(newWorld, newFocus, newIndex, null);
+    }
+
+    public void Configure(WorldRegionRuntime newWorld, Transform newFocus, WorldEntityIndex newIndex, WorldRuntimeState newRuntimeState)
+    {
         world = newWorld;
         focus = newFocus;
+        worldIndex = newIndex;
+        runtimeState = newRuntimeState;
+        if (runtimeState != null)
+        {
+            runtimeState.Configure(world, worldIndex, focus);
+        }
+
         EnsureRoot();
         RefreshNow();
     }
@@ -80,9 +101,18 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
             return;
         }
 
+        if (worldIndex != null)
+        {
+            worldIndex.EnsureBuilt(world);
+        }
+
         wantedProxyKeys.Clear();
         Vector3 focusPosition = focus.position;
         float activeRadius = Mathf.Max(500f, world.ActiveBubbleRadiusMeters * activeRadiusMultiplier);
+        if (runtimeState != null)
+        {
+            runtimeState.RefreshActiveBubble(focusPosition, activeRadius);
+        }
 
         RefreshIslandProxies(focusPosition, activeRadius);
         RefreshCloudProxies(focusPosition, activeRadius);
@@ -124,6 +154,16 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
         if (world == null)
         {
             world = FindFirstObjectByType<WorldRegionRuntime>();
+        }
+
+        if (worldIndex == null)
+        {
+            worldIndex = FindFirstObjectByType<WorldEntityIndex>();
+        }
+
+        if (runtimeState == null)
+        {
+            runtimeState = FindFirstObjectByType<WorldRuntimeState>();
         }
 
         if (focus == null && world != null)
