@@ -11,6 +11,7 @@ public static class VisualTargetSceneBuilder
     private const int TrueCloudLayer = 8;
     private const string TrueCloudMaterialPath = "Assets/TrueClouds/ExampleScenes/Materials/CloudMaterial.mat";
     private const string SpaceCloudWavesSourceMaterialPath = "Assets/ShadowVision/SpaceCloudWaves/Examples/SpaceCloudWaves/SpaceCloudWaves.mat";
+    private const string FogParticlePrefabPath = "Assets/Fog Particles/Prefabs/Bluish Fog.prefab";
 
     [MenuItem("Wild Wind/Visual/Build Visual Target Scene")]
     public static void BuildVisualTargetScene()
@@ -24,6 +25,7 @@ public static class VisualTargetSceneBuilder
         CreateCameraAndLight();
         CreateDistantIslands(palette);
         CreateAtmosphericCloudBanks(palette);
+        CreateFogParticleWisps();
         CreateCloudSea(palette);
         CreateIsland(palette);
         CreateShip(palette);
@@ -33,6 +35,31 @@ public static class VisualTargetSceneBuilder
         AssetDatabase.SaveAssets();
         VisualAeroSceneSetup.ApplyToVisualTargetScene();
         Debug.Log("[VisualTarget] Scene built with current visual setup: " + ScenePath);
+    }
+
+    [MenuItem("Wild Wind/Visual/Add Fog Particle Wisps To Current Scene")]
+    public static void AddFogParticleWispsToCurrentScene()
+    {
+        GameObject existing = GameObject.Find("Fog Particle Wisps");
+        if (existing != null)
+        {
+            UnityEngine.Object.DestroyImmediate(existing);
+        }
+
+        CreateFogParticleWisps();
+        VisualAeroSceneSetup.ApplyToVisualTargetScene();
+
+        Scene scene = SceneManager.GetActiveScene();
+        if (scene.IsValid())
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (!string.IsNullOrWhiteSpace(scene.path))
+            {
+                EditorSceneManager.SaveScene(scene);
+            }
+        }
+
+        Debug.Log("[VisualTarget] Fog Particle Wisps added to current scene.");
     }
 
     private static void EnsureFolders()
@@ -275,6 +302,105 @@ public static class VisualTargetSceneBuilder
         GameObject puff = CreatePrimitive(name, PrimitiveType.Sphere, parent, position, scale, material);
         puff.layer = TrueCloudLayer;
         puff.transform.localRotation = Quaternion.Euler(0f, -18f, 0f);
+    }
+
+    private static void CreateFogParticleWisps()
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FogParticlePrefabPath);
+        if (prefab == null)
+        {
+            Debug.LogWarning("[VisualTarget] Fog Particles prefab was not found: " + FogParticlePrefabPath);
+            return;
+        }
+
+        Transform root = new GameObject("Fog Particle Wisps").transform;
+        CreateFogWisp(prefab, root, "Near Port Fog Wisp", new Vector3(-12f, 0.3f, -7f), new Vector3(0f, -18f, 0f), new Vector3(22f, 4f, 12f), 7f, 18f, 7f, -0.06f, 0.04f);
+        CreateFogWisp(prefab, root, "Dock Fog Wisp", new Vector3(-7f, 1.5f, 1f), new Vector3(0f, 8f, 0f), new Vector3(18f, 3.2f, 8f), 5f, 13f, 5f, -0.04f, 0.02f);
+        CreateFogWisp(prefab, root, "Lower Cloud Break A", new Vector3(-22f, -2.6f, 15f), new Vector3(0f, 22f, 0f), new Vector3(34f, 6f, 18f), 10f, 24f, 9f, 0.03f, -0.02f);
+        CreateFogWisp(prefab, root, "Lower Cloud Break B", new Vector3(17f, -2.2f, 18f), new Vector3(0f, -28f, 0f), new Vector3(32f, 5f, 16f), 9f, 22f, 8f, -0.02f, 0.03f);
+        CreateFogWisp(prefab, root, "Horizon Fog Veil", new Vector3(-3f, 3.8f, 48f), new Vector3(0f, 0f, 0f), new Vector3(58f, 7f, 12f), 12f, 30f, 10f, -0.08f, 0.01f);
+    }
+
+    private static void CreateFogWisp(
+        GameObject prefab,
+        Transform parent,
+        string name,
+        Vector3 position,
+        Vector3 euler,
+        Vector3 shapeScale,
+        float startSizeMin,
+        float startSizeMax,
+        float emissionRate,
+        float driftX,
+        float driftZ)
+    {
+        GameObject wisp = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+        if (wisp == null)
+        {
+            return;
+        }
+
+        wisp.name = name;
+        wisp.transform.SetParent(parent, false);
+        wisp.transform.localPosition = position;
+        wisp.transform.localRotation = Quaternion.Euler(euler);
+        wisp.transform.localScale = Vector3.one;
+
+        ParticleSystem particleSystem = wisp.GetComponent<ParticleSystem>();
+        if (particleSystem == null)
+        {
+            return;
+        }
+
+        ParticleSystem.MainModule main = particleSystem.main;
+        main.loop = true;
+        main.prewarm = true;
+        main.startLifetime = TwoConstants(10f, 22f);
+        main.startSpeed = TwoConstants(0.02f, 0.18f);
+        main.startSize = TwoConstants(startSizeMin, startSizeMax);
+        main.maxParticles = 420;
+        main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+
+        ParticleSystem.EmissionModule emission = particleSystem.emission;
+        emission.enabled = true;
+        emission.rateOverTime = Constant(emissionRate);
+
+        ParticleSystem.ShapeModule shape = particleSystem.shape;
+        shape.enabled = true;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale = shapeScale;
+
+        ParticleSystem.VelocityOverLifetimeModule velocity = particleSystem.velocityOverLifetime;
+        velocity.enabled = true;
+        velocity.space = ParticleSystemSimulationSpace.Local;
+        velocity.x = TwoConstants(driftX - 0.08f, driftX + 0.08f);
+        velocity.y = TwoConstants(-0.015f, 0.045f);
+        velocity.z = TwoConstants(driftZ - 0.08f, driftZ + 0.08f);
+
+        ParticleSystemRenderer renderer = wisp.GetComponent<ParticleSystemRenderer>();
+        if (renderer != null)
+        {
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.alignment = ParticleSystemRenderSpace.View;
+            renderer.maxParticleSize = 0.35f;
+            renderer.sortingFudge = -0.15f;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+    }
+
+    private static ParticleSystem.MinMaxCurve Constant(float value)
+    {
+        return new ParticleSystem.MinMaxCurve(value);
+    }
+
+    private static ParticleSystem.MinMaxCurve TwoConstants(float min, float max)
+    {
+        ParticleSystem.MinMaxCurve curve = new ParticleSystem.MinMaxCurve();
+        curve.mode = ParticleSystemCurveMode.TwoConstants;
+        curve.constantMin = min;
+        curve.constantMax = max;
+        return curve;
     }
 
     private static void CreateCloudSea(VisualPalette palette)

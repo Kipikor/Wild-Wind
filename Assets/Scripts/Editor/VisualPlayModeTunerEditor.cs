@@ -20,6 +20,7 @@ public sealed class VisualPlayModeTunerEditor : Editor
         Field("aeroFogMaterial", "Материал AERO-тумана", "Материал fullscreen-тумана AERO.");
         Field("skyboxMaterial", "Материал неба", "Настроенная копия skybox из AllSky.");
         Field("cloudRoot", "Облака TrueClouds", "Корневой объект декоративных объёмных облаков.");
+        Field("fogParticlesRoot", "Туманные частицы", "Корневой объект локальных мягких облачков из Fog Particles.");
         Field("cloudSeaRoot", "Облачное море", "Корневой объект нижнего слоя Space Cloud Waves.");
         Field("cloudSeaMaterial", "Материал облачного моря", "Настроенная копия материала Space Cloud Waves.");
         Field("distantIslandsRoot", "Дальние острова", "Корневой объект силуэтов островов на горизонте.");
@@ -39,6 +40,24 @@ public sealed class VisualPlayModeTunerEditor : Editor
         Field("fogMaxDistance", "Дальность тумана", "На каком расстоянии AERO перестаёт накапливать туман.");
         Field("fogAlpha", "Сила наложения", "Прозрачность итогового тумана поверх картинки.");
         Field("fogColor", "Цвет тумана", "Цвет воздушной дымки.");
+
+        Section("Высотные слои");
+        Field("useAltitudeAtmosphere", "Управлять слоями по высоте", "Если включено, AERO-туман и видимость смертельной бури зависят от высоты корабля.");
+        Field("altitudeSource", "Источник высоты", "Обычно сюда можно дать корабль. Если пусто, используется высота предпросмотра ниже.");
+        Field("previewAltitudeMeters", "Высота предпросмотра", "Ручная высота для проверки слоёв прямо в визуальной сцене.");
+        Field("deadlyStormY", "Y смертельной бури", "Нулевая поверхность смертельной бури в мировых координатах.");
+        Field("deadlyStormDrawDistance", "Показ поверхности бури до", "До какой высоты над бурей вообще отрисовывается Space Cloud Waves.");
+        Field("violentStormCeiling", "Верх яростной бури", "Ниже этого значения действует самый плотный слой.");
+        Field("calmStormCeiling", "Верх спокойной бури", "Ниже этого значения буря ещё опасна, но уже читается спокойнее.");
+        Field("habitationCeiling", "Верх зоны обитания", "Ниже этого значения живёт основная часть мира.");
+        Field("violentStormVisibility", "Видимость яростной бури", "Сейчас по твоему ТЗ: 100 метров.");
+        Field("calmStormVisibility", "Видимость спокойной бури", "Видимость слоя 1000-2000 м.");
+        Field("habitationVisibility", "Видимость зоны обитания", "Техническая дальность видимости в зоне обитания.");
+        Field("upperTechnicalVisibility", "Техническая видимость верха", "Дальность для разреженной и верхней зоны.");
+        Field("violentStormFogColor", "Цвет яростной бури", "Тёмная грозовая пелена ниже 1000 м.");
+        Field("calmStormFogColor", "Цвет спокойной бури", "Менее плотная грозовая пелена 1000-2000 м.");
+        Field("habitationFogColor", "Цвет белой пелены", "Белёсое облачное дно, когда смотришь вниз из зоны обитания.");
+        Field("upperFogColor", "Цвет верхней дымки", "Холодная дальняя дымка верхних высот.");
 
         Section("Свет");
         Field("ambientColor", "Цвет окружения", "Общий холодный свет без направления.");
@@ -62,6 +81,7 @@ public sealed class VisualPlayModeTunerEditor : Editor
 
         Section("Слои");
         Field("showClouds", "Показывать облака", "Включает или выключает декоративные облачные банки TrueClouds.");
+        Field("showFogParticles", "Показывать туманные частицы", "Включает или выключает ближние мягкие клочья тумана из Fog Particles.");
         Field("showDistantIslands", "Показывать дальние острова", "Включает или выключает силуэты островов на горизонте.");
         Field("applyContinuously", "Применять постоянно", "Если включено, изменения обновляются каждый кадр в Play Mode.");
 
@@ -69,6 +89,7 @@ public sealed class VisualPlayModeTunerEditor : Editor
 
         EditorGUILayout.Space(8f);
         VisualPlayModeTuner tuner = (VisualPlayModeTuner)target;
+        EditorGUILayout.HelpBox(tuner.GetAtmosphereDebugText(), MessageType.None);
 
         if (GUILayout.Button("Применить сейчас"))
         {
@@ -482,6 +503,21 @@ internal static class VisualPlayModeTunerPlayModeSaver
             fogMaxDistance = FloatValue(serializedTuner, "fogMaxDistance"),
             fogAlpha = FloatValue(serializedTuner, "fogAlpha"),
             fogColor = ColorValue(serializedTuner, "fogColor"),
+            useAltitudeAtmosphere = BoolValue(serializedTuner, "useAltitudeAtmosphere"),
+            previewAltitudeMeters = FloatValue(serializedTuner, "previewAltitudeMeters"),
+            deadlyStormY = FloatValue(serializedTuner, "deadlyStormY"),
+            deadlyStormDrawDistance = FloatValue(serializedTuner, "deadlyStormDrawDistance"),
+            violentStormCeiling = FloatValue(serializedTuner, "violentStormCeiling"),
+            calmStormCeiling = FloatValue(serializedTuner, "calmStormCeiling"),
+            habitationCeiling = FloatValue(serializedTuner, "habitationCeiling"),
+            violentStormVisibility = FloatValue(serializedTuner, "violentStormVisibility"),
+            calmStormVisibility = FloatValue(serializedTuner, "calmStormVisibility"),
+            habitationVisibility = FloatValue(serializedTuner, "habitationVisibility"),
+            upperTechnicalVisibility = FloatValue(serializedTuner, "upperTechnicalVisibility"),
+            violentStormFogColor = ColorValue(serializedTuner, "violentStormFogColor"),
+            calmStormFogColor = ColorValue(serializedTuner, "calmStormFogColor"),
+            habitationFogColor = ColorValue(serializedTuner, "habitationFogColor"),
+            upperFogColor = ColorValue(serializedTuner, "upperFogColor"),
             ambientColor = ColorValue(serializedTuner, "ambientColor"),
             ambientIntensity = FloatValue(serializedTuner, "ambientIntensity"),
             moonColor = ColorValue(serializedTuner, "moonColor"),
@@ -499,6 +535,7 @@ internal static class VisualPlayModeTunerPlayModeSaver
             cloudSeaWaveSpeed = FloatValue(serializedTuner, "cloudSeaWaveSpeed"),
             cloudSeaOffsetStrength = FloatValue(serializedTuner, "cloudSeaOffsetStrength"),
             showClouds = BoolValue(serializedTuner, "showClouds"),
+            showFogParticles = BoolValue(serializedTuner, "showFogParticles"),
             showDistantIslands = BoolValue(serializedTuner, "showDistantIslands"),
             applyContinuously = BoolValue(serializedTuner, "applyContinuously")
         };
@@ -558,6 +595,21 @@ internal static class VisualPlayModeTunerPlayModeSaver
         SetFloat(serializedTuner, "fogMaxDistance", snapshot.fogMaxDistance);
         SetFloat(serializedTuner, "fogAlpha", snapshot.fogAlpha);
         SetColor(serializedTuner, "fogColor", snapshot.fogColor);
+        SetBool(serializedTuner, "useAltitudeAtmosphere", snapshot.useAltitudeAtmosphere);
+        SetFloat(serializedTuner, "previewAltitudeMeters", snapshot.previewAltitudeMeters);
+        SetFloat(serializedTuner, "deadlyStormY", snapshot.deadlyStormY);
+        SetFloat(serializedTuner, "deadlyStormDrawDistance", snapshot.deadlyStormDrawDistance);
+        SetFloat(serializedTuner, "violentStormCeiling", snapshot.violentStormCeiling);
+        SetFloat(serializedTuner, "calmStormCeiling", snapshot.calmStormCeiling);
+        SetFloat(serializedTuner, "habitationCeiling", snapshot.habitationCeiling);
+        SetFloat(serializedTuner, "violentStormVisibility", snapshot.violentStormVisibility);
+        SetFloat(serializedTuner, "calmStormVisibility", snapshot.calmStormVisibility);
+        SetFloat(serializedTuner, "habitationVisibility", snapshot.habitationVisibility);
+        SetFloat(serializedTuner, "upperTechnicalVisibility", snapshot.upperTechnicalVisibility);
+        SetColor(serializedTuner, "violentStormFogColor", snapshot.violentStormFogColor);
+        SetColor(serializedTuner, "calmStormFogColor", snapshot.calmStormFogColor);
+        SetColor(serializedTuner, "habitationFogColor", snapshot.habitationFogColor);
+        SetColor(serializedTuner, "upperFogColor", snapshot.upperFogColor);
         SetColor(serializedTuner, "ambientColor", snapshot.ambientColor);
         SetFloat(serializedTuner, "ambientIntensity", snapshot.ambientIntensity);
         SetColor(serializedTuner, "moonColor", snapshot.moonColor);
@@ -575,6 +627,7 @@ internal static class VisualPlayModeTunerPlayModeSaver
         SetFloat(serializedTuner, "cloudSeaWaveSpeed", snapshot.cloudSeaWaveSpeed);
         SetFloat(serializedTuner, "cloudSeaOffsetStrength", snapshot.cloudSeaOffsetStrength);
         SetBool(serializedTuner, "showClouds", snapshot.showClouds);
+        SetBool(serializedTuner, "showFogParticles", snapshot.showFogParticles);
         SetBool(serializedTuner, "showDistantIslands", snapshot.showDistantIslands);
         SetBool(serializedTuner, "applyContinuously", snapshot.applyContinuously);
         serializedTuner.ApplyModifiedPropertiesWithoutUndo();
@@ -718,6 +771,21 @@ internal static class VisualPlayModeTunerPlayModeSaver
         public float fogMaxDistance;
         public float fogAlpha;
         public Color fogColor;
+        public bool useAltitudeAtmosphere;
+        public float previewAltitudeMeters;
+        public float deadlyStormY;
+        public float deadlyStormDrawDistance;
+        public float violentStormCeiling;
+        public float calmStormCeiling;
+        public float habitationCeiling;
+        public float violentStormVisibility;
+        public float calmStormVisibility;
+        public float habitationVisibility;
+        public float upperTechnicalVisibility;
+        public Color violentStormFogColor;
+        public Color calmStormFogColor;
+        public Color habitationFogColor;
+        public Color upperFogColor;
         public Color ambientColor;
         public float ambientIntensity;
         public Color moonColor;
@@ -735,6 +803,7 @@ internal static class VisualPlayModeTunerPlayModeSaver
         public float cloudSeaWaveSpeed;
         public float cloudSeaOffsetStrength;
         public bool showClouds;
+        public bool showFogParticles;
         public bool showDistantIslands;
         public bool applyContinuously;
         public string aeroFogMaterialPath;

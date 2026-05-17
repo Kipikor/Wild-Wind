@@ -544,6 +544,7 @@ MonoBehaviour:
   aeroFogMaterial: {fileID: 2100000, guid: f06ab040c2c402243aea62207ee16044, type: 2}
   skyboxMaterial: {fileID: 2100000, guid: d39c6e1a3f7f40f4a9c48bf7703d7a11, type: 2}
   cloudRoot: {fileID: 698601058}
+  fogParticlesRoot: {fileID: 0}
   cloudSeaRoot: {fileID: 1783807056}
   cloudSeaMaterial: {fileID: 2100000, guid: 10d35623aa9584f43ab24487ba7e65aa, type: 2}
   distantIslandsRoot: {fileID: 506739969}
@@ -556,12 +557,12 @@ MonoBehaviour:
   fogDensity: 0.0247
   fogMaxDistance: 39.8
   fogAlpha: 0.24
-  fogColor: {r: 0.17999995, g: 0.27999994, b: 0.42999992, a: 1}
+  fogColor: {r: 0.17999998, g: 0.27999997, b: 0.42999998, a: 1}
   ambientColor: {r: 0.1, g: 0.16, b: 0.28, a: 1}
   ambientIntensity: 0.327
   moonColor: {r: 0.54, g: 0.66, b: 0.86, a: 1}
   moonIntensity: 0.84
-  moonEuler: {x: 42.000015, y: 328, z: 3.9999974}
+  moonEuler: {x: 42.000004, y: 328, z: 3.9999988}
   showCloudSea: 1
   overrideCloudSeaMaterial: 0
   cloudSeaYOffset: -5.8
@@ -574,6 +575,7 @@ MonoBehaviour:
   cloudSeaWaveSpeed: 6.44
   cloudSeaOffsetStrength: 0.9
   showClouds: 1
+  showFogParticles: 1
   showDistantIslands: 1
   applyContinuously: 1
 --- !u!4 &78318625
@@ -10297,7 +10299,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1585954342}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.335295, y: 0.2691953, z: -0.13003877, w: -0.89342105}
+  m_LocalRotation: {x: -0.33529493, y: 0.2691953, z: -0.13003877, w: -0.89342105}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0

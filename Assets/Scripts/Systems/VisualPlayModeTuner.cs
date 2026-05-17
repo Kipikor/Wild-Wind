@@ -15,6 +15,7 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
     [SerializeField, InspectorName("Материал AERO")] private Material aeroFogMaterial;
     [SerializeField, InspectorName("Материал неба")] private Material skyboxMaterial;
     [SerializeField, InspectorName("Облака TrueClouds")] private Transform cloudRoot;
+    [SerializeField, InspectorName("Туманные частицы")] private Transform fogParticlesRoot;
     [SerializeField, InspectorName("Облачное море")] private Transform cloudSeaRoot;
     [SerializeField, InspectorName("Материал облачного моря")] private Material cloudSeaMaterial;
     [SerializeField, InspectorName("Дальние острова")] private Transform distantIslandsRoot;
@@ -34,6 +35,24 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
     [SerializeField, Range(10f, 260f), InspectorName("Дистанция")] private float fogMaxDistance = 39.8f;
     [SerializeField, Range(0f, 1f), InspectorName("Прозрачность")] private float fogAlpha = 0.24f;
     [SerializeField, InspectorName("Цвет")] private Color fogColor = new Color(0.18f, 0.28f, 0.43f, 1f);
+
+    [Header("Высотные слои")]
+    [SerializeField, InspectorName("Управлять слоями по высоте")] private bool useAltitudeAtmosphere = true;
+    [SerializeField, InspectorName("Источник высоты")] private Transform altitudeSource = null;
+    [SerializeField, Range(0f, 100000f), InspectorName("Высота предпросмотра")] private float previewAltitudeMeters = 128f;
+    [SerializeField, InspectorName("Y смертельной бури")] private float deadlyStormY = 0f;
+    [SerializeField, Range(20f, 300f), InspectorName("Показ поверхности бури до")] private float deadlyStormDrawDistance = 100f;
+    [SerializeField, Range(100f, 2500f), InspectorName("Верх яростной бури")] private float violentStormCeiling = 1000f;
+    [SerializeField, Range(500f, 4000f), InspectorName("Верх спокойной бури")] private float calmStormCeiling = 2000f;
+    [SerializeField, Range(2000f, 20000f), InspectorName("Верх зоны обитания")] private float habitationCeiling = 10000f;
+    [SerializeField, Range(20f, 500f), InspectorName("Видимость яростной бури")] private float violentStormVisibility = 100f;
+    [SerializeField, Range(200f, 2500f), InspectorName("Видимость спокойной бури")] private float calmStormVisibility = 1000f;
+    [SerializeField, Range(1000f, 12000f), InspectorName("Видимость зоны обитания")] private float habitationVisibility = 6000f;
+    [SerializeField, Range(1000f, 20000f), InspectorName("Техническая видимость верха")] private float upperTechnicalVisibility = 8000f;
+    [SerializeField, InspectorName("Цвет яростной бури")] private Color violentStormFogColor = new Color(0.055f, 0.065f, 0.09f, 1f);
+    [SerializeField, InspectorName("Цвет спокойной бури")] private Color calmStormFogColor = new Color(0.20f, 0.22f, 0.27f, 1f);
+    [SerializeField, InspectorName("Цвет белой пелены")] private Color habitationFogColor = new Color(0.62f, 0.70f, 0.82f, 1f);
+    [SerializeField, InspectorName("Цвет верхней дымки")] private Color upperFogColor = new Color(0.35f, 0.47f, 0.66f, 1f);
 
     [Header("Свет")]
     [SerializeField, InspectorName("Цвет окружения")] private Color ambientColor = new Color(0.10f, 0.16f, 0.28f);
@@ -57,6 +76,7 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
 
     [Header("Слои")]
     [SerializeField, InspectorName("Показывать облака")] private bool showClouds = true;
+    [SerializeField, InspectorName("Показывать туманные частицы")] private bool showFogParticles = true;
     [SerializeField, InspectorName("Показывать дальние острова")] private bool showDistantIslands = true;
     [SerializeField, InspectorName("Применять постоянно")] private bool applyContinuously = true;
 
@@ -66,6 +86,7 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         Material fogMaterial,
         Material skyMaterial,
         Transform clouds,
+        Transform fogParticles,
         Transform cloudSea,
         Material cloudSeaMat,
         Transform distantIslands)
@@ -75,6 +96,7 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         aeroFogMaterial = fogMaterial;
         skyboxMaterial = skyMaterial;
         cloudRoot = clouds;
+        fogParticlesRoot = fogParticles;
         cloudSeaRoot = cloudSea;
         cloudSeaMaterial = cloudSeaMat;
         distantIslandsRoot = distantIslands;
@@ -154,6 +176,19 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         EditorGUIUtility.systemCopyBuffer = text;
 #endif
         Debug.Log(text, this);
+    }
+
+    public string GetAtmosphereDebugText()
+    {
+        AltitudeAtmosphere atmosphere = BuildAltitudeAtmosphere();
+        string surfaceState = atmosphere.showDeadlyStormSurface ? "видна" : "скрыта";
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "Высота над бурей: {0:0.#} м. Слой: {1}. Видимость: {2:0.#} м. Поверхность смертельной бури: {3}.",
+            atmosphere.altitudeAboveStorm,
+            atmosphere.layerName,
+            atmosphere.visibility,
+            surfaceState);
     }
 
     [ContextMenu("Пресет: грозовое дно")]
@@ -256,6 +291,12 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
             cloudRoot = clouds != null ? clouds.transform : null;
         }
 
+        if (fogParticlesRoot == null)
+        {
+            GameObject fogParticles = GameObject.Find("Fog Particle Wisps");
+            fogParticlesRoot = fogParticles != null ? fogParticles.transform : null;
+        }
+
         if (cloudSeaRoot == null)
         {
             GameObject cloudSea = GameObject.Find("Cloud Sea");
@@ -313,10 +354,16 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
             return;
         }
 
-        SetFloat(aeroFogMaterial, "_Density", fogDensity);
-        SetFloat(aeroFogMaterial, "_Max_Distance", fogMaxDistance);
+        AltitudeAtmosphere atmosphere = BuildAltitudeAtmosphere();
+        float appliedDensity = useAltitudeAtmosphere ? atmosphere.density : fogDensity;
+        float appliedMaxDistance = useAltitudeAtmosphere ? atmosphere.visibility : fogMaxDistance;
+        float appliedAlpha = useAltitudeAtmosphere ? atmosphere.alpha : fogAlpha;
+        Color appliedColor = useAltitudeAtmosphere ? atmosphere.color : fogColor;
+
+        SetFloat(aeroFogMaterial, "_Density", appliedDensity);
+        SetFloat(aeroFogMaterial, "_Max_Distance", appliedMaxDistance);
         SetFloat(aeroFogMaterial, "_ADDITIONAL_LIGHTS", 0f);
-        SetColor(aeroFogMaterial, "_Colour", new Color(fogColor.r, fogColor.g, fogColor.b, fogAlpha));
+        SetColor(aeroFogMaterial, "_Colour", new Color(appliedColor.r, appliedColor.g, appliedColor.b, appliedAlpha));
         aeroFogMaterial.DisableKeyword("_ADDITIONAL_LIGHTS");
         MarkDirty(aeroFogMaterial);
     }
@@ -339,9 +386,12 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
 
     private void ApplyCloudSea()
     {
+        AltitudeAtmosphere atmosphere = BuildAltitudeAtmosphere();
+        bool cloudSeaVisible = showCloudSea && (!useAltitudeAtmosphere || atmosphere.showDeadlyStormSurface);
+
         if (cloudSeaRoot != null)
         {
-            cloudSeaRoot.gameObject.SetActive(showCloudSea);
+            cloudSeaRoot.gameObject.SetActive(cloudSeaVisible);
             cloudSeaRoot.localPosition = new Vector3(0f, cloudSeaYOffset, 0f);
             cloudSeaRoot.localScale = Vector3.one * cloudSeaScale;
         }
@@ -361,11 +411,71 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         MarkDirty(cloudSeaMaterial);
     }
 
+    private AltitudeAtmosphere BuildAltitudeAtmosphere()
+    {
+        float altitude = Mathf.Max(0f, GetWorldAltitude() - deadlyStormY);
+
+        if (altitude < violentStormCeiling)
+        {
+            return new AltitudeAtmosphere(
+                altitude,
+                "Яростная буря",
+                violentStormVisibility,
+                0.03f,
+                0.62f,
+                violentStormFogColor,
+                altitude <= deadlyStormDrawDistance);
+        }
+
+        if (altitude < calmStormCeiling)
+        {
+            return new AltitudeAtmosphere(
+                altitude,
+                "Спокойная буря",
+                calmStormVisibility,
+                0.014f,
+                0.38f,
+                calmStormFogColor,
+                false);
+        }
+
+        if (altitude < habitationCeiling)
+        {
+            return new AltitudeAtmosphere(
+                altitude,
+                "Зона обитания",
+                habitationVisibility,
+                0.0065f,
+                0.20f,
+                habitationFogColor,
+                false);
+        }
+
+        return new AltitudeAtmosphere(
+            altitude,
+            "Разреженная зона",
+            upperTechnicalVisibility,
+            0.0035f,
+            0.12f,
+            upperFogColor,
+            false);
+    }
+
+    private float GetWorldAltitude()
+    {
+        return altitudeSource != null ? altitudeSource.position.y : previewAltitudeMeters;
+    }
+
     private void ApplyLayers()
     {
         if (cloudRoot != null)
         {
             cloudRoot.gameObject.SetActive(showClouds);
+        }
+
+        if (fogParticlesRoot != null)
+        {
+            fogParticlesRoot.gameObject.SetActive(showFogParticles);
         }
 
         if (distantIslandsRoot != null)
@@ -388,6 +498,22 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         builder.AppendLine("fogMaxDistance=" + Format(fogMaxDistance));
         builder.AppendLine("fogAlpha=" + Format(fogAlpha));
         builder.AppendLine("fogColor=" + Format(fogColor));
+        builder.AppendLine("useAltitudeAtmosphere=" + useAltitudeAtmosphere);
+        builder.AppendLine("previewAltitudeMeters=" + Format(previewAltitudeMeters));
+        builder.AppendLine("deadlyStormY=" + Format(deadlyStormY));
+        builder.AppendLine("deadlyStormDrawDistance=" + Format(deadlyStormDrawDistance));
+        builder.AppendLine("violentStormCeiling=" + Format(violentStormCeiling));
+        builder.AppendLine("calmStormCeiling=" + Format(calmStormCeiling));
+        builder.AppendLine("habitationCeiling=" + Format(habitationCeiling));
+        builder.AppendLine("violentStormVisibility=" + Format(violentStormVisibility));
+        builder.AppendLine("calmStormVisibility=" + Format(calmStormVisibility));
+        builder.AppendLine("habitationVisibility=" + Format(habitationVisibility));
+        builder.AppendLine("upperTechnicalVisibility=" + Format(upperTechnicalVisibility));
+        builder.AppendLine("violentStormFogColor=" + Format(violentStormFogColor));
+        builder.AppendLine("calmStormFogColor=" + Format(calmStormFogColor));
+        builder.AppendLine("habitationFogColor=" + Format(habitationFogColor));
+        builder.AppendLine("upperFogColor=" + Format(upperFogColor));
+        builder.AppendLine("computedAtmosphere=" + GetAtmosphereDebugText());
         builder.AppendLine("ambientColor=" + Format(ambientColor));
         builder.AppendLine("ambientIntensity=" + Format(ambientIntensity));
         builder.AppendLine("moonColor=" + Format(moonColor));
@@ -405,6 +531,7 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         builder.AppendLine("cloudSeaWaveHeight=" + Format(cloudSeaWaveHeight));
         builder.AppendLine("cloudSeaWaveSpeed=" + Format(cloudSeaWaveSpeed));
         builder.AppendLine("cloudSeaOffsetStrength=" + Format(cloudSeaOffsetStrength));
+        builder.AppendLine("showFogParticles=" + showFogParticles);
         builder.AppendLine("showDistantIslands=" + showDistantIslands);
         return builder.ToString();
     }
@@ -469,5 +596,34 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
             EditorUtility.SetDirty(target);
         }
 #endif
+    }
+
+    private readonly struct AltitudeAtmosphere
+    {
+        public readonly float altitudeAboveStorm;
+        public readonly string layerName;
+        public readonly float visibility;
+        public readonly float density;
+        public readonly float alpha;
+        public readonly Color color;
+        public readonly bool showDeadlyStormSurface;
+
+        public AltitudeAtmosphere(
+            float altitudeAboveStorm,
+            string layerName,
+            float visibility,
+            float density,
+            float alpha,
+            Color color,
+            bool showDeadlyStormSurface)
+        {
+            this.altitudeAboveStorm = altitudeAboveStorm;
+            this.layerName = layerName;
+            this.visibility = visibility;
+            this.density = density;
+            this.alpha = alpha;
+            this.color = color;
+            this.showDeadlyStormSurface = showDeadlyStormSurface;
+        }
     }
 }

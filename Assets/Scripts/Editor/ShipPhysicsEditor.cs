@@ -96,6 +96,11 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Окружающая среда", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("windVelocity"), new GUIContent("Ветер (м/с)"));
+        EditorGUILayout.HelpBox(
+            $"Эффективный ветер: {ship.EffectiveWindVelocity.magnitude:F1} м/с " +
+            $"из {ship.windVelocity.magnitude:F1} м/с. " +
+            $"Коэффициент формы корабля: x{ship.CurrentWindAerodynamicFactor:F2}.",
+            MessageType.Info);
 
         EditorGUILayout.HelpBox(
             "Коэффициенты формы (Cd):\n" +

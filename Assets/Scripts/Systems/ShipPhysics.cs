@@ -1913,6 +1913,8 @@ public class ShipPhysics : MonoBehaviour
 
     // Рассчитанный текущий коэффициент сопротивления (используется для физики)
     public float CurrentAeroDrag => 0.5f * airDensity * dragCoefficient * frontalArea;
+    public float CurrentWindAerodynamicFactor => Mathf.Max(0f, dragCoefficient);
+    public Vector3 EffectiveWindVelocity => GetEffectiveWindVelocity();
 
     [Header("Автопилот и Системы")]
     public bool autoStabilizeAtStart = true; // Новая галочка
@@ -2822,7 +2824,8 @@ public class ShipPhysics : MonoBehaviour
         UpdateSurvey();
 
         // --- АЭРОДИНАМИКА (с учетом ветра) ---
-        Vector3 airVelocity = rb.linearVelocity - windVelocity;
+        Vector3 effectiveWindVelocity = GetEffectiveWindVelocity();
+        Vector3 airVelocity = rb.linearVelocity - effectiveWindVelocity;
         float airspeed = airVelocity.magnitude;
 
         float aeroMultiplier = 1.0f;
@@ -2902,7 +2905,7 @@ public class ShipPhysics : MonoBehaviour
         }
 
         thrustAxis.Normalize();
-        Vector3 horizontalAirVelocity = Vector3.ProjectOnPlane(rb.linearVelocity - windVelocity, Vector3.up);
+        Vector3 horizontalAirVelocity = Vector3.ProjectOnPlane(rb.linearVelocity - GetEffectiveWindVelocity(), Vector3.up);
         float signedAirspeedWithThrust = Vector3.Dot(horizontalAirVelocity, thrustAxis) * thrustDirection;
         float speedFactor = signedAirspeedWithThrust >= propellerMaxSpeedMS ? 0f : 1f;
         float maxThrustKgf = propellerMaxThrustKgf * propellerEngagement * speedFactor;
@@ -3106,7 +3109,7 @@ public class ShipPhysics : MonoBehaviour
         float desiredSpeed = Mathf.Min(maxSpeed, Mathf.Sqrt(2f * brakeAcceleration * stopDistance));
 
         Vector3 desiredGroundVelocity = directionToTarget * desiredSpeed;
-        Vector3 requiredAirVelocity = desiredGroundVelocity - FlattenHorizontal(windVelocity);
+        Vector3 requiredAirVelocity = desiredGroundVelocity - FlattenHorizontal(GetEffectiveWindVelocity());
         Vector3 headingVector = requiredAirVelocity.sqrMagnitude > 0.04f ? requiredAirVelocity : directionToTarget;
 
         targetHeading = HeadingFromVector(headingVector);
@@ -3132,7 +3135,7 @@ public class ShipPhysics : MonoBehaviour
         float modulePowerKw = gasHarvesterEnabled ? Mathf.Max(0f, gasHarvesterPowerDrawKw) : 0f;
         float residualPowerKw = Mathf.Max(0f, enginePowerKwAt100 - liftPowerKw - modulePowerKw);
         float usefulPowerW = residualPowerKw * Mathf.Clamp01(propellerEfficiency) * 1000f;
-        float horizontalAirspeed = FlattenHorizontal(rb.linearVelocity - windVelocity).magnitude;
+        float horizontalAirspeed = FlattenHorizontal(rb.linearVelocity - GetEffectiveWindVelocity()).magnitude;
         float powerLimitedThrustN = usefulPowerW > 0f ? usefulPowerW / Mathf.Max(1f, horizontalAirspeed) : 0f;
         float estimatedThrustN = Mathf.Min(staticThrustN, powerLimitedThrustN);
         float estimatedAcceleration = estimatedThrustN / mass;
@@ -3180,7 +3183,7 @@ public class ShipPhysics : MonoBehaviour
             }
             else
             {
-                Vector3 windHorizontal = FlattenHorizontal(windVelocity);
+                Vector3 windHorizontal = FlattenHorizontal(GetEffectiveWindVelocity());
                 if (windHorizontal.sqrMagnitude > 0.04f)
                 {
                     headingVector = -windHorizontal;
@@ -3201,6 +3204,11 @@ public class ShipPhysics : MonoBehaviour
         float headingError = Mathf.Abs(Mathf.DeltaAngle(transform.eulerAngles.y, targetHeading));
         desiredSpeed *= CalculateRouteHeadingSpeedFactor(headingError);
         targetSpeedMS = Mathf.Clamp(desiredSpeed, 0f, Mathf.Max(0f, maxSpeed));
+    }
+
+    private Vector3 GetEffectiveWindVelocity()
+    {
+        return windVelocity * CurrentWindAerodynamicFactor;
     }
 
     private static Vector3 FlattenHorizontal(Vector3 value)
@@ -3587,12 +3595,13 @@ public class ShipPhysics : MonoBehaviour
     private void OnDrawGizmos()
     {
         // Визуализация ветра
-        if (windVelocity.sqrMagnitude > 0.1f)
+        Vector3 effectiveWindVelocity = GetEffectiveWindVelocity();
+        if (effectiveWindVelocity.sqrMagnitude > 0.1f)
         {
             Gizmos.color = new Color(1f, 0f, 1f, 0.7f); // Пурпурный
             Vector3 startPos = transform.position + Vector3.up * 10f; // Чуть выше корабля
-            Gizmos.DrawLine(startPos, startPos + windVelocity);
-            Gizmos.DrawWireSphere(startPos + windVelocity, 1f); // Наконечник
+            Gizmos.DrawLine(startPos, startPos + effectiveWindVelocity);
+            Gizmos.DrawWireSphere(startPos + effectiveWindVelocity, 1f); // Наконечник
         }
 
         if (positionHold)

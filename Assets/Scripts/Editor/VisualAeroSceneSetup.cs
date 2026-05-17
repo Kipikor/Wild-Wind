@@ -464,6 +464,7 @@ public static class VisualAeroSceneSetup
             fogMaterial,
             skyboxMaterial,
             FindTransform("Atmospheric Cloud Banks"),
+            FindTransform("Fog Particle Wisps"),
             cloudSea,
             FindCloudSeaMaterial(cloudSea),
             FindTransform("Distant Island Silhouettes"));
