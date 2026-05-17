@@ -47,6 +47,7 @@ public sealed class VisualPlayModeTunerEditor : Editor
         Field("previewAltitudeMeters", "Высота предпросмотра", "Ручная высота для проверки слоёв прямо в визуальной сцене.");
         Field("deadlyStormY", "Y смертельной бури", "Нулевая поверхность смертельной бури в мировых координатах.");
         Field("deadlyStormDrawDistance", "Показ поверхности бури до", "До какой высоты над бурей вообще отрисовывается Space Cloud Waves.");
+        Field("altitudeTransitionHalfWidth", "Полуширина перехода", "На сколько метров в обе стороны от границы плавно смешиваются показатели соседних слоёв.");
         Field("violentStormCeiling", "Верх яростной бури", "Ниже этого значения действует самый плотный слой.");
         Field("calmStormCeiling", "Верх спокойной бури", "Ниже этого значения буря ещё опасна, но уже читается спокойнее.");
         Field("habitationCeiling", "Верх зоны обитания", "Ниже этого значения живёт основная часть мира.");
@@ -507,6 +508,7 @@ internal static class VisualPlayModeTunerPlayModeSaver
             previewAltitudeMeters = FloatValue(serializedTuner, "previewAltitudeMeters"),
             deadlyStormY = FloatValue(serializedTuner, "deadlyStormY"),
             deadlyStormDrawDistance = FloatValue(serializedTuner, "deadlyStormDrawDistance"),
+            altitudeTransitionHalfWidth = FloatValue(serializedTuner, "altitudeTransitionHalfWidth"),
             violentStormCeiling = FloatValue(serializedTuner, "violentStormCeiling"),
             calmStormCeiling = FloatValue(serializedTuner, "calmStormCeiling"),
             habitationCeiling = FloatValue(serializedTuner, "habitationCeiling"),
@@ -599,6 +601,7 @@ internal static class VisualPlayModeTunerPlayModeSaver
         SetFloat(serializedTuner, "previewAltitudeMeters", snapshot.previewAltitudeMeters);
         SetFloat(serializedTuner, "deadlyStormY", snapshot.deadlyStormY);
         SetFloat(serializedTuner, "deadlyStormDrawDistance", snapshot.deadlyStormDrawDistance);
+        SetFloat(serializedTuner, "altitudeTransitionHalfWidth", snapshot.altitudeTransitionHalfWidth);
         SetFloat(serializedTuner, "violentStormCeiling", snapshot.violentStormCeiling);
         SetFloat(serializedTuner, "calmStormCeiling", snapshot.calmStormCeiling);
         SetFloat(serializedTuner, "habitationCeiling", snapshot.habitationCeiling);
@@ -775,6 +778,7 @@ internal static class VisualPlayModeTunerPlayModeSaver
         public float previewAltitudeMeters;
         public float deadlyStormY;
         public float deadlyStormDrawDistance;
+        public float altitudeTransitionHalfWidth;
         public float violentStormCeiling;
         public float calmStormCeiling;
         public float habitationCeiling;

@@ -42,6 +42,7 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
     [SerializeField, Range(0f, 100000f), InspectorName("Высота предпросмотра")] private float previewAltitudeMeters = 128f;
     [SerializeField, InspectorName("Y смертельной бури")] private float deadlyStormY = 0f;
     [SerializeField, Range(20f, 300f), InspectorName("Показ поверхности бури до")] private float deadlyStormDrawDistance = 100f;
+    [SerializeField, Range(0f, 500f), InspectorName("Полуширина перехода")] private float altitudeTransitionHalfWidth = 50f;
     [SerializeField, Range(100f, 2500f), InspectorName("Верх яростной бури")] private float violentStormCeiling = 1000f;
     [SerializeField, Range(500f, 4000f), InspectorName("Верх спокойной бури")] private float calmStormCeiling = 2000f;
     [SerializeField, Range(2000f, 20000f), InspectorName("Верх зоны обитания")] private float habitationCeiling = 10000f;
@@ -414,43 +415,84 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
     private AltitudeAtmosphere BuildAltitudeAtmosphere()
     {
         float altitude = Mathf.Max(0f, GetWorldAltitude() - deadlyStormY);
+        float transitionHalfWidth = Mathf.Max(0f, altitudeTransitionHalfWidth);
+
+        AltitudeAtmosphere violent = CreateViolentStormAtmosphere(altitude);
+        AltitudeAtmosphere calm = CreateCalmStormAtmosphere(altitude);
+        AltitudeAtmosphere habitation = CreateHabitationAtmosphere(altitude);
+        AltitudeAtmosphere upper = CreateUpperAtmosphere(altitude);
+
+        if (TryBlendAtmospheres(altitude, violentStormCeiling, transitionHalfWidth, violent, calm, out AltitudeAtmosphere blended))
+        {
+            return blended;
+        }
+
+        if (TryBlendAtmospheres(altitude, calmStormCeiling, transitionHalfWidth, calm, habitation, out blended))
+        {
+            return blended;
+        }
+
+        if (TryBlendAtmospheres(altitude, habitationCeiling, transitionHalfWidth, habitation, upper, out blended))
+        {
+            return blended;
+        }
 
         if (altitude < violentStormCeiling)
         {
-            return new AltitudeAtmosphere(
-                altitude,
-                "Яростная буря",
-                violentStormVisibility,
-                0.03f,
-                0.62f,
-                violentStormFogColor,
-                altitude <= deadlyStormDrawDistance);
+            return violent;
         }
 
         if (altitude < calmStormCeiling)
         {
-            return new AltitudeAtmosphere(
-                altitude,
-                "Спокойная буря",
-                calmStormVisibility,
-                0.014f,
-                0.38f,
-                calmStormFogColor,
-                false);
+            return calm;
         }
 
         if (altitude < habitationCeiling)
         {
-            return new AltitudeAtmosphere(
-                altitude,
-                "Зона обитания",
-                habitationVisibility,
-                0.0065f,
-                0.20f,
-                habitationFogColor,
-                false);
+            return habitation;
         }
 
+        return upper;
+    }
+
+    private AltitudeAtmosphere CreateViolentStormAtmosphere(float altitude)
+    {
+        return new AltitudeAtmosphere(
+            altitude,
+            "Яростная буря",
+            violentStormVisibility,
+            0.03f,
+            0.62f,
+            violentStormFogColor,
+            altitude <= deadlyStormDrawDistance);
+    }
+
+    private AltitudeAtmosphere CreateCalmStormAtmosphere(float altitude)
+    {
+        return new AltitudeAtmosphere(
+            altitude,
+            "Спокойная буря",
+            calmStormVisibility,
+            0.014f,
+            0.38f,
+            calmStormFogColor,
+            false);
+    }
+
+    private AltitudeAtmosphere CreateHabitationAtmosphere(float altitude)
+    {
+        return new AltitudeAtmosphere(
+            altitude,
+            "Зона обитания",
+            habitationVisibility,
+            0.0065f,
+            0.20f,
+            habitationFogColor,
+            false);
+    }
+
+    private AltitudeAtmosphere CreateUpperAtmosphere(float altitude)
+    {
         return new AltitudeAtmosphere(
             altitude,
             "Разреженная зона",
@@ -459,6 +501,26 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
             0.12f,
             upperFogColor,
             false);
+    }
+
+    private static bool TryBlendAtmospheres(
+        float altitude,
+        float boundary,
+        float halfWidth,
+        AltitudeAtmosphere lower,
+        AltitudeAtmosphere upper,
+        out AltitudeAtmosphere blended)
+    {
+        blended = lower;
+        if (halfWidth <= 0f || altitude < boundary - halfWidth || altitude > boundary + halfWidth)
+        {
+            return false;
+        }
+
+        float t = Mathf.InverseLerp(boundary - halfWidth, boundary + halfWidth, altitude);
+        t = Mathf.SmoothStep(0f, 1f, t);
+        blended = AltitudeAtmosphere.Lerp(lower, upper, t);
+        return true;
     }
 
     private float GetWorldAltitude()
@@ -502,6 +564,7 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         builder.AppendLine("previewAltitudeMeters=" + Format(previewAltitudeMeters));
         builder.AppendLine("deadlyStormY=" + Format(deadlyStormY));
         builder.AppendLine("deadlyStormDrawDistance=" + Format(deadlyStormDrawDistance));
+        builder.AppendLine("altitudeTransitionHalfWidth=" + Format(altitudeTransitionHalfWidth));
         builder.AppendLine("violentStormCeiling=" + Format(violentStormCeiling));
         builder.AppendLine("calmStormCeiling=" + Format(calmStormCeiling));
         builder.AppendLine("habitationCeiling=" + Format(habitationCeiling));
@@ -624,6 +687,25 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
             this.alpha = alpha;
             this.color = color;
             this.showDeadlyStormSurface = showDeadlyStormSurface;
+        }
+
+        public static AltitudeAtmosphere Lerp(AltitudeAtmosphere lower, AltitudeAtmosphere upper, float t)
+        {
+            t = Mathf.Clamp01(t);
+            string layerName = t <= 0.001f
+                ? lower.layerName
+                : t >= 0.999f
+                    ? upper.layerName
+                    : "Переход: " + lower.layerName + " -> " + upper.layerName;
+
+            return new AltitudeAtmosphere(
+                Mathf.Lerp(lower.altitudeAboveStorm, upper.altitudeAboveStorm, t),
+                layerName,
+                Mathf.Lerp(lower.visibility, upper.visibility, t),
+                Mathf.Lerp(lower.density, upper.density, t),
+                Mathf.Lerp(lower.alpha, upper.alpha, t),
+                Color.Lerp(lower.color, upper.color, t),
+                lower.showDeadlyStormSurface || upper.showDeadlyStormSurface);
         }
     }
 }
