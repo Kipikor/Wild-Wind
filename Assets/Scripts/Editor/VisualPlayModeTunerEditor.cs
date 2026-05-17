@@ -24,11 +24,23 @@ public sealed class VisualPlayModeTunerEditor : Editor
         Field("cloudSeaRoot", "Облачное море", "Корневой объект нижнего слоя Space Cloud Waves.");
         Field("cloudSeaMaterial", "Материал облачного моря", "Настроенная копия материала Space Cloud Waves.");
         Field("distantIslandsRoot", "Дальние острова", "Корневой объект силуэтов островов на горизонте.");
+        Field("compositionRoot", "Композиция стенда", "Корень стенда: остров, корабль и тестовые облака.");
 
         Section("Камера");
         Field("cameraPosition", "Позиция камеры", "Откуда смотрим.");
         Field("cameraTarget", "Точка взгляда", "Куда камера смотрит.");
         Field("cameraFov", "Угол обзора", "Шире значение даёт больше воздуха, меньшее приближает кадр.");
+
+        Section("Стенд композиции");
+        Field("useCompositionRig", "Управлять композицией", "Если включено, этот же тюнер двигает корень композиции и камеру по высоте/дистанции.");
+        Field("compositionAltitudeMeters", "Высота композиции", "Y-высота стенда в метрах мира. По ней же выбирается слой тумана.");
+        Field("compositionCameraDistanceMeters", "Дистанция камеры", "Расстояние камеры до композиции.");
+        Field("compositionSideOffsetMeters", "Боковой сдвиг", "Двигает всю композицию вправо или влево.");
+        Field("compositionDepthOffsetMeters", "Сдвиг вперед/назад", "Двигает композицию по глубине кадра.");
+        Field("compositionLookHeightMeters", "Высота взгляда", "На какую точку над корнем композиции смотрит камера.");
+        Field("compositionCameraHeightMeters", "Камера выше цели", "Насколько камера поднята над точкой взгляда.");
+        Field("compositionCameraYawDegrees", "Угол обхода камеры", "Поворот камеры вокруг композиции.");
+        Field("compositionCameraFarClipMeters", "Far Clip камеры", "Техническая дальность отрисовки камеры для теста видимости.");
 
         Section("Небо");
         Field("skyExposure", "Яркость неба", "0 темнее, 1 стандартно, выше 1 ярче.");
@@ -163,7 +175,6 @@ internal static class VisualStormBottomPresetEditor
     {
     }
 
-    [MenuItem("Wild Wind/Visual/Применить пресет грозового дна", false, 120)]
     private static void ApplyPresetFromMenu()
     {
         Renderer selectedRenderer = FindSelectedRenderer();
@@ -262,7 +273,6 @@ internal static class VisualSelectedMaterialPlayModeSaver
         EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
     }
 
-    [MenuItem("Wild Wind/Visual/Сохранить материалы выделенного рендера после Play Mode", false, 130)]
     private static void QueueSaveFromSelection()
     {
         Renderer renderer = Selection.activeGameObject != null
@@ -278,7 +288,6 @@ internal static class VisualSelectedMaterialPlayModeSaver
         QueueSave(renderer);
     }
 
-    [MenuItem("Wild Wind/Visual/Сохранить материалы выделенного рендера после Play Mode", true)]
     private static bool CanQueueSaveFromSelection()
     {
         return Selection.activeGameObject != null

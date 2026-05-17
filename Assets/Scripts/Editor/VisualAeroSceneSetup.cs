@@ -19,18 +19,37 @@ public static class VisualAeroSceneSetup
     private const int TrueCloudLayer = 8;
     private const int TrueCloudLightLayer = 10;
 
-    [MenuItem("Wild Wind/Visual/Apply AERO To Visual Target Scene")]
     public static void ApplyToVisualTargetScene()
     {
         EnsureFolders();
 
         if (!System.IO.File.Exists(ScenePath))
         {
-            Debug.LogWarning("[VisualAERO] Scene not found. Build it first: Wild Wind/Visual/Build Visual Target Scene");
+            Debug.LogWarning("[VisualAERO] Scene not found. Build it first: Wild Wind/Visual/Build Visual Scene");
             return;
         }
 
         Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        ApplyToLoadedScene(scene);
+        Debug.Log("[VisualAERO] AERO fog and AllSky skybox applied to " + ScenePath);
+    }
+
+    public static void ApplyToActiveScene()
+    {
+        EnsureFolders();
+        Scene scene = SceneManager.GetActiveScene();
+        ApplyToLoadedScene(scene);
+        Debug.Log("[VisualAERO] AERO fog and AllSky skybox applied to active scene: " + scene.path);
+    }
+
+    private static void ApplyToLoadedScene(Scene scene)
+    {
+        if (!scene.IsValid())
+        {
+            Debug.LogWarning("[VisualAERO] Active scene is not valid.");
+            return;
+        }
+
         Material fogMaterial = EnsureAeroMaterial();
         int rendererIndex = EnsureVisualRenderer(fogMaterial);
         Material skyboxMaterial = ConfigureSceneAtmosphere();
@@ -39,10 +58,17 @@ public static class VisualAeroSceneSetup
         ConfigureController(fogMaterial);
         ConfigurePlayModeTuner(fogMaterial, skyboxMaterial);
 
-        EditorSceneManager.SaveScene(scene);
+        if (!string.IsNullOrWhiteSpace(scene.path))
+        {
+            EditorSceneManager.SaveScene(scene);
+        }
+        else
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+        }
+
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[VisualAERO] AERO fog and AllSky skybox applied to " + ScenePath);
     }
 
     private static void EnsureFolders()
@@ -380,7 +406,7 @@ public static class VisualAeroSceneSetup
         SetField(cloudCamera, "WorldDepthResolutionDivider", 2);
         SetEnumField(cloudCamera, "DepthPrecision", 5);
         SetField(cloudCamera, "LateCut", true);
-        SetField(cloudCamera, "BlurRadius", 16f);
+        SetField(cloudCamera, "BlurRadius", 10f);
         SetEnumField(cloudCamera, "BlurQuality", 5);
         SetField(cloudCamera, "LateCutThreshohld", 0.02f);
         SetField(cloudCamera, "LateCutPower", 1.45f);
@@ -391,17 +417,17 @@ public static class VisualAeroSceneSetup
         SetField(cloudCamera, "Wind", new Vector3(-1.6f, -0.22f, -0.55f));
         SetField(cloudCamera, "NoiseScale", 4f);
         SetField(cloudCamera, "DepthNoiseScale", 5f);
-        SetField(cloudCamera, "NormalNoisePower", 1.85f);
-        SetField(cloudCamera, "DepthNoisePower", 0.36f);
-        SetField(cloudCamera, "DisplacementNoisePower", 1.7f);
+        SetField(cloudCamera, "NormalNoisePower", 1.25f);
+        SetField(cloudCamera, "DepthNoisePower", 0.24f);
+        SetField(cloudCamera, "DisplacementNoisePower", 1.15f);
         SetField(cloudCamera, "NoiseSinTimeScale", 0.10f);
         SetField(cloudCamera, "DistanceToClouds", 32f);
         SetField(cloudCamera, "Light", FindLight("Moon Directional Light")?.transform);
         SetField(cloudCamera, "UseRamp", false);
-        SetField(cloudCamera, "LightColor", new Color(0.62f, 0.74f, 0.94f));
-        SetField(cloudCamera, "ShadowColor", new Color(0.08f, 0.14f, 0.24f));
-        SetField(cloudCamera, "LightEnd", 0.64f);
-        SetField(cloudCamera, "HaloPower", 2.2f);
+        SetField(cloudCamera, "LightColor", Color.white);
+        SetField(cloudCamera, "ShadowColor", new Color(0.78f, 0.80f, 0.84f));
+        SetField(cloudCamera, "LightEnd", 0.78f);
+        SetField(cloudCamera, "HaloPower", 1.05f);
         SetField(cloudCamera, "HaloDistance", 0.65f);
         SetField(cloudCamera, "FallbackDistance", 1.1f);
 

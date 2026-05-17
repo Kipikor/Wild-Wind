@@ -19,11 +19,23 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
     [SerializeField, InspectorName("Облачное море")] private Transform cloudSeaRoot;
     [SerializeField, InspectorName("Материал облачного моря")] private Material cloudSeaMaterial;
     [SerializeField, InspectorName("Дальние острова")] private Transform distantIslandsRoot;
+    [SerializeField, InspectorName("Композиция стенда")] private Transform compositionRoot;
 
     [Header("Камера")]
     [SerializeField, InspectorName("Позиция камеры")] private Vector3 cameraPosition = new Vector3(-24f, 10.5f, -25f);
     [SerializeField, InspectorName("Точка взгляда")] private Vector3 cameraTarget = new Vector3(0.5f, 1.2f, 0f);
     [SerializeField, Range(20f, 70f), InspectorName("Угол обзора")] private float cameraFov = 37.4f;
+
+    [Header("Стенд композиции")]
+    [SerializeField, InspectorName("Управлять композицией")] private bool useCompositionRig = false;
+    [SerializeField, Range(0f, 100000f), InspectorName("Высота композиции, м")] private float compositionAltitudeMeters = 2500f;
+    [SerializeField, Range(20f, 12000f), InspectorName("Дистанция камеры, м")] private float compositionCameraDistanceMeters = 320f;
+    [SerializeField, Range(-3000f, 3000f), InspectorName("Боковой сдвиг, м")] private float compositionSideOffsetMeters = 0f;
+    [SerializeField, Range(-3000f, 3000f), InspectorName("Сдвиг вперед/назад, м")] private float compositionDepthOffsetMeters = 0f;
+    [SerializeField, Range(-200f, 400f), InspectorName("Высота взгляда над корнем, м")] private float compositionLookHeightMeters = 35f;
+    [SerializeField, Range(-100f, 600f), InspectorName("Камера выше цели, м")] private float compositionCameraHeightMeters = 75f;
+    [SerializeField, Range(0f, 360f), InspectorName("Угол обхода камеры")] private float compositionCameraYawDegrees = 228f;
+    [SerializeField, Range(100f, 20000f), InspectorName("Far Clip камеры")] private float compositionCameraFarClipMeters = 12000f;
 
     [Header("Небо")]
     [SerializeField, Range(0f, 2f), InspectorName("Экспозиция неба")] private float skyExposure = 0.829f;
@@ -105,9 +117,38 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         ApplyNow();
     }
 
+    public void ConfigureCompositionRig(Transform newCompositionRoot, bool enabled)
+    {
+        compositionRoot = newCompositionRoot;
+        useCompositionRig = enabled;
+        if (newCompositionRoot != null)
+        {
+            compositionAltitudeMeters = Mathf.Max(0f, newCompositionRoot.position.y);
+        }
+
+        ApplyNow();
+        MarkDirty(this);
+    }
+
+    public void SetRuntimeView(Transform newAltitudeSource, Vector3 newCameraPosition, Vector3 newCameraTarget, float newCameraFov)
+    {
+        altitudeSource = newAltitudeSource;
+        if (newAltitudeSource != null)
+        {
+            previewAltitudeMeters = Mathf.Max(0f, newAltitudeSource.position.y);
+        }
+
+        cameraPosition = newCameraPosition;
+        cameraTarget = newCameraTarget;
+        cameraFov = Mathf.Clamp(newCameraFov, 20f, 70f);
+        ApplyNow();
+        MarkDirty(this);
+    }
+
     [ContextMenu("Применить сейчас")]
     public void ApplyNow()
     {
+        ApplyCompositionRig();
         ApplyCamera();
         ApplySkybox();
         ApplyFog();
@@ -315,6 +356,42 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
             GameObject islands = GameObject.Find("Distant Island Silhouettes");
             distantIslandsRoot = islands != null ? islands.transform : null;
         }
+
+        if (compositionRoot == null)
+        {
+            GameObject composition = GameObject.Find("Altitude Test Composition");
+            compositionRoot = composition != null ? composition.transform : null;
+        }
+    }
+
+    private void ApplyCompositionRig()
+    {
+        if (!useCompositionRig || compositionRoot == null)
+        {
+            return;
+        }
+
+        compositionAltitudeMeters = Mathf.Max(0f, compositionAltitudeMeters);
+        compositionCameraDistanceMeters = Mathf.Max(20f, compositionCameraDistanceMeters);
+        compositionCameraFarClipMeters = Mathf.Max(compositionCameraDistanceMeters + 100f, compositionCameraFarClipMeters);
+
+        Vector3 rootPosition = new Vector3(compositionSideOffsetMeters, compositionAltitudeMeters, compositionDepthOffsetMeters);
+        compositionRoot.position = rootPosition;
+        altitudeSource = compositionRoot;
+        previewAltitudeMeters = compositionAltitudeMeters;
+
+        cameraTarget = rootPosition + Vector3.up * compositionLookHeightMeters;
+        Vector3 forward = Quaternion.Euler(0f, compositionCameraYawDegrees, 0f) * Vector3.forward;
+        cameraPosition = cameraTarget - forward.normalized * compositionCameraDistanceMeters + Vector3.up * compositionCameraHeightMeters;
+
+        if (visualCamera != null)
+        {
+            visualCamera.nearClipPlane = 0.1f;
+            visualCamera.farClipPlane = compositionCameraFarClipMeters;
+            MarkDirty(visualCamera);
+        }
+
+        MarkDirty(compositionRoot);
     }
 
     private void ApplyCamera()
@@ -553,6 +630,15 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
         builder.AppendLine("cameraPosition=" + Format(cameraPosition));
         builder.AppendLine("cameraTarget=" + Format(cameraTarget));
         builder.AppendLine("cameraFov=" + Format(cameraFov));
+        builder.AppendLine("useCompositionRig=" + useCompositionRig);
+        builder.AppendLine("compositionAltitudeMeters=" + Format(compositionAltitudeMeters));
+        builder.AppendLine("compositionCameraDistanceMeters=" + Format(compositionCameraDistanceMeters));
+        builder.AppendLine("compositionSideOffsetMeters=" + Format(compositionSideOffsetMeters));
+        builder.AppendLine("compositionDepthOffsetMeters=" + Format(compositionDepthOffsetMeters));
+        builder.AppendLine("compositionLookHeightMeters=" + Format(compositionLookHeightMeters));
+        builder.AppendLine("compositionCameraHeightMeters=" + Format(compositionCameraHeightMeters));
+        builder.AppendLine("compositionCameraYawDegrees=" + Format(compositionCameraYawDegrees));
+        builder.AppendLine("compositionCameraFarClipMeters=" + Format(compositionCameraFarClipMeters));
         builder.AppendLine("skyExposure=" + Format(skyExposure));
         builder.AppendLine("skyRotation=" + Format(skyRotation));
         builder.AppendLine("skyTint=" + Format(skyTint));

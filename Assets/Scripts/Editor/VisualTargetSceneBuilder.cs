@@ -7,13 +7,14 @@ using UnityEngine.UI;
 public static class VisualTargetSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/VisualTargetScene.unity";
+    private const string AltitudeTestScenePath = "Assets/Scenes/VisualAltitudeCompositionScene.unity";
     private const string MaterialFolder = "Assets/Data/VisualTarget/Materials";
     private const int TrueCloudLayer = 8;
     private const string TrueCloudMaterialPath = "Assets/TrueClouds/ExampleScenes/Materials/CloudMaterial.mat";
     private const string SpaceCloudWavesSourceMaterialPath = "Assets/ShadowVision/SpaceCloudWaves/Examples/SpaceCloudWaves/SpaceCloudWaves.mat";
     private const string FogParticlePrefabPath = "Assets/Fog Particles/Prefabs/Bluish Fog.prefab";
+    private const string FogParticleWhiteMaterialPath = "Assets/Fog Particles/Material/Fog-Material White.mat";
 
-    [MenuItem("Wild Wind/Visual/Build Visual Target Scene")]
     public static void BuildVisualTargetScene()
     {
         EnsureFolders();
@@ -33,11 +34,33 @@ public static class VisualTargetSceneBuilder
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.SaveAssets();
-        VisualAeroSceneSetup.ApplyToVisualTargetScene();
+        VisualAeroSceneSetup.ApplyToActiveScene();
         Debug.Log("[VisualTarget] Scene built with current visual setup: " + ScenePath);
     }
 
-    [MenuItem("Wild Wind/Visual/Add Fog Particle Wisps To Current Scene")]
+    [MenuItem("Wild Wind/Visual/Build Visual Scene")]
+    public static void BuildAltitudeCompositionTestScene()
+    {
+        EnsureFolders();
+        Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        scene.name = "VisualAltitudeCompositionScene";
+
+        VisualPalette palette = CreatePalette();
+        ConfigureAtmosphere(palette);
+        CreateCameraAndLight();
+        ConfigureAltitudeTestCamera();
+        CreateCloudSea(palette);
+        Transform composition = CreateAltitudeTestComposition(palette);
+
+        EditorSceneManager.SaveScene(scene, AltitudeTestScenePath);
+        AssetDatabase.SaveAssets();
+        VisualAeroSceneSetup.ApplyToActiveScene();
+        ConfigureAltitudeCompositionTuner(composition);
+        EditorSceneManager.SaveScene(SceneManager.GetActiveScene());
+        AssetDatabase.SaveAssets();
+        Debug.Log("[VisualTarget] Altitude composition test scene built: " + AltitudeTestScenePath);
+    }
+
     public static void AddFogParticleWispsToCurrentScene()
     {
         GameObject existing = GameObject.Find("Fog Particle Wisps");
@@ -47,7 +70,7 @@ public static class VisualTargetSceneBuilder
         }
 
         CreateFogParticleWisps();
-        VisualAeroSceneSetup.ApplyToVisualTargetScene();
+        VisualAeroSceneSetup.ApplyToActiveScene();
 
         Scene scene = SceneManager.GetActiveScene();
         if (scene.IsValid())
@@ -62,8 +85,55 @@ public static class VisualTargetSceneBuilder
         Debug.Log("[VisualTarget] Fog Particle Wisps added to current scene.");
     }
 
+    public static void RebuildAltitudeTestCloudsInActiveScene()
+    {
+        EnsureFolders();
+
+        GameObject compositionObject = GameObject.Find("Altitude Test Composition");
+        if (compositionObject == null)
+        {
+            Debug.LogWarning("[VisualTarget] Altitude Test Composition was not found. Build the test scene first.");
+            return;
+        }
+
+        Transform composition = compositionObject.transform;
+        DestroyNamedChild(composition, "Atmospheric Cloud Banks");
+        DestroyNamedChild(composition, "Fog Particle Wisps");
+
+        VisualPalette palette = CreatePalette();
+        CreateAltitudeTestClouds(composition, palette);
+        CreateAltitudeTestFogWisps(composition);
+        VisualAeroSceneSetup.ApplyToActiveScene();
+
+        Scene scene = SceneManager.GetActiveScene();
+        if (scene.IsValid())
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (!string.IsNullOrWhiteSpace(scene.path))
+            {
+                EditorSceneManager.SaveScene(scene);
+            }
+        }
+
+        Debug.Log("[VisualTarget] Altitude test clouds rebuilt in active scene.");
+    }
+
+    private static void DestroyNamedChild(Transform parent, string childName)
+    {
+        Transform child = parent.Find(childName);
+        if (child != null)
+        {
+            UnityEngine.Object.DestroyImmediate(child.gameObject);
+        }
+    }
+
     private static void EnsureFolders()
     {
+        if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
+        {
+            AssetDatabase.CreateFolder("Assets", "Scenes");
+        }
+
         if (!AssetDatabase.IsValidFolder("Assets/Data"))
         {
             AssetDatabase.CreateFolder("Assets", "Data");
@@ -98,9 +168,9 @@ public static class VisualTargetSceneBuilder
             Window = Material("M_Visual_WindowWarm", new Color(1.0f, 0.72f, 0.30f), true),
             Lamp = Material("M_Visual_LampWarm", new Color(1.0f, 0.68f, 0.26f), true),
             Crystal = Material("M_Visual_Crystal", new Color(0.0f, 0.78f, 1.0f), true),
-            CloudDistant = Material("M_Visual_DistantCloud", new Color(0.36f, 0.48f, 0.66f, 0.20f), false, true),
-            CloudLight = Material("M_Visual_DistantCloudLight", new Color(0.62f, 0.74f, 0.92f, 0.16f), false, true),
-            TrueCloudVolume = TrueCloudMaterial("M_TrueClouds_VisualVolume", new Color(1f, 1f, 1f, 1f), 0.64f),
+            CloudDistant = Material("M_Visual_DistantCloud", new Color(0.82f, 0.84f, 0.86f, 0.34f), false, true),
+            CloudLight = Material("M_Visual_DistantCloudLight", new Color(1f, 1f, 1f, 0.32f), false, true),
+            TrueCloudVolume = TrueCloudMaterial("M_TrueClouds_VisualVolume", Color.white, 0.82f),
             CloudSea = SpaceCloudWavesMaterial("M_SpaceCloudWaves_CloudSea"),
             Panel = Material("M_Visual_HudPanel", new Color(0.025f, 0.04f, 0.06f, 0.86f), false, true),
             PanelSoft = Material("M_Visual_HudPanelSoft", new Color(0.035f, 0.055f, 0.075f, 0.72f), false, true)
@@ -192,6 +262,28 @@ public static class VisualTargetSceneBuilder
         return material;
     }
 
+    private static Material EnsureOpaqueWhiteFogParticleMaterial()
+    {
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(FogParticleWhiteMaterialPath);
+        if (material == null)
+        {
+            Debug.LogWarning("[VisualTarget] White Fog Particles material was not found: " + FogParticleWhiteMaterialPath);
+            return null;
+        }
+
+        SetMaterialColor(material, "_BaseColor", Color.white);
+        SetMaterialColor(material, "_Color", Color.white);
+        SetMaterialFloat(material, "_Surface", 0f);
+        SetMaterialFloat(material, "_AlphaClip", 0f);
+        SetMaterialFloat(material, "_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+        SetMaterialFloat(material, "_DstBlend", (float)UnityEngine.Rendering.BlendMode.Zero);
+        SetMaterialFloat(material, "_ZWrite", 1f);
+        material.SetOverrideTag("RenderType", "Opaque");
+        material.renderQueue = -1;
+        EditorUtility.SetDirty(material);
+        return material;
+    }
+
     private static void SetMaterialFloat(Material material, string property, float value)
     {
         if (material.HasProperty(property))
@@ -266,6 +358,33 @@ public static class VisualTargetSceneBuilder
         moon.color = new Color(0.48f, 0.58f, 0.74f);
         moon.intensity = 1.35f;
         moonObject.transform.rotation = Quaternion.Euler(44f, -38f, 5f);
+    }
+
+    private static void ConfigureAltitudeTestCamera()
+    {
+        Camera camera = Camera.main;
+        if (camera == null)
+        {
+            return;
+        }
+
+        camera.farClipPlane = 12000f;
+        camera.nearClipPlane = 0.1f;
+        camera.fieldOfView = 37.4f;
+        EditorUtility.SetDirty(camera);
+    }
+
+    private static void ConfigureAltitudeCompositionTuner(Transform composition)
+    {
+        VisualPlayModeTuner tuner = UnityEngine.Object.FindFirstObjectByType<VisualPlayModeTuner>();
+        if (tuner == null)
+        {
+            GameObject tunerObject = new GameObject("Visual Play Mode Tuner");
+            tuner = tunerObject.AddComponent<VisualPlayModeTuner>();
+        }
+
+        tuner.ConfigureCompositionRig(composition, true);
+        EditorUtility.SetDirty(tuner);
     }
 
     private static void CreateDistantIslands(VisualPalette palette)
@@ -358,7 +477,8 @@ public static class VisualTargetSceneBuilder
         main.startLifetime = TwoConstants(10f, 22f);
         main.startSpeed = TwoConstants(0.02f, 0.18f);
         main.startSize = TwoConstants(startSizeMin, startSizeMax);
-        main.maxParticles = 420;
+        main.startColor = TwoColors(new Color(0.88f, 0.90f, 0.94f, 0.46f), new Color(1f, 1f, 1f, 0.74f));
+        main.maxParticles = 760;
         main.scalingMode = ParticleSystemScalingMode.Hierarchy;
 
         ParticleSystem.EmissionModule emission = particleSystem.emission;
@@ -380,6 +500,12 @@ public static class VisualTargetSceneBuilder
         ParticleSystemRenderer renderer = wisp.GetComponent<ParticleSystemRenderer>();
         if (renderer != null)
         {
+            Material whiteFogMaterial = EnsureOpaqueWhiteFogParticleMaterial();
+            if (whiteFogMaterial != null)
+            {
+                renderer.sharedMaterial = whiteFogMaterial;
+            }
+
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
             renderer.alignment = ParticleSystemRenderSpace.View;
             renderer.maxParticleSize = 0.35f;
@@ -403,6 +529,15 @@ public static class VisualTargetSceneBuilder
         return curve;
     }
 
+    private static ParticleSystem.MinMaxGradient TwoColors(Color min, Color max)
+    {
+        ParticleSystem.MinMaxGradient gradient = new ParticleSystem.MinMaxGradient();
+        gradient.mode = ParticleSystemGradientMode.TwoColors;
+        gradient.colorMin = min;
+        gradient.colorMax = max;
+        return gradient;
+    }
+
     private static void CreateCloudSea(VisualPalette palette)
     {
         Transform root = new GameObject("Cloud Sea").transform;
@@ -419,6 +554,150 @@ public static class VisualTargetSceneBuilder
         renderer.sharedMaterial = palette.CloudSea;
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         renderer.receiveShadows = false;
+    }
+
+    private static Transform CreateAltitudeTestComposition(VisualPalette palette)
+    {
+        Transform root = new GameObject("Altitude Test Composition").transform;
+        root.position = new Vector3(0f, 2500f, 0f);
+
+        Transform island = new GameObject("Test Island").transform;
+        island.SetParent(root, false);
+        CreateFloatingRock("Test Island Rock Body", island, Vector3.zero, new Vector3(13.5f, 4.8f, 9f), palette.Rock);
+        CreatePrimitive("Test Stone Platform", PrimitiveType.Cube, island, new Vector3(0f, 2.1f, 0f), new Vector3(13.2f, 0.5f, 8.2f), palette.Ground);
+        CreateDock(island, palette);
+        CreateFactory(island, palette);
+        CreateWarehouse(island, palette);
+        CreateCrane(island, palette);
+        CreateCrystal(island, palette);
+        CreateLamps(island, palette);
+
+        CreateAltitudeTestShip(root, palette);
+        CreateAltitudeTestClouds(root, palette);
+        CreateAltitudeTestFogWisps(root);
+        return root;
+    }
+
+    private static void CreateAltitudeTestShip(Transform parent, VisualPalette palette)
+    {
+        Transform ship = new GameObject("Test Player Airship").transform;
+        ship.SetParent(parent, false);
+        ship.localPosition = new Vector3(-17.5f, 3.15f, -6.8f);
+        ship.localRotation = Quaternion.Euler(0f, 22f, 0f);
+
+        CreatePrimitive("Balloon Body", PrimitiveType.Capsule, ship, Vector3.zero, new Vector3(1.45f, 2.7f, 1.45f), palette.ShipHull, new Vector3(0f, 0f, 90f));
+        CreatePrimitive("Balloon Nose Band", PrimitiveType.Cube, ship, new Vector3(-1.95f, 0f, 0f), new Vector3(0.22f, 2.5f, 2.5f), palette.ShipBand);
+        CreatePrimitive("Balloon Middle Band", PrimitiveType.Cube, ship, new Vector3(0f, 0f, 0f), new Vector3(0.18f, 2.75f, 2.75f), palette.ShipBand);
+        CreatePrimitive("Balloon Tail Band", PrimitiveType.Cube, ship, new Vector3(1.95f, 0f, 0f), new Vector3(0.22f, 2.5f, 2.5f), palette.ShipBand);
+
+        CreatePrimitive("Gondola", PrimitiveType.Cube, ship, new Vector3(0f, -1.45f, 0f), new Vector3(2.2f, 0.9f, 1.15f), palette.WoodDark);
+        CreateWindow(ship, palette, new Vector3(-0.55f, -1.45f, -0.6f), new Vector3(0.46f, 0.4f, 0.08f));
+        CreateWindow(ship, palette, new Vector3(0.3f, -1.45f, -0.6f), new Vector3(0.46f, 0.4f, 0.08f));
+
+        Transform propellerRoot = new GameObject("Propeller").transform;
+        propellerRoot.SetParent(ship, false);
+        propellerRoot.localPosition = new Vector3(-2.8f, -0.15f, 0f);
+        CreatePrimitive("Propeller Hub", PrimitiveType.Cylinder, propellerRoot, Vector3.zero, new Vector3(0.22f, 0.18f, 0.22f), palette.Metal, new Vector3(90f, 0f, 0f));
+        CreatePrimitive("Propeller Blade A", PrimitiveType.Cube, propellerRoot, Vector3.zero, new Vector3(0.16f, 1.5f, 0.1f), palette.WoodDark);
+        CreatePrimitive("Propeller Blade B", PrimitiveType.Cube, propellerRoot, Vector3.zero, new Vector3(1.5f, 0.16f, 0.1f), palette.WoodDark);
+    }
+
+    private static void CreateAltitudeTestClouds(Transform parent, VisualPalette palette)
+    {
+        Transform root = new GameObject("Atmospheric Cloud Banks").transform;
+        root.SetParent(parent, false);
+        root.gameObject.layer = TrueCloudLayer;
+
+        CreateCloudPuff(root, "Sky Fill Front Low", new Vector3(-20f, 28f, -72f), new Vector3(260f, 46f, 118f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Front High", new Vector3(28f, 98f, -42f), new Vector3(280f, 58f, 130f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Overhead A", new Vector3(-92f, 150f, 48f), new Vector3(310f, 68f, 160f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Overhead B", new Vector3(112f, 142f, 92f), new Vector3(330f, 70f, 170f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Center Sheet", new Vector3(0f, 96f, 156f), new Vector3(390f, 62f, 205f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Left Wall", new Vector3(-250f, 82f, 162f), new Vector3(290f, 58f, 210f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Right Wall", new Vector3(260f, 76f, 176f), new Vector3(300f, 58f, 220f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Horizon Low", new Vector3(-16f, 52f, 340f), new Vector3(520f, 74f, 240f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Horizon High", new Vector3(34f, 160f, 410f), new Vector3(560f, 94f, 260f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Sky Fill Far Blanket", new Vector3(0f, 124f, 680f), new Vector3(760f, 112f, 330f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Low Rolling Cloud Floor", new Vector3(14f, -18f, 110f), new Vector3(320f, 24f, 150f), palette.TrueCloudVolume);
+        CreateCloudPuff(root, "Soft White Veil Around Island", new Vector3(0f, 32f, 34f), new Vector3(210f, 38f, 118f), palette.TrueCloudVolume);
+        CreateAltitudeStressCloudField(root, palette);
+    }
+
+    private static void CreateAltitudeStressCloudField(Transform root, VisualPalette palette)
+    {
+        int index = 0;
+        for (int ring = 0; ring < 9; ring++)
+        {
+            float radius = 620f + ring * 545f;
+            int count = 14 + ring * 4;
+            for (int i = 0; i < count; i++)
+            {
+                float normalized = i / (float)count;
+                float angle = normalized * Mathf.PI * 2f + ring * 0.37f;
+                float wobble = Mathf.Sin(i * 2.17f + ring * 1.31f) * 140f;
+                float x = Mathf.Cos(angle) * (radius + wobble);
+                float z = Mathf.Sin(angle) * (radius + wobble);
+                float y = 35f + Mathf.Sin(i * 0.91f + ring * 0.43f) * 85f + ring * 26f;
+                float width = 420f + ring * 56f + Mathf.Sin(i * 0.73f) * 90f;
+                float height = 48f + ring * 8f + Mathf.Abs(Mathf.Sin(i * 1.19f)) * 48f;
+                float depth = 230f + ring * 34f + Mathf.Cos(i * 0.61f) * 70f;
+
+                CreateCloudPuff(
+                    root,
+                    "Stress TrueCloud Bank " + index,
+                    new Vector3(x, y, z),
+                    new Vector3(width, height, depth),
+                    palette.TrueCloudVolume);
+                index++;
+            }
+        }
+    }
+
+    private static void CreateAltitudeTestFogWisps(Transform parent)
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(FogParticlePrefabPath);
+        if (prefab == null)
+        {
+            Debug.LogWarning("[VisualTarget] Fog Particles prefab was not found: " + FogParticlePrefabPath);
+            return;
+        }
+
+        Transform root = new GameObject("Fog Particle Wisps").transform;
+        root.SetParent(parent, false);
+        CreateFogWisp(prefab, root, "Near White Cloud Veil", new Vector3(-18f, 34f, -52f), new Vector3(0f, -10f, 0f), new Vector3(260f, 44f, 110f), 34f, 78f, 18f, -0.04f, 0.02f);
+        CreateFogWisp(prefab, root, "Island White Cloud Wrap", new Vector3(4f, 34f, 26f), new Vector3(0f, 12f, 0f), new Vector3(220f, 42f, 120f), 32f, 74f, 17f, 0.03f, -0.02f);
+        CreateFogWisp(prefab, root, "Mid White Cloud Drift", new Vector3(-28f, 78f, 138f), new Vector3(0f, 4f, 0f), new Vector3(360f, 48f, 170f), 46f, 104f, 20f, -0.02f, 0.02f);
+        CreateFogWisp(prefab, root, "Far White Cloud Blanket", new Vector3(8f, 118f, 330f), new Vector3(0f, -3f, 0f), new Vector3(520f, 64f, 230f), 60f, 138f, 22f, -0.015f, 0.01f);
+        CreateFogWisp(prefab, root, "High White Cloud Fibers", new Vector3(30f, 176f, 210f), new Vector3(0f, 20f, 0f), new Vector3(460f, 50f, 210f), 52f, 126f, 16f, 0.02f, -0.01f);
+        CreateAltitudeStressFogField(prefab, root);
+    }
+
+    private static void CreateAltitudeStressFogField(GameObject prefab, Transform root)
+    {
+        for (int i = 0; i < 28; i++)
+        {
+            float normalized = i / 28f;
+            float angle = normalized * Mathf.PI * 2f;
+            float radius = 380f + (i % 7) * 610f;
+            float x = Mathf.Cos(angle) * radius;
+            float z = Mathf.Sin(angle) * radius;
+            float y = 28f + (i % 5) * 42f;
+            float yaw = normalized * 360f + 17f;
+            Vector3 shapeScale = new Vector3(520f + (i % 4) * 110f, 58f + (i % 3) * 24f, 220f + (i % 5) * 70f);
+
+            CreateFogWisp(
+                prefab,
+                root,
+                "Stress White Fog Cloud " + i,
+                new Vector3(x, y, z),
+                new Vector3(0f, yaw, 0f),
+                shapeScale,
+                54f,
+                132f,
+                24f + (i % 4) * 3f,
+                Mathf.Sin(i * 0.67f) * 0.04f,
+                Mathf.Cos(i * 0.57f) * 0.04f);
+        }
     }
 
     private static void CreateIsland(VisualPalette palette)
