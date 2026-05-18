@@ -1,4 +1,4 @@
 recipe_id,step_index,local_name_ru,local_name_en,duration_seconds,input_item,input_amount,output_item,output_amount
-recipe_assembly_airframe,0,Закладка киля,Keel Set,90,"wood,metal","12,6",,
+recipe_assembly_airframe,0,Закладка каркаса,Frame Set,90,"aerolite,metal","12,6",,
 recipe_assembly_airframe,1,Монтаж механизмов,Mechanism Fit,120,"mechanisms,tools","4,3",,
 recipe_assembly_airframe,2,Обшивка и сдача,Hull Plating,150,"cloth,metal","8,8","airframe_kit",1

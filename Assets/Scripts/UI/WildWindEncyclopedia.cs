@@ -232,9 +232,53 @@ public class WildWindEncyclopedia : MonoBehaviour
                 "Остров из Island.csv.",
                 "id: " + island.id +
                 "\nПозиция: " + FormatVector(island.position) +
+                "\nАрхетип: " + JoinOrDash(island.archetypeId) +
                 "\nБазовое производство: " + island.productionId +
                 "\nРадиус стыковки: " + FormatFloat(island.dockingRadius) + " м" +
                 "\nСкорость загрузки: 1 предмет за " + FormatFloat(island.timeForOneItemLoadSeconds) + " сек.");
+        }
+
+        for (int i = 0; i < config.islandArchetypes.Count; i++)
+        {
+            IslandArchetypeConfig archetype = config.islandArchetypes[i];
+            AddEntry("islands", "island_archetype_" + archetype.id, archetype.DisplayNameRu, "ТИ",
+                "Архетип острова.",
+                "id: " + archetype.id +
+                "\nВысотная полоса: " + archetype.heightBand +
+                "\nБазовый ресурс: " + config.GetItemNameRu(archetype.baseProductionItemId) +
+                "\nСтартовая потребность: " + config.GetItemNameRu(archetype.startNeedItemId) +
+                "\n\n" + archetype.descriptionRu);
+        }
+
+        for (int i = 0; i < config.islandArchetypeStages.Count; i++)
+        {
+            IslandArchetypeStageConfig stage = config.islandArchetypeStages[i];
+            AddEntry("islands", "island_stage_" + stage.id, stage.DisplayNameRu, "СТ",
+                "Стадия развития острова.",
+                "id: " + stage.id +
+                "\nАрхетип: " + stage.archetypeId +
+                "\nНомер стадии: " + stage.stageIndex +
+                "\nНужен ресурс: " + config.GetItemNameRu(stage.triggerNeedItemId) +
+                "\nОткрывает ресурс: " + (string.IsNullOrWhiteSpace(stage.unlockedProductionItemId) ? "-" : config.GetItemNameRu(stage.unlockedProductionItemId)) +
+                "\nМножитель базовой выработки: x" + FormatFloat(stage.productionMultiplier) +
+                "\nОткрывает общественные потребности: " + (stage.opensSocialNeeds ? "да" : "нет") +
+                "\n\n" + stage.descriptionRu);
+        }
+
+        for (int i = 0; i < config.islandSocialNeeds.Count; i++)
+        {
+            IslandSocialNeedConfig need = config.islandSocialNeeds[i];
+            AddEntry("islands", "island_need_" + need.id, need.DisplayNameRu, "ПО",
+                "Общественная потребность острова.",
+                "id: " + need.id +
+                "\nТип: " + need.kind +
+                "\nВосстанавливается: " + config.GetItemNameRu(need.recoveryItemId) +
+                "\nМаксимум: " + FormatFloat(need.maxValue) +
+                "\nВосстановление за предмет: " + FormatFloat(need.restorePerItem) +
+                "\nБазовое падение в час: " + FormatFloat(need.baseDecayPerHour) +
+                "\nПадение за нагрузку в час: " + FormatFloat(need.loadDecayPerHour) +
+                "\nПорог удовлетворения: " + FormatFloat(need.satisfiedThreshold) +
+                "\n\n" + need.descriptionRu);
         }
 
         for (int i = 0; i < config.technologies.Count; i++)
@@ -257,7 +301,29 @@ public class WildWindEncyclopedia : MonoBehaviour
                 "id: " + industry.id +
                 "\nОстров: " + industry.islandId +
                 "\nТип: " + industry.kind +
-                "\nРецепт: " + industry.recipeId);
+                "\nРецепт: " + industry.recipeId +
+                "\nЗдание: " + JoinOrDash(industry.buildingId));
+        }
+
+        for (int i = 0; i < config.islandBuildings.Count; i++)
+        {
+            IslandBuildingConfig building = config.islandBuildings[i];
+            AddEntry("production", "building_" + building.id, building.DisplayNameRu, building.IsService ? "СВ" : "ЗД",
+                building.IsService ? "Сервисное здание острова." : "Производственное здание острова.",
+                "id: " + building.id +
+                "\nКатегория: " + building.category +
+                "\nТип производства: " + building.industryKind +
+                "\nСервисная роль: " + JoinOrDash(building.serviceRole) +
+                "\nТехнология: " + JoinOrDash(building.requiredTechnologyId) +
+                "\nМаксимальный уровень: " + building.maxUpgradeLevel +
+                "\nВосстановление острова после стройки: " + FormatFloat(building.constructionRecoveryHours) + " ч" +
+                "\nНагрузки: рабочая сила " + building.workforceLoad +
+                ", здоровье " + building.healthLoad +
+                ", безопасность " + building.safetyLoad +
+                ", комфорт " + building.comfortLoad +
+                ", творчество " + building.creativityLoad +
+                "\nСтройка: " + FormatAmounts(building.constructionInputs, config) +
+                "\n\n" + building.descriptionRu);
         }
 
         for (int i = 0; i < config.industryRecipes.Count; i++)
@@ -944,7 +1010,13 @@ public class WildWindEncyclopedia : MonoBehaviour
     private static string JoinOrDash(List<string> values)
     {
         if (values == null || values.Count == 0) return "-";
-        return string.Join(", ", values.Where(v => !string.IsNullOrWhiteSpace(v)));
+        string joined = string.Join(", ", values.Where(v => !string.IsNullOrWhiteSpace(v)));
+        return string.IsNullOrWhiteSpace(joined) ? "-" : joined;
+    }
+
+    private static string JoinOrDash(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
     }
 
     private static string DisplayName(string localNameRu, string fallback)

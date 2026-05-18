@@ -13,7 +13,9 @@ public static class IslandIndustrySimulator
     {
         if (config == null || !config.isLoaded || progress == null || toUtcTicks <= fromUtcTicks) return 0;
 
+        IslandDevelopmentSimulator.EnsureIslandStates(config, progress);
         EnsureIslandStates(config, progress);
+        IslandSocietySimulator.EnsureIslandStates(config, progress);
 
         int changed = 0;
         long currentTicks = fromUtcTicks;
@@ -101,6 +103,8 @@ public static class IslandIndustrySimulator
     {
         int changed = 0;
         float deltaMinutes = Mathf.Max(0f, (float)new TimeSpan(toTicks - fromTicks).TotalMinutes);
+        changed += IslandDevelopmentSimulator.Advance(config, progress, fromTicks, toTicks);
+        changed += IslandSocietySimulator.Advance(config, progress, deltaMinutes);
 
         for (int i = 0; i < config.islandIndustries.Count; i++)
         {
@@ -117,10 +121,16 @@ public static class IslandIndustrySimulator
             IslandIndustryState state = islandState.GetIndustryState(industry.id, true);
             state.kind = industry.kind;
             state.recipeId = recipe.id;
+            float societyMultiplier = IslandSocietySimulator.CalculateProductionMultiplier(config, islandState, industry);
+            if (!IslandDevelopmentSimulator.IsBuildingBuilt(islandState, industry.buildingId))
+            {
+                societyMultiplier = 0f;
+                state.lastMessage = "Р—РґР°РЅРёРµ РµС‰Рµ РЅРµ РїРѕСЃС‚СЂРѕРµРЅРѕ.";
+            }
 
             if (industry.kind == IslandIndustryKind.Generation)
             {
-                changed += AdvanceGeneration(islandState, state, recipe, deltaMinutes);
+                changed += AdvanceGeneration(islandState, state, recipe, deltaMinutes, societyMultiplier);
                 continue;
             }
 
@@ -129,17 +139,17 @@ public static class IslandIndustrySimulator
                 DecayConversion(state, recipe, deltaMinutes);
             }
 
-            changed += AdvanceCycledIndustry(config, islandState, state, industry, recipe, fromTicks, toTicks);
+            changed += AdvanceCycledIndustry(config, islandState, state, industry, recipe, fromTicks, toTicks, societyMultiplier);
         }
 
         return changed;
     }
 
-    private static int AdvanceGeneration(IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, float minutes)
+    private static int AdvanceGeneration(IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, float minutes, float societyMultiplier)
     {
         if (islandState == null || state == null || recipe == null || recipe.generationCountBasePerMinute <= 0f) return 0;
 
-        state.productionProgress += recipe.generationCountBasePerMinute * Mathf.Max(0f, minutes);
+        state.productionProgress += recipe.generationCountBasePerMinute * Mathf.Max(0f, minutes) * Mathf.Clamp01(societyMultiplier);
         int completed = Mathf.FloorToInt(state.productionProgress);
         if (completed <= 0) return 0;
 
@@ -168,7 +178,8 @@ public static class IslandIndustrySimulator
         IslandIndustryConfig industry,
         IndustryRecipeConfig recipe,
         long fromTicks,
-        long toTicks)
+        long toTicks,
+        float societyMultiplier)
     {
         int changed = 0;
         long cursor = fromTicks;
@@ -176,7 +187,13 @@ public static class IslandIndustrySimulator
 
         if (!state.active)
         {
-            TryStartCycle(config, islandState, state, industry, recipe, cursor);
+            if (societyMultiplier <= 0f)
+            {
+                state.lastMessage = "РџСЂРѕРёР·РІРѕРґСЃС‚РІРѕ Р¶РґРµС‚ РїРѕСЃС‚СЂРѕР№РєРё Р·РґР°РЅРёСЏ.";
+                return 0;
+            }
+
+            TryStartCycle(config, islandState, state, industry, recipe, cursor, societyMultiplier);
         }
 
         while (state.active && state.nextCompletionUtcTicks <= toTicks && guard < MaxCyclesPerIndustryAdvance)
@@ -188,7 +205,7 @@ public static class IslandIndustrySimulator
             state.cycleStartedUtcTicks = 0;
             state.nextCompletionUtcTicks = 0;
 
-            TryStartCycle(config, islandState, state, industry, recipe, cursor);
+            TryStartCycle(config, islandState, state, industry, recipe, cursor, societyMultiplier);
         }
 
         return changed;
@@ -200,28 +217,29 @@ public static class IslandIndustrySimulator
         IslandIndustryState state,
         IslandIndustryConfig industry,
         IndustryRecipeConfig recipe,
-        long startTicks)
+        long startTicks,
+        float societyMultiplier)
     {
         if (state == null || islandState == null || industry == null || recipe == null || state.active) return false;
 
         switch (industry.kind)
         {
             case IslandIndustryKind.Processing:
-                return TryStartProcessing(config, islandState, state, recipe, startTicks);
+                return TryStartProcessing(config, islandState, state, recipe, startTicks, societyMultiplier);
             case IslandIndustryKind.Manufacturing:
-                return TryStartManufacturing(config, islandState, state, recipe, startTicks);
+                return TryStartManufacturing(config, islandState, state, recipe, startTicks, societyMultiplier);
             case IslandIndustryKind.Reaction:
-                return TryStartReaction(config, islandState, state, recipe, startTicks);
+                return TryStartReaction(config, islandState, state, recipe, startTicks, societyMultiplier);
             case IslandIndustryKind.Conversion:
-                return TryStartConversion(config, islandState, state, recipe, startTicks);
+                return TryStartConversion(config, islandState, state, recipe, startTicks, societyMultiplier);
             case IslandIndustryKind.Assembly:
-                return TryStartAssemblyStep(islandState, state, recipe, startTicks);
+                return TryStartAssemblyStep(islandState, state, recipe, startTicks, societyMultiplier);
             default:
                 return false;
         }
     }
 
-    private static bool TryStartProcessing(WorldConfigDatabase config, IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks)
+    private static bool TryStartProcessing(WorldConfigDatabase config, IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks, float societyMultiplier)
     {
         string inputResourceId = FindProcessingInputResource(config, islandState, recipe);
         if (string.IsNullOrWhiteSpace(inputResourceId))
@@ -243,12 +261,12 @@ public static class IslandIndustrySimulator
         }
 
         state.activeInputResourceId = inputResourceId;
-        StartTimedCycle(state, recipe.durationSeconds, startTicks);
+        StartTimedCycle(state, AdjustDurationForSociety(recipe.durationSeconds, societyMultiplier), startTicks);
         state.lastMessage = "Переработка начата: " + inputResourceId + ".";
         return true;
     }
 
-    private static bool TryStartManufacturing(WorldConfigDatabase config, IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks)
+    private static bool TryStartManufacturing(WorldConfigDatabase config, IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks, float societyMultiplier)
     {
         if (!HasItems(islandState, recipe.inputs, 1f))
         {
@@ -264,12 +282,12 @@ public static class IslandIndustrySimulator
 
         TrySpendItems(islandState, recipe.inputs);
 
-        StartTimedCycle(state, recipe.durationSeconds, startTicks);
+        StartTimedCycle(state, AdjustDurationForSociety(recipe.durationSeconds, societyMultiplier), startTicks);
         state.lastMessage = "Производство по рецепту начато.";
         return true;
     }
 
-    private static bool TryStartReaction(WorldConfigDatabase config, IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks)
+    private static bool TryStartReaction(WorldConfigDatabase config, IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks, float societyMultiplier)
     {
         if (!HasItems(islandState, recipe.inputs, 1f))
         {
@@ -290,12 +308,12 @@ public static class IslandIndustrySimulator
         float successChance = Mathf.Clamp01(recipe.reactionBaseSuccessChance - recipe.reactionRiskPerSpeed * (speed - 1f) + catalystBonus);
         state.activeReactionSuccessChance = successChance;
 
-        StartTimedCycle(state, Mathf.Max(1f, recipe.durationSeconds / speed), startTicks);
+        StartTimedCycle(state, AdjustDurationForSociety(Mathf.Max(1f, recipe.durationSeconds / speed), societyMultiplier), startTicks);
         state.lastMessage = $"Реакция начата: x{speed:0.#}, шанс {successChance * 100f:0}%";
         return true;
     }
 
-    private static bool TryStartConversion(WorldConfigDatabase config, IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks)
+    private static bool TryStartConversion(WorldConfigDatabase config, IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks, float societyMultiplier)
     {
         float multiplier = Mathf.Max(1f, state.conversionMultiplier);
         if (!HasItems(islandState, recipe.inputs, multiplier))
@@ -312,12 +330,12 @@ public static class IslandIndustrySimulator
 
         TrySpendScaledItems(islandState, recipe.inputs, multiplier);
 
-        StartTimedCycle(state, recipe.durationSeconds, startTicks);
+        StartTimedCycle(state, AdjustDurationForSociety(recipe.durationSeconds, societyMultiplier), startTicks);
         state.lastMessage = "Маховик держит темп x" + state.conversionMultiplier.ToString("0.##") + ".";
         return true;
     }
 
-    private static bool TryStartAssemblyStep(IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks)
+    private static bool TryStartAssemblyStep(IslandProductionState islandState, IslandIndustryState state, IndustryRecipeConfig recipe, long startTicks, float societyMultiplier)
     {
         if (recipe.assemblySteps == null || recipe.assemblySteps.Count == 0)
         {
@@ -333,7 +351,7 @@ public static class IslandIndustrySimulator
             return false;
         }
 
-        StartTimedCycle(state, step.durationSeconds, startTicks);
+        StartTimedCycle(state, AdjustDurationForSociety(step.durationSeconds, societyMultiplier), startTicks);
         state.lastMessage = "Сборка: " + step.DisplayNameRu + ".";
         return true;
     }
@@ -430,6 +448,11 @@ public static class IslandIndustrySimulator
         }
 
         return Mathf.Max(1, added);
+    }
+
+    private static float AdjustDurationForSociety(float durationSeconds, float societyMultiplier)
+    {
+        return Mathf.Max(1f, durationSeconds / Mathf.Max(0.01f, societyMultiplier));
     }
 
     private static void StartTimedCycle(IslandIndustryState state, float durationSeconds, long startTicks)

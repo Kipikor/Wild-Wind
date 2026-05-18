@@ -1561,6 +1561,8 @@ public class IslandProductionState
     public float productionProgress;
     public List<IslandConsumptionState> consumptions = new List<IslandConsumptionState>();
     public List<IslandIndustryState> industries = new List<IslandIndustryState>();
+    public List<IslandSocietyNeedState> societyNeeds = new List<IslandSocietyNeedState>();
+    public IslandDevelopmentState development = new IslandDevelopmentState();
 
     public void Normalize()
     {
@@ -1568,6 +1570,9 @@ public class IslandProductionState
         storage ??= new List<ResourceStack>();
         consumptions ??= new List<IslandConsumptionState>();
         industries ??= new List<IslandIndustryState>();
+        societyNeeds ??= new List<IslandSocietyNeedState>();
+        development ??= new IslandDevelopmentState();
+        development.Normalize();
         productionProgress = Mathf.Max(0f, productionProgress);
 
         for (int i = storage.Count - 1; i >= 0; i--)
@@ -1604,6 +1609,18 @@ public class IslandProductionState
             }
 
             industry.Normalize();
+        }
+
+        for (int i = societyNeeds.Count - 1; i >= 0; i--)
+        {
+            IslandSocietyNeedState need = societyNeeds[i];
+            if (need == null || string.IsNullOrWhiteSpace(need.needId))
+            {
+                societyNeeds.RemoveAt(i);
+                continue;
+            }
+
+            need.Normalize();
         }
     }
 
@@ -1720,6 +1737,33 @@ public class IslandProductionState
         return newState;
     }
 
+    public IslandSocietyNeedState GetSocietyNeedState(string needId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(needId)) return null;
+        societyNeeds ??= new List<IslandSocietyNeedState>();
+
+        for (int i = 0; i < societyNeeds.Count; i++)
+        {
+            IslandSocietyNeedState state = societyNeeds[i];
+            if (state != null && state.needId == needId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        IslandSocietyNeedState newState = new IslandSocietyNeedState { needId = needId };
+        societyNeeds.Add(newState);
+        return newState;
+    }
+
+    public IslandBuildingState GetBuildingState(string buildingId, bool createIfMissing)
+    {
+        development ??= new IslandDevelopmentState();
+        return development.GetBuildingState(buildingId, createIfMissing);
+    }
+
     private ResourceStack GetResourceStack(string resourceId, bool createIfMissing)
     {
         if (string.IsNullOrWhiteSpace(resourceId)) return null;
@@ -1753,6 +1797,161 @@ public class IslandConsumptionState
     {
         itemId ??= "";
         consumptionProgress = Mathf.Max(0f, consumptionProgress);
+    }
+}
+
+[Serializable]
+public class IslandSocietyNeedState
+{
+    public string needId = "";
+    public float currentValue;
+    public bool initialized;
+
+    public void Normalize()
+    {
+        needId ??= "";
+        currentValue = Mathf.Max(0f, currentValue);
+    }
+}
+
+[Serializable]
+public enum IslandConstructionProjectKind
+{
+    Build,
+    Upgrade,
+    Modernization
+}
+
+[Serializable]
+public class IslandDevelopmentState
+{
+    public string archetypeId = "";
+    public int completedStage;
+    public bool socialNeedsUnlocked;
+    public long constructionRecoveryUntilUtcTicks;
+    public IslandConstructionProjectState constructionProject = new IslandConstructionProjectState();
+    public List<IslandBuildingState> buildings = new List<IslandBuildingState>();
+
+    public void Normalize()
+    {
+        archetypeId ??= "";
+        completedStage = Mathf.Max(0, completedStage);
+        if (constructionRecoveryUntilUtcTicks < 0) constructionRecoveryUntilUtcTicks = 0;
+        constructionProject ??= new IslandConstructionProjectState();
+        constructionProject.Normalize();
+        buildings ??= new List<IslandBuildingState>();
+
+        for (int i = buildings.Count - 1; i >= 0; i--)
+        {
+            IslandBuildingState building = buildings[i];
+            if (building == null || string.IsNullOrWhiteSpace(building.buildingId))
+            {
+                buildings.RemoveAt(i);
+                continue;
+            }
+
+            building.Normalize();
+        }
+    }
+
+    public IslandBuildingState GetBuildingState(string buildingId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(buildingId)) return null;
+        buildings ??= new List<IslandBuildingState>();
+
+        for (int i = 0; i < buildings.Count; i++)
+        {
+            IslandBuildingState state = buildings[i];
+            if (state != null && state.buildingId == buildingId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        IslandBuildingState newState = new IslandBuildingState { buildingId = buildingId };
+        buildings.Add(newState);
+        return newState;
+    }
+
+    public bool HasAnyBuiltBuildings()
+    {
+        if (buildings == null) return false;
+
+        for (int i = 0; i < buildings.Count; i++)
+        {
+            IslandBuildingState building = buildings[i];
+            if (building != null && building.built)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool IsBuildingBuilt(string buildingId)
+    {
+        IslandBuildingState building = GetBuildingState(buildingId, false);
+        return building != null && building.built;
+    }
+}
+
+[Serializable]
+public class IslandConstructionProjectState
+{
+    public bool active;
+    public IslandConstructionProjectKind kind = IslandConstructionProjectKind.Build;
+    public string buildingId = "";
+    public int targetLevel;
+    public int activeStepIndex;
+    public long cycleStartedUtcTicks;
+    public long nextCompletionUtcTicks;
+    public string lastMessage = "";
+
+    public void Normalize()
+    {
+        buildingId ??= "";
+        targetLevel = Mathf.Max(0, targetLevel);
+        activeStepIndex = Mathf.Max(0, activeStepIndex);
+        if (cycleStartedUtcTicks < 0) cycleStartedUtcTicks = 0;
+        if (nextCompletionUtcTicks < 0) nextCompletionUtcTicks = 0;
+        lastMessage ??= "";
+
+        if (!active)
+        {
+            activeStepIndex = 0;
+            cycleStartedUtcTicks = 0;
+            nextCompletionUtcTicks = 0;
+        }
+    }
+}
+
+[Serializable]
+public class IslandBuildingState
+{
+    public string buildingId = "";
+    public bool built;
+    public int level;
+    public int modernizationLevel;
+
+    public void Normalize()
+    {
+        buildingId ??= "";
+        level = Mathf.Max(0, level);
+        modernizationLevel = Mathf.Clamp(modernizationLevel, 0, 5);
+
+        if (built && level <= 0)
+        {
+            level = 1;
+        }
+
+        if (!built)
+        {
+            level = 0;
+            modernizationLevel = 0;
+        }
     }
 }
 

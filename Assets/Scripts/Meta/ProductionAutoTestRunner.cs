@@ -288,14 +288,21 @@ public sealed class ProductionAutoTestRunner : MonoBehaviour
 
     private static void StockCommonResources(IslandProductionState storage)
     {
+        SetAtLeast(storage, "food", 300);
+        SetAtLeast(storage, "water", 300);
+        SetAtLeast(storage, "aerolite", 300);
         SetAtLeast(storage, "wood", 300);
         SetAtLeast(storage, "metal", 300);
         SetAtLeast(storage, "mechanisms", 300);
         SetAtLeast(storage, "tools", 300);
+        SetAtLeast(storage, "medicines", 300);
+        SetAtLeast(storage, "weapon", 300);
+        SetAtLeast(storage, "paper", 300);
         SetAtLeast(storage, "cloth", 300);
         SetAtLeast(storage, "charcoal", 900);
         SetAtLeast(storage, "sulfur", 300);
         SetAtLeast(storage, "alcohol", 120);
+        SetAtLeast(storage, "claudium", 300);
         SetAtLeast(storage, "claudite", 300);
     }
 

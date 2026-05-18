@@ -14,6 +14,7 @@ public partial class WorldConfigDatabase
                 islandId = Get(row, "island_id"),
                 kind = ParseIndustryKind(Get(row, "production_type")),
                 recipeId = Get(row, "recipe_id"),
+                buildingId = Get(row, "building_id"),
                 localNameRu = Get(row, "local_name_ru"),
                 localNameEn = Get(row, "local_name_en")
             };
@@ -164,6 +165,7 @@ public class IslandIndustryConfig
     public string islandId = "";
     public IslandIndustryKind kind = IslandIndustryKind.Generation;
     public string recipeId = "";
+    public string buildingId = "";
     public string localNameRu = "";
     public string localNameEn = "";
 

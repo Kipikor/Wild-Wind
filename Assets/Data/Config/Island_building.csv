@@ -1,0 +1,33 @@
+id_building,local_name_ru,local_name_en,category,production_type,service_role,required_technology,max_upgrade_level,construction_recovery_hours,workforce_load,health_load,safety_load,comfort_load,creativity_load,construction_item,construction_amount,description_ru
+separator,Сепаратор,Separator,Processing,Processing,,,5,0.5,1,0,0,1,0,"aerolite,tools","12,3",Перерабатывает руды газы и сублиматы на полезные фракции.
+dismantling_yard,Разборка,Dismantling Yard,Processing,Processing,,,5,0.5,1,0,1,0,1,"aerolite,tools","10,4",Разбирает изношенные корабли автоматонов и артефакты на опыт и salvage.
+butchery,Разделочная,Leviathan Butchery,Processing,Processing,,,5,0.5,2,1,1,1,0,"aerolite,tools,cloth","8,4,4",Разделывает туши левиафанов на органику.
+metallurgical_complex,Металлургический комбинат,Metallurgical Complex,Reaction,Reaction,,,5,0.75,2,1,0,2,0,"aerolite,charcoal,tools","16,8,4",Делает сплавы и прочные материалы.
+chemical_vat,Химический бак,Chemical Vat,Reaction,Reaction,,,5,0.75,0,3,1,0,1,"aerolite,tools,water","10,3,6",Ведет опасные реакции и производит химические соединения.
+biotech_synthesis,Биотехнологический синтез,Biotech Synthesis,Reaction,Reaction,,,5,1,0,2,1,0,2,"aerolite,medicines,tools","12,4,4",Бактериальные процессы переводят органику в редкие материалы.
+sublimate_coater,Субликатный напылитель,Sublimate Coater,Reaction,Reaction,,,5,1.25,0,2,2,1,2,"aerolite,claudium,tools","18,5,5",Высотные материалы Т3 создаются через сублиматное напыление.
+ranch,Ранчо,Ranch,Conversion,Conversion,,,5,0.5,2,1,0,1,0,"food,water,cloth","10,8,4",Выращивает необычных животных и держит биологический маховик.
+plantation,Плантация,Plantation,Conversion,Conversion,,,5,0.5,2,0,0,1,0,"water,tools,cloth","12,3,4",Выращивает необычные растения и долго разгоняется.
+laboratory,Лаборатория,Laboratory,Conversion,Conversion,,,5,0.75,0,0,0,1,4,"paper,tools,water","10,4,5",Проводит исследования и требует непрерывного снабжения.
+bureau,Бюро,Bureau,Conversion,Conversion,,,5,0.75,0,0,0,1,3,"paper,tools,cloth","12,3,3",Улучшает клонирует и перерабатывает рецепты.
+ship_dock,Корабельный док,Ship Dock,Assembly,Assembly,,,5,1,2,0,1,1,0,"aerolite,tools,cloth","24,6,8",Собирает субкапитальные корабли.
+capital_module_shop,Крупноузловой цех,Capital Module Shop,Assembly,Assembly,,,5,1.5,3,0,0,2,1,"aerolite,tools,claudium","36,8,4",Собирает отсеки крупных кораблей.
+capital_shipyard,Капитальная верфь,Capital Shipyard,Assembly,Assembly,,,5,2,4,0,2,2,1,"aerolite,tools,claudium","60,12,8",Собирает капиталы и крупные субкапиталы.
+installation_workshop,Цех установок,Installation Workshop,Assembly,Assembly,,,5,1,2,0,0,1,1,"aerolite,tools","24,8",Собирает крупное оборудование для модернизаций заводов.
+construction_workshop,Конструкционный цех,Construction Workshop,Manufacturing,Manufacturing,,,5,0.5,3,0,0,1,0,"aerolite,tools","16,4",Делает плиты балки обшивки и каркасные детали.
+instrumentation_shop,Приборостроительный цех,Instrumentation Shop,Manufacturing,Manufacturing,,,5,0.75,1,0,0,0,2,"aerolite,tools,paper","12,4,4",Делает приборы датчики регуляторы и автоматику.
+engine_workshop,Моторостроительный цех,Engine Workshop,Manufacturing,Manufacturing,,,5,0.75,2,0,0,2,1,"aerolite,charcoal,tools","18,8,5",Делает силовые установки и движительные узлы.
+machine_node_shop,Узловой цех,Machine Node Shop,Manufacturing,Manufacturing,,,5,0.75,2,0,1,0,1,"aerolite,tools","18,6",Собирает агрегаты приводы буры гарпуны и пушки.
+light_industry,Лёгкая промышленность,Light Industry,Manufacturing,Manufacturing,,,5,0.5,2,0,0,1,0,"cloth,tools","10,3",Делает базовые общественные товары и простые изделия.
+cybernetic_node,Кибернетический узел,Cybernetic Node,Manufacturing,Manufacturing,,,5,1,0,0,2,0,3,"aerolite,paper,claudium","16,8,4",Производит узлы связанные с технологиями автоматонов.
+cargo_dock,Грузовой док,Cargo Dock,Service,Generation,cargo_speed,,5,0.5,0,0,0,0,0,"aerolite,tools","14,3",Ускоряет погрузку и выгрузку.
+aviation_hq,Штаб воздухоплавания,Aviation HQ,Service,Generation,pilot_limits,,5,0.75,0,0,1,0,2,"paper,tools,cloth","8,4,4",Открывает автоматических пилотов и их допуски.
+mooring_pier,Причал,Mooring Pier,Service,Generation,mooring,,5,0.5,0,0,0,0,0,"aerolite,tools","18,3",Позволяет швартоваться кораблям без специальных средств.
+repair_dock,Ремонтный док,Repair Dock,Service,Generation,repair,,5,0.75,2,0,0,1,1,"aerolite,tools","20,6",Ускоряет удешевляет и расширяет ремонт кораблей.
+canteen,Столовая,Canteen,Service,Generation,need_workforce,,5,0.5,0,0,0,0,0,"food,cloth,tools","8,3,2",Улучшает конвертацию еды в рабочую силу.
+hospital,Больница,Hospital,Service,Generation,need_health,,5,0.75,0,0,0,0,1,"medicines,cloth,tools","8,4,3",Улучшает конвертацию медикаментов в здоровье.
+atelier,Ателье,Atelier,Service,Generation,need_comfort,,5,0.5,1,0,0,0,1,"cloth,tools","10,3",Улучшает конвертацию ткани в комфорт.
+guard_post,Охранный пост,Guard Post,Service,Generation,need_safety,,5,0.5,0,0,1,0,0,"weapon,aerolite","5,8",Улучшает конвертацию оружия в безопасность.
+academy,Академия,Academy,Service,Generation,need_creativity,,5,0.75,0,0,0,1,2,"paper,tools,cloth","12,4,3",Улучшает конвертацию бумаги в творчество.
+island_expansion_yard,Наращивание острова,Island Expansion Yard,Service,Assembly,island_expansion,,5,1.5,2,0,0,1,1,"aerolite,claudium,tools","40,6,8",Добавляет новые места строительства на развитом острове.
+claudium_spiral,Клавдиевая спираль,Claudium Spiral,Service,Generation,launch_boost,,5,1,0,0,1,0,1,"claudium,aerolite,tools","10,20,5",Даёт кораблям временное ускорение при старте с острова.

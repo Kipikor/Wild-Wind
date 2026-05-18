@@ -20,6 +20,10 @@ public partial class WorldConfigDatabase
     private readonly Dictionary<string, SpecialModuleConfig> specialModulesById = new Dictionary<string, SpecialModuleConfig>();
     private readonly Dictionary<string, IslandIndustryConfig> islandIndustriesById = new Dictionary<string, IslandIndustryConfig>();
     private readonly Dictionary<string, IndustryRecipeConfig> industryRecipesById = new Dictionary<string, IndustryRecipeConfig>();
+    private readonly Dictionary<string, IslandArchetypeConfig> islandArchetypesById = new Dictionary<string, IslandArchetypeConfig>();
+    private readonly Dictionary<string, IslandArchetypeStageConfig> islandArchetypeStagesById = new Dictionary<string, IslandArchetypeStageConfig>();
+    private readonly Dictionary<string, IslandSocialNeedConfig> islandSocialNeedsById = new Dictionary<string, IslandSocialNeedConfig>();
+    private readonly Dictionary<string, IslandBuildingConfig> islandBuildingsById = new Dictionary<string, IslandBuildingConfig>();
 
     public List<ItemConfig> items = new List<ItemConfig>();
     public List<IslandConfig> islands = new List<IslandConfig>();
@@ -34,6 +38,10 @@ public partial class WorldConfigDatabase
     public List<SpecialModuleConfig> specialModules = new List<SpecialModuleConfig>();
     public List<IslandIndustryConfig> islandIndustries = new List<IslandIndustryConfig>();
     public List<IndustryRecipeConfig> industryRecipes = new List<IndustryRecipeConfig>();
+    public List<IslandArchetypeConfig> islandArchetypes = new List<IslandArchetypeConfig>();
+    public List<IslandArchetypeStageConfig> islandArchetypeStages = new List<IslandArchetypeStageConfig>();
+    public List<IslandSocialNeedConfig> islandSocialNeeds = new List<IslandSocialNeedConfig>();
+    public List<IslandBuildingConfig> islandBuildings = new List<IslandBuildingConfig>();
 
     public bool isLoaded;
     public string lastError = "";
@@ -64,6 +72,10 @@ public partial class WorldConfigDatabase
             LoadIndustryRecipes(Path.Combine(folder, "Production_recipe.csv"));
             LoadAssemblySteps(Path.Combine(folder, "Assembly_step.csv"));
             LoadIslandIndustries(Path.Combine(folder, "Production_industry.csv"));
+            LoadIslandArchetypes(Path.Combine(folder, "Island_archetype.csv"));
+            LoadIslandArchetypeStages(Path.Combine(folder, "Island_archetype_stage.csv"));
+            LoadIslandSocialNeeds(Path.Combine(folder, "Island_social_need.csv"));
+            LoadIslandBuildings(Path.Combine(folder, "Island_building.csv"));
             isLoaded = true;
             lastError = "";
         }
@@ -166,6 +178,34 @@ public partial class WorldConfigDatabase
         return recipe;
     }
 
+    public IslandArchetypeConfig GetIslandArchetype(string archetypeId)
+    {
+        if (string.IsNullOrWhiteSpace(archetypeId)) return null;
+        islandArchetypesById.TryGetValue(archetypeId, out IslandArchetypeConfig archetype);
+        return archetype;
+    }
+
+    public IslandArchetypeStageConfig GetIslandArchetypeStage(string stageId)
+    {
+        if (string.IsNullOrWhiteSpace(stageId)) return null;
+        islandArchetypeStagesById.TryGetValue(stageId, out IslandArchetypeStageConfig stage);
+        return stage;
+    }
+
+    public IslandSocialNeedConfig GetIslandSocialNeed(string needId)
+    {
+        if (string.IsNullOrWhiteSpace(needId)) return null;
+        islandSocialNeedsById.TryGetValue(needId, out IslandSocialNeedConfig need);
+        return need;
+    }
+
+    public IslandBuildingConfig GetIslandBuilding(string buildingId)
+    {
+        if (string.IsNullOrWhiteSpace(buildingId)) return null;
+        islandBuildingsById.TryGetValue(buildingId, out IslandBuildingConfig building);
+        return building;
+    }
+
     public string GetItemNameRu(string itemId)
     {
         ItemConfig item = GetItem(itemId);
@@ -195,6 +235,10 @@ public partial class WorldConfigDatabase
         specialModules.Clear();
         islandIndustries.Clear();
         industryRecipes.Clear();
+        islandArchetypes.Clear();
+        islandArchetypeStages.Clear();
+        islandSocialNeeds.Clear();
+        islandBuildings.Clear();
         itemsById.Clear();
         islandsById.Clear();
         productionsById.Clear();
@@ -208,6 +252,10 @@ public partial class WorldConfigDatabase
         specialModulesById.Clear();
         islandIndustriesById.Clear();
         industryRecipesById.Clear();
+        islandArchetypesById.Clear();
+        islandArchetypeStagesById.Clear();
+        islandSocialNeedsById.Clear();
+        islandBuildingsById.Clear();
         isLoaded = false;
         lastError = "";
     }
@@ -243,6 +291,7 @@ public partial class WorldConfigDatabase
                     ParseFloat(Get(row, "position_x")),
                     ParseFloat(Get(row, "position_y")),
                     ParseFloat(Get(row, "position_z"))),
+                archetypeId = Get(row, "archetype_id"),
                 productionId = Get(row, "Island_production"),
                 dockingRadius = ParseFloat(Get(row, "docking_radius")),
                 timeForOneItemLoadSeconds = Mathf.Max(0.01f, ParseFloat(Get(row, "time_for_one_item_load"), 1f))
@@ -670,6 +719,7 @@ public class IslandConfig
     public string localNameRu = "";
     public string localNameEn = "";
     public Vector3 position;
+    public string archetypeId = "";
     public string productionId = "";
     public float dockingRadius;
     public float timeForOneItemLoadSeconds = 1f;
@@ -861,6 +911,8 @@ public static class IslandProductionSimulator
     {
         if (config == null || !config.isLoaded || progress == null || toUtcTicks <= fromUtcTicks) return 0;
 
+        IslandDevelopmentSimulator.EnsureIslandStates(config, progress);
+
         double remainingSeconds = new TimeSpan(toUtcTicks - fromUtcTicks).TotalSeconds;
         if (remainingSeconds <= 0.0) return 0;
 
@@ -880,6 +932,8 @@ public static class IslandProductionSimulator
     public static void EnsureIslandStates(WorldConfigDatabase config, PlayerProgress progress)
     {
         if (config == null || !config.isLoaded || progress == null) return;
+
+        IslandDevelopmentSimulator.EnsureIslandStates(config, progress);
 
         for (int i = 0; i < config.islands.Count; i++)
         {
@@ -975,14 +1029,16 @@ public static class IslandProductionSimulator
         if (string.IsNullOrWhiteSpace(production.productionItemId) || production.productionCountBasePerMinute <= 0f) return 0;
 
         float multiplier = CalculateProductionMultiplier(state, production);
+        multiplier *= IslandDevelopmentSimulator.GetBaseProductionMultiplier(config, state);
         state.productionProgress += production.productionCountBasePerMinute * multiplier * minutes;
 
         int completedUnits = Mathf.FloorToInt(state.productionProgress);
         if (completedUnits <= 0) return 0;
 
         int added = state.AddResource(production.productionItemId, completedUnits);
+        int unlockedAdded = IslandDevelopmentSimulator.AddUnlockedStageProduction(config, state, added);
         state.productionProgress -= added;
-        return added;
+        return added + unlockedAdded;
     }
 
     private static float CalculateProductionMultiplier(IslandProductionState state, IslandProductionConfig production)

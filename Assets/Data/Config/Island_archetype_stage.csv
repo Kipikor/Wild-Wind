@@ -1,0 +1,11 @@
+id_stage,archetype_id,stage_index,trigger_need_item,unlocked_production_item,production_multiplier,opens_social_needs,local_name_ru,local_name_en,description_ru
+farming_stage_1,farming,1,water,cloth,2,false,Полив и быт,Irrigation and Shelter,Первое снабжение водой ускоряет еду и открывает ткань.
+farming_stage_2,farming,2,tools,paper,1.5,true,Инструменты и записи,Tools and Records,Инструменты открывают бумагу и общественные потребности.
+ore_stage_1,ore,1,food,tools,2,false,Стабильные смены,Stable Shifts,Еда ускоряет аэролит и открывает инструменты.
+ore_stage_2,ore,2,medicines,weapon,1.5,true,Здоровые шахтеры,Healthy Miners,Медикаменты открывают оружейное производство и общественные потребности.
+mist_stage_1,mist,1,food,medicines,2,false,Службы конденсации,Condensing Crews,Еда ускоряет воду и открывает медикаменты.
+mist_stage_2,mist,2,cloth,gunpowder,1.5,true,Сухие лаборатории,Dry Labs,Ткань открывает взрывчатку и общественные потребности.
+coal_stage_1,coal,1,food,,2,false,Смены топочников,Stoker Shifts,Еда резко увеличивает добычу угля.
+coal_stage_2,coal,2,tools,,1.8,true,Оснастка штолен,Coal Tooling,Инструменты снова увеличивают уголь и открывают общественные потребности.
+claudium_stage_1,claudium,1,food,,2,false,Стабильные сборщики,Stable Claudium Crews,Еда увеличивает сбор клавдия.
+claudium_stage_2,claudium,2,charcoal,,1.8,true,Теплая стабилизация,Heated Stabilization,Уголь усиливает клавдиевую добычу и открывает общественные потребности.

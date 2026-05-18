@@ -3,9 +3,11 @@ food,Еда,Food,0
 charcoal,Уголь,Charcoal,8
 sulfur,Сера,Sulfur,0
 metal,Металл,Metal,0
+aerolite,Аэролит,Aerolite,0
 tools,Инструменты,Tools,0
 weapon,Оружие,Weapons,0
 paper,Бумага,Paper,0
+design_experience,Конструкторский опыт,Design Experience,0
 rock_info,Информация о глыбах,Rock Survey Data,0
 cloud_info,Информация об облаках,Cloud Survey Data,0
 leviathan_info,Информация о левиафанах,Leviathan Survey Data,0
@@ -13,7 +15,7 @@ wood,Древесина,Wood,4
 claudium,Клавдий,Claudium,0
 medicines,Медикаменты,Medicines,0
 alcohol,Спирт,Alcohol,7.5
-gunpowder,Порох,Gunpowder,0
+gunpowder,Взрывчатка,Explosives,0
 mechanisms,Механизмы,Mechanisms,0
 fat,Жир,Fat,12.1
 water,Вода,Water,0

@@ -2,7 +2,7 @@ id_recipe,production_type,local_name_ru,local_name_en,duration_seconds,generatio
 recipe_generation_paper,Generation,Бумажная мастерская,Paper Workshop,60,6,,,"paper",1,,,,,,,,,,
 recipe_processing_ore,Processing,Дробилка руды,Ore Crusher,20,,"","",,,charcoal,4,ore,,,,,,,
 recipe_processing_gas,Processing,Перегонка конденсата,Condensate Still,18,,"","",,,charcoal,2,gas,,,,,,,
-recipe_manufacturing_tools_economy,Manufacturing,Инструменты из дерева и металла,Wood-Metal Tools,45,,"wood,metal","2,1","tools",1,charcoal,1,,,,,,,
+recipe_manufacturing_tools_economy,Manufacturing,Инструменты из аэролита,Airframe Tools,45,,"aerolite,metal","2,1","tools",1,charcoal,1,,,,,,,
 recipe_manufacturing_tools_quality,Manufacturing,Точные инструменты,Precision Tools,30,,"metal,mechanisms","1,1","tools",2,charcoal,1,,,,,,,
 recipe_reaction_gunpowder_safe,Reaction,Пороховая реакция,Gunpowder Reaction,240,,"sulfur,charcoal","1,2","gunpowder",2,,,,0.92,0.015,alcohol,1,0.12,,,
 recipe_conversion_claudium,Conversion,Клавдиевый маховик,Claudium Flywheel,60,,"claudite","1","claudium",1,,,,,,,,,0.12,0.55,6

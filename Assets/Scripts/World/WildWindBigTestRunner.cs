@@ -220,6 +220,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(config.specialModules.Count >= 1, "Special_module.csv содержит спецмодули: " + config.specialModules.Count + ".");
         report.Check(config.islandIndustries.Count >= 6, "Production_industry.csv содержит производственные линии: " + config.islandIndustries.Count + ".");
         report.Check(config.industryRecipes.Count >= 6, "Production_recipe.csv содержит производственные рецепты: " + config.industryRecipes.Count + ".");
+        report.Check(config.islandArchetypes.Count == 5, "Island_archetype.csv содержит 5 типов островов: " + config.islandArchetypes.Count + ".");
+        report.Check(config.islandArchetypeStages.Count >= 10, "Island_archetype_stage.csv содержит стадии развития островов: " + config.islandArchetypeStages.Count + ".");
+        report.Check(config.islandSocialNeeds.Count == 5, "Island_social_need.csv содержит 5 общественных потребностей: " + config.islandSocialNeeds.Count + ".");
+        report.Check(config.islandBuildings.Count >= 30, "Island_building.csv содержит производственные и сервисные здания: " + config.islandBuildings.Count + ".");
 
         CheckUniqueIds(config.items, item => item.id, "предметов", report);
         CheckUniqueIds(config.islands, island => island.id, "островов", report);
@@ -234,8 +238,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         CheckUniqueIds(config.specialModules, module => module.id, "спецмодулей", report);
         CheckUniqueIds(config.islandIndustries, industry => industry.id, "линий производств", report);
         CheckUniqueIds(config.industryRecipes, recipe => recipe.id, "рецептов производств", report);
+        CheckUniqueIds(config.islandArchetypes, archetype => archetype.id, "типов островов", report);
+        CheckUniqueIds(config.islandArchetypeStages, stage => stage.id, "стадий островов", report);
+        CheckUniqueIds(config.islandSocialNeeds, need => need.id, "общественных потребностей", report);
+        CheckUniqueIds(config.islandBuildings, building => building.id, "островных зданий", report);
 
         ValidateConfigReferences(config, report);
+        ValidateIslandDevelopmentConfig(config, report);
         ValidateIndustryConfig(config, report);
     }
 
@@ -392,6 +401,248 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         report.Check(techValid, "Технологии и спецмодули имеют валидные зависимости, стоимость и массу.");
+    }
+
+    private static void ValidateIslandDevelopmentConfig(WorldConfigDatabase config, BigTestReport report)
+    {
+        bool coreItemsExist =
+            config.GetItem("food") != null &&
+            config.GetItem("water") != null &&
+            config.GetItem("aerolite") != null &&
+            config.GetItem("charcoal") != null &&
+            config.GetItem("claudium") != null &&
+            config.GetItem("cloth") != null &&
+            config.GetItem("tools") != null &&
+            config.GetItem("medicines") != null &&
+            config.GetItem("paper") != null &&
+            config.GetItem("weapon") != null &&
+            config.GetItem("gunpowder") != null &&
+            config.GetItem("design_experience") != null;
+        report.Check(coreItemsExist, "Магистральные ресурсы и конструкторский опыт заведены в Item.csv.");
+
+        bool archetypesValid = true;
+        bool hasFarming = false;
+        bool hasOre = false;
+        bool hasMist = false;
+        bool hasCoal = false;
+        bool hasClaudium = false;
+
+        for (int i = 0; i < config.islandArchetypes.Count; i++)
+        {
+            IslandArchetypeConfig archetype = config.islandArchetypes[i];
+            if (archetype == null)
+            {
+                archetypesValid = false;
+                continue;
+            }
+
+            hasFarming |= archetype.id == "farming";
+            hasOre |= archetype.id == "ore";
+            hasMist |= archetype.id == "mist";
+            hasCoal |= archetype.id == "coal";
+            hasClaudium |= archetype.id == "claudium";
+
+            archetypesValid &= config.GetItem(archetype.baseProductionItemId) != null &&
+                config.GetItem(archetype.startNeedItemId) != null &&
+                !string.IsNullOrWhiteSpace(archetype.heightBand);
+        }
+
+        report.Check(archetypesValid && hasFarming && hasOre && hasMist && hasCoal && hasClaudium, "Пять архетипов островов валидны и ссылаются на магистральные ресурсы.");
+
+        bool islandArchetypeReferencesValid = true;
+        bool hasClaudiumIsland = false;
+        for (int i = 0; i < config.islands.Count; i++)
+        {
+            IslandConfig island = config.islands[i];
+            if (island == null || string.IsNullOrWhiteSpace(island.archetypeId)) continue;
+
+            islandArchetypeReferencesValid &= config.GetIslandArchetype(island.archetypeId) != null;
+            hasClaudiumIsland |= island.archetypeId == "claudium";
+        }
+
+        report.Check(islandArchetypeReferencesValid && hasClaudiumIsland, "Острова с archetype_id ссылаются на существующие типы и есть клавдиевые острова.");
+
+        bool stagesValid = true;
+        int socialOpeningStages = 0;
+        for (int i = 0; i < config.islandArchetypeStages.Count; i++)
+        {
+            IslandArchetypeStageConfig stage = config.islandArchetypeStages[i];
+            if (stage == null)
+            {
+                stagesValid = false;
+                continue;
+            }
+
+            stagesValid &= config.GetIslandArchetype(stage.archetypeId) != null &&
+                stage.stageIndex > 0 &&
+                config.GetItem(stage.triggerNeedItemId) != null &&
+                stage.productionMultiplier >= 1f;
+
+            if (!string.IsNullOrWhiteSpace(stage.unlockedProductionItemId))
+            {
+                stagesValid &= config.GetItem(stage.unlockedProductionItemId) != null;
+            }
+
+            if (stage.opensSocialNeeds)
+            {
+                socialOpeningStages++;
+            }
+        }
+
+        report.Check(stagesValid && socialOpeningStages == 5, "Стадии островов валидны и каждая ветка открывает общественные потребности.");
+
+        bool needsValid = true;
+        HashSet<IslandNeedKind> needKinds = new HashSet<IslandNeedKind>();
+        for (int i = 0; i < config.islandSocialNeeds.Count; i++)
+        {
+            IslandSocialNeedConfig need = config.islandSocialNeeds[i];
+            if (need == null)
+            {
+                needsValid = false;
+                continue;
+            }
+
+            needKinds.Add(need.kind);
+            needsValid &= config.GetItem(need.recoveryItemId) != null &&
+                need.maxValue > 0f &&
+                need.restorePerItem > 0f &&
+                need.loadDecayPerHour > 0f;
+        }
+
+        report.Check(needsValid && needKinds.Count == 5, "Пять общественных потребностей валидны и восстанавливаются ресурсами.");
+
+        bool buildingsValid = true;
+        bool hasProcessing = false;
+        bool hasReaction = false;
+        bool hasConversion = false;
+        bool hasAssembly = false;
+        bool hasManufacturing = false;
+        int productionBuildings = 0;
+        int serviceBuildings = 0;
+
+        for (int i = 0; i < config.islandBuildings.Count; i++)
+        {
+            IslandBuildingConfig building = config.islandBuildings[i];
+            if (building == null)
+            {
+                buildingsValid = false;
+                continue;
+            }
+
+            bool constructionOk = ItemAmountsReferenceExistingItems(building.constructionInputs, a => a.itemId, a => a.amount, config);
+            bool techOk = string.IsNullOrWhiteSpace(building.requiredTechnologyId) || config.GetTechnology(building.requiredTechnologyId) != null;
+            bool loadsOk = building.workforceLoad <= 5 &&
+                building.healthLoad <= 5 &&
+                building.safetyLoad <= 5 &&
+                building.comfortLoad <= 5 &&
+                building.creativityLoad <= 5;
+
+            buildingsValid &= constructionOk && techOk && loadsOk && building.maxUpgradeLevel >= 0;
+
+            if (building.IsService)
+            {
+                serviceBuildings++;
+            }
+            else
+            {
+                productionBuildings++;
+                hasProcessing |= building.industryKind == IslandIndustryKind.Processing;
+                hasReaction |= building.industryKind == IslandIndustryKind.Reaction;
+                hasConversion |= building.industryKind == IslandIndustryKind.Conversion;
+                hasAssembly |= building.industryKind == IslandIndustryKind.Assembly;
+                hasManufacturing |= building.industryKind == IslandIndustryKind.Manufacturing;
+            }
+        }
+
+        report.Check(buildingsValid && productionBuildings == 21 && serviceBuildings >= 10 &&
+            hasProcessing && hasReaction && hasConversion && hasAssembly && hasManufacturing,
+            "Островные здания покрывают 21 производство, сервисы и все типы механик.");
+
+        bool industryBuildingReferencesValid = true;
+        for (int i = 0; i < config.islandIndustries.Count; i++)
+        {
+            IslandIndustryConfig industry = config.islandIndustries[i];
+            if (industry == null || string.IsNullOrWhiteSpace(industry.buildingId)) continue;
+
+            industryBuildingReferencesValid &= config.GetIslandBuilding(industry.buildingId) != null;
+        }
+
+        report.Check(industryBuildingReferencesValid, "Production_industry.csv может ссылаться на Island_building.csv через building_id.");
+
+        PlayerProgress progress = new PlayerProgress();
+        progress.Normalize();
+        IslandProductionState capital = progress.GetIslandProductionState("capital", true);
+        capital.SetResourceAmount("food", 5);
+        capital.SetResourceAmount("medicines", 5);
+        capital.SetResourceAmount("weapon", 5);
+        capital.SetResourceAmount("cloth", 5);
+        capital.SetResourceAmount("paper", 5);
+
+        IslandSocietySimulator.EnsureIslandStates(config, progress);
+        for (int i = 0; i < config.islandSocialNeeds.Count; i++)
+        {
+            IslandSocialNeedConfig need = config.islandSocialNeeds[i];
+            IslandSocietyNeedState state = capital.GetSocietyNeedState(need.id, true);
+            state.currentValue = 0f;
+            state.initialized = true;
+        }
+
+        int restored = IslandSocietySimulator.Advance(config, progress, 1f);
+        bool restoredAllNeeds = restored >= 5;
+        for (int i = 0; i < config.islandSocialNeeds.Count; i++)
+        {
+            IslandSocialNeedConfig need = config.islandSocialNeeds[i];
+            IslandSocietyNeedState state = capital.GetSocietyNeedState(need.id, false);
+            restoredAllNeeds &= state != null && state.currentValue > 0f;
+        }
+
+        report.Check(restoredAllNeeds, "Остров сам восстанавливает общественные потребности ресурсами со склада.");
+
+        PlayerProgress developmentProgress = new PlayerProgress();
+        developmentProgress.Normalize();
+        IslandDevelopmentSimulator.EnsureIslandStates(config, developmentProgress);
+
+        IslandProductionState farmingIsland = developmentProgress.GetIslandProductionState("Island1", true);
+        farmingIsland.SetResourceAmount("water", 5);
+        farmingIsland.SetResourceAmount("tools", 5);
+
+        bool stage1Completed = IslandDevelopmentSimulator.TryCompleteNextStage(config, developmentProgress, "Island1", out _);
+        bool stage2Completed = IslandDevelopmentSimulator.TryCompleteNextStage(config, developmentProgress, "Island1", out _);
+        bool stageStateOk = farmingIsland.development.completedStage >= 2 && farmingIsland.development.socialNeedsUnlocked;
+        report.Check(stage1Completed && stage2Completed && stageStateOk, "Остров проходит несгораемые стадии развития и открывает общественные потребности.");
+
+        int foodBeforeStageProduction = farmingIsland.GetResourceAmount("food");
+        int clothBeforeStageProduction = farmingIsland.GetResourceAmount("cloth");
+        long stageStartTicks = DateTime.UtcNow.Ticks;
+        IslandProductionSimulator.Advance(config, developmentProgress, stageStartTicks, stageStartTicks + TimeSpan.FromMinutes(5).Ticks);
+        bool stageProductionOk = farmingIsland.GetResourceAmount("food") > foodBeforeStageProduction &&
+            farmingIsland.GetResourceAmount("cloth") > clothBeforeStageProduction;
+        report.Check(stageProductionOk, "Развитый остров усиливает базовую выработку и даёт открытый побочный ресурс.");
+
+        PlayerProgress buildingProgress = new PlayerProgress();
+        buildingProgress.Normalize();
+        IslandDevelopmentSimulator.EnsureIslandStates(config, buildingProgress);
+        IslandProductionState buildIsland = buildingProgress.GetIslandProductionState("Island1", true);
+        StockCommonResources(buildIsland);
+
+        IslandBuildingConfig lightIndustry = config.GetIslandBuilding("light_industry");
+        StockAmounts(buildIsland, lightIndustry != null ? lightIndustry.constructionInputs : null, 100);
+
+        long buildStartTicks = DateTime.UtcNow.Ticks;
+        bool constructionStarted = IslandDevelopmentSimulator.TryStartConstruction(config, buildingProgress, "Island1", "light_industry", buildStartTicks, out _);
+        bool duplicateBlockedWhileBuilding = !IslandDevelopmentSimulator.TryStartConstruction(config, buildingProgress, "Island1", "light_industry", buildStartTicks, out _);
+        IslandDevelopmentSimulator.Advance(config, buildingProgress, buildStartTicks, buildStartTicks + TimeSpan.FromHours(1).Ticks);
+        IslandBuildingState builtLightIndustry = buildIsland.GetBuildingState("light_industry", false);
+        bool constructionCompleted = builtLightIndustry != null && builtLightIndustry.built && builtLightIndustry.level == 1;
+        report.Check(constructionStarted && duplicateBlockedWhileBuilding && constructionCompleted, "Строительство здания идёт одним assembly-проектом, проходит этапы и запрещает дубликаты.");
+
+        long upgradeStartTicks = buildStartTicks + TimeSpan.FromHours(2).Ticks;
+        StockAmounts(buildIsland, lightIndustry != null ? lightIndustry.constructionInputs : null, 100);
+        bool upgradeStarted = IslandDevelopmentSimulator.TryStartUpgrade(config, buildingProgress, "Island1", "light_industry", upgradeStartTicks, out _);
+        IslandDevelopmentSimulator.Advance(config, buildingProgress, upgradeStartTicks, upgradeStartTicks + TimeSpan.FromHours(1).Ticks);
+        bool upgradeCompleted = builtLightIndustry.level >= 2 && builtLightIndustry.built;
+        bool duplicateBlockedAfterBuild = !IslandDevelopmentSimulator.TryStartConstruction(config, buildingProgress, "Island1", "light_industry", upgradeStartTicks + TimeSpan.FromHours(2).Ticks, out _);
+        report.Check(upgradeStarted && upgradeCompleted && duplicateBlockedAfterBuild, "Построенное здание можно улучшать без клонирования второго такого же здания.");
     }
 
     private static void ValidateIndustryConfig(WorldConfigDatabase config, BigTestReport report)
@@ -1210,14 +1461,20 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
     private static void StockCommonResources(IslandProductionState storage)
     {
+        SetAtLeast(storage, "food", 500);
+        SetAtLeast(storage, "water", 500);
+        SetAtLeast(storage, "aerolite", 500);
         SetAtLeast(storage, "wood", 500);
         SetAtLeast(storage, "metal", 500);
         SetAtLeast(storage, "mechanisms", 500);
         SetAtLeast(storage, "tools", 500);
+        SetAtLeast(storage, "medicines", 500);
+        SetAtLeast(storage, "weapon", 500);
         SetAtLeast(storage, "cloth", 500);
         SetAtLeast(storage, "charcoal", 1200);
         SetAtLeast(storage, "sulfur", 500);
         SetAtLeast(storage, "alcohol", 240);
+        SetAtLeast(storage, "claudium", 500);
         SetAtLeast(storage, "claudite", 500);
         SetAtLeast(storage, "paper", 120);
     }

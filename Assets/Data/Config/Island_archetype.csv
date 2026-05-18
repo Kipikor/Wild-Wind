@@ -1,0 +1,6 @@
+id_archetype,local_name_ru,local_name_en,height_band,base_production_item,start_need_item,description_ru
+farming,Фермерский,Farming,low_habitable,food,water,Зеленые низкие острова дают еду и первыми просят воду.
+ore,Рудный,Ore,mid_habitable,aerolite,food,Средние острова у скоплений глыб дают аэролит и требуют снабжения едой.
+mist,Туманный,Mist,updraft_clouds,water,food,Пасмурные острова в восходящих потоках собирают воду из облаков.
+coal,Угольный,Coal,low_mid_habitable,charcoal,food,Темные теплые острова дают уголь для кораблей и промышленности.
+claudium,Клавдиевый,Claudium,upper_habitable,claudium,food,Высокие острова с клавдиевыми прожилками дают главный летный ресурс.
