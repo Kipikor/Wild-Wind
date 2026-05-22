@@ -13,6 +13,43 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 {
     private const string LogPrefix = "[WildWindBigTest] ";
     private const string DefaultConfigFolder = "Data/Config";
+    private const int BigTestContractVersion = 2;
+    private const int MinimumExpectedCheckCount = 320;
+    private const string BigTestSessionSavePrefix = "wild_wind_big_test_session_";
+
+    public const string DefaultStartSceneName = "StartScreen";
+    public const string DefaultWorldSceneName = "WildWindWorldScene";
+
+    public static bool SuppressRunOnStartForAutomation { get; set; }
+    public static bool IsSessionLoopLaunchInProgress => sessionLoopLaunchInProgress;
+
+    private static bool autoRunConsumedThisPlaySession;
+    private static bool activeRunInProgress;
+    private static bool sessionLoopLaunchInProgress;
+
+    private static readonly string[] RequiredSectionTitles =
+    {
+        "Паспорт проверки",
+        "Сцена и контекст запуска",
+        "CSV-конфиги",
+        "Localization",
+        "Грузовые единицы и отсеки кораблей",
+        "R1 ships: runtime mechanics",
+        "Симуляция производств",
+        "Сид и манифест мира",
+        "Большой мир и чанки",
+        "Индекс сущностей мира",
+        "Единый runtime-состояния мира",
+        "Сохранение мира в слот",
+        "Сердцебиение мира и фоновая симуляция",
+        "Активный пузырь и материализация",
+        "Визуал, высотные слои и туман",
+        "Настройки проекта и управление",
+        "Корабль, ветер и лётная физика",
+        "Сессионные перезаходы стартовое меню <-> мир",
+        "Защита побочных эффектов",
+        "Методика сопровождения"
+    };
 
     [Header("Большой тест")]
     [SerializeField, InspectorName("Запускать при старте Play Mode")] public bool runOnStart = true;
@@ -36,14 +73,37 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private bool hasRun;
     private bool becamePersistentForSceneLoop;
 
+    public WildWindBigTestResult LastResult { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPlaySessionState()
+    {
+        SuppressRunOnStartForAutomation = false;
+        autoRunConsumedThisPlaySession = false;
+        activeRunInProgress = false;
+        sessionLoopLaunchInProgress = false;
+    }
+
+    public static bool IsBigTestTemporarySaveFileName(string fileName)
+    {
+        return !string.IsNullOrWhiteSpace(fileName) &&
+            fileName.StartsWith(BigTestSessionSavePrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
     private IEnumerator Start()
     {
-        if (!runOnStart)
+        if (!runOnStart || SuppressRunOnStartForAutomation || autoRunConsumedThisPlaySession || activeRunInProgress)
         {
             yield break;
         }
 
         yield return null;
+        if (!runOnStart || SuppressRunOnStartForAutomation || autoRunConsumedThisPlaySession || activeRunInProgress)
+        {
+            yield break;
+        }
+
+        autoRunConsumedThisPlaySession = true;
         RunBigTest();
     }
 
@@ -56,12 +116,39 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return;
         }
 
+        if (activeRunInProgress)
+        {
+            Debug.LogWarning(LogPrefix + "Большой тест уже выполняется другим runner'ом.", this);
+            return;
+        }
+
         hasRun = true;
-        StartCoroutine(RunBigTestRoutine());
+        activeRunInProgress = true;
+        StartCoroutine(RunBigTestRoutine(null, true));
     }
 
-    private IEnumerator RunBigTestRoutine()
+    public IEnumerator RunBigTestForAutomation(Action<WildWindBigTestResult> completed = null)
     {
+        if (hasRun)
+        {
+            completed?.Invoke(LastResult ?? WildWindBigTestResult.CreateBlocked("Большой тест уже запускался на этом объекте."));
+            yield break;
+        }
+
+        if (activeRunInProgress)
+        {
+            completed?.Invoke(WildWindBigTestResult.CreateBlocked("Большой тест уже выполняется другим runner'ом."));
+            yield break;
+        }
+
+        hasRun = true;
+        activeRunInProgress = true;
+        yield return RunBigTestRoutine(completed, false);
+    }
+
+    private IEnumerator RunBigTestRoutine(Action<WildWindBigTestResult> completed, bool emitReportOutput)
+    {
+        BigTestSideEffectSnapshot sideEffects = BigTestSideEffectSnapshot.Capture();
         BigTestReport report = new BigTestReport(this);
         Stopwatch totalWatch = Stopwatch.StartNew();
 
@@ -91,19 +178,24 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         });
 
         yield return RunCheckedCoroutine(report, ValidateSessionLoopRoundTrip(report));
+        yield return RestoreAndValidateSideEffects(sideEffects, report);
 
         RunChecked(report, () => ValidateMaintainability(report));
+        report.AssertIntegrity(RequiredSectionTitles, MinimumExpectedCheckCount, CanarySelfTestPasses);
 
         totalWatch.Stop();
-        report.Finish(totalWatch.ElapsedMilliseconds);
+        long elapsedMs = totalWatch.ElapsedMilliseconds;
+        report.Finish(elapsedMs);
+        LastResult = report.CreateResult(BigTestContractVersion, elapsedMs, true, RequiredSectionTitles, MinimumExpectedCheckCount);
+        completed?.Invoke(LastResult);
 
         string text = report.BuildText();
-        if (writeReportFile)
+        if (emitReportOutput && writeReportFile)
         {
-            TryWriteReport(text, report);
+            TryWriteReport(text, LastResult, report);
         }
 
-        if (logFullReportToConsole)
+        if (emitReportOutput && logFullReportToConsole)
         {
             if (report.FailureCount == 0)
             {
@@ -115,10 +207,18 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
         }
 
+        ReleaseActiveRun();
+
         if (becamePersistentForSceneLoop)
         {
             Destroy(gameObject);
         }
+    }
+
+    private void ReleaseActiveRun()
+    {
+        activeRunInProgress = false;
+        sessionLoopLaunchInProgress = false;
     }
 
     private void RunChecked(BigTestReport report, Action action)
@@ -161,9 +261,56 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
     }
 
+    private IEnumerator RestoreAndValidateSideEffects(BigTestSideEffectSnapshot snapshot, BigTestReport report)
+    {
+        report.Section("Защита побочных эффектов");
+        if (snapshot == null)
+        {
+            report.Fail("Не удалось снять snapshot побочных эффектов перед стартом большого теста.");
+            yield break;
+        }
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (!string.IsNullOrWhiteSpace(snapshot.ActiveSceneName) && activeScene.name != snapshot.ActiveSceneName)
+        {
+            report.Warn("Большой тест завершает проверку в сцене '" + activeScene.name + "', восстанавливаю '" + snapshot.ActiveSceneName + "'.");
+            SceneManager.LoadScene(snapshot.ActiveSceneName);
+            DisableDuplicateBigTestRunners();
+            yield return null;
+            DisableDuplicateBigTestRunners();
+            yield return null;
+        }
+
+        snapshot.RestorePrefsAndTimeScale();
+        snapshot.AssertRestored(report);
+    }
+
+    public static WildWindBigTestResult RunCanarySelfTest()
+    {
+        BigTestReport report = new BigTestReport(null, false);
+        report.Section("Canary");
+        report.Fail("Ожидаемый canary FAIL: механизм ошибок должен делать результат красным.");
+        report.Finish(0L);
+        return report.CreateResult(BigTestContractVersion, 0L, true, new[] { "Canary" }, 1);
+    }
+
+    private static bool CanarySelfTestPasses()
+    {
+        WildWindBigTestResult result = RunCanarySelfTest();
+        return result != null &&
+            result.Completed &&
+            !result.Succeeded &&
+            result.FailureCount == 1 &&
+            result.CheckCount == 1;
+    }
+
     public void ResetRunStateForEditor()
     {
         hasRun = false;
+        LastResult = null;
+        autoRunConsumedThisPlaySession = false;
+        activeRunInProgress = false;
+        sessionLoopLaunchInProgress = false;
     }
 
     private void ResolveReferences()
@@ -182,11 +329,14 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private void DescribeTestScope(BigTestReport report)
     {
         report.Section("Паспорт проверки");
+        report.Info("Версия контракта большого теста: " + BigTestContractVersion + ".");
+        report.Info("ID запуска: " + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".");
         report.Info("Кнопка: Wild Wind/Провести большой тест.");
         report.Info("Назначение: один общий дотошный протокол по текущей сборке игры.");
         report.Info("Сейчас покрыто: CSV-конфиги, дерево технологий, дерево кораблей, производства, потребности островов/кораблей, скорость их удовлетворения, пассажироперевозки, типы грузов и отсеки, мир 100x100 км, чанки, высотные зоны, активный пузырь, визуальные зависимости, настройки, ветер/аэродинамика, лётная физика, save slots и перезаходы стартовое меню <-> мир.");
         report.Info("Допуски: размер мира +-1 м, размер чанка +-1 м, среднее обновление пузыря <= " + streamerAverageBudgetMs.ToString("0.#") + " мс, симуляция производств " + productionSimulationMinutes.ToString("0.#") + " мин.");
         report.Info("Принцип: FAIL = сломано или противоречит текущему ТЗ; WARN = подозрительно, но можно продолжать; OK = проверено явно.");
+        report.Pass("Паспорт большого теста сформирован и попадёт в машинно-читаемый результат.");
     }
 
     private void ValidateSceneContext(BigTestReport report)
@@ -399,8 +549,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
         }
 
-        report.Check(entriesValid && hasPioneerRoot && r1Count >= 6 && roleIds.Count >= 6,
-            "Ship_tree.csv задаёт скромное текущее дерево: Пионер R0, минимум шесть R1-кораблей и основные роли.");
+        report.Check(entriesValid && hasPioneerRoot && r1Count >= 7 && roleIds.Count >= 7,
+            "Ship_tree.csv задаёт скромное текущее дерево: Пионер R0, минимум семь R1-кораблей и основные роли.");
 
         report.Check(!ShipTreeHasCycles(config),
             "Дерево кораблей не содержит циклов по parent_ship_id.");
@@ -894,6 +1044,23 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, dockOverflow, out _);
         report.Check(cargoLimitsWork, "Корабельные отсеки проверяют места салона, смешиваемый фургон, однотипные кузова/цистерны/баллоны, док-слот, 10% массу докованного корабля и расход клавдия на поддержку дока.");
 
+        LogisticsShipMetrics fuelOnlyMetrics = new LogisticsShipMetrics
+        {
+            cargoCompartments = new List<CargoCompartmentDefinition>
+            {
+                new CargoCompartmentDefinition
+                {
+                    storageKind = CargoStorageKind.Van,
+                    capacity = 100f,
+                    allowedItemIds = new List<string> { "charcoal", "claudium" }
+                }
+            }
+        };
+        bool cargoItemWhitelistWorks =
+            CargoStoragePlanner.TryValidateCargoStorage(config, fuelOnlyMetrics, new Dictionary<string, int> { ["charcoal"] = 50, ["claudium"] = 40 }, out _) &&
+            !CargoStoragePlanner.TryValidateCargoStorage(config, fuelOnlyMetrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
+        report.Check(cargoItemWhitelistWorks, "Грузовой отсек может быть ограничен конкретными item id, например только углем и клавдием.");
+
         PlayerProgress playerCargoProgress = new PlayerProgress();
         playerCargoProgress.Normalize();
         playerCargoProgress.AddShipCargo(PassengerCargoIds.ToCapitalItemId, 2);
@@ -921,6 +1088,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         SpecialModuleConfig jaeger = config.GetSpecialModule("jaeger_harpoon_fridge");
         SpecialModuleConfig jaegerMk2 = config.GetSpecialModule("jaeger_harpoon_fridge_mk2");
         SpecialModuleConfig opora = config.GetSpecialModule("opora_crane_platform");
+        SpecialModuleConfig fuelTender = config.GetSpecialModule("fuel_tender_tanks");
         SpecialModuleConfig parovoz = config.GetSpecialModule("parovoz_passenger_cabin");
 
         ValidateR1ShipCatalog(config, report);
@@ -970,6 +1138,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             opora.needRepairRecoveryPerHour > 0f &&
             opora.cargoVanCapacityUnits >= 6000f,
             "Opora module exists: repair recovery and large van deck.");
+
+        report.Check(fuelTender != null &&
+            fuelTender.cargoVanCapacityUnits >= 6400f &&
+            ContainsId(fuelTender.allowedCargoItemIds, "charcoal") &&
+            ContainsId(fuelTender.allowedCargoItemIds, "claudium"),
+            "Fuel tender module exists: large van capacity locked to charcoal and claudium.");
 
         report.Check(parovoz != null &&
             parovoz.passengerSeatCapacity >= 15f &&
@@ -1091,8 +1265,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             report.Check(appliedParts >= expectedParts && expectedParts > 0,
                 "CSV ship part configs sync into ShipCatalog: " + appliedParts + "/" + expectedParts + " parts.");
 
-            report.Check(R1ShipDesignCatalog.All.Count == 6,
-                "R1 design catalog contains all six ships: Vodomerka, Bulat, Shershen, Eger, Opora, Parovoz.");
+            report.Check(R1ShipDesignCatalog.All.Count == 7,
+                "R1 design catalog contains all seven ships: Vodomerka, Bulat, Shershen, Eger, Opora, Fuel Tender, Parovoz.");
 
             string[] requiredR1TechnologyIds =
             {
@@ -1184,7 +1358,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     Approximately(stats.Get(ShipStatId.EngineMaxPower, 0f), design.expectedEnginePowerKw, 0.01f) &&
                     Approximately(stats.Get(ShipStatId.StructureHp, 0f), design.expectedStructureHp, 0.01f) &&
                     stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f) >= design.expectedMaxTakeoffMassKg - 0.01f &&
-                    Approximately(stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f), 28f, 0.01f) &&
+                    Approximately(stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f), design.expectedClaudiumLiftEfficiency, 0.01f) &&
                     stats.Get(ShipStatId.PropellerMaxThrustKgf, 0f) > 0f &&
                     stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f) > 0f;
                 report.Check(coreStatsMatch,
@@ -1359,16 +1533,32 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             case "opora":
                 return R1CoreLoadoutStatsMatch(stats,
                         maximum ? 4260f : 3600f,
-                        maximum ? 6900f : 5800f,
-                        maximum ? 2600f : 2200f,
-                        340f,
+                        maximum ? 11000f : 10000f,
+                        maximum ? 6740f : 6400f,
+                        400f,
                         maximum ? 2000f : 1400f,
                         maximum ? 16f : 10f,
                         4f,
                         maximum ? 1.25f : 1.6f,
-                        maximum ? 6900f : 5800f) &&
+                        maximum ? 11000f : 10000f,
+                        maximum ? 50f : 45f) &&
                     Approximately(stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f), maximum ? 38f : 30f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), maximum ? 14000f : 6000f, 0.001f);
+            case "fuel_tender":
+                return R1CoreLoadoutStatsMatch(stats,
+                        3600f,
+                        10000f,
+                        6400f,
+                        400f,
+                        700f,
+                        16f,
+                        2f,
+                        1.15f,
+                        10000f,
+                        50f) &&
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 6400f, 0.001f) &&
+                    ContainsId(stats.AllowedCargoItemIds, "charcoal") &&
+                    ContainsId(stats.AllowedCargoItemIds, "claudium");
             case "parovoz":
                 return R1CoreLoadoutStatsMatch(stats,
                         maximum ? 4820f : 4300f,
@@ -1400,7 +1590,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         float expectedPropellerMaxSpeedMS,
         float expectedAutoVerticalSpeedMS,
         float expectedDragCoefficient,
-        float expectedClaudiumMaxLiftKg)
+        float expectedClaudiumMaxLiftKg,
+        float expectedClaudiumLiftEfficiency = 28f)
     {
         if (stats == null) return false;
 
@@ -1416,7 +1607,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             Approximately(stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f), expectedPropellerMaxSpeedMS, 0.01f) &&
             Approximately(stats.Get(ShipStatId.MaxAutoVerticalSpeed, 0f), expectedAutoVerticalSpeedMS, 0.01f) &&
             Approximately(stats.Get(ShipStatId.DragCoefficient, 0f), expectedDragCoefficient, 0.001f) &&
-            Approximately(stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f), 28f, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f), expectedClaudiumLiftEfficiency, 0.01f) &&
             Approximately(stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f), expectedClaudiumMaxLiftKg, 0.01f) &&
             stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f) >= maxTakeoffMassKg - 0.01f;
     }
@@ -1434,6 +1625,21 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         return true;
+    }
+
+    private static bool ContainsId(IReadOnlyList<string> ids, string id)
+    {
+        if (ids == null || string.IsNullOrWhiteSpace(id)) return false;
+
+        for (int i = 0; i < ids.Count; i++)
+        {
+            if (ids[i] == id)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool SlotAllowsAll(ShipPartDefinitionSO hull, string slotId, List<string> partIds)
@@ -1578,6 +1784,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             case "opora":
                 return stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f) > 0f &&
                     stats.Get(ShipStatId.CargoVanCapacityUnits, 0f) >= 6000f;
+            case "fuel_tender":
+                return stats.Get(ShipStatId.CargoVanCapacityUnits, 0f) >= 6400f &&
+                    ContainsId(stats.AllowedCargoItemIds, "charcoal") &&
+                    ContainsId(stats.AllowedCargoItemIds, "claudium");
             case "parovoz":
                 return stats.Get(ShipStatId.PassengerSeatCapacity, 0f) >= 15f &&
                     stats.Get(ShipStatId.CargoVanCapacityUnits, 0f) >= 250f &&
@@ -2882,8 +3092,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         string previousSelectedSave = WildWindSaveSlots.GetSelectedSaveFileNameOrEmpty();
         bool previousPendingLaunch = PlayerPrefs.GetInt(WildWindSaveSlots.PendingGameplayLaunchPlayerPrefsKey, 0) == 1;
         int seed = 777331;
-        string tempSlotName = "wild_wind_big_test_session_" + DateTime.UtcNow.Ticks + ".json";
+        string tempSlotName = BigTestSessionSavePrefix + DateTime.UtcNow.Ticks + ".json";
         string tempSlotPath = WildWindSaveSlots.GetSavePath(tempSlotName);
+        CleanupAbandonedBigTestSaveSlots(previousSelectedSave, report);
 
         try
         {
@@ -2904,28 +3115,29 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             DontDestroyOnLoad(gameObject);
             becamePersistentForSceneLoop = true;
 
-            SceneManager.LoadScene("StartScreen");
+            SceneManager.LoadScene(DefaultStartSceneName);
             yield return null;
             yield return null;
 
             Scene startScene = SceneManager.GetActiveScene();
-            report.Check(startScene.name == "StartScreen", "Большой тест реально перешёл в стартовую сцену: " + startScene.name + ".");
+            report.Check(startScene.name == DefaultStartSceneName, "Большой тест реально перешёл в стартовую сцену: " + startScene.name + ".");
 
             WildWindStartScreen startScreen = FindFirstObjectByType<WildWindStartScreen>();
             report.Check(startScreen != null, startScreen != null ? "Стартовый экран поднялся после выхода из мира." : "Стартовый экран не найден после загрузки StartScreen.");
-            report.Check(startScreen != null && startScreen.gameplaySceneName == "WildWindWorldScene",
-                "Стартовый экран ведёт в WildWindWorldScene.");
+            report.Check(startScreen != null && startScreen.gameplaySceneName == DefaultWorldSceneName,
+                "Стартовый экран ведёт в " + DefaultWorldSceneName + ".");
 
             WildWindSaveSlots.SetSelectedSaveFileName(tempSlotName);
             WildWindSaveSlots.MarkPendingGameplayLaunch();
-            SceneManager.LoadScene("WildWindWorldScene");
+            sessionLoopLaunchInProgress = true;
+            SceneManager.LoadScene(DefaultWorldSceneName);
             DisableDuplicateBigTestRunners();
-            yield return null;
-            DisableDuplicateBigTestRunners();
-            yield return null;
+            yield return WaitForLoadedSessionWorld(seed, tempSlotName);
+            sessionLoopLaunchInProgress = false;
+            ReportSessionWorldReadinessIfNeeded(seed, tempSlotName, "первый вход", report);
 
             Scene firstWorldScene = SceneManager.GetActiveScene();
-            report.Check(firstWorldScene.name == "WildWindWorldScene", "Continue загрузил world-сцену в первый раз: " + firstWorldScene.name + ".");
+            report.Check(firstWorldScene.name == DefaultWorldSceneName, "Continue загрузил world-сцену в первый раз: " + firstWorldScene.name + ".");
             ValidateLoadedSessionWorld(seed, tempSlotName, "первый вход", report);
 
             WildWindGameplayMenu gameplayMenu = FindFirstObjectByType<WildWindGameplayMenu>();
@@ -2947,26 +3159,89 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             yield return null;
 
             Scene returnedScene = SceneManager.GetActiveScene();
-            report.Check(returnedScene.name == "StartScreen", "Внутриигровое меню вернуло сессию на стартовый экран: " + returnedScene.name + ".");
+            report.Check(returnedScene.name == DefaultStartSceneName, "Внутриигровое меню вернуло сессию на стартовый экран: " + returnedScene.name + ".");
             report.Check(File.Exists(tempSlotPath), "Save slot остался на диске после выхода в меню с сохранением.");
 
             WildWindSaveSlots.SetSelectedSaveFileName(tempSlotName);
             WildWindSaveSlots.MarkPendingGameplayLaunch();
-            SceneManager.LoadScene("WildWindWorldScene");
+            sessionLoopLaunchInProgress = true;
+            SceneManager.LoadScene(DefaultWorldSceneName);
             DisableDuplicateBigTestRunners();
-            yield return null;
-            DisableDuplicateBigTestRunners();
-            yield return null;
+            yield return WaitForLoadedSessionWorld(seed, tempSlotName);
+            sessionLoopLaunchInProgress = false;
+            ReportSessionWorldReadinessIfNeeded(seed, tempSlotName, "повторный вход", report);
 
             Scene secondWorldScene = SceneManager.GetActiveScene();
-            report.Check(secondWorldScene.name == "WildWindWorldScene", "Повторный Continue снова загрузил world-сцену: " + secondWorldScene.name + ".");
+            report.Check(secondWorldScene.name == DefaultWorldSceneName, "Повторный Continue снова загрузил world-сцену: " + secondWorldScene.name + ".");
             ValidateLoadedSessionWorld(seed, tempSlotName, "повторный вход", report);
         }
         finally
         {
+            sessionLoopLaunchInProgress = false;
             RestoreSessionLoopPrefs(previousSelectedSave, previousPendingLaunch);
             TryDeleteTemporaryFile(tempSlotPath, "save slot проверки перезаходов", report);
         }
+    }
+
+    private IEnumerator WaitForLoadedSessionWorld(int expectedSeed, string expectedSaveFileName)
+    {
+        for (int i = 0; i < 120 && !IsLoadedSessionWorldReady(expectedSeed, expectedSaveFileName); i++)
+        {
+            DisableDuplicateBigTestRunners();
+            yield return null;
+        }
+    }
+
+    private static bool IsLoadedSessionWorldReady(int expectedSeed, string expectedSaveFileName)
+    {
+        Scene scene = SceneManager.GetActiveScene();
+        WorldRegionRuntime loadedWorld = FindFirstObjectByType<WorldRegionRuntime>();
+        WorldRuntimeState loadedRuntimeState = FindFirstObjectByType<WorldRuntimeState>();
+        MetaGameState loadedMeta = FindFirstObjectByType<MetaGameState>();
+        WildWindGameplayMenu loadedMenu = FindFirstObjectByType<WildWindGameplayMenu>();
+
+        return scene.name == DefaultWorldSceneName &&
+            loadedWorld != null &&
+            loadedWorld.RegionSeed == expectedSeed &&
+            loadedRuntimeState != null &&
+            loadedRuntimeState.LoadedManifestSeed == expectedSeed &&
+            loadedMeta != null &&
+            loadedMeta.EffectiveSaveFileName == expectedSaveFileName &&
+            loadedMenu != null;
+    }
+
+    private static void ReportSessionWorldReadinessIfNeeded(int expectedSeed, string expectedSaveFileName, string label, BigTestReport report)
+    {
+        if (IsLoadedSessionWorldReady(expectedSeed, expectedSaveFileName))
+        {
+            return;
+        }
+
+        report.Fail("World-сессия не стала готовой после ожидания (" + label + "): " +
+            DescribeLoadedSessionWorldReadiness(expectedSeed, expectedSaveFileName) + ".");
+    }
+
+    private static string DescribeLoadedSessionWorldReadiness(int expectedSeed, string expectedSaveFileName)
+    {
+        Scene scene = SceneManager.GetActiveScene();
+        WorldRegionRuntime loadedWorld = FindFirstObjectByType<WorldRegionRuntime>();
+        WorldRuntimeState loadedRuntimeState = FindFirstObjectByType<WorldRuntimeState>();
+        MetaGameState loadedMeta = FindFirstObjectByType<MetaGameState>();
+        WildWindGameplayMenu loadedMenu = FindFirstObjectByType<WildWindGameplayMenu>();
+
+        string worldSeed = loadedWorld != null ? loadedWorld.RegionSeed.ToString() : "<нет WorldRegionRuntime>";
+        string runtimeSeed = loadedRuntimeState != null ? loadedRuntimeState.LoadedManifestSeed.ToString() : "<нет WorldRuntimeState>";
+        string saveFileName = loadedMeta != null ? loadedMeta.EffectiveSaveFileName : "<нет MetaGameState>";
+        string menu = loadedMenu != null ? "есть" : "нет";
+
+        return "scene=" + scene.name +
+            ", expectedScene=" + DefaultWorldSceneName +
+            ", worldSeed=" + worldSeed +
+            ", expectedSeed=" + expectedSeed +
+            ", runtimeSeed=" + runtimeSeed +
+            ", metaSave=" + saveFileName +
+            ", expectedSave=" + expectedSaveFileName +
+            ", gameplayMenu=" + menu;
     }
 
     private void ValidateLoadedSessionWorld(int expectedSeed, string expectedSaveFileName, string label, BigTestReport report)
@@ -3041,6 +3316,90 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
     }
 
+    private static void CleanupAbandonedBigTestSaveSlots(string keepFileName, BigTestReport report)
+    {
+        try
+        {
+            string directory = Application.persistentDataPath;
+            if (!Directory.Exists(directory))
+            {
+                return;
+            }
+
+            string keep = string.IsNullOrWhiteSpace(keepFileName) ? "" : Path.GetFileName(keepFileName);
+            string[] files = Directory.GetFiles(directory, BigTestSessionSavePrefix + "*.json", SearchOption.TopDirectoryOnly);
+            int deleted = 0;
+            for (int i = 0; i < files.Length; i++)
+            {
+                string path = files[i];
+                string fileName = Path.GetFileName(path);
+                if (!string.IsNullOrWhiteSpace(keep) && fileName.Equals(keep, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                File.Delete(path);
+                deleted++;
+            }
+
+            if (deleted > 0)
+            {
+                report.Info("Удалены заброшенные временные save slot большого теста: " + deleted + ".");
+            }
+        }
+        catch (Exception exception)
+        {
+            report.Warn("Не удалось очистить заброшенные временные save slot большого теста: " + exception.Message);
+        }
+    }
+
+    private sealed class BigTestSideEffectSnapshot
+    {
+        private string selectedSaveFileName;
+        private bool pendingGameplayLaunch;
+        private float timeScale;
+
+        public string ActiveSceneName { get; private set; }
+
+        private BigTestSideEffectSnapshot()
+        {
+        }
+
+        public static BigTestSideEffectSnapshot Capture()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            return new BigTestSideEffectSnapshot
+            {
+                selectedSaveFileName = WildWindSaveSlots.GetSelectedSaveFileNameOrEmpty(),
+                pendingGameplayLaunch = PlayerPrefs.GetInt(WildWindSaveSlots.PendingGameplayLaunchPlayerPrefsKey, 0) == 1,
+                timeScale = Time.timeScale,
+                ActiveSceneName = scene.IsValid() ? scene.name : ""
+            };
+        }
+
+        public void RestorePrefsAndTimeScale()
+        {
+            RestoreSessionLoopPrefs(selectedSaveFileName, pendingGameplayLaunch);
+            Time.timeScale = timeScale;
+        }
+
+        public void AssertRestored(BigTestReport report)
+        {
+            string actualSelectedSave = WildWindSaveSlots.GetSelectedSaveFileNameOrEmpty();
+            bool actualPendingLaunch = PlayerPrefs.GetInt(WildWindSaveSlots.PendingGameplayLaunchPlayerPrefsKey, 0) == 1;
+            Scene activeScene = SceneManager.GetActiveScene();
+
+            report.Check(actualSelectedSave == selectedSaveFileName,
+                "Selected save slot восстановлен после большого теста.");
+            report.Check(actualPendingLaunch == pendingGameplayLaunch,
+                "Pending gameplay launch flag восстановлен после большого теста.");
+            report.Check(Approximately(Time.timeScale, timeScale, 0.001f),
+                "Time.timeScale восстановлен после большого теста: " + Time.timeScale.ToString("0.###") + ".");
+            report.Check(string.IsNullOrWhiteSpace(ActiveSceneName) || activeScene.name == ActiveSceneName,
+                "Активная сцена восстановлена после большого теста: " + activeScene.name + ".");
+        }
+    }
+
     private void ValidateMaintainability(BigTestReport report)
     {
         report.Section("Методика сопровождения");
@@ -3077,7 +3436,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return chunk != null && chunk.id == chunkId;
     }
 
-    private void TryWriteReport(string text, BigTestReport report)
+    private void TryWriteReport(string text, WildWindBigTestResult result, BigTestReport report)
     {
         try
         {
@@ -3087,10 +3446,65 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             string path = Path.Combine(folder, "WildWindBigTestReport.txt");
             File.WriteAllText(path, text, Encoding.UTF8);
             Debug.Log(LogPrefix + "Текстовый протокол сохранён: " + path, this);
+
+            if (result != null)
+            {
+                string jsonPath = Path.Combine(folder, "WildWindBigTestReport.json");
+                string json = JsonUtility.ToJson(BigTestJsonSummary.FromResult(result, path), true);
+                File.WriteAllText(jsonPath, json, Encoding.UTF8);
+                Debug.Log(LogPrefix + "JSON summary сохранён: " + jsonPath, this);
+            }
         }
         catch (Exception exception)
         {
-            report.Warn("Не удалось сохранить текстовый протокол: " + exception.Message);
+            report.Warn("Не удалось сохранить протоколы большого теста: " + exception.Message);
+        }
+    }
+
+    [Serializable]
+    private sealed class BigTestJsonSummary
+    {
+        public string generatedAtUtc;
+        public string textReportPath;
+        public int contractVersion;
+        public bool completed;
+        public bool succeeded;
+        public int checkCount;
+        public int infoCount;
+        public int warningCount;
+        public int failureCount;
+        public long elapsedMilliseconds;
+        public int minimumExpectedCheckCount;
+        public bool requiredSectionsSatisfied;
+        public string[] missingRequiredSections;
+        public string[] emptyRequiredSections;
+        public string[] sectionNames;
+
+        public static BigTestJsonSummary FromResult(WildWindBigTestResult result, string textReportPath)
+        {
+            return new BigTestJsonSummary
+            {
+                generatedAtUtc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                textReportPath = textReportPath ?? "",
+                contractVersion = result.ContractVersion,
+                completed = result.Completed,
+                succeeded = result.Succeeded,
+                checkCount = result.CheckCount,
+                infoCount = result.InfoCount,
+                warningCount = result.WarningCount,
+                failureCount = result.FailureCount,
+                elapsedMilliseconds = result.ElapsedMilliseconds,
+                minimumExpectedCheckCount = result.MinimumExpectedCheckCount,
+                requiredSectionsSatisfied = result.RequiredSectionsSatisfied,
+                missingRequiredSections = ToArray(result.MissingRequiredSections),
+                emptyRequiredSections = ToArray(result.EmptyRequiredSections),
+                sectionNames = ToArray(result.SectionNames)
+            };
+        }
+
+        private static string[] ToArray(List<string> values)
+        {
+            return values == null ? Array.Empty<string>() : values.ToArray();
         }
     }
 
@@ -3631,7 +4045,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private sealed class BigTestReport
     {
         private readonly UnityEngine.Object context;
+        private readonly bool logImmediateMessages;
         private readonly StringBuilder builder = new StringBuilder(8192);
+        private readonly Dictionary<string, int> sectionCheckCounts = new Dictionary<string, int>();
+        private readonly List<string> sectionOrder = new List<string>();
         private int checkCount;
         private int infoCount;
         private int warningCount;
@@ -3640,15 +4057,22 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         public int FailureCount => failureCount;
 
-        public BigTestReport(UnityEngine.Object context)
+        public BigTestReport(UnityEngine.Object context, bool logImmediateMessages = true)
         {
             this.context = context;
+            this.logImmediateMessages = logImmediateMessages;
             builder.AppendLine("=== Wild Wind: большой тест ===");
         }
 
         public void Section(string title)
         {
-            currentSection = title;
+            currentSection = title ?? "";
+            if (!sectionCheckCounts.ContainsKey(currentSection))
+            {
+                sectionCheckCounts[currentSection] = 0;
+                sectionOrder.Add(currentSection);
+            }
+
             builder.AppendLine();
             builder.AppendLine("## " + title);
         }
@@ -3662,6 +4086,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         public void Pass(string message)
         {
             checkCount++;
+            IncrementCurrentSectionChecks();
             builder.AppendLine("- OK: " + message);
         }
 
@@ -3681,15 +4106,43 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         {
             warningCount++;
             builder.AppendLine("- WARN: " + message);
-            Debug.LogWarning(LogPrefix + "WARN" + FormatSection() + ": " + message, context);
+            if (logImmediateMessages)
+            {
+                Debug.LogWarning(LogPrefix + "WARN" + FormatSection() + ": " + message, context);
+            }
         }
 
         public void Fail(string message)
         {
             checkCount++;
+            IncrementCurrentSectionChecks();
             failureCount++;
             builder.AppendLine("- FAIL: " + message);
-            Debug.LogError(LogPrefix + "FAIL" + FormatSection() + ": " + message, context);
+            if (logImmediateMessages)
+            {
+                Debug.LogError(LogPrefix + "FAIL" + FormatSection() + ": " + message, context);
+            }
+        }
+
+        public void AssertIntegrity(string[] requiredSections, int minimumChecks, Func<bool> canaryProbe)
+        {
+            int preIntegrityCheckCount = checkCount;
+            Section("Целостность большого теста");
+
+            List<string> missingSections = GetMissingSections(requiredSections);
+            List<string> emptySections = GetEmptySections(requiredSections);
+            Check(missingSections.Count == 0,
+                missingSections.Count == 0
+                    ? "Все обязательные разделы большого теста были запущены."
+                    : "Не были запущены обязательные разделы: " + JoinNames(missingSections) + ".");
+            Check(emptySections.Count == 0,
+                emptySections.Count == 0
+                    ? "Каждый обязательный раздел содержит хотя бы одну OK/FAIL проверку."
+                    : "Обязательные разделы без проверок: " + JoinNames(emptySections) + ".");
+            Check(preIntegrityCheckCount >= minimumChecks,
+                "Количество проверок до self-check не ниже контракта: " + preIntegrityCheckCount + " / " + minimumChecks + ".");
+            Check(canaryProbe != null && canaryProbe(),
+                "Canary-сбой делает машинный результат красным и не проходит как OK.");
         }
 
         public void Finish(long elapsedMs)
@@ -3711,9 +4164,122 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return builder.ToString();
         }
 
+        public WildWindBigTestResult CreateResult(int contractVersion, long elapsedMs, bool completed, string[] requiredSections, int minimumChecks)
+        {
+            List<string> missingSections = GetMissingSections(requiredSections);
+            List<string> emptySections = GetEmptySections(requiredSections);
+            bool requiredSectionsSatisfied = missingSections.Count == 0 && emptySections.Count == 0;
+            return new WildWindBigTestResult
+            {
+                ContractVersion = contractVersion,
+                Completed = completed,
+                Succeeded = completed && failureCount == 0 && requiredSectionsSatisfied && checkCount >= minimumChecks,
+                CheckCount = checkCount,
+                InfoCount = infoCount,
+                WarningCount = warningCount,
+                FailureCount = failureCount,
+                ElapsedMilliseconds = elapsedMs,
+                MinimumExpectedCheckCount = minimumChecks,
+                RequiredSectionsSatisfied = requiredSectionsSatisfied,
+                MissingRequiredSections = missingSections,
+                EmptyRequiredSections = emptySections,
+                SectionNames = new List<string>(sectionOrder),
+                ReportText = BuildText()
+            };
+        }
+
         private string FormatSection()
         {
             return string.IsNullOrWhiteSpace(currentSection) ? "" : " [" + currentSection + "]";
         }
+
+        private void IncrementCurrentSectionChecks()
+        {
+            if (string.IsNullOrWhiteSpace(currentSection))
+            {
+                return;
+            }
+
+            if (!sectionCheckCounts.ContainsKey(currentSection))
+            {
+                sectionCheckCounts[currentSection] = 0;
+                sectionOrder.Add(currentSection);
+            }
+
+            sectionCheckCounts[currentSection]++;
+        }
+
+        private List<string> GetMissingSections(string[] requiredSections)
+        {
+            List<string> missing = new List<string>();
+            if (requiredSections == null) return missing;
+
+            for (int i = 0; i < requiredSections.Length; i++)
+            {
+                string section = requiredSections[i];
+                if (!string.IsNullOrWhiteSpace(section) && !sectionCheckCounts.ContainsKey(section))
+                {
+                    missing.Add(section);
+                }
+            }
+
+            return missing;
+        }
+
+        private List<string> GetEmptySections(string[] requiredSections)
+        {
+            List<string> empty = new List<string>();
+            if (requiredSections == null) return empty;
+
+            for (int i = 0; i < requiredSections.Length; i++)
+            {
+                string section = requiredSections[i];
+                if (string.IsNullOrWhiteSpace(section))
+                {
+                    continue;
+                }
+
+                if (!sectionCheckCounts.TryGetValue(section, out int checks) || checks <= 0)
+                {
+                    empty.Add(section);
+                }
+            }
+
+            return empty;
+        }
+
+        private static string JoinNames(List<string> names)
+        {
+            return names == null || names.Count == 0 ? "" : string.Join(", ", names.ToArray());
+        }
+    }
+}
+
+public sealed class WildWindBigTestResult
+{
+    public int ContractVersion { get; internal set; }
+    public bool Completed { get; internal set; }
+    public bool Succeeded { get; internal set; }
+    public int CheckCount { get; internal set; }
+    public int InfoCount { get; internal set; }
+    public int WarningCount { get; internal set; }
+    public int FailureCount { get; internal set; }
+    public long ElapsedMilliseconds { get; internal set; }
+    public int MinimumExpectedCheckCount { get; internal set; }
+    public bool RequiredSectionsSatisfied { get; internal set; }
+    public List<string> MissingRequiredSections { get; internal set; } = new List<string>();
+    public List<string> EmptyRequiredSections { get; internal set; } = new List<string>();
+    public List<string> SectionNames { get; internal set; } = new List<string>();
+    public string ReportText { get; internal set; } = "";
+
+    public static WildWindBigTestResult CreateBlocked(string reason)
+    {
+        return new WildWindBigTestResult
+        {
+            Completed = false,
+            Succeeded = false,
+            FailureCount = 1,
+            ReportText = reason ?? "Большой тест не был запущен."
+        };
     }
 }

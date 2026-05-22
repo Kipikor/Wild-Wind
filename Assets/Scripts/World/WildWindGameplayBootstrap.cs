@@ -1,8 +1,21 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public static class WildWindGameplayBootstrap
 {
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void InstallGameplayLaunchBootstrap()
+    {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+        BootstrapGameplayLaunch();
+    }
+
+    private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        BootstrapGameplayLaunch();
+    }
+
     private static void BootstrapGameplayLaunch()
     {
         if (!WildWindSaveSlots.ConsumePendingGameplayLaunch())
@@ -14,6 +27,15 @@ public static class WildWindGameplayBootstrap
         if (string.IsNullOrWhiteSpace(selectedSave))
         {
             Debug.LogWarning("[WildWindGameplayBootstrap] Gameplay launch requested, but no save slot is selected.");
+            return;
+        }
+
+        if (WildWindBigTestRunner.IsBigTestTemporarySaveFileName(selectedSave) &&
+            !WildWindBigTestRunner.IsSessionLoopLaunchInProgress)
+        {
+            PlayerPrefs.DeleteKey(WildWindSaveSlots.SelectedSaveFileNamePlayerPrefsKey);
+            PlayerPrefs.Save();
+            Debug.LogWarning("[WildWindGameplayBootstrap] Ignored abandoned big test save slot: " + selectedSave);
             return;
         }
 

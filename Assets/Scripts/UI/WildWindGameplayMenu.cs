@@ -40,6 +40,18 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
     private static Font cachedDefaultFont;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void InstallGameplayMenuBootstrap()
+    {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+        EnsureMenuForGameplayScene();
+    }
+
+    private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        EnsureMenuForGameplayScene();
+    }
+
     private static void EnsureMenuForGameplayScene()
     {
         if (Object.FindFirstObjectByType<WorldRegionRuntime>() == null)
