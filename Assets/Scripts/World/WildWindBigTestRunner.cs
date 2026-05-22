@@ -34,6 +34,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     [SerializeField, InspectorName("Мета-состояние")] public MetaGameState metaGameState;
 
     private bool hasRun;
+    private bool becamePersistentForSceneLoop;
 
     private IEnumerator Start()
     {
@@ -56,10 +57,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         hasRun = true;
+        StartCoroutine(RunBigTestRoutine());
+    }
+
+    private IEnumerator RunBigTestRoutine()
+    {
         BigTestReport report = new BigTestReport(this);
         Stopwatch totalWatch = Stopwatch.StartNew();
 
-        try
+        RunChecked(report, () =>
         {
             ResolveReferences();
             DescribeTestScope(report);
@@ -82,13 +88,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ValidateVisualAtmosphere(report);
             ValidateSettings(report);
             ValidateShipWindAerodynamics(report);
-            ValidateMaintainability(report);
-        }
-        catch (Exception exception)
-        {
-            report.Fail("Большой тест упал исключением: " + exception.GetType().Name + " - " + exception.Message);
-            Debug.LogException(exception, this);
-        }
+        });
+
+        yield return RunCheckedCoroutine(report, ValidateSessionLoopRoundTrip(report));
+
+        RunChecked(report, () => ValidateMaintainability(report));
 
         totalWatch.Stop();
         report.Finish(totalWatch.ElapsedMilliseconds);
@@ -109,6 +113,51 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             {
                 Debug.LogError(text, this);
             }
+        }
+
+        if (becamePersistentForSceneLoop)
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    private void RunChecked(BigTestReport report, Action action)
+    {
+        try
+        {
+            action?.Invoke();
+        }
+        catch (Exception exception)
+        {
+            report.Fail("Большой тест упал исключением: " + exception.GetType().Name + " - " + exception.Message);
+            Debug.LogException(exception, this);
+        }
+    }
+
+    private IEnumerator RunCheckedCoroutine(BigTestReport report, IEnumerator routine)
+    {
+        while (routine != null)
+        {
+            bool moved;
+            object current;
+            try
+            {
+                moved = routine.MoveNext();
+                current = moved ? routine.Current : null;
+            }
+            catch (Exception exception)
+            {
+                report.Fail("Асинхронная часть большого теста упала исключением: " + exception.GetType().Name + " - " + exception.Message);
+                Debug.LogException(exception, this);
+                yield break;
+            }
+
+            if (!moved)
+            {
+                yield break;
+            }
+
+            yield return current;
         }
     }
 
@@ -135,7 +184,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Section("Паспорт проверки");
         report.Info("Кнопка: Wild Wind/Провести большой тест.");
         report.Info("Назначение: один общий дотошный протокол по текущей сборке игры.");
-        report.Info("Сейчас покрыто: CSV-конфиги, дерево технологий, дерево кораблей, производства, потребности островов/кораблей, скорость их удовлетворения, пассажироперевозки, типы грузов и отсеки, мир 100x100 км, чанки, высотные зоны, активный пузырь, визуальные зависимости, настройки, ветер/аэродинамика, лётная физика.");
+        report.Info("Сейчас покрыто: CSV-конфиги, дерево технологий, дерево кораблей, производства, потребности островов/кораблей, скорость их удовлетворения, пассажироперевозки, типы грузов и отсеки, мир 100x100 км, чанки, высотные зоны, активный пузырь, визуальные зависимости, настройки, ветер/аэродинамика, лётная физика, save slots и перезаходы стартовое меню <-> мир.");
         report.Info("Допуски: размер мира +-1 м, размер чанка +-1 м, среднее обновление пузыря <= " + streamerAverageBudgetMs.ToString("0.#") + " мс, симуляция производств " + productionSimulationMinutes.ToString("0.#") + " мин.");
         report.Info("Принцип: FAIL = сломано или противоречит текущему ТЗ; WARN = подозрительно, но можно продолжать; OK = проверено явно.");
     }
@@ -2826,12 +2875,179 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
     }
 
+    private IEnumerator ValidateSessionLoopRoundTrip(BigTestReport report)
+    {
+        report.Section("Сессионные перезаходы стартовое меню <-> мир");
+
+        string previousSelectedSave = WildWindSaveSlots.GetSelectedSaveFileNameOrEmpty();
+        bool previousPendingLaunch = PlayerPrefs.GetInt(WildWindSaveSlots.PendingGameplayLaunchPlayerPrefsKey, 0) == 1;
+        int seed = 777331;
+        string tempSlotName = "wild_wind_big_test_session_" + DateTime.UtcNow.Ticks + ".json";
+        string tempSlotPath = WildWindSaveSlots.GetSavePath(tempSlotName);
+
+        try
+        {
+            bool saveCreated = WorldSaveSlotFactory.TryCreateNewWorldSave(tempSlotName, seed, out string createError);
+            report.Check(saveCreated, saveCreated
+                ? "Временный save slot для проверки перезаходов создан."
+                : "Не удалось создать временный save slot для проверки перезаходов: " + createError);
+            if (!saveCreated)
+            {
+                yield break;
+            }
+
+            if (transform.parent != null)
+            {
+                transform.SetParent(null);
+            }
+
+            DontDestroyOnLoad(gameObject);
+            becamePersistentForSceneLoop = true;
+
+            SceneManager.LoadScene("StartScreen");
+            yield return null;
+            yield return null;
+
+            Scene startScene = SceneManager.GetActiveScene();
+            report.Check(startScene.name == "StartScreen", "Большой тест реально перешёл в стартовую сцену: " + startScene.name + ".");
+
+            WildWindStartScreen startScreen = FindFirstObjectByType<WildWindStartScreen>();
+            report.Check(startScreen != null, startScreen != null ? "Стартовый экран поднялся после выхода из мира." : "Стартовый экран не найден после загрузки StartScreen.");
+            report.Check(startScreen != null && startScreen.gameplaySceneName == "WildWindWorldScene",
+                "Стартовый экран ведёт в WildWindWorldScene.");
+
+            WildWindSaveSlots.SetSelectedSaveFileName(tempSlotName);
+            WildWindSaveSlots.MarkPendingGameplayLaunch();
+            SceneManager.LoadScene("WildWindWorldScene");
+            DisableDuplicateBigTestRunners();
+            yield return null;
+            DisableDuplicateBigTestRunners();
+            yield return null;
+
+            Scene firstWorldScene = SceneManager.GetActiveScene();
+            report.Check(firstWorldScene.name == "WildWindWorldScene", "Continue загрузил world-сцену в первый раз: " + firstWorldScene.name + ".");
+            ValidateLoadedSessionWorld(seed, tempSlotName, "первый вход", report);
+
+            WildWindGameplayMenu gameplayMenu = FindFirstObjectByType<WildWindGameplayMenu>();
+            report.Check(gameplayMenu != null, gameplayMenu != null ? "Внутриигровое меню найдено при первом входе." : "Внутриигровое меню не найдено при первом входе.");
+            if (gameplayMenu == null)
+            {
+                yield break;
+            }
+
+            gameplayMenu.SetOpen(true);
+            yield return null;
+            MetaGameState pausedMeta = FindFirstObjectByType<MetaGameState>();
+            report.Check(pausedMeta != null && pausedMeta.IsSessionPaused && Approximately(Time.timeScale, 0f, 0.001f),
+                "Esc-меню ставит world-сессию на паузу.");
+
+            bool saveExitInvoked = TryInvokePrivateMethod(gameplayMenu, "SaveAndExitToMenu", report);
+            report.Check(saveExitInvoked, "Кнопка 'Сохранить и в меню' вызывается без исключений.");
+            yield return null;
+            yield return null;
+
+            Scene returnedScene = SceneManager.GetActiveScene();
+            report.Check(returnedScene.name == "StartScreen", "Внутриигровое меню вернуло сессию на стартовый экран: " + returnedScene.name + ".");
+            report.Check(File.Exists(tempSlotPath), "Save slot остался на диске после выхода в меню с сохранением.");
+
+            WildWindSaveSlots.SetSelectedSaveFileName(tempSlotName);
+            WildWindSaveSlots.MarkPendingGameplayLaunch();
+            SceneManager.LoadScene("WildWindWorldScene");
+            DisableDuplicateBigTestRunners();
+            yield return null;
+            DisableDuplicateBigTestRunners();
+            yield return null;
+
+            Scene secondWorldScene = SceneManager.GetActiveScene();
+            report.Check(secondWorldScene.name == "WildWindWorldScene", "Повторный Continue снова загрузил world-сцену: " + secondWorldScene.name + ".");
+            ValidateLoadedSessionWorld(seed, tempSlotName, "повторный вход", report);
+        }
+        finally
+        {
+            RestoreSessionLoopPrefs(previousSelectedSave, previousPendingLaunch);
+            TryDeleteTemporaryFile(tempSlotPath, "save slot проверки перезаходов", report);
+        }
+    }
+
+    private void ValidateLoadedSessionWorld(int expectedSeed, string expectedSaveFileName, string label, BigTestReport report)
+    {
+        WorldRegionRuntime loadedWorld = FindFirstObjectByType<WorldRegionRuntime>();
+        WorldRuntimeState loadedRuntimeState = FindFirstObjectByType<WorldRuntimeState>();
+        MetaGameState loadedMeta = FindFirstObjectByType<MetaGameState>();
+        WildWindGameplayMenu loadedMenu = FindFirstObjectByType<WildWindGameplayMenu>();
+
+        report.Check(loadedWorld != null, "WorldRegionRuntime найден после сценария '" + label + "'.");
+        report.Check(loadedWorld != null && loadedWorld.RegionSeed == expectedSeed,
+            "Мир после сценария '" + label + "' загружен из save seed " + expectedSeed + ".");
+        report.Check(loadedRuntimeState != null && loadedRuntimeState.LoadedManifestSeed == expectedSeed,
+            "WorldRuntimeState после сценария '" + label + "' принял manifest seed " + expectedSeed + ".");
+        report.Check(loadedMeta != null && loadedMeta.EffectiveSaveFileName == expectedSaveFileName,
+            "MetaGameState после сценария '" + label + "' смотрит в выбранный save slot.");
+        report.Check(loadedMenu != null, "Внутриигровое меню поднялось после сценария '" + label + "'.");
+    }
+
+    private void DisableDuplicateBigTestRunners()
+    {
+        WildWindBigTestRunner[] runners = FindObjectsByType<WildWindBigTestRunner>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < runners.Length; i++)
+        {
+            WildWindBigTestRunner runner = runners[i];
+            if (runner == null || runner == this)
+            {
+                continue;
+            }
+
+            runner.runOnStart = false;
+            runner.hasRun = true;
+            runner.enabled = false;
+            DestroyBigTestObject(runner.gameObject);
+        }
+    }
+
+    private static void RestoreSessionLoopPrefs(string selectedSaveFileName, bool pendingGameplayLaunch)
+    {
+        if (string.IsNullOrWhiteSpace(selectedSaveFileName))
+        {
+            PlayerPrefs.DeleteKey(WildWindSaveSlots.SelectedSaveFileNamePlayerPrefsKey);
+        }
+        else
+        {
+            WildWindSaveSlots.SetSelectedSaveFileName(selectedSaveFileName);
+        }
+
+        if (pendingGameplayLaunch)
+        {
+            WildWindSaveSlots.MarkPendingGameplayLaunch();
+        }
+        else
+        {
+            PlayerPrefs.DeleteKey(WildWindSaveSlots.PendingGameplayLaunchPlayerPrefsKey);
+            PlayerPrefs.Save();
+        }
+    }
+
+    private static void TryDeleteTemporaryFile(string path, string label, BigTestReport report)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception exception)
+        {
+            report.Warn("Не удалось удалить временный файл '" + label + "': " + exception.Message);
+        }
+    }
+
     private void ValidateMaintainability(BigTestReport report)
     {
         report.Section("Методика сопровождения");
-        report.Info("Когда появляется новая крупная механика, добавляем сюда отдельный раздел: конфиг, runtime-состояние, симуляция, граничные условия, производительность.");
+        report.Info("Когда появляется новая крупная механика, добавляем сюда отдельный раздел: конфиг, runtime-состояние, симуляция, граничные условия, производительность и пользовательский маршрут.");
         report.Info("Модульные тесты остаются рядом со своей областью: ProductionAutoTestRunner и WorldAutoTestRunner можно запускать отдельно, а большой тест обязан проверять их ключевые инварианты.");
         report.Info("Если тест ругается WARN, это не блокер, но повод записать решение: оставить допуск, ужесточить его или превратить в FAIL.");
+        report.Info("Правило проекта: новая фича не считается принятой, пока её главный сценарий не попал в большой тест.");
         report.Pass("Большой тест сформировал явный текстовый протокол, который можно расширять дальше.");
     }
 
