@@ -209,10 +209,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         bool defaultLanguageIsRussian = WildWindLocalization.DefaultLanguage == WildWindLanguage.Ru;
         report.Check(defaultLanguageIsRussian, "Default UI language is Russian.");
 
-        bool valid = WildWindLocalization.ValidateDefaultConfig(WildWindStartScreen.RequiredLocalizationKeys, out List<string> errors);
+        List<string> requiredKeys = new List<string>();
+        requiredKeys.AddRange(WildWindStartScreen.RequiredLocalizationKeys);
+        requiredKeys.AddRange(WildWindGameplayMenu.RequiredLocalizationKeys);
+        bool valid = WildWindLocalization.ValidateDefaultConfig(requiredKeys, out List<string> errors);
         if (valid)
         {
-            report.Pass("Localization config is loaded and all start screen keys have ru/en text.");
+            report.Pass("Localization config is loaded and all start/gameplay menu keys have ru/en text.");
         }
         else
         {
@@ -2696,6 +2699,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(controls.DebugVerticalSpeedMetersPerSecond > 0f, "Вертикальная скорость debug-перелёта положительная: " + controls.DebugVerticalSpeedMetersPerSecond.ToString("0.#") + " м/с.");
         report.Check(controls.DebugSprintMultiplier >= 1f, "Множитель ускорения debug-перелёта не меньше 1: x" + controls.DebugSprintMultiplier.ToString("0.#") + ".");
         report.Check(controls.DebugCameraFollowSharpness > 0f && controls.DebugCameraFollowSharpness <= 1f, "Плавность следования камеры в диапазоне 0..1: " + controls.DebugCameraFollowSharpness.ToString("0.###") + ".");
+
+        WildWindGameplayMenu gameplayMenu = FindFirstObjectByType<WildWindGameplayMenu>();
+        report.Check(gameplayMenu != null, gameplayMenu != null ? "Внутриигровое меню найдено в world-сессии." : "Внутриигровое меню не найдено.");
     }
 
     private void ValidateShipWindAerodynamics(BigTestReport report)

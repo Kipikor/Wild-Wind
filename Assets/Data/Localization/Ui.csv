@@ -19,3 +19,9 @@ status.loading_save,Loading save status,Загружаем сохранение.
 status.missing_scene,Missing scene status,Сцена игры не найдена,Gameplay scene is missing
 error.new_world_save_failed,New world save failed,Не удалось создать мир,Failed to create world
 error.no_save_selected,No save selected,Сохранение не выбрано,No save selected
+game.menu.title,Gameplay menu title,Меню,Menu
+game.menu.resume,Resume game,Продолжить,Resume
+game.menu.save_exit,Save and exit to menu,Сохранить и в меню,Save and Exit to Menu
+game.menu.exit_without_save,Exit to menu without saving,В меню без сохранения,Exit Without Saving
+game.menu.status_saved,Save status,Сохранено,Saved
+game.menu.status_save_failed,Save failed status,Не удалось сохранить,Could not save

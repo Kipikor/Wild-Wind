@@ -47,7 +47,13 @@ public sealed class WildWindStartScreen : MonoBehaviour
         "status.loading_save",
         "status.missing_scene",
         "error.new_world_save_failed",
-        "error.no_save_selected"
+        "error.no_save_selected",
+        "game.menu.title",
+        "game.menu.resume",
+        "game.menu.save_exit",
+        "game.menu.exit_without_save",
+        "game.menu.status_saved",
+        "game.menu.status_save_failed"
     };
 
     [Header("Scene flow")]

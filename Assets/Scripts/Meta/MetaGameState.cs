@@ -561,6 +561,10 @@ public partial class MetaGameState : MonoBehaviour
     private void Update()
     {
         ApplyUnityTimeScale();
+        if (sessionPaused)
+        {
+            return;
+        }
 
         if (processRealTimeWhilePlaying)
         {
@@ -1369,6 +1373,11 @@ public partial class MetaGameState : MonoBehaviour
         return TrySaveGame(false);
     }
 
+    public bool TrySaveGameForSessionExit()
+    {
+        return TrySaveGame(true);
+    }
+
     private bool TrySaveGame(bool allowFlightSave)
     {
         EnsureProgressInitialized();
@@ -1380,9 +1389,13 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         DateTime now = DateTime.UtcNow;
-        if (Application.isPlaying)
+        if (Application.isPlaying && !sessionPaused)
         {
             AdvanceScaledRealTimeProcesses();
+        }
+        else if (sessionPaused)
+        {
+            ResetProcessRealtimeClock();
         }
         else
         {

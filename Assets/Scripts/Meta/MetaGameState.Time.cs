@@ -26,8 +26,29 @@ public partial class MetaGameState
     private DateTime lastProcessRealtimeUtc;
     private float originalFixedDeltaTime = -1f;
     private float originalMaximumDeltaTime = -1f;
+    private bool sessionPaused;
 
     public DateTime CurrentProcessUtcNow => GetProcessUtcNow();
+    public bool IsSessionPaused => sessionPaused;
+
+    public void SetSessionPaused(bool paused)
+    {
+        if (sessionPaused == paused)
+        {
+            return;
+        }
+
+        sessionPaused = paused;
+        if (paused)
+        {
+            CacheUnityTimeSettings();
+            Time.timeScale = 0f;
+            return;
+        }
+
+        ResetProcessRealtimeClock();
+        ApplyUnityTimeScale();
+    }
 
     private void CacheUnityTimeSettings()
     {
@@ -62,6 +83,14 @@ public partial class MetaGameState
     {
         if (!Application.isPlaying) return;
         CacheUnityTimeSettings();
+
+        if (sessionPaused)
+        {
+            Time.timeScale = 0f;
+            Time.fixedDeltaTime = originalFixedDeltaTime > 0f ? originalFixedDeltaTime : Time.fixedDeltaTime;
+            Time.maximumDeltaTime = originalMaximumDeltaTime > 0f ? originalMaximumDeltaTime : Time.maximumDeltaTime;
+            return;
+        }
 
         float physicsScale = accelerateUnityTimeScale ? Mathf.Clamp(gameTimeScale, 1f, Mathf.Max(1f, maxUnityTimeScale)) : 1f;
         Time.timeScale = physicsScale;
