@@ -685,6 +685,7 @@ public partial class WorldConfigDatabase
             };
 
             module.compatibleSlotTypeIds.AddRange(SplitInlineList(Get(row, "compatible_slot_type")));
+            module.allowedCargoItemIds.AddRange(SplitInlineList(Get(row, "allowed_cargo_item_ids")));
 
             if (string.IsNullOrWhiteSpace(module.id)) continue;
             specialModules.Add(module);
@@ -1119,6 +1120,7 @@ public class SpecialModuleConfig
     public ShipSizeClass shipDockMaxClass = ShipSizeClass.None;
     public float dockedShipMassFactor = 0.1f;
     public float dockSupportClaudiumPerTonHour = 0.02f;
+    public List<string> allowedCargoItemIds = new List<string>();
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }

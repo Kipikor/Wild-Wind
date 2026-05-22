@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
@@ -48,6 +49,10 @@ public class CargoCompartmentDefinition
     [Tooltip("Фургон и салон считают штуки/места, кузов/цистерна/баллон/холодильник считают литры, док считает слоты.")]
     public float capacity = 0f;
 
+    [InspectorName("Разрешенные грузы")]
+    [Tooltip("Если список заполнен, отсек принимает только эти item id.")]
+    public List<string> allowedItemIds = new List<string>();
+
     [InspectorName("Макс. класс корабля для дока")]
     public ShipSizeClass maxDockedShipClass = ShipSizeClass.None;
 
@@ -57,9 +62,25 @@ public class CargoCompartmentDefinition
     [InspectorName("Клавдий дока, кг/т/ч")]
     public float dockSupportClaudiumPerTonHour = 0.02f;
 
+    public bool AllowsItem(string itemId)
+    {
+        if (allowedItemIds == null || allowedItemIds.Count == 0) return true;
+        if (string.IsNullOrWhiteSpace(itemId)) return false;
+
+        for (int i = 0; i < allowedItemIds.Count; i++)
+        {
+            if (allowedItemIds[i] == itemId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public CargoCompartmentDefinition CloneNormalized()
     {
-        return new CargoCompartmentDefinition
+        CargoCompartmentDefinition clone = new CargoCompartmentDefinition
         {
             displayName = displayName ?? "",
             storageKind = storageKind,
@@ -68,5 +89,19 @@ public class CargoCompartmentDefinition
             dockedShipMassFactor = Mathf.Clamp(dockedShipMassFactor <= 0f ? 0.1f : dockedShipMassFactor, 0.01f, 1f),
             dockSupportClaudiumPerTonHour = Mathf.Max(0f, dockSupportClaudiumPerTonHour)
         };
+
+        if (allowedItemIds != null)
+        {
+            for (int i = 0; i < allowedItemIds.Count; i++)
+            {
+                string itemId = allowedItemIds[i];
+                if (!string.IsNullOrWhiteSpace(itemId) && !clone.allowedItemIds.Contains(itemId))
+                {
+                    clone.allowedItemIds.Add(itemId);
+                }
+            }
+        }
+
+        return clone;
     }
 }

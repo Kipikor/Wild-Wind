@@ -1046,12 +1046,13 @@ public static class CargoStoragePlanner
             }
         }
 
-        AddStatCompartment(compartments, stats, ShipStatId.CargoVanCapacityUnits, CargoStorageKind.Van, "Фургон");
-        AddStatCompartment(compartments, stats, ShipStatId.PassengerSeatCapacity, CargoStorageKind.Cabin, "Салон");
-        AddStatCompartment(compartments, stats, ShipStatId.BulkHoldCapacityLiters, CargoStorageKind.BulkHold, "Кузов");
-        AddStatCompartment(compartments, stats, ShipStatId.LiquidTankCapacityLiters, CargoStorageKind.LiquidTank, "Цистерна");
-        AddStatCompartment(compartments, stats, ShipStatId.GasCylinderCapacityLiters, CargoStorageKind.GasCylinder, "Баллон");
-        AddStatCompartment(compartments, stats, ShipStatId.RefrigeratedHoldCapacityLiters, CargoStorageKind.RefrigeratedHold, "Холодильник");
+        IReadOnlyList<string> allowedCargoItemIds = stats != null ? stats.AllowedCargoItemIds : null;
+        AddStatCompartment(compartments, stats, ShipStatId.CargoVanCapacityUnits, CargoStorageKind.Van, "Фургон", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.PassengerSeatCapacity, CargoStorageKind.Cabin, "Салон", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.BulkHoldCapacityLiters, CargoStorageKind.BulkHold, "Кузов", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.LiquidTankCapacityLiters, CargoStorageKind.LiquidTank, "Цистерна", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.GasCylinderCapacityLiters, CargoStorageKind.GasCylinder, "Баллон", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.RefrigeratedHoldCapacityLiters, CargoStorageKind.RefrigeratedHold, "Холодильник", allowedCargoItemIds);
 
         float dockSlots = stats != null ? stats.Get(ShipStatId.ShipDockSlots, 0f) : 0f;
         if (dockSlots > 0f)
@@ -1076,17 +1077,21 @@ public static class CargoStoragePlanner
         ShipStatBlock stats,
         ShipStatId stat,
         CargoStorageKind kind,
-        string displayName)
+        string displayName,
+        IReadOnlyList<string> allowedCargoItemIds = null)
     {
         float capacity = stats != null ? stats.Get(stat, 0f) : 0f;
         if (capacity <= 0f) return;
 
-        compartments.Add(new CargoCompartmentDefinition
+        CargoCompartmentDefinition compartment = new CargoCompartmentDefinition
         {
             displayName = displayName,
             storageKind = kind,
             capacity = capacity
-        });
+        };
+
+        CopyAllowedItemIds(compartment.allowedItemIds, allowedCargoItemIds);
+        compartments.Add(compartment);
     }
 
     public static float GetCargoMassKg(WorldConfigDatabase config, List<ResourceStack> cargo)
@@ -1193,6 +1198,11 @@ public static class CargoStoragePlanner
             if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value <= 0) continue;
 
             CargoStorageKind storageKind = config != null ? config.GetItemStorageKind(pair.Key) : CargoStorageKind.Van;
+            if (!TryValidateCargoItemAllowed(config, metrics, pair.Key, storageKind, out error))
+            {
+                return false;
+            }
+
             float storageAmount = config != null ? config.GetItemStorageAmount(pair.Key, pair.Value) : pair.Value;
             switch (storageKind)
             {
@@ -1244,6 +1254,72 @@ public static class CargoStoragePlanner
         if (!TryFitDockSlots(config, metrics, dockDemands, out error)) return false;
 
         return true;
+    }
+
+    private static void CopyAllowedItemIds(List<string> target, IReadOnlyList<string> source)
+    {
+        if (target == null || source == null) return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            string itemId = source[i];
+            if (!string.IsNullOrWhiteSpace(itemId) && !target.Contains(itemId))
+            {
+                target.Add(itemId);
+            }
+        }
+    }
+
+    private static bool TryValidateCargoItemAllowed(
+        WorldConfigDatabase config,
+        LogisticsShipMetrics metrics,
+        string itemId,
+        CargoStorageKind storageKind,
+        out string error)
+    {
+        error = "";
+        if (string.IsNullOrWhiteSpace(itemId)) return true;
+        if (metrics.cargoCompartments == null || metrics.cargoCompartments.Count == 0) return true;
+
+        bool hasStorageKind = false;
+        for (int i = 0; i < metrics.cargoCompartments.Count; i++)
+        {
+            CargoCompartmentDefinition compartment = metrics.cargoCompartments[i];
+            if (compartment == null || compartment.storageKind != storageKind) continue;
+
+            hasStorageKind = true;
+            if (compartment.AllowsItem(itemId))
+            {
+                return true;
+            }
+        }
+
+        if (!hasStorageKind) return true;
+
+        string itemName = config != null ? config.GetItemNameRu(itemId) : itemId;
+        error = GetStorageKindLabel(storageKind) + " не принимает груз: " + itemName + ".";
+        return false;
+    }
+
+    private static string GetStorageKindLabel(CargoStorageKind storageKind)
+    {
+        switch (storageKind)
+        {
+            case CargoStorageKind.Cabin:
+                return "Салон";
+            case CargoStorageKind.BulkHold:
+                return "Кузов";
+            case CargoStorageKind.LiquidTank:
+                return "Цистерна";
+            case CargoStorageKind.GasCylinder:
+                return "Баллон";
+            case CargoStorageKind.RefrigeratedHold:
+                return "Холодильник";
+            case CargoStorageKind.ShipDock:
+                return "Док";
+            default:
+                return "Фургон";
+        }
     }
 
     private static void AddDemand(Dictionary<string, float> demands, string itemId, float amount)

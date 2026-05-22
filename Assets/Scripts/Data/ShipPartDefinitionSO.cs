@@ -25,6 +25,11 @@ public class ShipPartDefinitionSO : ScriptableObject
     [Tooltip("Заполняется только у двигателя. Энергоемкость топлива берется из Item.csv.")]
     public string engineFuelId = "";
 
+    [Header("Грузовые ограничения")]
+    [InspectorName("Разрешенные грузы")]
+    [Tooltip("Если список заполнен, грузовые отсеки этой детали принимают только эти item id.")]
+    public List<string> allowedCargoItemIds = new List<string>();
+
     [Header("Слоты корпуса")]
     [InspectorName("Слоты")]
     [Tooltip("Слоты, которые дает корпус. Обязательность задается у каждого слота отдельно и не зависит от типа слота.")]

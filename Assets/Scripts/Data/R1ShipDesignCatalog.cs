@@ -19,6 +19,7 @@ public sealed class R1ShipDesignDefinition
     public float expectedMaxTakeoffMassKg;
     public float expectedEnginePowerKw;
     public float expectedStructureHp;
+    public float expectedClaudiumLiftEfficiency = 28f;
 
     public List<string> GetAllowedHullIds()
     {
@@ -166,9 +167,26 @@ public static class R1ShipDesignCatalog
             claudiumLoopUpgradeIds = new List<string> { "opora_claudium_loop_mk2" },
             specialModuleUpgradeIds = new List<string> { "opora_crane_platform_mk2" },
             expectedServiceMassKg = 3600f,
-            expectedMaxTakeoffMassKg = 5800f,
-            expectedEnginePowerKw = 340f,
-            expectedStructureHp = 1400f
+            expectedMaxTakeoffMassKg = 10000f,
+            expectedEnginePowerKw = 400f,
+            expectedStructureHp = 1400f,
+            expectedClaudiumLiftEfficiency = 45f
+        },
+        new R1ShipDesignDefinition
+        {
+            shipId = "fuel_tender",
+            displayNameRu = "Топливщик",
+            requiredTechId = "support_platform",
+            hullId = "fuel_tender_hull",
+            engineId = "fuel_tender_engine",
+            propellerId = "fuel_tender_propeller",
+            claudiumLoopId = "fuel_tender_claudium_loop",
+            specialModuleId = "fuel_tender_tanks",
+            expectedServiceMassKg = 3600f,
+            expectedMaxTakeoffMassKg = 10000f,
+            expectedEnginePowerKw = 400f,
+            expectedStructureHp = 700f,
+            expectedClaudiumLiftEfficiency = 50f
         },
         new R1ShipDesignDefinition
         {

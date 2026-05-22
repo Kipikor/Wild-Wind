@@ -221,6 +221,7 @@ public static class ShipAssemblyBuilder
                 part.description = "CSV hull config.";
                 part.completedTechId = hullConfig.completedTechId ?? "";
                 part.engineFuelId = "";
+                part.allowedCargoItemIds = new List<string>();
                 part.compatibleSlotTypeIds = new List<string>();
                 part.grantedSlots = new List<ShipSlotDefinition>();
                 part.slots = BuildHullSlots(hullConfig, config);
@@ -241,6 +242,7 @@ public static class ShipAssemblyBuilder
                 part.description = "CSV engine config.";
                 part.completedTechId = engineConfig.completedTechId ?? "";
                 part.engineFuelId = engineConfig.fuelId ?? "";
+                part.allowedCargoItemIds = new List<string>();
                 part.slots = new List<ShipSlotDefinition>();
                 part.compatibleSlotTypeIds = new List<string> { "engine_main" };
                 part.grantedSlots = new List<ShipSlotDefinition>();
@@ -261,6 +263,7 @@ public static class ShipAssemblyBuilder
                 part.description = "CSV propeller config.";
                 part.completedTechId = propellerConfig.completedTechId ?? "";
                 part.engineFuelId = "";
+                part.allowedCargoItemIds = new List<string>();
                 part.slots = new List<ShipSlotDefinition>();
                 part.compatibleSlotTypeIds = new List<string> { "propeller_main" };
                 part.grantedSlots = new List<ShipSlotDefinition>();
@@ -281,6 +284,7 @@ public static class ShipAssemblyBuilder
                 part.description = "CSV claudium loop config.";
                 part.completedTechId = loopConfig.completedTechId ?? "";
                 part.engineFuelId = "";
+                part.allowedCargoItemIds = new List<string>();
                 part.slots = new List<ShipSlotDefinition>();
                 part.compatibleSlotTypeIds = new List<string> { "claudium_loop" };
                 part.grantedSlots = new List<ShipSlotDefinition>();
@@ -322,6 +326,12 @@ public static class ShipAssemblyBuilder
 
             part.completedTechId = moduleConfig.completedTechId ?? "";
             part.engineFuelId = "";
+            part.allowedCargoItemIds = new List<string>();
+            if (moduleConfig.allowedCargoItemIds != null)
+            {
+                part.allowedCargoItemIds.AddRange(moduleConfig.allowedCargoItemIds);
+            }
+
             part.slots = new List<ShipSlotDefinition>();
             part.compatibleSlotTypeIds = new List<string>();
             if (moduleConfig.compatibleSlotTypeIds != null)
@@ -621,14 +631,28 @@ public class ShipStatBlock
     private readonly Dictionary<ShipStatId, float> addValues = new Dictionary<ShipStatId, float>();
     private readonly Dictionary<ShipStatId, float> multiplyValues = new Dictionary<ShipStatId, float>();
     private readonly HashSet<ShipStatId> setStats = new HashSet<ShipStatId>();
+    private readonly List<string> allowedCargoItemIds = new List<string>();
     private string engineFuelId = "";
 
     public string EngineFuelId => engineFuelId;
+    public IReadOnlyList<string> AllowedCargoItemIds => allowedCargoItemIds;
 
     public bool ApplyPart(ShipPartDefinitionSO part, out string error)
     {
         error = "";
         if (part == null) return true;
+
+        if (part.allowedCargoItemIds != null)
+        {
+            for (int i = 0; i < part.allowedCargoItemIds.Count; i++)
+            {
+                string itemId = part.allowedCargoItemIds[i];
+                if (!string.IsNullOrWhiteSpace(itemId) && !allowedCargoItemIds.Contains(itemId))
+                {
+                    allowedCargoItemIds.Add(itemId);
+                }
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(part.engineFuelId))
         {

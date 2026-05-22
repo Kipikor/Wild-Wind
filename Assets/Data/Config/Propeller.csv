@@ -8,6 +8,7 @@ bulat_propeller,Рудный винт Булата,Bulat Ore Propeller,ore_colle
 hornet_propeller,Разведочный винт Шершня,Hornet Scout Propeller,continuous_observations,140,31,0.8,300
 jaeger_propeller,Охотничий винт Егеря,Jaeger Hunting Propeller,hunter_hull,230,24,0.68,330
 opora_propeller,Нижний винт Опоры,Opora Downthrust Propeller,support_platform,300,10,0.55,360
+fuel_tender_propeller,Маршрутный винт Топливщика,Fuel Tender Route Propeller,support_platform,220,16,0.7,300
 parovoz_propeller,Пассажирский винт Паровоза,Parovoz Passenger Propeller,passenger_routes,230,20,0.72,300
 opora_propeller_mk2,Свободный нижний винт Опоры,Opora Free Downthrust Propeller,ribbed_deck_truss,330,16,0.58,390
 parovoz_propeller_mk2,Скоростной пассажирский винт,Parovoz Passenger Propeller II,passenger_propeller,260,30,0.76,360

@@ -16,7 +16,7 @@ MonoBehaviour:
   seed: 170517
   worldSizeMeters: 100000
   chunkSizeMeters: 10000
-  generatedAtUtc: 2026-05-20 17:02:11
+  generatedAtUtc: 2026-05-22 19:06:31
   chunks:
   - id: chunk_00_00
     chunkX: 0
@@ -2153,8 +2153,8 @@ MonoBehaviour:
     permanentEntity: 1
     materializesAsSceneObject: 1
   - id: island_04
-    displayNameRu: "\u041B\u0435\u0441\u043D\u0430\u044F \u0431\u0430\u043D\u043A\u0430"
-    roleRu: "\u0414\u0440\u0435\u0432\u0435\u0441\u0438\u043D\u0430"
+    displayNameRu: "\u0422\u043A\u0430\u043D\u0435\u0432\u0430\u044F \u0431\u0430\u043D\u043A\u0430"
+    roleRu: "\u0422\u043A\u0430\u043D\u044C"
     positionMeters: {x: -6700.965, y: 7399.0503, z: 28443.854}
     radiusMeters: 424.88507
     chunkId: chunk_04_07
@@ -2281,7 +2281,7 @@ MonoBehaviour:
     radiusMeters: 1361.8894
     thicknessMeters: 1270.9419
     density01: 0.42223898
-    resourceId: sulfur_haze
+    resourceId: fulgur_trace
     resourceKgEstimate: 26452
     chunkId: chunk_02_06
     simulationOnlyWhenFar: 1
@@ -2369,7 +2369,7 @@ MonoBehaviour:
     radiusMeters: 3182.4624
     thicknessMeters: 630.0652
     density01: 0.8779893
-    resourceId: sulfur_haze
+    resourceId: fulgur_trace
     resourceKgEstimate: 128532
     chunkId: chunk_04_09
     simulationOnlyWhenFar: 1
@@ -2457,7 +2457,7 @@ MonoBehaviour:
     radiusMeters: 4209.4014
     thicknessMeters: 757.8623
     density01: 0.84592575
-    resourceId: sulfur_haze
+    resourceId: fulgur_trace
     resourceKgEstimate: 163799
     chunkId: chunk_02_07
     simulationOnlyWhenFar: 1
@@ -2545,7 +2545,7 @@ MonoBehaviour:
     radiusMeters: 757.0923
     thicknessMeters: 192.34247
     density01: 0.20499228
-    resourceId: sulfur_haze
+    resourceId: fulgur_trace
     resourceKgEstimate: 2794
     chunkId: chunk_06_04
     simulationOnlyWhenFar: 1

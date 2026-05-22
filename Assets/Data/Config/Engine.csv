@@ -7,7 +7,8 @@ water_strider_engine,Удачная топка Водомерки,Water Strider 
 bulat_engine,Горная топка Булата,Bulat Mining Boiler,ore_collector,1050,charcoal,240,0.22
 hornet_engine,Разведочная топка Шершня,Hornet Scout Boiler,continuous_observations,1100,charcoal,280,0.24
 jaeger_engine,Боевой котёл Егеря,Jaeger Hunting Boiler,hunter_hull,1650,charcoal,330,0.14
-opora_engine,Опорная топка платформы,Opora Platform Boiler,support_platform,1700,charcoal,340,0.2
+opora_engine,Опорная топка тендера,Opora Tender Boiler,support_platform,1700,charcoal,400,0.36
+fuel_tender_engine,Экономичная топка Топливщика,Fuel Tender Economical Boiler,support_platform,1500,charcoal,400,0.4
 parovoz_engine,Пассажирский котёл Паровоза,Parovoz Passenger Boiler,passenger_routes,1800,charcoal,360,0.17
 water_strider_engine_mk2,Настроенная топка Водомерки,Water Strider Tuned Boiler,water_strider_engine_tuning,980,charcoal,260,0.25
 bulat_engine_mk2,Форсированная топка Булата,Bulat Forced Boiler,bulat_engine_tuning,1180,charcoal,310,0.24
