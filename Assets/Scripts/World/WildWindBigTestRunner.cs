@@ -76,6 +76,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ValidateWorldRuntime(report);
             ValidateWorldEntityIndex(report);
             ValidateWorldRuntimeState(report);
+            ValidateWorldSaveSlotRoundTrip(report);
             ValidateWorldSimulationTick(report);
             ValidateBubbleStreaming(report);
             ValidateVisualAtmosphere(report);
@@ -2406,6 +2407,81 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         catch (Exception exception)
         {
             report.Warn("Не удалось удалить временный файл runtime-теста: " + exception.Message);
+        }
+    }
+
+    private void ValidateWorldSaveSlotRoundTrip(BigTestReport report)
+    {
+        report.Section("Сохранение мира в слот");
+        if (world == null)
+        {
+            report.Fail("Проверка save slot мира невозможна: WorldRegionRuntime не найден.");
+            return;
+        }
+
+        WorldManifestData runtimeManifest = WorldManifestData.FromRuntime(world, "big_test_runtime");
+        report.Check(runtimeManifest != null && runtimeManifest.IsUsable, "WorldManifestData снимается с runtime мира.");
+        report.Check(runtimeManifest.chunks.Count == world.Chunks.Count && runtimeManifest.islands.Count == world.Islands.Count,
+            "WorldManifestData сохраняет чанки и острова: " + runtimeManifest.chunks.Count + " / " + runtimeManifest.islands.Count + ".");
+
+        int seed = 424242;
+        MetaGameSaveData generatedSave = WorldSaveSlotFactory.BuildNewWorldSaveData(seed);
+        bool generatedUsable = generatedSave != null &&
+            generatedSave.version == MetaGameSaveData.CurrentVersion &&
+            generatedSave.worldManifest != null &&
+            generatedSave.worldManifest.IsUsable &&
+            generatedSave.worldManifest.seed == seed &&
+            generatedSave.worldRuntime != null &&
+            generatedSave.worldRuntime.IsUsable;
+        report.Check(generatedUsable, "Новая игра создаёт save data с версией, seed, manifest и runtime-заготовкой.");
+
+        string json = JsonUtility.ToJson(generatedSave, true);
+        MetaGameSaveData loadedSave = JsonUtility.FromJson<MetaGameSaveData>(json);
+        bool jsonRoundTrip = loadedSave != null &&
+            loadedSave.worldManifest != null &&
+            loadedSave.worldManifest.IsUsable &&
+            loadedSave.worldManifest.seed == seed &&
+            loadedSave.worldRuntime != null &&
+            loadedSave.worldRuntime.IsUsable;
+        report.Check(jsonRoundTrip, "Save slot мира проходит JSON round-trip.");
+
+        GameObject probeRoot = null;
+        try
+        {
+            probeRoot = new GameObject("Big Test World Save Slot Probe");
+            WorldRegionRuntime probeWorld = probeRoot.AddComponent<WorldRegionRuntime>();
+            WorldManifestData loadedManifest = loadedSave != null ? loadedSave.worldManifest : null;
+            bool manifestApplied = loadedManifest != null && probeWorld.LoadFromManifestData(loadedManifest);
+            report.Check(manifestApplied, "WorldManifestData распаковывается обратно в WorldRegionRuntime.");
+            report.Check(loadedManifest != null &&
+                probeWorld.Chunks.Count == loadedManifest.chunks.Count &&
+                probeWorld.Islands.Count == loadedManifest.islands.Count,
+                "Распакованный мир сохранил количество чанков и островов.");
+
+            WorldEntityIndex probeIndex = probeRoot.AddComponent<WorldEntityIndex>();
+            probeIndex.Configure(probeWorld);
+            probeIndex.EnsureBuilt(probeWorld);
+            bool capitalResolved = probeIndex.TryGetIsland("capital", out WorldRegionRuntime.WorldIslandRecord capital) && capital != null;
+            report.Check(capitalResolved, "После распаковки WorldEntityIndex находит столицу.");
+
+            WorldRuntimeState probeState = probeRoot.AddComponent<WorldRuntimeState>();
+            probeState.Configure(probeWorld, probeIndex, null);
+            WorldRuntimeSaveData loadedRuntime = loadedSave != null ? loadedSave.worldRuntime : null;
+            bool runtimeApplied = loadedRuntime != null && probeState.ApplySaveData(loadedRuntime);
+            report.Check(runtimeApplied, "WorldRuntimeSaveData накатывается на распакованный мир.");
+            report.Check(probeState.ChunkStateCount == probeWorld.Chunks.Count &&
+                probeState.EntityStateCount >= probeWorld.Islands.Count,
+                "Runtime state после распаковки восстановил чанки и сущности.");
+
+            WorldRuntimeSaveData recapturedRuntime = probeState.CreateSaveData();
+            report.Check(recapturedRuntime != null &&
+                recapturedRuntime.manifestSeed == seed &&
+                recapturedRuntime.chunks.Count == probeWorld.Chunks.Count,
+                "Runtime state повторно пакуется с тем же seed и чанками.");
+        }
+        finally
+        {
+            DestroyBigTestObject(probeRoot);
         }
     }
 

@@ -55,6 +55,7 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     public Transform Focus => focus;
     public WorldRegionProfile Profile => profile;
     public WorldRegionManifest Manifest => manifest;
+    public int RegionSeed => regionSeed;
     public IReadOnlyList<WorldChunkRecord> Chunks => chunks;
     public IReadOnlyList<WorldIslandRecord> Islands => islands;
     public IReadOnlyList<WorldCloudFieldRecord> CloudFields => cloudFields;
@@ -110,6 +111,16 @@ public sealed class WorldRegionRuntime : MonoBehaviour
         ApplyProfileDefaults();
     }
 
+    public void ConfigureProceduralWorld(int seed, float newWorldSizeMeters, float newChunkSizeMeters)
+    {
+        profile = null;
+        manifest = null;
+        regionSeed = seed;
+        worldSizeMeters = Mathf.Max(DefaultChunkSizeMeters, newWorldSizeMeters);
+        chunkSizeMeters = Mathf.Clamp(newChunkSizeMeters, 1000f, worldSizeMeters);
+        GenerateStarterRegion();
+    }
+
     private void ApplyProfileDefaults()
     {
         if (profile == null)
@@ -140,6 +151,27 @@ public sealed class WorldRegionRuntime : MonoBehaviour
         resourceFields = WorldRegionManifest.CloneResourceFields(source.ResourceFields);
         leviathanRegions = WorldRegionManifest.CloneLeviathanRegions(source.LeviathanRegions);
         icebergFields = WorldRegionManifest.CloneIcebergFields(source.IcebergFields);
+    }
+
+    public bool LoadFromManifestData(WorldManifestData data)
+    {
+        if (data == null || !data.IsUsable)
+        {
+            return false;
+        }
+
+        profile = null;
+        manifest = null;
+        worldSizeMeters = data.worldSizeMeters;
+        chunkSizeMeters = data.chunkSizeMeters;
+        regionSeed = data.seed;
+        chunks = WorldRegionManifest.CloneChunks(data.chunks);
+        islands = WorldRegionManifest.CloneIslands(data.islands);
+        cloudFields = WorldRegionManifest.CloneCloudFields(data.cloudFields);
+        resourceFields = WorldRegionManifest.CloneResourceFields(data.resourceFields);
+        leviathanRegions = WorldRegionManifest.CloneLeviathanRegions(data.leviathanRegions);
+        icebergFields = WorldRegionManifest.CloneIcebergFields(data.icebergFields);
+        return true;
     }
 
     public void ConfigureDebugDraw(bool showAllChunks, bool showDistantRecords)

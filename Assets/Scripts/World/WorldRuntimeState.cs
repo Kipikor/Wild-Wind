@@ -376,17 +376,7 @@ public sealed class WorldRuntimeState : MonoBehaviour
 
         try
         {
-            InitializeFromWorld(true);
-            SaveData data = new SaveData
-            {
-                version = CurrentSaveVersion,
-                manifestSeed = CurrentManifestSeed(),
-                manifestName = CurrentManifestName(),
-                savedUtcTicks = DateTime.UtcNow.Ticks,
-                lastKnownPlayerPosition = lastKnownPlayerPosition,
-                chunks = chunks,
-                entities = entities
-            };
+            WorldRuntimeSaveData data = CreateSaveData();
 
             string folder = Path.GetDirectoryName(path);
             if (!string.IsNullOrWhiteSpace(folder))
@@ -413,26 +403,46 @@ public sealed class WorldRuntimeState : MonoBehaviour
 
         try
         {
-            SaveData data = JsonUtility.FromJson<SaveData>(File.ReadAllText(path, Encoding.UTF8));
-            if (data == null || data.version <= 0)
-            {
-                return false;
-            }
-
-            chunks = data.chunks ?? new List<ChunkRuntimeState>();
-            entities = data.entities ?? new List<EntityRuntimeState>();
-            lastKnownPlayerPosition = data.lastKnownPlayerPosition;
-            loadedManifestSeed = data.manifestSeed;
-            loadedManifestName = data.manifestName;
-            BuildRuntimeDictionaries();
-            InitializeFromWorld(true);
-            return true;
+            WorldRuntimeSaveData data = JsonUtility.FromJson<WorldRuntimeSaveData>(File.ReadAllText(path, Encoding.UTF8));
+            return ApplySaveData(data);
         }
         catch (Exception exception)
         {
             Debug.LogError("[WorldRuntimeState] Load failed: " + exception.Message, this);
             return false;
         }
+    }
+
+    public WorldRuntimeSaveData CreateSaveData()
+    {
+        InitializeFromWorld(true);
+        return new WorldRuntimeSaveData
+        {
+            version = CurrentSaveVersion,
+            manifestSeed = CurrentManifestSeed(),
+            manifestName = CurrentManifestName(),
+            savedUtcTicks = DateTime.UtcNow.Ticks,
+            lastKnownPlayerPosition = lastKnownPlayerPosition,
+            chunks = CloneChunkRuntimeStates(chunks),
+            entities = CloneEntityRuntimeStates(entities)
+        };
+    }
+
+    public bool ApplySaveData(WorldRuntimeSaveData data)
+    {
+        if (data == null || !data.IsUsable)
+        {
+            return false;
+        }
+
+        chunks = CloneChunkRuntimeStates(data.chunks);
+        entities = CloneEntityRuntimeStates(data.entities);
+        lastKnownPlayerPosition = data.lastKnownPlayerPosition;
+        loadedManifestSeed = data.manifestSeed;
+        loadedManifestName = data.manifestName ?? "";
+        BuildRuntimeDictionaries();
+        InitializeFromWorld(true);
+        return true;
     }
 
     [ContextMenu("Reset Runtime State")]
@@ -618,6 +628,11 @@ public sealed class WorldRuntimeState : MonoBehaviour
             return world.Profile.Seed;
         }
 
+        if (world != null)
+        {
+            return world.RegionSeed;
+        }
+
         return 0;
     }
 
@@ -633,24 +648,68 @@ public sealed class WorldRuntimeState : MonoBehaviour
             return world.Profile.name;
         }
 
+        if (world != null)
+        {
+            return "runtime_seed_" + world.RegionSeed;
+        }
+
         return "";
+    }
+
+    private static List<ChunkRuntimeState> CloneChunkRuntimeStates(IReadOnlyList<ChunkRuntimeState> source)
+    {
+        List<ChunkRuntimeState> result = new List<ChunkRuntimeState>();
+        if (source == null) return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            ChunkRuntimeState item = source[i];
+            if (item == null) continue;
+            result.Add(new ChunkRuntimeState
+            {
+                chunkId = item.chunkId,
+                discovered = item.discovered,
+                activeInBubble = item.activeInBubble,
+                visitCount = item.visitCount,
+                firstDiscoveredUtcTicks = item.firstDiscoveredUtcTicks,
+                lastVisitedUtcTicks = item.lastVisitedUtcTicks
+            });
+        }
+
+        return result;
+    }
+
+    private static List<EntityRuntimeState> CloneEntityRuntimeStates(IReadOnlyList<EntityRuntimeState> source)
+    {
+        List<EntityRuntimeState> result = new List<EntityRuntimeState>();
+        if (source == null) return result;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            EntityRuntimeState item = source[i];
+            if (item == null) continue;
+            result.Add(new EntityRuntimeState
+            {
+                kind = item.kind,
+                id = item.id,
+                chunkId = item.chunkId,
+                discovered = item.discovered,
+                activeInBubble = item.activeInBubble,
+                depleted = item.depleted,
+                initialAmount = item.initialAmount,
+                remainingAmount = item.remainingAmount,
+                interactionCount = item.interactionCount,
+                firstDiscoveredUtcTicks = item.firstDiscoveredUtcTicks,
+                lastUpdatedUtcTicks = item.lastUpdatedUtcTicks
+            });
+        }
+
+        return result;
     }
 
     private static string BuildEntityKey(WorldEntityKind kind, string id)
     {
         return kind + ":" + id;
-    }
-
-    [Serializable]
-    private sealed class SaveData
-    {
-        public int version;
-        public int manifestSeed;
-        public string manifestName;
-        public long savedUtcTicks;
-        public Vector3 lastKnownPlayerPosition;
-        public List<ChunkRuntimeState> chunks = new List<ChunkRuntimeState>();
-        public List<EntityRuntimeState> entities = new List<EntityRuntimeState>();
     }
 
     [Serializable]

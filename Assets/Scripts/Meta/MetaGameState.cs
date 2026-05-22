@@ -6,10 +6,16 @@ using UnityEngine;
 [Serializable]
 public class MetaGameSaveData
 {
+    public const int CurrentVersion = 2;
+
     [InspectorName("Версия сохранения")]
-    public int version = 1;
+    public int version = CurrentVersion;
     [InspectorName("Прогресс")]
     public PlayerProgress progress = new PlayerProgress();
+    [InspectorName("World Manifest")]
+    public WorldManifestData worldManifest;
+    [InspectorName("World Runtime")]
+    public WorldRuntimeSaveData worldRuntime;
 }
 
 public partial class MetaGameState : MonoBehaviour
@@ -37,6 +43,12 @@ public partial class MetaGameState : MonoBehaviour
     public LeviathanManager leviathanManager;
     [InspectorName("Разведывательный флот")]
     public ScoutFleetController scoutFleet;
+    [InspectorName("World Runtime")]
+    public WorldRegionRuntime worldRuntime;
+    [InspectorName("World Index")]
+    public WorldEntityIndex worldIndex;
+    [InspectorName("World Runtime State")]
+    public WorldRuntimeState worldRuntimeState;
     [InspectorName("Стартовые деньги")]
     public int startingMoney;
     [InspectorName("Прогресс игрока")]
@@ -1393,7 +1405,13 @@ public partial class MetaGameState : MonoBehaviour
         }
         progress.Normalize();
 
-        MetaGameSaveData saveData = new MetaGameSaveData { progress = progress };
+        MetaGameSaveData saveData = new MetaGameSaveData
+        {
+            version = MetaGameSaveData.CurrentVersion,
+            progress = progress,
+            worldManifest = CaptureWorldManifestForSave(),
+            worldRuntime = CaptureWorldRuntimeForSave()
+        };
 
         try
         {
@@ -1429,6 +1447,7 @@ public partial class MetaGameState : MonoBehaviour
             }
 
             progress = saveData.progress;
+            ApplyWorldSaveData(saveData);
             progress.Normalize();
 
             initialized = false;
@@ -1440,6 +1459,74 @@ public partial class MetaGameState : MonoBehaviour
             lastSaveMessage = "Ошибка загрузки: " + exception.Message;
             Debug.LogWarning(lastSaveMessage);
             return false;
+        }
+    }
+
+    private WorldManifestData CaptureWorldManifestForSave()
+    {
+        ResolveWorldSaveReferences();
+        if (worldRuntime == null)
+        {
+            return null;
+        }
+
+        return WorldManifestData.FromRuntime(worldRuntime, "slot_" + Path.GetFileNameWithoutExtension(EffectiveSaveFileName));
+    }
+
+    private WorldRuntimeSaveData CaptureWorldRuntimeForSave()
+    {
+        ResolveWorldSaveReferences();
+        return worldRuntimeState != null ? worldRuntimeState.CreateSaveData() : null;
+    }
+
+    private void ApplyWorldSaveData(MetaGameSaveData saveData)
+    {
+        if (saveData == null)
+        {
+            return;
+        }
+
+        ResolveWorldSaveReferences();
+        if (worldRuntime != null && saveData.worldManifest != null && saveData.worldManifest.IsUsable)
+        {
+            worldRuntime.LoadFromManifestData(saveData.worldManifest);
+        }
+
+        if (worldIndex != null && worldRuntime != null)
+        {
+            worldIndex.Configure(worldRuntime);
+        }
+
+        if (worldRuntimeState != null && worldRuntime != null)
+        {
+            Transform focus = worldRuntime.Focus != null ? worldRuntime.Focus : transform;
+            worldRuntimeState.Configure(worldRuntime, worldIndex, focus);
+            if (saveData.worldRuntime != null && saveData.worldRuntime.IsUsable)
+            {
+                worldRuntimeState.ApplySaveData(saveData.worldRuntime);
+            }
+            else
+            {
+                worldRuntimeState.InitializeFromWorld(false);
+            }
+        }
+    }
+
+    private void ResolveWorldSaveReferences()
+    {
+        if (worldRuntime == null)
+        {
+            worldRuntime = FindFirstObjectByType<WorldRegionRuntime>();
+        }
+
+        if (worldIndex == null)
+        {
+            worldIndex = FindFirstObjectByType<WorldEntityIndex>();
+        }
+
+        if (worldRuntimeState == null)
+        {
+            worldRuntimeState = FindFirstObjectByType<WorldRuntimeState>();
         }
     }
 

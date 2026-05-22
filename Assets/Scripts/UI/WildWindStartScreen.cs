@@ -46,6 +46,7 @@ public sealed class WildWindStartScreen : MonoBehaviour
         "status.new_world",
         "status.loading_save",
         "status.missing_scene",
+        "error.new_world_save_failed",
         "error.no_save_selected"
     };
 
@@ -409,6 +410,14 @@ public sealed class WildWindStartScreen : MonoBehaviour
     {
         SetStatus("status.new_world");
         string fileName = WildWindSaveSlots.CreateNewWorldSaveFileName();
+        int seed = WorldSaveSlotFactory.CreateSeed();
+        if (!WorldSaveSlotFactory.TryCreateNewWorldSave(fileName, seed, out string error))
+        {
+            Debug.LogError("[WildWindStartScreen] New world save failed: " + error, this);
+            SetStatus("error.new_world_save_failed");
+            return;
+        }
+
         WildWindSaveSlots.SetSelectedSaveFileName(fileName);
         LoadGameplayScene();
     }
