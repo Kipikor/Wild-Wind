@@ -166,7 +166,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d37196e2d69446db88670e82b7f22ef4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WildWindStartScreen
-  gameplaySceneName: SampleScene
+  gameplaySceneName: WildWindWorldScene
   referenceResolution: {x: 1920, y: 1080}
   panelWidth: 520
 --- !u!1 &37308898

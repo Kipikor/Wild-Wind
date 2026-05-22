@@ -51,7 +51,7 @@ public sealed class WildWindStartScreen : MonoBehaviour
     };
 
     [Header("Scene flow")]
-    public string gameplaySceneName = "SampleScene";
+    public string gameplaySceneName = "WildWindWorldScene";
 
     [Header("Layout")]
     public Vector2 referenceResolution = new Vector2(1920f, 1080f);
@@ -443,6 +443,7 @@ public sealed class WildWindStartScreen : MonoBehaviour
             return;
         }
 
+        WildWindSaveSlots.MarkPendingGameplayLaunch();
         SceneManager.LoadScene(gameplaySceneName);
     }
 

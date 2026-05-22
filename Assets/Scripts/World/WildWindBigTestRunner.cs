@@ -2445,6 +2445,44 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             loadedSave.worldRuntime.IsUsable;
         report.Check(jsonRoundTrip, "Save slot мира проходит JSON round-trip.");
 
+        string tempSlotName = "wild_wind_big_test_slot_" + DateTime.UtcNow.Ticks + ".json";
+        string tempSlotPath = WildWindSaveSlots.GetSavePath(tempSlotName);
+        try
+        {
+            File.WriteAllText(tempSlotPath, json);
+            List<WildWindSaveSlotInfo> slots = WildWindSaveSlots.GetExistingSlots();
+            bool slotListed = false;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                if (slots[i] != null && slots[i].fileName == tempSlotName && slots[i].seed == seed)
+                {
+                    slotListed = true;
+                    break;
+                }
+            }
+
+            report.Check(slotListed, "Continue видит только настоящий игровой save slot с world manifest.");
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempSlotPath))
+                {
+                    File.Delete(tempSlotPath);
+                }
+            }
+            catch (Exception exception)
+            {
+                report.Warn("Не удалось удалить временный save slot большого теста: " + exception.Message);
+            }
+        }
+
+        WildWindSaveSlots.MarkPendingGameplayLaunch();
+        bool pendingLaunchConsumed = WildWindSaveSlots.ConsumePendingGameplayLaunch();
+        bool pendingLaunchCleared = !WildWindSaveSlots.ConsumePendingGameplayLaunch();
+        report.Check(pendingLaunchConsumed && pendingLaunchCleared, "Флаг перехода стартовый экран -> gameplay одноразовый.");
+
         GameObject probeRoot = null;
         try
         {

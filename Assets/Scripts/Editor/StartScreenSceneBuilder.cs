@@ -46,7 +46,7 @@ public static class StartScreenSceneBuilder
         else
         {
             startScreen.gameObject.name = RootName;
-            startScreen.gameplaySceneName = "SampleScene";
+            startScreen.gameplaySceneName = "WildWindWorldScene";
             startScreen.referenceResolution = new Vector2(1920f, 1080f);
             startScreen.panelWidth = 520f;
             startScreen.RebuildEditableScreen();
@@ -88,7 +88,7 @@ public static class StartScreenSceneBuilder
     {
         GameObject root = new GameObject(RootName);
         WildWindStartScreen startScreen = root.AddComponent<WildWindStartScreen>();
-        startScreen.gameplaySceneName = "SampleScene";
+        startScreen.gameplaySceneName = "WildWindWorldScene";
         startScreen.referenceResolution = new Vector2(1920f, 1080f);
         startScreen.panelWidth = 520f;
         startScreen.RebuildEditableScreen();

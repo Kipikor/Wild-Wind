@@ -6,6 +6,7 @@ using UnityEngine;
 public static class WildWindSaveSlots
 {
     public const string SelectedSaveFileNamePlayerPrefsKey = "WildWind.SelectedSaveFileName";
+    public const string PendingGameplayLaunchPlayerPrefsKey = "WildWind.PendingGameplayLaunch";
     public const string DefaultSaveFileName = "wild_wind_save.json";
 
     public static string GetSelectedSaveFileNameOrEmpty()
@@ -31,6 +32,24 @@ public static class WildWindSaveSlots
         PlayerPrefs.Save();
     }
 
+    public static void MarkPendingGameplayLaunch()
+    {
+        PlayerPrefs.SetInt(PendingGameplayLaunchPlayerPrefsKey, 1);
+        PlayerPrefs.Save();
+    }
+
+    public static bool ConsumePendingGameplayLaunch()
+    {
+        bool pending = PlayerPrefs.GetInt(PendingGameplayLaunchPlayerPrefsKey, 0) == 1;
+        if (pending)
+        {
+            PlayerPrefs.DeleteKey(PendingGameplayLaunchPlayerPrefsKey);
+            PlayerPrefs.Save();
+        }
+
+        return pending;
+    }
+
     public static string CreateNewWorldSaveFileName()
     {
         return "wild_wind_world_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".json";
@@ -50,13 +69,12 @@ public static class WildWindSaveSlots
         {
             string path = files[i];
             FileInfo info = new FileInfo(path);
-            slots.Add(new WildWindSaveSlotInfo
+            if (!TryCreateSlotInfo(path, info, out WildWindSaveSlotInfo slot))
             {
-                fileName = info.Name,
-                fullPath = info.FullName,
-                lastWriteUtc = info.LastWriteTimeUtc,
-                sizeBytes = info.Length
-            });
+                continue;
+            }
+
+            slots.Add(slot);
         }
 
         slots.Sort((a, b) => b.lastWriteUtc.CompareTo(a.lastWriteUtc));
@@ -66,6 +84,43 @@ public static class WildWindSaveSlots
     public static string GetSavePath(string fileName)
     {
         return Path.Combine(Application.persistentDataPath, SanitizeFileName(fileName));
+    }
+
+    private static bool TryCreateSlotInfo(string path, FileInfo info, out WildWindSaveSlotInfo slot)
+    {
+        slot = null;
+        if (info == null || !info.Exists)
+        {
+            return false;
+        }
+
+        try
+        {
+            MetaGameSaveData saveData = JsonUtility.FromJson<MetaGameSaveData>(File.ReadAllText(path));
+            if (saveData == null ||
+                saveData.version != MetaGameSaveData.CurrentVersion ||
+                saveData.worldManifest == null ||
+                !saveData.worldManifest.IsUsable)
+            {
+                return false;
+            }
+
+            slot = new WildWindSaveSlotInfo
+            {
+                fileName = info.Name,
+                fullPath = info.FullName,
+                lastWriteUtc = info.LastWriteTimeUtc,
+                sizeBytes = info.Length,
+                version = saveData.version,
+                seed = saveData.worldManifest.seed
+            };
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("[WildWindSaveSlots] Ignoring invalid save slot '" + info.Name + "': " + exception.Message);
+            return false;
+        }
     }
 
     private static string SanitizeFileName(string fileName)
@@ -86,13 +141,16 @@ public sealed class WildWindSaveSlotInfo
     public string fullPath = "";
     public DateTime lastWriteUtc;
     public long sizeBytes;
+    public int version;
+    public int seed;
 
     public string DisplayName
     {
         get
         {
             string localTime = lastWriteUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
-            return Path.GetFileNameWithoutExtension(fileName) + "  " + localTime;
+            string seedText = seed != 0 ? "  seed " + seed : "";
+            return Path.GetFileNameWithoutExtension(fileName) + seedText + "  " + localTime;
         }
     }
 }
