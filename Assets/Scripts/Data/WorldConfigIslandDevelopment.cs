@@ -100,6 +100,8 @@ public partial class WorldConfigDatabase
                 safetyLoad = Mathf.Clamp(ParseInt(Get(row, "safety_load")), 0, 5),
                 comfortLoad = Mathf.Clamp(ParseInt(Get(row, "comfort_load")), 0, 5),
                 creativityLoad = Mathf.Clamp(ParseInt(Get(row, "creativity_load")), 0, 5),
+                repairLoad = Mathf.Clamp(ParseInt(Get(row, "repair_load")), 0, 5),
+                capitalConnectionLoad = Mathf.Clamp(ParseInt(Get(row, "capital_connection_load")), 0, 5),
                 descriptionRu = Get(row, "description_ru")
             };
 
@@ -135,7 +137,9 @@ public enum IslandNeedKind
     Health,
     Safety,
     Comfort,
-    Creativity
+    Creativity,
+    Repair,
+    CapitalConnection
 }
 
 public class IslandArchetypeConfig
@@ -200,12 +204,17 @@ public class IslandBuildingConfig
     public int safetyLoad;
     public int comfortLoad;
     public int creativityLoad;
+    public int repairLoad;
+    public int capitalConnectionLoad;
     public string descriptionRu = "";
     public List<ProductionItemAmountConfig> constructionInputs = new List<ProductionItemAmountConfig>();
 
     public bool IsService => !string.IsNullOrWhiteSpace(serviceRole);
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
-    public int TotalNeedLoad => workforceLoad + healthLoad + safetyLoad + comfortLoad + creativityLoad;
+    public int CoreNeedLoad => workforceLoad + healthLoad + safetyLoad + comfortLoad + creativityLoad;
+    public int EffectiveRepairLoad => repairLoad > 0 ? repairLoad : (CoreNeedLoad > 0 ? Mathf.Clamp(1 + CoreNeedLoad / 4, 1, 5) : 0);
+    public int EffectiveCapitalConnectionLoad => capitalConnectionLoad > 0 ? capitalConnectionLoad : (serviceRole == "need_capital_connection" || CoreNeedLoad > 0 ? 1 : 0);
+    public int TotalNeedLoad => CoreNeedLoad + EffectiveRepairLoad + EffectiveCapitalConnectionLoad;
 
     public int GetNeedLoad(IslandNeedKind kind)
     {
@@ -221,6 +230,10 @@ public class IslandBuildingConfig
                 return comfortLoad;
             case IslandNeedKind.Creativity:
                 return creativityLoad;
+            case IslandNeedKind.Repair:
+                return EffectiveRepairLoad;
+            case IslandNeedKind.CapitalConnection:
+                return EffectiveCapitalConnectionLoad;
             default:
                 return 0;
         }

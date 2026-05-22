@@ -220,8 +220,12 @@ public enum ShipStatId
     GasHarvesterRadiusMeters = 52,
     [InspectorName("Харвестер: длительность цикла, сек")]
     GasHarvesterCycleSeconds = 53,
+    [InspectorName("Харвестер: водный режим")]
+    GasHarvesterWaterOnly = 54,
     [InspectorName("Майнинг: вместимость противоударного кузова, кг")]
     MiningImpactHoldCapacityKg = 60,
+    [InspectorName("Майнинг: множитель урона от глыб")]
+    MiningImpactDamageTakenMultiplier = 61,
     [InspectorName("Разведка: радиус наблюдения, м")]
     ObservationRadiusMeters = 70,
     [InspectorName("Разведка: скорость сведений на 50% радиуса")]
@@ -231,5 +235,55 @@ public enum ShipStatId
     [InspectorName("Разведка: эффективность информации по облакам")]
     ObservationCloudInfoEfficiency = 73,
     [InspectorName("Разведка: эффективность информации по левиафанам")]
-    ObservationLeviathanInfoEfficiency = 74
+    ObservationLeviathanInfoEfficiency = 74,
+    [InspectorName("Разведка: КПД бумаги в информацию")]
+    SurveyPaperToInfoEfficiency = 75,
+    [InspectorName("Разведка: множитель тревоги левиафанов")]
+    LeviathanAlarmGenerationMultiplier = 76,
+    [InspectorName("Гарпун: расход оружия в минуту")]
+    HarpoonWeaponCostPerMinute = 80,
+    [InspectorName("Гарпун: максимальная масса туши")]
+    HarpoonMaxCarcassMassKg = 81,
+    [InspectorName("Гарпун: урон выстрела")]
+    HarpoonFlightDamage = 82,
+    [InspectorName("Гарпун: дальность")]
+    HarpoonRangeMeters = 83,
+    [InspectorName("Потребность: рабочая сила, восстановление/час")]
+    NeedWorkforceRecoveryPerHour = 90,
+    [InspectorName("Потребность: здоровье, восстановление/час")]
+    NeedHealthRecoveryPerHour = 91,
+    [InspectorName("Потребность: безопасность, восстановление/час")]
+    NeedSafetyRecoveryPerHour = 92,
+    [InspectorName("Потребность: комфорт, восстановление/час")]
+    NeedComfortRecoveryPerHour = 93,
+    [InspectorName("Потребность: творчество, восстановление/час")]
+    NeedCreativityRecoveryPerHour = 94,
+    [InspectorName("Потребность: ремонт, восстановление/час")]
+    NeedRepairRecoveryPerHour = 95,
+    [InspectorName("Потребность: связь со столицей, восстановление/час")]
+    NeedCapitalConnectionRecoveryPerHour = 96,
+    [InspectorName("Груз: фургон, смешиваемые единицы")]
+    CargoVanCapacityUnits = 100,
+    [InspectorName("Груз: пассажирские места")]
+    PassengerSeatCapacity = 101,
+    [InspectorName("Груз: кузов для сыпучки, л")]
+    BulkHoldCapacityLiters = 102,
+    [InspectorName("Груз: цистерна, л")]
+    LiquidTankCapacityLiters = 103,
+    [InspectorName("Груз: баллоны, л")]
+    GasCylinderCapacityLiters = 104,
+    [InspectorName("Груз: док, слоты")]
+    ShipDockSlots = 105,
+    [InspectorName("Груз: док, максимальный класс")]
+    ShipDockMaxClass = 106,
+    [InspectorName("Груз: масса корабля в доке")]
+    DockedShipMassFactor = 107,
+    [InspectorName("Груз: клавдий дока, кг/т/ч")]
+    DockSupportClaudiumPerTonHour = 108,
+    [InspectorName("Груз: холодильник, л")]
+    RefrigeratedHoldCapacityLiters = 109,
+    [InspectorName("Груз: мощность холодильника, кВт")]
+    RefrigeratedHoldPowerDrawKw = 110,
+    [InspectorName("РџСЂРѕС‡РЅРѕСЃС‚СЊ РєРѕСЂРїСѓСЃР°")]
+    StructureHp = 111
 }

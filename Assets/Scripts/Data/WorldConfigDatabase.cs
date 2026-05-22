@@ -68,7 +68,12 @@ public partial class WorldConfigDatabase
             LoadLeviathanTypes(Path.Combine(folder, "Leviathan_type.csv"));
             LoadLeviathanZones(Path.Combine(folder, "Leviathan_zone.csv"));
             LoadTechnologies(Path.Combine(folder, "Technology.csv"));
+            LoadHulls(Path.Combine(folder, "Hull.csv"));
+            LoadEngines(Path.Combine(folder, "Engine.csv"));
+            LoadPropellers(Path.Combine(folder, "Propeller.csv"));
+            LoadClaudiumLoops(Path.Combine(folder, "Claudium_loop.csv"));
             LoadSpecialModules(Path.Combine(folder, "Special_module.csv"));
+            LoadShipTree(Path.Combine(folder, "Ship_tree.csv"));
             LoadIndustryRecipes(Path.Combine(folder, "Production_recipe.csv"));
             LoadAssemblySteps(Path.Combine(folder, "Assembly_step.csv"));
             LoadIslandIndustries(Path.Combine(folder, "Production_industry.csv"));
@@ -213,6 +218,61 @@ public partial class WorldConfigDatabase
         return string.IsNullOrWhiteSpace(item.localNameRu) ? item.id : item.localNameRu;
     }
 
+    public CargoUnitKind GetItemUnitKind(string itemId)
+    {
+        ItemConfig item = GetItem(itemId);
+        if (item != null) return item.cargoUnitKind;
+        return IsPassengerCargoItemId(itemId) ? CargoUnitKind.Passenger : CargoUnitKind.Piece;
+    }
+
+    public CargoStorageKind GetItemStorageKind(string itemId)
+    {
+        ItemConfig item = GetItem(itemId);
+        if (item != null) return item.cargoStorageKind;
+        return IsPassengerCargoItemId(itemId) ? CargoStorageKind.Cabin : CargoStorageKind.Van;
+    }
+
+    public ShipSizeClass GetItemShipSizeClass(string itemId)
+    {
+        ItemConfig item = GetItem(itemId);
+        return item != null ? item.shipSizeClass : ShipSizeClass.None;
+    }
+
+    public float GetItemStorageAmount(string itemId, int amount)
+    {
+        return Mathf.Max(0, amount);
+    }
+
+    public float GetItemTransportMassKg(string itemId, int amount)
+    {
+        float fullMassKg = GetItemFullMassKg(itemId, amount);
+        ItemConfig item = GetItem(itemId);
+        if (item != null && item.cargoStorageKind == CargoStorageKind.ShipDock)
+        {
+            return fullMassKg * Mathf.Clamp(item.dockedTransportMassFactor <= 0f ? 0.1f : item.dockedTransportMassFactor, 0.01f, 1f);
+        }
+
+        return fullMassKg;
+    }
+
+    public float GetItemFullMassKg(string itemId, int amount)
+    {
+        if (amount <= 0) return 0f;
+
+        ItemConfig item = GetItem(itemId);
+        if (item != null)
+        {
+            return Mathf.Max(0, amount) * Mathf.Max(0f, item.massKgPerUnit);
+        }
+
+        if (IsPassengerCargoItemId(itemId))
+        {
+            return Mathf.Max(0, amount) * 100f;
+        }
+
+        return Mathf.Max(0, amount);
+    }
+
     public string GetTechnologyNameRu(string technologyId)
     {
         TechnologyConfig technology = GetTechnology(technologyId);
@@ -233,6 +293,7 @@ public partial class WorldConfigDatabase
         leviathanZones.Clear();
         technologies.Clear();
         specialModules.Clear();
+        ClearShipPartConfigs();
         islandIndustries.Clear();
         industryRecipes.Clear();
         islandArchetypes.Clear();
@@ -264,12 +325,18 @@ public partial class WorldConfigDatabase
     {
         foreach (Dictionary<string, string> row in ReadCsv(path))
         {
+            string itemId = Get(row, "id_item");
             ItemConfig item = new ItemConfig
             {
-                id = Get(row, "id_item"),
+                id = itemId,
                 localNameRu = Get(row, "local_name_ru"),
                 localNameEn = Get(row, "local_name_en"),
-                energyKwhPerKg = Mathf.Max(0f, ParseFloat(Get(row, "energy_kwh_per_kg")))
+                energyKwhPerKg = Mathf.Max(0f, ParseFloat(Get(row, "energy_kwh_per_kg"))),
+                cargoUnitKind = ParseCargoUnitKind(Get(row, "cargo_unit_kind"), itemId),
+                cargoStorageKind = ParseCargoStorageKind(Get(row, "cargo_storage_kind"), itemId),
+                massKgPerUnit = Mathf.Max(0f, ParseFloat(Get(row, "mass_kg_per_unit"), IsPassengerCargoItemId(itemId) ? 100f : 1f)),
+                shipSizeClass = ParseShipSizeClass(Get(row, "ship_size_class")),
+                dockedTransportMassFactor = Mathf.Clamp(ParseFloat(Get(row, "docked_transport_mass_factor"), 0.1f), 0.01f, 1f)
             };
 
             if (string.IsNullOrWhiteSpace(item.id)) continue;
@@ -535,6 +602,9 @@ public partial class WorldConfigDatabase
                 id = Get(row, "id_technology"),
                 localNameRu = Get(row, "local_name_ru"),
                 localNameEn = Get(row, "local_name_en"),
+                rank = Mathf.Max(0, ParseInt(Get(row, "rank"), 0)),
+                branch = Get(row, "branch"),
+                unlockSummaryRu = Get(row, "unlock_summary_ru"),
                 cycleTimeSeconds = Mathf.Max(0, ParseInt(Get(row, "cycle_time_seconds"), 1)),
                 requiredCycles = Mathf.Max(1, ParseInt(Get(row, "required_cycles"), 1))
             };
@@ -580,12 +650,38 @@ public partial class WorldConfigDatabase
                 gasHarvesterPowerDrawKw = Mathf.Max(0f, ParseFloat(Get(row, "gas_harvester_power_draw_kw"))),
                 gasHarvesterRadiusMeters = Mathf.Max(0f, ParseFloat(Get(row, "gas_harvester_radius_m"))),
                 gasHarvesterCycleSeconds = Mathf.Max(0f, ParseFloat(Get(row, "gas_harvester_cycle_seconds"))),
+                gasHarvesterWaterOnly = ParseBool01(Get(row, "gas_harvester_water_only")),
                 miningImpactHoldCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "mining_impact_hold_capacity_kg"))),
+                miningImpactDamageTakenMultiplier = Mathf.Max(0f, ParseFloat(Get(row, "mining_impact_damage_taken_multiplier"))),
                 observationRadiusMeters = Mathf.Max(0f, ParseFloat(Get(row, "observation_radius_m"))),
                 observationFactsAtHalfRadiusPerSecond = Mathf.Max(0f, ParseFloat(Get(row, "observation_facts_at_half_radius_per_second"))),
                 observationRockInfoEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "observation_rock_info_efficiency"))),
                 observationCloudInfoEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "observation_cloud_info_efficiency"))),
-                observationLeviathanInfoEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "observation_leviathan_info_efficiency")))
+                observationLeviathanInfoEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "observation_leviathan_info_efficiency"))),
+                surveyPaperToInfoEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "survey_paper_to_info_efficiency"))),
+                leviathanAlarmGenerationMultiplier = Mathf.Max(0f, ParseFloat(Get(row, "leviathan_alarm_generation_multiplier"))),
+                harpoonWeaponCostPerMinute = Mathf.Max(0f, ParseFloat(Get(row, "harpoon_weapon_cost_per_minute"))),
+                harpoonMaxCarcassMassKg = Mathf.Max(0f, ParseFloat(Get(row, "harpoon_max_carcass_mass_kg"))),
+                harpoonFlightDamage = Mathf.Max(0f, ParseFloat(Get(row, "harpoon_flight_damage"))),
+                harpoonRangeMeters = Mathf.Max(0f, ParseFloat(Get(row, "harpoon_range_m"))),
+                needWorkforceRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_workforce_recovery_per_hour"))),
+                needHealthRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_health_recovery_per_hour"))),
+                needSafetyRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_safety_recovery_per_hour"))),
+                needComfortRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_comfort_recovery_per_hour"))),
+                needCreativityRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_creativity_recovery_per_hour"))),
+                needRepairRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_repair_recovery_per_hour"))),
+                needCapitalConnectionRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_capital_connection_recovery_per_hour"))),
+                cargoVanCapacityUnits = Mathf.Max(0f, ParseFloat(Get(row, "cargo_van_capacity_units"))),
+                passengerSeatCapacity = Mathf.Max(0f, ParseFloat(Get(row, "passenger_seat_capacity"))),
+                bulkHoldCapacityLiters = Mathf.Max(0f, ParseFloat(Get(row, "bulk_hold_capacity_l"))),
+                liquidTankCapacityLiters = Mathf.Max(0f, ParseFloat(Get(row, "liquid_tank_capacity_l"))),
+                gasCylinderCapacityLiters = Mathf.Max(0f, ParseFloat(Get(row, "gas_cylinder_capacity_l"))),
+                refrigeratedHoldCapacityLiters = Mathf.Max(0f, ParseFloat(Get(row, "refrigerated_hold_capacity_l"))),
+                refrigeratedHoldPowerDrawKw = Mathf.Max(0f, ParseFloat(Get(row, "refrigerated_hold_power_draw_kw"))),
+                shipDockSlots = Mathf.Max(0f, ParseFloat(Get(row, "ship_dock_slots"))),
+                shipDockMaxClass = ParseShipSizeClass(Get(row, "ship_dock_max_class")),
+                dockedShipMassFactor = Mathf.Clamp(ParseFloat(Get(row, "docked_ship_mass_factor"), 0.1f), 0.01f, 1f),
+                dockSupportClaudiumPerTonHour = Mathf.Max(0f, ParseFloat(Get(row, "dock_support_claudium_per_ton_hour"), 0.02f))
             };
 
             module.compatibleSlotTypeIds.AddRange(SplitInlineList(Get(row, "compatible_slot_type")));
@@ -703,6 +799,97 @@ public partial class WorldConfigDatabase
         color.a = fallback.a;
         return color;
     }
+
+    private static CargoUnitKind ParseCargoUnitKind(string value, string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return IsPassengerCargoItemId(itemId) ? CargoUnitKind.Passenger : CargoUnitKind.Piece;
+        }
+
+        string normalized = value.Trim().Replace("-", "").Replace("_", "");
+        if (string.Equals(normalized, "liter", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "liters", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "volume", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "volumeliter", StringComparison.OrdinalIgnoreCase))
+        {
+            return CargoUnitKind.VolumeLiter;
+        }
+
+        return Enum.TryParse(value, true, out CargoUnitKind parsed) ? parsed : CargoUnitKind.Piece;
+    }
+
+    private static CargoStorageKind ParseCargoStorageKind(string value, string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return IsPassengerCargoItemId(itemId) ? CargoStorageKind.Cabin : CargoStorageKind.Van;
+        }
+
+        string normalized = value.Trim().Replace("-", "").Replace("_", "");
+        if (string.Equals(normalized, "bulk", StringComparison.OrdinalIgnoreCase))
+        {
+            return CargoStorageKind.BulkHold;
+        }
+
+        if (string.Equals(normalized, "liquid", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "tank", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "cistern", StringComparison.OrdinalIgnoreCase))
+        {
+            return CargoStorageKind.LiquidTank;
+        }
+
+        if (string.Equals(normalized, "gas", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "cylinder", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "bottle", StringComparison.OrdinalIgnoreCase))
+        {
+            return CargoStorageKind.GasCylinder;
+        }
+
+        if (string.Equals(normalized, "refrigerated", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "refrigerator", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "fridge", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "cold", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "coldhold", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "refrigeratedhold", StringComparison.OrdinalIgnoreCase))
+        {
+            return CargoStorageKind.RefrigeratedHold;
+        }
+
+        if (string.Equals(normalized, "dock", StringComparison.OrdinalIgnoreCase))
+        {
+            return CargoStorageKind.ShipDock;
+        }
+
+        return Enum.TryParse(value, true, out CargoStorageKind parsed) ? parsed : CargoStorageKind.Van;
+    }
+
+    private static ShipSizeClass ParseShipSizeClass(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return ShipSizeClass.None;
+        return Enum.TryParse(value, true, out ShipSizeClass parsed) ? parsed : ShipSizeClass.None;
+    }
+
+    private static bool ParseBool01(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        string normalized = value.Trim();
+        if (float.TryParse(normalized.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float number))
+        {
+            return number > 0.5f;
+        }
+
+        return normalized.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("да", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Equals("y", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPassengerCargoItemId(string itemId)
+    {
+        return !string.IsNullOrWhiteSpace(itemId) &&
+            itemId.StartsWith("passengers_to_", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 public class ItemConfig
@@ -711,6 +898,11 @@ public class ItemConfig
     public string localNameRu = "";
     public string localNameEn = "";
     public float energyKwhPerKg;
+    public CargoUnitKind cargoUnitKind = CargoUnitKind.Piece;
+    public CargoStorageKind cargoStorageKind = CargoStorageKind.Van;
+    public float massKgPerUnit = 1f;
+    public ShipSizeClass shipSizeClass = ShipSizeClass.None;
+    public float dockedTransportMassFactor = 0.1f;
 }
 
 public class IslandConfig
@@ -867,6 +1059,9 @@ public class TechnologyConfig
     public string id = "";
     public string localNameRu = "";
     public string localNameEn = "";
+    public int rank;
+    public string branch = "";
+    public string unlockSummaryRu = "";
     public int cycleTimeSeconds = 1;
     public int requiredCycles = 1;
     public List<string> prerequisiteTechnologyIds = new List<string>();
@@ -892,12 +1087,38 @@ public class SpecialModuleConfig
     public float gasHarvesterPowerDrawKw;
     public float gasHarvesterRadiusMeters;
     public float gasHarvesterCycleSeconds;
+    public bool gasHarvesterWaterOnly;
     public float miningImpactHoldCapacityKg;
+    public float miningImpactDamageTakenMultiplier;
     public float observationRadiusMeters;
     public float observationFactsAtHalfRadiusPerSecond;
     public float observationRockInfoEfficiency;
     public float observationCloudInfoEfficiency;
     public float observationLeviathanInfoEfficiency;
+    public float surveyPaperToInfoEfficiency;
+    public float leviathanAlarmGenerationMultiplier;
+    public float harpoonWeaponCostPerMinute;
+    public float harpoonMaxCarcassMassKg;
+    public float harpoonFlightDamage;
+    public float harpoonRangeMeters;
+    public float needWorkforceRecoveryPerHour;
+    public float needHealthRecoveryPerHour;
+    public float needSafetyRecoveryPerHour;
+    public float needComfortRecoveryPerHour;
+    public float needCreativityRecoveryPerHour;
+    public float needRepairRecoveryPerHour;
+    public float needCapitalConnectionRecoveryPerHour;
+    public float cargoVanCapacityUnits;
+    public float passengerSeatCapacity;
+    public float bulkHoldCapacityLiters;
+    public float liquidTankCapacityLiters;
+    public float gasCylinderCapacityLiters;
+    public float refrigeratedHoldCapacityLiters;
+    public float refrigeratedHoldPowerDrawKw;
+    public float shipDockSlots;
+    public ShipSizeClass shipDockMaxClass = ShipSizeClass.None;
+    public float dockedShipMassFactor = 0.1f;
+    public float dockSupportClaudiumPerTonHour = 0.02f;
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }

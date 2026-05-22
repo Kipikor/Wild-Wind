@@ -1,68 +1,70 @@
-﻿id_item,local_name_ru,local_name_en,energy_kwh_per_kg
+id_item,local_name_ru,local_name_en,energy_kwh_per_kg,cargo_unit_kind,cargo_storage_kind,mass_kg_per_unit,ship_size_class,docked_transport_mass_factor
 food,Еда,Food,0
 charcoal,Уголь,Charcoal,8
-sulfur,Сера,Sulfur,0
 metal,Металл,Metal,0
 aerolite,Аэролит,Aerolite,0
 tools,Инструменты,Tools,0
 weapon,Оружие,Weapons,0
 paper,Бумага,Paper,0
+passengers_to_capital,Пассажиры в столицу,Passengers to Capital,0,Passenger,Cabin,100,None,1
+passengers_to_island,Пассажиры на остров,Passengers to Island,0,Passenger,Cabin,100,None,1
+passengers_to_ship,Пассажиры на корабль,Passengers to Ship,0,Passenger,Cabin,100,None,1
 design_experience,Конструкторский опыт,Design Experience,0
+fundamental_experience,Фундаментальный опыт,Fundamental Experience,0
 rock_info,Информация о глыбах,Rock Survey Data,0
 cloud_info,Информация об облаках,Cloud Survey Data,0
 leviathan_info,Информация о левиафанах,Leviathan Survey Data,0
-wood,Древесина,Wood,4
 claudium,Клавдий,Claudium,0
 medicines,Медикаменты,Medicines,0
-alcohol,Спирт,Alcohol,7.5
+alcohol,Спирт,Alcohol,7.5,VolumeLiter,LiquidTank,0.79,None,1
 gunpowder,Взрывчатка,Explosives,0
 mechanisms,Механизмы,Mechanisms,0
-fat,Жир,Fat,12.1
-water,Вода,Water,0
+fat,Жир,Fat,12.1,VolumeLiter,LiquidTank,0.92,None,1
+water,Вода,Water,0,VolumeLiter,LiquidTank,1,None,1
 cloth,Ткань,Cloth,0
-aer_silt,Аэрная взвесь,Aer Silt,0
-vespar,Веспар,Vespar,0
-fulgur,Фульгур,Fulgur,0
-azurite_gas,Лазуритовый газ,Azurite Gas,0
-amberon,Амберон,Amberon,0
-viridine,Виридин,Viridine,0
-ionite,Ионит,Ionite,0
-calorine,Калорин,Calorine,0
-crystane,Кристан,Crystane,0
-claudine,Клавдин,Claudine,0
-nulgas,Нульгаз,Nulgas,0
-mist_condensate,Концентрат сухой дымки,Dry Mist Condensate,0
-cloud_condensate,Облачный концентрат,Cloud Condensate,0
-wet_condensate,Влажный концентрат,Wet Cloud Condensate,0
-storm_condensate,Грозовой концентрат,Storm Condensate,0
-azure_condensate,Лазурный газовый концентрат,Azure Gas Condensate,0
-amber_condensate,Янтарный газовый концентрат,Amber Gas Condensate,0
-green_condensate,Зеленый газовый концентрат,Green Gas Condensate,0
-ion_condensate,Ионный концентрат,Ion Condensate,0
-thermal_condensate,Тепловой концентрат,Thermal Condensate,0
-crystal_condensate,Кристаллический концентрат,Crystal Condensate,0
-claudic_condensate,Клавдиевый концентрат,Claudic Condensate,0
-void_condensate,Пустотный концентрат,Void Condensate,0
-windshale_ore,Ветровой сланец,Wind Shale Ore,0
-dawnspar_ore,Зоревик,Dawn Spar Ore,0
-bluebrass_ore,Синелатунь,Bluebrass Ore,0
-needlechalk_ore,Игломел,Needle Chalk Ore,0
-rainroot_ore,Дождекорень,Rainroot Ore,0
-emberloam_ore,Жарозем,Emberloam Ore,0
-glassmire_ore,Стеклотина,Glassmire Ore,0
-stormbone_ore,Грозокость,Stormbone Ore,0
-ashpearl_ore,Пепложемчуг,Ash Pearl Ore,0
-liftmarrow_ore,Подъемная жила,Lift Marrow Ore,0
-duskclay_ore,Сумеречная глина,Dusk Clay Ore,0
-thundergrit_ore,Громовая крошка,Thunder Grit Ore,0
-mirrorbasalt_ore,Зеркальный базальт,Mirror Basalt Ore,0
-hollowchalk_ore,Полый мел,Hollow Chalk Ore,0
-crownstone_ore,Венечник,Crownstone Ore,0
-blackhoneycomb_ore,Черные соты,Black Honeycomb Ore,0
-silverdrift_ore,Сребродрейф,Silver Drift Ore,0
-embervein_ore,Жарожила,Ember Vein Ore,0
-claudreef_ore,Клавдиевый риф,Claudium Reef Ore,0
-nullcrust_ore,Нулевая корка,Null Crust Ore,0
+aer_silt,Аэрная взвесь,Aer Silt,0,VolumeLiter,GasCylinder,1,None,1
+vespar,Веспар,Vespar,0,VolumeLiter,GasCylinder,1,None,1
+fulgur,Фульгур,Fulgur,0,VolumeLiter,GasCylinder,1,None,1
+azurite_gas,Лазуритовый газ,Azurite Gas,0,VolumeLiter,GasCylinder,1,None,1
+amberon,Амберон,Amberon,0,VolumeLiter,GasCylinder,1,None,1
+viridine,Виридин,Viridine,0,VolumeLiter,GasCylinder,1,None,1
+ionite,Ионит,Ionite,0,VolumeLiter,GasCylinder,1,None,1
+calorine,Калорин,Calorine,0,VolumeLiter,GasCylinder,1,None,1
+crystane,Кристан,Crystane,0,VolumeLiter,GasCylinder,1,None,1
+claudine,Клавдин,Claudine,0,VolumeLiter,GasCylinder,1,None,1
+nulgas,Нульгаз,Nulgas,0,VolumeLiter,GasCylinder,1,None,1
+mist_condensate,Концентрат сухой дымки,Dry Mist Condensate,0,VolumeLiter,LiquidTank,1,None,1
+cloud_condensate,Облачный концентрат,Cloud Condensate,0,VolumeLiter,LiquidTank,1,None,1
+wet_condensate,Влажный концентрат,Wet Cloud Condensate,0,VolumeLiter,LiquidTank,1,None,1
+storm_condensate,Грозовой концентрат,Storm Condensate,0,VolumeLiter,LiquidTank,1,None,1
+azure_condensate,Лазурный газовый концентрат,Azure Gas Condensate,0,VolumeLiter,LiquidTank,1,None,1
+amber_condensate,Янтарный газовый концентрат,Amber Gas Condensate,0,VolumeLiter,LiquidTank,1,None,1
+green_condensate,Зеленый газовый концентрат,Green Gas Condensate,0,VolumeLiter,LiquidTank,1,None,1
+ion_condensate,Ионный концентрат,Ion Condensate,0,VolumeLiter,LiquidTank,1,None,1
+thermal_condensate,Тепловой концентрат,Thermal Condensate,0,VolumeLiter,LiquidTank,1,None,1
+crystal_condensate,Кристаллический концентрат,Crystal Condensate,0,VolumeLiter,LiquidTank,1,None,1
+claudic_condensate,Клавдиевый концентрат,Claudic Condensate,0,VolumeLiter,LiquidTank,1,None,1
+void_condensate,Пустотный концентрат,Void Condensate,0,VolumeLiter,LiquidTank,1,None,1
+windshale_ore,Ветровой сланец,Wind Shale Ore,0,VolumeLiter,BulkHold,1,None,1
+dawnspar_ore,Зоревик,Dawn Spar Ore,0,VolumeLiter,BulkHold,1,None,1
+bluebrass_ore,Синелатунь,Bluebrass Ore,0,VolumeLiter,BulkHold,1,None,1
+needlechalk_ore,Игломел,Needle Chalk Ore,0,VolumeLiter,BulkHold,1,None,1
+rainroot_ore,Дождекорень,Rainroot Ore,0,VolumeLiter,BulkHold,1,None,1
+emberloam_ore,Жарозем,Emberloam Ore,0,VolumeLiter,BulkHold,1,None,1
+glassmire_ore,Стеклотина,Glassmire Ore,0,VolumeLiter,BulkHold,1,None,1
+stormbone_ore,Грозокость,Stormbone Ore,0,VolumeLiter,BulkHold,1,None,1
+ashpearl_ore,Пепложемчуг,Ash Pearl Ore,0,VolumeLiter,BulkHold,1,None,1
+liftmarrow_ore,Подъемная жила,Lift Marrow Ore,0,VolumeLiter,BulkHold,1,None,1
+duskclay_ore,Сумеречная глина,Dusk Clay Ore,0,VolumeLiter,BulkHold,1,None,1
+thundergrit_ore,Громовая крошка,Thunder Grit Ore,0,VolumeLiter,BulkHold,1,None,1
+mirrorbasalt_ore,Зеркальный базальт,Mirror Basalt Ore,0,VolumeLiter,BulkHold,1,None,1
+hollowchalk_ore,Полый мел,Hollow Chalk Ore,0,VolumeLiter,BulkHold,1,None,1
+crownstone_ore,Венечник,Crownstone Ore,0,VolumeLiter,BulkHold,1,None,1
+blackhoneycomb_ore,Черные соты,Black Honeycomb Ore,0,VolumeLiter,BulkHold,1,None,1
+silverdrift_ore,Сребродрейф,Silver Drift Ore,0,VolumeLiter,BulkHold,1,None,1
+embervein_ore,Жарожила,Ember Vein Ore,0,VolumeLiter,BulkHold,1,None,1
+claudreef_ore,Клавдиевый риф,Claudium Reef Ore,0,VolumeLiter,BulkHold,1,None,1
+nullcrust_ore,Нулевая корка,Null Crust Ore,0,VolumeLiter,BulkHold,1,None,1
 ferron,Феррон,Ferron,0
 silvate,Сильват,Silvate,0
 cupryl,Куприл,Cupryl,0
@@ -74,13 +76,14 @@ myrglass,Мирстекло,Myrglass,0
 claudite,Клавдит,Claudite,0
 umbracite,Умбрацит,Umbracite,0
 nullsalt,Нульсоль,Nullsalt,0
-windcalf_carcass,Туша ветротеленка,Wind Calf Carcass,0
-mistwhale_carcass,Туша дымного кита,Mist Whale Carcass,0
-sky_eel_carcass,Туша небесного угря,Sky Eel Carcass,0
-stoneback_carcass,Туша камнеспина,Stoneback Carcass,0
-leviathan_fat,Левиафанов жир,Leviathan Fat,10
+windcalf_carcass,Туша ветротеленка,Wind Calf Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1
+mistwhale_carcass,Туша дымного кита,Mist Whale Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1
+sky_eel_carcass,Туша небесного угря,Sky Eel Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1
+stoneback_carcass,Туша камнеспина,Stoneback Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1
+leviathan_fat,Левиафанов жир,Leviathan Fat,10,VolumeLiter,LiquidTank,0.92,None,1
 leviathan_hide,Шкура левиафана,Leviathan Hide,0
 claudium_gland,Клавдиевая железа,Claudium Gland,0
 flexbone,Гибкокость,Flexbone,0
 airframe_kit,Набор корпуса,Airframe Kit,0
 chemical_batch,Химическая партия,Chemical Batch,0
+utility_boat_ship,Служебный катер,Utility Boat,0,Ship,ShipDock,15000,Boat,0.1

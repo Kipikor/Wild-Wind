@@ -66,8 +66,8 @@ public class LogisticsFleetController : MonoBehaviour
         {
             routes.Add(new LogisticsRouteDefinition
             {
-                routeId = "starter_food_wood_tools",
-                displayName = "Еда, доски, инструменты",
+                routeId = "starter_food_charcoal_tools",
+                displayName = "Еда, уголь, инструменты",
                 loop = true,
                 stops = new List<LogisticsRouteStop>
                 {
@@ -82,7 +82,7 @@ public class LogisticsFleetController : MonoBehaviour
                     {
                         islandId = "Island6",
                         unload = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "food", amount = 10 } },
-                        load = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "wood", amount = 10 } },
+                        load = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "charcoal", amount = 10 } },
                         targetFuelKg = 30,
                         targetClaudiumKg = 15
                     },
@@ -92,7 +92,7 @@ public class LogisticsFleetController : MonoBehaviour
                         unload = new List<LogisticsCargoOrder>
                         {
                             new LogisticsCargoOrder { itemId = "food", amount = 10 },
-                            new LogisticsCargoOrder { itemId = "wood", amount = 10 }
+                            new LogisticsCargoOrder { itemId = "charcoal", amount = 10 }
                         },
                         load = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "tools", amount = 20 } },
                         targetFuelKg = 30,
@@ -199,21 +199,25 @@ public class LogisticsFleetController : MonoBehaviour
     {
         if (state == null) return 0;
 
-        LogisticsRouteDefinition route = GetRoute(definition.routeId);
-        if (route == null || route.stops == null || route.stops.Count == 0)
-        {
-            SetWaiting(state, "Маршрут не найден или пуст.");
-            return 0;
-        }
-
         LogisticsShipMetrics metrics;
-        if (!TryBuildMetrics(definition, progress, catalog, techTree, config, state.GetCargoMassKg(), out metrics, out string metricsError))
+        if (!TryBuildMetrics(definition, progress, catalog, techTree, config, state.GetCargoMassKg(config), out metrics, out string metricsError))
         {
             SetError(state, metricsError);
             return 0;
         }
 
         int changed = 0;
+        float deltaMinutes = Mathf.Max(0f, (float)new TimeSpan(toUtcTicks - fromUtcTicks).TotalMinutes);
+        IslandProductionState capitalStorage = progress.GetIslandProductionState("capital", true);
+        changed += ShipboardNeedsSimulator.AdvanceLogisticsShip(config, definition, state, metrics, capitalStorage, deltaMinutes);
+
+        LogisticsRouteDefinition route = GetRoute(definition.routeId);
+        if (route == null || route.stops == null || route.stops.Count == 0)
+        {
+            SetWaiting(state, "Маршрут не найден или пуст.");
+            return changed;
+        }
+
         long cursorTicks = fromUtcTicks;
         int guard = 0;
 
@@ -385,9 +389,17 @@ public class LogisticsFleetController : MonoBehaviour
             movedUnits += MoveUpToTarget(islandStorage, shipCargo, ResolveClaudiumResourceId(definition, stop.claudiumResourceId), stop.targetClaudiumKg);
         }
 
-        if (GetCargoMassKg(shipCargo) > metrics.maxCargoKg + 0.001f)
+        movedUnits += ApplyAutomaticPassengerExchange(definition, state, stop, shipCargo, islandStorage);
+
+        if (!CargoStoragePlanner.TryValidateCargoStorage(config, metrics, shipCargo, out error))
         {
-            error = $"После операций груз {GetCargoMassKg(shipCargo):F0} кг больше грузоподъемности {metrics.maxCargoKg:F0} кг.";
+            return false;
+        }
+
+        float cargoMassKg = CargoStoragePlanner.GetCargoMassKg(config, shipCargo);
+        if (cargoMassKg > metrics.maxCargoKg + 0.001f)
+        {
+            error = $"После операций груз {cargoMassKg:F0} кг больше грузоподъемности {metrics.maxCargoKg:F0} кг.";
             return false;
         }
 
@@ -442,7 +454,10 @@ public class LogisticsFleetController : MonoBehaviour
             return false;
         }
 
-        LogisticsLegEstimate estimate = EstimateLeg(metrics, fromIsland.position, toIsland.position, state.GetCargoMassKg());
+        Dictionary<string, int> currentCargo = ToMap(state.cargo);
+        float currentCargoMassKg = CargoStoragePlanner.GetCargoMassKg(config, currentCargo);
+        float dockedShipFullMassKg = CargoStoragePlanner.GetDockedShipFullMassKg(config, currentCargo);
+        LogisticsLegEstimate estimate = EstimateLeg(metrics, fromIsland.position, toIsland.position, currentCargoMassKg, dockedShipFullMassKg);
         if (!estimate.canFly)
         {
             error = estimate.reason;
@@ -463,9 +478,16 @@ public class LogisticsFleetController : MonoBehaviour
             return false;
         }
 
-        if (state.GetCargoMassKg() > metrics.maxCargoKg + 0.001f)
+        Dictionary<string, int> toppedCargo = ToMap(state.cargo);
+        if (!CargoStoragePlanner.TryValidateCargoStorage(config, metrics, toppedCargo, out error))
         {
-            error = $"После дозаправки груз {state.GetCargoMassKg():F0} кг больше грузоподъемности {metrics.maxCargoKg:F0} кг.";
+            return false;
+        }
+
+        float toppedCargoMassKg = CargoStoragePlanner.GetCargoMassKg(config, toppedCargo);
+        if (toppedCargoMassKg > metrics.maxCargoKg + 0.001f)
+        {
+            error = $"После дозаправки груз {toppedCargoMassKg:F0} кг больше грузоподъемности {metrics.maxCargoKg:F0} кг.";
             return false;
         }
 
@@ -547,7 +569,7 @@ public class LogisticsFleetController : MonoBehaviour
         metrics.emptyMassKg = stats.Get(ShipStatId.BaseMass, 0f);
         metrics.enginePowerKw = stats.Get(ShipStatId.EngineMaxPower, 0f);
         metrics.engineFuelEfficiency = Mathf.Clamp(stats.Get(ShipStatId.EngineFuelEfficiency, 0.32f), 0.01f, 0.95f);
-        metrics.engineFuelId = string.IsNullOrWhiteSpace(stats.EngineFuelId) ? "wood" : stats.EngineFuelId;
+        metrics.engineFuelId = string.IsNullOrWhiteSpace(stats.EngineFuelId) ? "charcoal" : stats.EngineFuelId;
         metrics.propellerMaxSpeedMS = stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f);
         metrics.maxAutoVerticalSpeedMS = stats.Get(ShipStatId.MaxAutoVerticalSpeed, 1f);
         metrics.maxStructuralVerticalSpeedMS = stats.Get(ShipStatId.MaxStructuralVerticalSpeed, 1f);
@@ -560,6 +582,14 @@ public class LogisticsFleetController : MonoBehaviour
         metrics.maxCargoKg = Mathf.Max(0f, metrics.allowedTakeoffMassKg - metrics.emptyMassKg);
         metrics.cruiseSpeedMS = Mathf.Max(0f, metrics.propellerMaxSpeedMS * Mathf.Clamp(cruiseSpeedFactor, 0.1f, 1f));
         metrics.cruisePowerKw = Mathf.Max(0f, metrics.enginePowerKw * Mathf.Clamp(cruisePowerLever, 0.05f, 1.2f));
+        metrics.needWorkforceRecoveryPerHour = stats.Get(ShipStatId.NeedWorkforceRecoveryPerHour, 0f);
+        metrics.needHealthRecoveryPerHour = stats.Get(ShipStatId.NeedHealthRecoveryPerHour, 0f);
+        metrics.needSafetyRecoveryPerHour = stats.Get(ShipStatId.NeedSafetyRecoveryPerHour, 0f);
+        metrics.needComfortRecoveryPerHour = stats.Get(ShipStatId.NeedComfortRecoveryPerHour, 0f);
+        metrics.needCreativityRecoveryPerHour = stats.Get(ShipStatId.NeedCreativityRecoveryPerHour, 0f);
+        metrics.needRepairRecoveryPerHour = stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f);
+        metrics.needCapitalConnectionRecoveryPerHour = stats.Get(ShipStatId.NeedCapitalConnectionRecoveryPerHour, 0f);
+        metrics.cargoCompartments = CargoStoragePlanner.BuildStatCompartments(stats, definition.cargoCompartments);
 
         ItemConfig fuel = config != null ? config.GetItem(metrics.engineFuelId) : null;
         metrics.fuelEnergyKwhPerKg = fuel != null ? Mathf.Max(0f, fuel.energyKwhPerKg) : 0f;
@@ -591,7 +621,7 @@ public class LogisticsFleetController : MonoBehaviour
         return true;
     }
 
-    private LogisticsLegEstimate EstimateLeg(LogisticsShipMetrics metrics, Vector3 from, Vector3 to, float cargoKg)
+    private LogisticsLegEstimate EstimateLeg(LogisticsShipMetrics metrics, Vector3 from, Vector3 to, float cargoKg, float dockedShipFullMassKg = 0f)
     {
         LogisticsLegEstimate estimate = new LogisticsLegEstimate();
         float totalMassKg = metrics.emptyMassKg + Mathf.Max(0f, cargoKg);
@@ -616,6 +646,7 @@ public class LogisticsFleetController : MonoBehaviour
         }
 
         float claudiumKg = metrics.claudiumConsumptionPerTonSecond * Mathf.Max(0f, totalMassKg / 1000f) * estimate.durationSeconds;
+        claudiumKg += CargoStoragePlanner.GetDockSupportClaudiumKg(metrics, dockedShipFullMassKg, estimate.durationSeconds);
         estimate.requiredFuelKg = Mathf.CeilToInt(fuelKg * reserve);
         estimate.requiredClaudiumKg = Mathf.CeilToInt(claudiumKg * reserve);
         estimate.canFly = true;
@@ -767,7 +798,7 @@ public class LogisticsFleetController : MonoBehaviour
             if (order == null || string.IsNullOrWhiteSpace(order.itemId) || order.amount <= 0) continue;
             if (GetAmount(islandStorage, order.itemId) < order.amount)
             {
-                error = $"На складе не хватает {order.itemId}: нужно {order.amount} кг.";
+                error = $"На складе не хватает {order.itemId}: нужно {order.amount} ед.";
                 return false;
             }
         }
@@ -801,6 +832,38 @@ public class LogisticsFleetController : MonoBehaviour
 
         SetAmount(from, itemId, GetAmount(from, itemId) - moved);
         SetAmount(to, itemId, current + moved);
+        return moved;
+    }
+
+    private static int ApplyAutomaticPassengerExchange(
+        LogisticsShipDefinition definition,
+        LogisticsShipState state,
+        LogisticsRouteStop stop,
+        Dictionary<string, int> shipCargo,
+        Dictionary<string, int> islandStorage)
+    {
+        if (state == null || stop == null || shipCargo == null || islandStorage == null) return 0;
+
+        int moved = 0;
+        if (!string.Equals(stop.islandId, "capital", StringComparison.OrdinalIgnoreCase))
+        {
+            return moved;
+        }
+
+        int passengersToCapital = GetAmount(shipCargo, PassengerCargoIds.ToCapitalItemId);
+        if (passengersToCapital > 0)
+        {
+            SetAmount(shipCargo, PassengerCargoIds.ToCapitalItemId, 0);
+            moved += passengersToCapital;
+        }
+
+        if (ShipboardNeedsSimulator.UsesCapitalConnection(definition))
+        {
+            string passengerItemId = PassengerCargoIds.ToShipItemId(state.shipId);
+            int targetPassengers = ShipboardNeedsSimulator.CalculateCapitalPassengerTargetAmount(definition);
+            moved += MoveUpToTarget(islandStorage, shipCargo, passengerItemId, targetPassengers);
+        }
+
         return moved;
     }
 
@@ -953,6 +1016,378 @@ public class LogisticsFleetController : MonoBehaviour
     }
 }
 
+public static class CargoStoragePlanner
+{
+    public static Dictionary<string, int> ToCargoMap(List<ResourceStack> cargo)
+    {
+        Dictionary<string, int> map = new Dictionary<string, int>();
+        if (cargo == null) return map;
+
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0) continue;
+            map[stack.resourceId] = map.TryGetValue(stack.resourceId, out int current) ? current + stack.amount : stack.amount;
+        }
+
+        return map;
+    }
+
+    public static List<CargoCompartmentDefinition> BuildStatCompartments(ShipStatBlock stats, List<CargoCompartmentDefinition> baseCompartments = null)
+    {
+        List<CargoCompartmentDefinition> compartments = new List<CargoCompartmentDefinition>();
+        if (baseCompartments != null)
+        {
+            for (int i = 0; i < baseCompartments.Count; i++)
+            {
+                CargoCompartmentDefinition compartment = baseCompartments[i];
+                if (compartment == null || compartment.capacity <= 0f) continue;
+                compartments.Add(compartment.CloneNormalized());
+            }
+        }
+
+        AddStatCompartment(compartments, stats, ShipStatId.CargoVanCapacityUnits, CargoStorageKind.Van, "Фургон");
+        AddStatCompartment(compartments, stats, ShipStatId.PassengerSeatCapacity, CargoStorageKind.Cabin, "Салон");
+        AddStatCompartment(compartments, stats, ShipStatId.BulkHoldCapacityLiters, CargoStorageKind.BulkHold, "Кузов");
+        AddStatCompartment(compartments, stats, ShipStatId.LiquidTankCapacityLiters, CargoStorageKind.LiquidTank, "Цистерна");
+        AddStatCompartment(compartments, stats, ShipStatId.GasCylinderCapacityLiters, CargoStorageKind.GasCylinder, "Баллон");
+        AddStatCompartment(compartments, stats, ShipStatId.RefrigeratedHoldCapacityLiters, CargoStorageKind.RefrigeratedHold, "Холодильник");
+
+        float dockSlots = stats != null ? stats.Get(ShipStatId.ShipDockSlots, 0f) : 0f;
+        if (dockSlots > 0f)
+        {
+            ShipSizeClass dockClass = (ShipSizeClass)Mathf.RoundToInt(stats.Get(ShipStatId.ShipDockMaxClass, (float)ShipSizeClass.Cruiser));
+            compartments.Add(new CargoCompartmentDefinition
+            {
+                displayName = "Док",
+                storageKind = CargoStorageKind.ShipDock,
+                capacity = dockSlots,
+                maxDockedShipClass = dockClass,
+                dockedShipMassFactor = Mathf.Clamp(stats.Get(ShipStatId.DockedShipMassFactor, 0.1f), 0.01f, 1f),
+                dockSupportClaudiumPerTonHour = Mathf.Max(0f, stats.Get(ShipStatId.DockSupportClaudiumPerTonHour, 0.02f))
+            });
+        }
+
+        return compartments;
+    }
+
+    private static void AddStatCompartment(
+        List<CargoCompartmentDefinition> compartments,
+        ShipStatBlock stats,
+        ShipStatId stat,
+        CargoStorageKind kind,
+        string displayName)
+    {
+        float capacity = stats != null ? stats.Get(stat, 0f) : 0f;
+        if (capacity <= 0f) return;
+
+        compartments.Add(new CargoCompartmentDefinition
+        {
+            displayName = displayName,
+            storageKind = kind,
+            capacity = capacity
+        });
+    }
+
+    public static float GetCargoMassKg(WorldConfigDatabase config, List<ResourceStack> cargo)
+    {
+        if (cargo == null) return 0f;
+
+        float total = 0f;
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0) continue;
+            total += config != null ? config.GetItemTransportMassKg(stack.resourceId, stack.amount) : stack.amount;
+        }
+
+        return total;
+    }
+
+    public static float GetCargoMassKg(WorldConfigDatabase config, Dictionary<string, int> cargo)
+    {
+        if (cargo == null) return 0f;
+
+        float total = 0f;
+        foreach (KeyValuePair<string, int> pair in cargo)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value <= 0) continue;
+            total += config != null ? config.GetItemTransportMassKg(pair.Key, pair.Value) : pair.Value;
+        }
+
+        return total;
+    }
+
+    public static float GetDockedShipFullMassKg(WorldConfigDatabase config, Dictionary<string, int> cargo)
+    {
+        if (config == null || cargo == null) return 0f;
+
+        float total = 0f;
+        foreach (KeyValuePair<string, int> pair in cargo)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value <= 0) continue;
+            if (config.GetItemStorageKind(pair.Key) != CargoStorageKind.ShipDock) continue;
+            total += config.GetItemFullMassKg(pair.Key, pair.Value);
+        }
+
+        return total;
+    }
+
+    public static float GetDockSupportClaudiumKg(LogisticsShipMetrics metrics, float dockedShipFullMassKg, float durationSeconds)
+    {
+        if (dockedShipFullMassKg <= 0f || durationSeconds <= 0f) return 0f;
+
+        float supportPerTonHour = 0f;
+        if (metrics.cargoCompartments != null)
+        {
+            for (int i = 0; i < metrics.cargoCompartments.Count; i++)
+            {
+                CargoCompartmentDefinition compartment = metrics.cargoCompartments[i];
+                if (compartment == null || compartment.storageKind != CargoStorageKind.ShipDock) continue;
+                supportPerTonHour = Mathf.Max(supportPerTonHour, compartment.dockSupportClaudiumPerTonHour);
+            }
+        }
+
+        return Mathf.Max(0f, dockedShipFullMassKg / 1000f) * supportPerTonHour * Mathf.Max(0f, durationSeconds / 3600f);
+    }
+
+    public static bool TryValidateCargoStorage(
+        WorldConfigDatabase config,
+        List<CargoCompartmentDefinition> compartments,
+        List<ResourceStack> cargo,
+        out string error)
+    {
+        return TryValidateCargoStorage(config, compartments, ToCargoMap(cargo), out error);
+    }
+
+    public static bool TryValidateCargoStorage(
+        WorldConfigDatabase config,
+        List<CargoCompartmentDefinition> compartments,
+        Dictionary<string, int> cargo,
+        out string error)
+    {
+        LogisticsShipMetrics metrics = new LogisticsShipMetrics { cargoCompartments = compartments };
+        return TryValidateCargoStorage(config, metrics, cargo, out error);
+    }
+
+    public static bool TryValidateCargoStorage(
+        WorldConfigDatabase config,
+        LogisticsShipMetrics metrics,
+        Dictionary<string, int> cargo,
+        out string error)
+    {
+        error = "";
+        if (cargo == null || cargo.Count == 0) return true;
+        if (metrics.cargoCompartments == null || metrics.cargoCompartments.Count == 0) return true;
+
+        float vanDemand = 0f;
+        float cabinDemand = 0f;
+        Dictionary<string, float> bulkDemands = new Dictionary<string, float>();
+        Dictionary<string, float> liquidDemands = new Dictionary<string, float>();
+        Dictionary<string, float> gasDemands = new Dictionary<string, float>();
+        float refrigeratedDemand = 0f;
+        Dictionary<string, int> dockDemands = new Dictionary<string, int>();
+
+        foreach (KeyValuePair<string, int> pair in cargo)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value <= 0) continue;
+
+            CargoStorageKind storageKind = config != null ? config.GetItemStorageKind(pair.Key) : CargoStorageKind.Van;
+            float storageAmount = config != null ? config.GetItemStorageAmount(pair.Key, pair.Value) : pair.Value;
+            switch (storageKind)
+            {
+                case CargoStorageKind.Cabin:
+                    cabinDemand += storageAmount;
+                    break;
+                case CargoStorageKind.BulkHold:
+                    AddDemand(bulkDemands, pair.Key, storageAmount);
+                    break;
+                case CargoStorageKind.LiquidTank:
+                    AddDemand(liquidDemands, pair.Key, storageAmount);
+                    break;
+                case CargoStorageKind.GasCylinder:
+                    AddDemand(gasDemands, pair.Key, storageAmount);
+                    break;
+                case CargoStorageKind.RefrigeratedHold:
+                    refrigeratedDemand += storageAmount;
+                    break;
+                case CargoStorageKind.ShipDock:
+                    dockDemands[pair.Key] = Mathf.Max(0, pair.Value);
+                    break;
+                default:
+                    vanDemand += storageAmount;
+                    break;
+            }
+        }
+
+        if (vanDemand > GetMixedCapacity(metrics, CargoStorageKind.Van) + 0.001f)
+        {
+            error = $"Фургон перегружен: {vanDemand:F0}/{GetMixedCapacity(metrics, CargoStorageKind.Van):F0} ед.";
+            return false;
+        }
+
+        if (cabinDemand > GetMixedCapacity(metrics, CargoStorageKind.Cabin) + 0.001f)
+        {
+            error = $"Салон перегружен: {cabinDemand:F0}/{GetMixedCapacity(metrics, CargoStorageKind.Cabin):F0} мест.";
+            return false;
+        }
+
+        if (!TryFitSingleTypeCompartments(metrics, CargoStorageKind.BulkHold, bulkDemands, "Кузов", out error)) return false;
+        if (!TryFitSingleTypeCompartments(metrics, CargoStorageKind.LiquidTank, liquidDemands, "Цистерны", out error)) return false;
+        if (!TryFitSingleTypeCompartments(metrics, CargoStorageKind.GasCylinder, gasDemands, "Баллоны", out error)) return false;
+        if (refrigeratedDemand > GetMixedCapacity(metrics, CargoStorageKind.RefrigeratedHold) + 0.001f)
+        {
+            error = $"Холодильник перегружен: {refrigeratedDemand:F0}/{GetMixedCapacity(metrics, CargoStorageKind.RefrigeratedHold):F0} л.";
+            return false;
+        }
+
+        if (!TryFitDockSlots(config, metrics, dockDemands, out error)) return false;
+
+        return true;
+    }
+
+    private static void AddDemand(Dictionary<string, float> demands, string itemId, float amount)
+    {
+        if (demands == null || string.IsNullOrWhiteSpace(itemId) || amount <= 0f) return;
+        demands[itemId] = demands.TryGetValue(itemId, out float current) ? current + amount : amount;
+    }
+
+    private static float GetMixedCapacity(LogisticsShipMetrics metrics, CargoStorageKind kind)
+    {
+        float capacity = 0f;
+        if (metrics.cargoCompartments == null) return capacity;
+
+        for (int i = 0; i < metrics.cargoCompartments.Count; i++)
+        {
+            CargoCompartmentDefinition compartment = metrics.cargoCompartments[i];
+            if (compartment == null || compartment.storageKind != kind) continue;
+            capacity += Mathf.Max(0f, compartment.capacity);
+        }
+
+        return capacity;
+    }
+
+    private static bool TryFitSingleTypeCompartments(
+        LogisticsShipMetrics metrics,
+        CargoStorageKind kind,
+        Dictionary<string, float> demands,
+        string label,
+        out string error)
+    {
+        error = "";
+        if (demands == null || demands.Count == 0) return true;
+
+        List<float> capacities = GetSingleTypeCapacities(metrics, kind);
+        foreach (KeyValuePair<string, float> pair in SortDemandsDescending(demands))
+        {
+            float remaining = pair.Value;
+            for (int i = 0; i < capacities.Count && remaining > 0.001f; i++)
+            {
+                float capacity = capacities[i];
+                if (capacity <= 0f) continue;
+
+                remaining -= capacity;
+                capacities.RemoveAt(i);
+                i--;
+            }
+
+            if (remaining > 0.001f)
+            {
+                error = $"{label}: не хватает отдельного отсека для {pair.Key}, осталось {remaining:F0} л.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static List<float> GetSingleTypeCapacities(LogisticsShipMetrics metrics, CargoStorageKind kind)
+    {
+        List<float> capacities = new List<float>();
+        if (metrics.cargoCompartments == null) return capacities;
+
+        for (int i = 0; i < metrics.cargoCompartments.Count; i++)
+        {
+            CargoCompartmentDefinition compartment = metrics.cargoCompartments[i];
+            if (compartment == null || compartment.storageKind != kind || compartment.capacity <= 0f) continue;
+            capacities.Add(compartment.capacity);
+        }
+
+        capacities.Sort((a, b) => b.CompareTo(a));
+        return capacities;
+    }
+
+    private static List<KeyValuePair<string, float>> SortDemandsDescending(Dictionary<string, float> demands)
+    {
+        List<KeyValuePair<string, float>> sorted = new List<KeyValuePair<string, float>>(demands);
+        sorted.Sort((a, b) => b.Value.CompareTo(a.Value));
+        return sorted;
+    }
+
+    private static bool TryFitDockSlots(
+        WorldConfigDatabase config,
+        LogisticsShipMetrics metrics,
+        Dictionary<string, int> dockDemands,
+        out string error)
+    {
+        error = "";
+        if (dockDemands == null || dockDemands.Count == 0) return true;
+
+        List<ShipSizeClass> slots = new List<ShipSizeClass>();
+        if (metrics.cargoCompartments != null)
+        {
+            for (int i = 0; i < metrics.cargoCompartments.Count; i++)
+            {
+                CargoCompartmentDefinition compartment = metrics.cargoCompartments[i];
+                if (compartment == null || compartment.storageKind != CargoStorageKind.ShipDock || compartment.capacity <= 0f) continue;
+
+                int count = Mathf.FloorToInt(compartment.capacity + 0.001f);
+                ShipSizeClass maxClass = compartment.maxDockedShipClass == ShipSizeClass.None ? ShipSizeClass.Cruiser : compartment.maxDockedShipClass;
+                for (int slot = 0; slot < count; slot++)
+                {
+                    slots.Add(maxClass);
+                }
+            }
+        }
+
+        slots.Sort((a, b) => ((int)a).CompareTo((int)b));
+        foreach (KeyValuePair<string, int> pair in dockDemands)
+        {
+            ShipSizeClass shipClass = config != null ? config.GetItemShipSizeClass(pair.Key) : ShipSizeClass.None;
+            if (shipClass == ShipSizeClass.None) shipClass = ShipSizeClass.Boat;
+
+            for (int unit = 0; unit < pair.Value; unit++)
+            {
+                int slotIndex = FindDockSlot(slots, shipClass);
+                if (slotIndex < 0)
+                {
+                    error = $"Док: нет свободного слота класса {shipClass} для {pair.Key}.";
+                    return false;
+                }
+
+                slots.RemoveAt(slotIndex);
+            }
+        }
+
+        return true;
+    }
+
+    private static int FindDockSlot(List<ShipSizeClass> slots, ShipSizeClass shipClass)
+    {
+        if (slots == null) return -1;
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if ((int)slots[i] >= (int)shipClass)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+}
+
 [Serializable]
 public class LogisticsRouteDefinition
 {
@@ -993,6 +1428,18 @@ public class LogisticsShipDefinition
     public string hullId = "starter_hull";
     public string claudiumResourceId = "claudium";
     public bool autoInstallRequiredModules = true;
+    public int workforceNeedLoad;
+    public int healthNeedLoad;
+    public int safetyNeedLoad;
+    public int comfortNeedLoad;
+    public int creativityNeedLoad;
+    public bool repairNeedEnabled;
+    public bool capitalConnectionEnabled;
+    public int crewCapacity = 1;
+    public int passengerCapacity;
+    public int repairNeedLoad = 1;
+    public int capitalConnectionNeedLoad = 1;
+    public List<CargoCompartmentDefinition> cargoCompartments = new List<CargoCompartmentDefinition>();
     public List<InstalledModuleState> installedModules = new List<InstalledModuleState>();
     public List<ResourceStack> startingCargo = new List<ResourceStack>();
 }
@@ -1024,6 +1471,9 @@ public class LogisticsShipState
     public long flightArrivesUtcTicks;
     public Vector3 lastKnownPosition;
     public List<ResourceStack> cargo = new List<ResourceStack>();
+    public List<ShipboardNeedState> societyNeeds = new List<ShipboardNeedState>();
+    public float passengersToCapitalProgress;
+    public float passengersFromCapitalProgress;
     public int completedRouteLoops;
     public string lastError = "";
 
@@ -1037,6 +1487,9 @@ public class LogisticsShipState
         targetStopIndex = Mathf.Max(-1, targetStopIndex);
         currentStopIndex = Mathf.Max(0, currentStopIndex);
         cargo ??= new List<ResourceStack>();
+        societyNeeds ??= new List<ShipboardNeedState>();
+        passengersToCapitalProgress = Mathf.Max(0f, passengersToCapitalProgress);
+        passengersFromCapitalProgress = Mathf.Max(0f, passengersFromCapitalProgress);
         lastError ??= "";
 
         for (int i = cargo.Count - 1; i >= 0; i--)
@@ -1049,6 +1502,18 @@ public class LogisticsShipState
             }
 
             stack.amount = Mathf.Max(0, stack.amount);
+        }
+
+        for (int i = societyNeeds.Count - 1; i >= 0; i--)
+        {
+            ShipboardNeedState need = societyNeeds[i];
+            if (need == null || string.IsNullOrWhiteSpace(need.needId))
+            {
+                societyNeeds.RemoveAt(i);
+                continue;
+            }
+
+            need.Normalize();
         }
     }
 
@@ -1070,6 +1535,11 @@ public class LogisticsShipState
         }
 
         return total;
+    }
+
+    public float GetCargoMassKg(WorldConfigDatabase config)
+    {
+        return CargoStoragePlanner.GetCargoMassKg(config, cargo);
     }
 
     public void AddCargo(string itemId, int amount)
@@ -1094,6 +1564,27 @@ public class LogisticsShipState
         return true;
     }
 
+    public ShipboardNeedState GetSocietyNeedState(string needId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(needId)) return null;
+        societyNeeds ??= new List<ShipboardNeedState>();
+
+        for (int i = 0; i < societyNeeds.Count; i++)
+        {
+            ShipboardNeedState state = societyNeeds[i];
+            if (state != null && state.needId == needId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ShipboardNeedState newState = new ShipboardNeedState { needId = needId };
+        societyNeeds.Add(newState);
+        return newState;
+    }
+
     private ResourceStack GetCargoStack(string itemId, bool createIfMissing)
     {
         if (string.IsNullOrWhiteSpace(itemId)) return null;
@@ -1116,6 +1607,248 @@ public class LogisticsShipState
     }
 }
 
+[Serializable]
+public class ShipboardNeedState
+{
+    public string needId = "";
+    public float currentValue;
+    public float recoveryCapacityProgress;
+    public float recoveryItemProgress;
+    public bool initialized;
+
+    public void Normalize()
+    {
+        needId ??= "";
+        currentValue = Mathf.Max(0f, currentValue);
+        recoveryCapacityProgress = Mathf.Max(0f, recoveryCapacityProgress);
+        recoveryItemProgress = Mathf.Max(0f, recoveryItemProgress);
+    }
+}
+
+public static class ShipboardNeedsSimulator
+{
+    public static int AdvanceLogisticsShip(
+        WorldConfigDatabase config,
+        LogisticsShipDefinition definition,
+        LogisticsShipState state,
+        LogisticsShipMetrics metrics,
+        IslandProductionState capitalStorage,
+        float deltaMinutes)
+    {
+        if (config == null || !config.isLoaded || definition == null || state == null || deltaMinutes <= 0f) return 0;
+
+        state.Normalize();
+        int changed = 0;
+        float deltaHours = Mathf.Max(0f, deltaMinutes / 60f);
+
+        for (int i = 0; i < config.islandSocialNeeds.Count; i++)
+        {
+            IslandSocialNeedConfig need = config.islandSocialNeeds[i];
+            if (need == null || string.IsNullOrWhiteSpace(need.id)) continue;
+
+            int load = GetNeedLoad(definition, need.kind);
+            float serviceRecoveryPerHour = GetModuleRecoveryPerHour(metrics, need.kind);
+            bool activeNeed = load > 0 || serviceRecoveryPerHour > 0f;
+            if (need.kind == IslandNeedKind.CapitalConnection)
+            {
+                activeNeed = UsesCapitalConnection(definition);
+            }
+
+            if (!activeNeed) continue;
+
+            string recoveryItemId = ResolveShipRecoveryItemId(need, state.shipId);
+            changed += AdvanceNeed(state, need, load, serviceRecoveryPerHour, deltaHours, recoveryItemId);
+        }
+
+        if (UsesCapitalConnection(definition))
+        {
+            float passengerRate = CalculatePassengerRatePerHour(definition);
+            changed += GeneratePassengerCargo(state, PassengerCargoIds.ToCapitalItemId, ref state.passengersToCapitalProgress, passengerRate * deltaHours);
+
+            if (capitalStorage != null)
+            {
+                changed += GeneratePassengerCargo(capitalStorage, PassengerCargoIds.ToShipItemId(state.shipId), ref state.passengersFromCapitalProgress, passengerRate * 0.8f * deltaHours);
+            }
+        }
+
+        return changed;
+    }
+
+    public static bool UsesCapitalConnection(LogisticsShipDefinition definition)
+    {
+        return definition != null && (definition.capitalConnectionEnabled || definition.passengerCapacity > 0 || definition.crewCapacity >= 40);
+    }
+
+    public static int CalculateCapitalPassengerTargetAmount(LogisticsShipDefinition definition)
+    {
+        if (definition == null) return 1;
+
+        int people = Mathf.Max(1, definition.crewCapacity + definition.passengerCapacity);
+        return Mathf.Clamp(Mathf.CeilToInt(people / 20f), 1, 20);
+    }
+
+    private static int AdvanceNeed(LogisticsShipState state, IslandSocialNeedConfig need, int load, float moduleRecoveryPerHour, float deltaHours, string recoveryItemId)
+    {
+        if (state == null || need == null || string.IsNullOrWhiteSpace(recoveryItemId)) return 0;
+
+        ShipboardNeedState needState = state.GetSocietyNeedState(need.id, true);
+        InitializeNeedState(needState, need);
+
+        float decay = (need.baseDecayPerHour + Mathf.Max(0, load) * need.loadDecayPerHour) * deltaHours;
+        if (decay > 0f)
+        {
+            needState.currentValue = Mathf.Max(0f, needState.currentValue - decay);
+        }
+
+        float deficit = Mathf.Max(0f, need.maxValue - needState.currentValue);
+        if (deficit <= 0.001f) return 0;
+
+        float recoveryPerHour = IslandSocietySimulator.GetBaseNeedRecoveryPointsPerHour(need) + Mathf.Max(0f, moduleRecoveryPerHour);
+        needState.recoveryCapacityProgress += Mathf.Max(0f, recoveryPerHour) * Mathf.Max(0f, deltaHours);
+        if (needState.recoveryCapacityProgress <= 0.001f && needState.recoveryItemProgress <= 0.001f) return 0;
+
+        int spentItems = 0;
+        int guard = 0;
+        while (deficit > 0.001f && needState.recoveryCapacityProgress > 0.001f && guard < 1000)
+        {
+            guard++;
+            if (needState.recoveryItemProgress <= 0.001f)
+            {
+                if (!state.TrySpendCargo(recoveryItemId, 1)) break;
+
+                needState.recoveryItemProgress += Mathf.Max(1f, need.restorePerItem);
+                spentItems++;
+            }
+
+            float restored = Mathf.Min(deficit, needState.recoveryCapacityProgress, needState.recoveryItemProgress);
+            if (restored <= 0.001f) break;
+
+            needState.currentValue = Mathf.Min(need.maxValue, needState.currentValue + restored);
+            needState.recoveryCapacityProgress = Mathf.Max(0f, needState.recoveryCapacityProgress - restored);
+            needState.recoveryItemProgress = Mathf.Max(0f, needState.recoveryItemProgress - restored);
+            deficit = Mathf.Max(0f, need.maxValue - needState.currentValue);
+        }
+
+        return spentItems;
+    }
+
+    private static int GetNeedLoad(LogisticsShipDefinition definition, IslandNeedKind kind)
+    {
+        if (definition == null) return 0;
+
+        switch (kind)
+        {
+            case IslandNeedKind.Workforce:
+                return Mathf.Max(0, definition.workforceNeedLoad);
+            case IslandNeedKind.Health:
+                return Mathf.Max(0, definition.healthNeedLoad);
+            case IslandNeedKind.Safety:
+                return Mathf.Max(0, definition.safetyNeedLoad);
+            case IslandNeedKind.Comfort:
+                return Mathf.Max(0, definition.comfortNeedLoad);
+            case IslandNeedKind.Creativity:
+                return Mathf.Max(0, definition.creativityNeedLoad);
+            case IslandNeedKind.Repair:
+                return definition.repairNeedEnabled ? Mathf.Max(0, definition.repairNeedLoad) : 0;
+            case IslandNeedKind.CapitalConnection:
+                return UsesCapitalConnection(definition) ? Mathf.Max(0, definition.capitalConnectionNeedLoad) : 0;
+            default:
+                return 0;
+        }
+    }
+
+    private static float GetModuleRecoveryPerHour(LogisticsShipMetrics metrics, IslandNeedKind kind)
+    {
+        switch (kind)
+        {
+            case IslandNeedKind.Workforce:
+                return metrics.needWorkforceRecoveryPerHour;
+            case IslandNeedKind.Health:
+                return metrics.needHealthRecoveryPerHour;
+            case IslandNeedKind.Safety:
+                return metrics.needSafetyRecoveryPerHour;
+            case IslandNeedKind.Comfort:
+                return metrics.needComfortRecoveryPerHour;
+            case IslandNeedKind.Creativity:
+                return metrics.needCreativityRecoveryPerHour;
+            case IslandNeedKind.Repair:
+                return metrics.needRepairRecoveryPerHour;
+            case IslandNeedKind.CapitalConnection:
+                return metrics.needCapitalConnectionRecoveryPerHour;
+            default:
+                return 0f;
+        }
+    }
+
+    private static string ResolveShipRecoveryItemId(IslandSocialNeedConfig need, string shipId)
+    {
+        if (need == null) return "";
+        if (need.kind == IslandNeedKind.CapitalConnection)
+        {
+            return PassengerCargoIds.ToShipItemId(shipId);
+        }
+
+        return need.recoveryItemId ?? "";
+    }
+
+    private static void InitializeNeedState(ShipboardNeedState state, IslandSocialNeedConfig need)
+    {
+        if (state == null || need == null || state.initialized) return;
+
+        state.currentValue = need.maxValue;
+        state.initialized = true;
+    }
+
+    private static IslandSocialNeedConfig FindNeed(WorldConfigDatabase config, IslandNeedKind kind)
+    {
+        if (config == null) return null;
+        for (int i = 0; i < config.islandSocialNeeds.Count; i++)
+        {
+            IslandSocialNeedConfig need = config.islandSocialNeeds[i];
+            if (need != null && need.kind == kind)
+            {
+                return need;
+            }
+        }
+
+        return null;
+    }
+
+    private static float CalculatePassengerRatePerHour(LogisticsShipDefinition definition)
+    {
+        if (definition == null) return 0f;
+
+        int people = Mathf.Max(0, definition.crewCapacity) + Mathf.Max(0, definition.passengerCapacity);
+        return Mathf.Clamp(0.15f + people * 0.015f, 0.25f, 24f);
+    }
+
+    private static int GeneratePassengerCargo(LogisticsShipState state, string itemId, ref float passengerProgress, float passengerCount)
+    {
+        if (state == null || string.IsNullOrWhiteSpace(itemId) || passengerCount <= 0f) return 0;
+
+        passengerProgress = Mathf.Max(0f, passengerProgress + passengerCount);
+        int wholePassengers = Mathf.FloorToInt(passengerProgress);
+        if (wholePassengers <= 0) return 0;
+
+        passengerProgress -= wholePassengers;
+        state.AddCargo(itemId, wholePassengers);
+        return wholePassengers;
+    }
+
+    private static int GeneratePassengerCargo(IslandProductionState storage, string itemId, ref float passengerProgress, float passengerCount)
+    {
+        if (storage == null || string.IsNullOrWhiteSpace(itemId) || passengerCount <= 0f) return 0;
+
+        passengerProgress = Mathf.Max(0f, passengerProgress + passengerCount);
+        int wholePassengers = Mathf.FloorToInt(passengerProgress);
+        if (wholePassengers <= 0) return 0;
+
+        passengerProgress -= wholePassengers;
+        storage.AddResource(itemId, wholePassengers);
+        return wholePassengers;
+    }
+}
+
 public struct LogisticsShipMetrics
 {
     public float emptyMassKg;
@@ -1135,6 +1868,14 @@ public struct LogisticsShipMetrics
     public float maxCargoKg;
     public float cruiseSpeedMS;
     public float cruisePowerKw;
+    public float needWorkforceRecoveryPerHour;
+    public float needHealthRecoveryPerHour;
+    public float needSafetyRecoveryPerHour;
+    public float needComfortRecoveryPerHour;
+    public float needCreativityRecoveryPerHour;
+    public float needRepairRecoveryPerHour;
+    public float needCapitalConnectionRecoveryPerHour;
+    public List<CargoCompartmentDefinition> cargoCompartments;
 }
 
 public struct LogisticsLegEstimate

@@ -653,6 +653,11 @@ public class PlayerProgress
         return GetShipInternalCargoMassKg();
     }
 
+    public float GetShipCargoMassKg(WorldConfigDatabase config)
+    {
+        return GetShipInternalCargoMassKg(config);
+    }
+
     public int GetShipInternalCargoMassKg()
     {
         int total = 0;
@@ -662,6 +667,22 @@ public class PlayerProgress
             ResourceStack stack = shipCargo[i];
             if (stack == null) continue;
             total += Mathf.Max(0, stack.amount);
+        }
+
+        return total;
+    }
+
+    public float GetShipInternalCargoMassKg(WorldConfigDatabase config)
+    {
+        if (config == null) return GetShipInternalCargoMassKg();
+
+        float total = 0f;
+        shipCargo ??= new List<ResourceStack>();
+        for (int i = 0; i < shipCargo.Count; i++)
+        {
+            ResourceStack stack = shipCargo[i];
+            if (stack == null) continue;
+            total += config.GetItemTransportMassKg(stack.resourceId, stack.amount);
         }
 
         return total;
@@ -1099,6 +1120,7 @@ public class ScoutedObjectState
     public float informationPotentialKg;
     public float informationExtractedKg;
     public float informationBufferKg;
+    public float informationPaperSpendBufferKg;
     public long informationUpdatedUtcTicks;
     public string typeId = "";
     public string zoneId = "";
@@ -1114,6 +1136,7 @@ public class ScoutedObjectState
         informationPotentialKg = Mathf.Max(0f, informationPotentialKg);
         informationExtractedKg = Mathf.Clamp(informationExtractedKg, 0f, Mathf.Max(informationExtractedKg, informationPotentialKg));
         informationBufferKg = Mathf.Clamp(informationBufferKg, 0f, 0.999f);
+        informationPaperSpendBufferKg = Mathf.Clamp(informationPaperSpendBufferKg, 0f, 999f);
         if (factsUpdatedUtcTicks < 0) factsUpdatedUtcTicks = 0;
         if (informationUpdatedUtcTicks < 0) informationUpdatedUtcTicks = 0;
         typeId ??= "";
@@ -1563,6 +1586,8 @@ public class IslandProductionState
     public List<IslandIndustryState> industries = new List<IslandIndustryState>();
     public List<IslandSocietyNeedState> societyNeeds = new List<IslandSocietyNeedState>();
     public IslandDevelopmentState development = new IslandDevelopmentState();
+    public float passengersToCapitalProgress;
+    public float passengersFromCapitalProgress;
 
     public void Normalize()
     {
@@ -1574,6 +1599,8 @@ public class IslandProductionState
         development ??= new IslandDevelopmentState();
         development.Normalize();
         productionProgress = Mathf.Max(0f, productionProgress);
+        passengersToCapitalProgress = Mathf.Max(0f, passengersToCapitalProgress);
+        passengersFromCapitalProgress = Mathf.Max(0f, passengersFromCapitalProgress);
 
         for (int i = storage.Count - 1; i >= 0; i--)
         {
@@ -1805,12 +1832,16 @@ public class IslandSocietyNeedState
 {
     public string needId = "";
     public float currentValue;
+    public float recoveryCapacityProgress;
+    public float recoveryItemProgress;
     public bool initialized;
 
     public void Normalize()
     {
         needId ??= "";
         currentValue = Mathf.Max(0f, currentValue);
+        recoveryCapacityProgress = Mathf.Max(0f, recoveryCapacityProgress);
+        recoveryItemProgress = Mathf.Max(0f, recoveryItemProgress);
     }
 }
 

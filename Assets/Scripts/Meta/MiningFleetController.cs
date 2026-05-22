@@ -29,8 +29,7 @@ public class MiningFleetController : MonoBehaviour
     [Header("Debug")]
     public bool debugLogging;
     public bool debugStockAllIslandFuelAndClaudium = true;
-    public int debugMinIslandWoodKg = 500;
-    public int debugMinIslandCharcoalKg = 500;
+    public int debugMinIslandFuelKg = 500;
     public int debugMinIslandClaudiumKg = 250;
     [InspectorName("Mining ships")]
     public List<MiningShipDefinition> ships = new List<MiningShipDefinition>();
@@ -147,8 +146,7 @@ public class MiningFleetController : MonoBehaviour
             if (island == null || string.IsNullOrWhiteSpace(island.id)) continue;
 
             IslandProductionState storage = progress.GetIslandProductionState(island.id, true);
-            changed += SetStorageAtLeast(storage, "wood", debugMinIslandWoodKg);
-            changed += SetStorageAtLeast(storage, "charcoal", debugMinIslandCharcoalKg);
+            changed += SetStorageAtLeast(storage, "charcoal", debugMinIslandFuelKg);
             changed += SetStorageAtLeast(storage, ResolveClaudiumResourceId(null), debugMinIslandClaudiumKg);
         }
 
@@ -759,7 +757,7 @@ public class MiningFleetController : MonoBehaviour
         metrics.emptyMassKg = stats.Get(ShipStatId.BaseMass, 0f);
         metrics.enginePowerKw = stats.Get(ShipStatId.EngineMaxPower, 0f);
         metrics.engineFuelEfficiency = Mathf.Clamp(stats.Get(ShipStatId.EngineFuelEfficiency, 0.32f), 0.01f, 0.95f);
-        metrics.engineFuelId = string.IsNullOrWhiteSpace(stats.EngineFuelId) ? "wood" : stats.EngineFuelId;
+        metrics.engineFuelId = string.IsNullOrWhiteSpace(stats.EngineFuelId) ? "charcoal" : stats.EngineFuelId;
         metrics.propellerMaxSpeedMS = stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f);
         metrics.maxAutoVerticalSpeedMS = stats.Get(ShipStatId.MaxAutoVerticalSpeed, 1f);
         metrics.maxStructuralVerticalSpeedMS = stats.Get(ShipStatId.MaxStructuralVerticalSpeed, 1f);

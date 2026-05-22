@@ -1,0 +1,20 @@
+key,#name,ru,en
+app.title,Game title,Wild Wind,Wild Wind
+app.subtitle,Main menu subtitle,Небо держится на ветре,The sky is held by wind
+menu.new_world,New world,Новая игра,New Game
+menu.continue,Continue,Продолжить,Continue
+menu.settings,Settings,Настройки,Settings
+menu.exit,Exit,Выход,Exit
+menu.back,Back,Назад,Back
+menu.start_hint,Start hint,Создать новый мир,Create a new world
+continue.title,Continue title,Выберите сохранение,Choose a save
+continue.empty,No saves,Сохранений пока нет,No saves yet
+continue.slot_prefix,Save slot prefix,Мир,World
+settings.title,Settings title,Настройки,Settings
+settings.language,Language label,Язык,Language
+settings.language_ru,Russian language,Русский,Russian
+settings.language_en,English language,Английский,English
+status.new_world,New world status,Создаём новый мир...,Creating a new world...
+status.loading_save,Loading save status,Загружаем сохранение...,Loading save...
+status.missing_scene,Missing scene status,Сцена игры не найдена,Gameplay scene is missing
+error.no_save_selected,No save selected,Сохранение не выбрано,No save selected

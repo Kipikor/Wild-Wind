@@ -48,6 +48,7 @@ public class ScoutFleetController : MonoBehaviour
             rockInfoEfficiency = 0.85f,
             cloudInfoEfficiency = 0.75f,
             leviathanInfoEfficiency = 0.55f,
+            paperToInfoEfficiency = 1f,
             paperCargoTargetKg = 60,
             maxInfoCargoKg = 90,
             safeLeviathanDistanceMeters = 260f
@@ -188,7 +189,8 @@ public class ScoutFleetController : MonoBehaviour
                 state.cargo,
                 definition.rockInfoEfficiency,
                 definition.cloudInfoEfficiency,
-                definition.leviathanInfoEfficiency);
+                definition.leviathanInfoEfficiency,
+                definition.paperToInfoEfficiency);
             return changed;
         }
 
@@ -218,7 +220,8 @@ public class ScoutFleetController : MonoBehaviour
             state.cargo,
             definition.rockInfoEfficiency,
             definition.cloudInfoEfficiency,
-            definition.leviathanInfoEfficiency);
+            definition.leviathanInfoEfficiency,
+            definition.paperToInfoEfficiency);
 
         if (TargetIsDoneForScout(definition, progress, target))
         {
@@ -609,6 +612,9 @@ public class ScoutShipDefinition
     [InspectorName("Информация по левиафанам")]
     [Tooltip("Какую долю потенциальной информации о левиафанах этот прибор способен снять.")]
     [Range(0f, 1f)] public float leviathanInfoEfficiency = 0.55f;
+    [InspectorName("КПД бумаги в информацию")]
+    [Tooltip("Сколько научной информации дает 1 кг бумаги. 0.2 = 5 кг бумаги на 1 кг информации.")]
+    [Range(0.01f, 1f)] public float paperToInfoEfficiency = 1f;
     [InspectorName("Бумага в рейс, кг")]
     [Tooltip("Сколько бумаги разведчик пытается взять перед выходом. 1 кг бумаги превращается в 1 кг информации.")]
     public int paperCargoTargetKg = 60;

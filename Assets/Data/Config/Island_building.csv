@@ -29,5 +29,7 @@ hospital,Больница,Hospital,Service,Generation,need_health,,5,0.75,0,0,0,
 atelier,Ателье,Atelier,Service,Generation,need_comfort,,5,0.5,1,0,0,0,1,"cloth,tools","10,3",Улучшает конвертацию ткани в комфорт.
 guard_post,Охранный пост,Guard Post,Service,Generation,need_safety,,5,0.5,0,0,1,0,0,"weapon,aerolite","5,8",Улучшает конвертацию оружия в безопасность.
 academy,Академия,Academy,Service,Generation,need_creativity,,5,0.75,0,0,0,1,2,"paper,tools,cloth","12,4,3",Улучшает конвертацию бумаги в творчество.
+maintenance_post,Пост обслуживания,Maintenance Post,Service,Generation,need_repair,,5,0.5,1,0,0,0,1,"tools,aerolite","4,8",Поддерживает ремонтные смены острова и корабельные бригады.
+passenger_terminal,Пассажирский терминал,Passenger Terminal,Service,Generation,need_capital_connection,,5,0.5,1,0,1,1,1,"aerolite,cloth,paper,tools","12,6,4,3",Собирает пассажиров и поддерживает регулярную связь со столицей.
 island_expansion_yard,Наращивание острова,Island Expansion Yard,Service,Assembly,island_expansion,,5,1.5,2,0,0,1,1,"aerolite,claudium,tools","40,6,8",Добавляет новые места строительства на развитом острове.
 claudium_spiral,Клавдиевая спираль,Claudium Spiral,Service,Generation,launch_boost,,5,1,0,0,1,0,1,"claudium,aerolite,tools","10,20,5",Даёт кораблям временное ускорение при старте с острова.

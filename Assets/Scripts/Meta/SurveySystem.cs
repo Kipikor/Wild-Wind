@@ -38,14 +38,15 @@ public static class SurveySystem
         List<ResourceStack> cargo,
         float rockInfoEfficiency,
         float cloudInfoEfficiency,
-        float leviathanInfoEfficiency)
+        float leviathanInfoEfficiency,
+        float paperToInfoEfficiency = 1f)
     {
         if (config == null || progress == null || deltaSeconds <= 0f || radiusMeters <= 0f) return 0;
 
         int changed = 0;
-        changed += ObserveGasCloudsFromPoint(config, progress, observerPosition, radiusMeters, factsAtHalfRadiusPerSecond, deltaSeconds, utcTicks, cargo, cloudInfoEfficiency);
-        changed += ObserveMiningRocksFromPoint(config, progress, observerPosition, radiusMeters, factsAtHalfRadiusPerSecond, deltaSeconds, utcTicks, cargo, rockInfoEfficiency);
-        changed += ObserveLeviathansFromPoint(progress, observerPosition, radiusMeters, factsAtHalfRadiusPerSecond, deltaSeconds, utcTicks, cargo, leviathanInfoEfficiency);
+        changed += ObserveGasCloudsFromPoint(config, progress, observerPosition, radiusMeters, factsAtHalfRadiusPerSecond, deltaSeconds, utcTicks, cargo, cloudInfoEfficiency, paperToInfoEfficiency);
+        changed += ObserveMiningRocksFromPoint(config, progress, observerPosition, radiusMeters, factsAtHalfRadiusPerSecond, deltaSeconds, utcTicks, cargo, rockInfoEfficiency, paperToInfoEfficiency);
+        changed += ObserveLeviathansFromPoint(progress, observerPosition, radiusMeters, factsAtHalfRadiusPerSecond, deltaSeconds, utcTicks, cargo, leviathanInfoEfficiency, paperToInfoEfficiency);
         return changed;
     }
 
@@ -141,7 +142,8 @@ public static class SurveySystem
         float deltaSeconds,
         long utcTicks,
         List<ResourceStack> cargo = null,
-        float infoEfficiency = 0f)
+        float infoEfficiency = 0f,
+        float paperToInfoEfficiency = 1f)
     {
         if (config == null || progress == null || config.gasClouds == null) return 0;
 
@@ -177,7 +179,7 @@ public static class SurveySystem
                 utcTicks,
                 () => FillGasCloudFacts(state, cloud, type, remainingLiters));
 
-            int extracted = ExtractInformation(state, cargo, ScoutedObjectKind.GasCloud, infoEfficiency, rate, deltaSeconds, utcTicks);
+            int extracted = ExtractInformation(state, cargo, ScoutedObjectKind.GasCloud, infoEfficiency, paperToInfoEfficiency, rate, deltaSeconds, utcTicks);
             if (factsChanged || extracted > 0) changed++;
         }
 
@@ -193,7 +195,8 @@ public static class SurveySystem
         float deltaSeconds,
         long utcTicks,
         List<ResourceStack> cargo = null,
-        float infoEfficiency = 0f)
+        float infoEfficiency = 0f,
+        float paperToInfoEfficiency = 1f)
     {
         if (config == null || progress == null || progress.miningRocks == null) return 0;
 
@@ -228,7 +231,7 @@ public static class SurveySystem
                 utcTicks,
                 () => FillMiningRockFacts(state, config, zone, oreType, rock, position, utcTicks));
 
-            int extracted = ExtractInformation(state, cargo, ScoutedObjectKind.MiningRock, infoEfficiency, rate, deltaSeconds, utcTicks);
+            int extracted = ExtractInformation(state, cargo, ScoutedObjectKind.MiningRock, infoEfficiency, paperToInfoEfficiency, rate, deltaSeconds, utcTicks);
             if (factsChanged || extracted > 0) changed++;
         }
 
@@ -243,7 +246,8 @@ public static class SurveySystem
         float deltaSeconds,
         long utcTicks,
         List<ResourceStack> cargo = null,
-        float infoEfficiency = 0f)
+        float infoEfficiency = 0f,
+        float paperToInfoEfficiency = 1f)
     {
         if (progress == null) return 0;
 
@@ -275,7 +279,7 @@ public static class SurveySystem
                 utcTicks,
                 () => FillLeviathanFacts(state, leviathan));
 
-            int extracted = ExtractInformation(state, cargo, ScoutedObjectKind.Leviathan, infoEfficiency, rate, deltaSeconds, utcTicks);
+            int extracted = ExtractInformation(state, cargo, ScoutedObjectKind.Leviathan, infoEfficiency, paperToInfoEfficiency, rate, deltaSeconds, utcTicks);
             if (factsChanged || extracted > 0) changed++;
         }
 
@@ -352,6 +356,7 @@ public static class SurveySystem
         List<ResourceStack> cargo,
         ScoutedObjectKind kind,
         float efficiency,
+        float paperToInfoEfficiency,
         float gatherRate,
         float deltaSeconds,
         long utcTicks)
@@ -366,10 +371,11 @@ public static class SurveySystem
         state.informationBufferKg += Mathf.Min(remainingAllowed, gatherRate * 0.35f * deltaSeconds);
         int produced = 0;
         string infoItemId = GetInfoItemId(kind);
+        float paperCostPerInfo = 1f / Mathf.Clamp(paperToInfoEfficiency <= 0f ? 1f : paperToInfoEfficiency, 0.01f, 1f);
 
         while (state.informationBufferKg >= 1f
             && state.informationExtractedKg + 1f <= allowedKg + 0.001f
-            && TrySpendStack(cargo, PaperItemId, 1))
+            && TrySpendInformationPaper(cargo, paperCostPerInfo, ref state.informationPaperSpendBufferKg))
         {
             AddStack(cargo, infoItemId, 1);
             state.informationBufferKg -= 1f;
@@ -380,6 +386,31 @@ public static class SurveySystem
 
         state.informationBufferKg = Mathf.Clamp(state.informationBufferKg, 0f, 0.999f);
         return produced;
+    }
+
+    private static bool TrySpendInformationPaper(List<ResourceStack> cargo, float paperCost, ref float spendBuffer)
+    {
+        if (cargo == null) return false;
+
+        paperCost = Mathf.Max(0.01f, paperCost);
+        spendBuffer = Mathf.Max(0f, spendBuffer) + paperCost;
+        int wholePaper = Mathf.FloorToInt(spendBuffer + 0.0001f);
+        if (wholePaper <= 0) return true;
+
+        if (GetStackAmount(cargo, PaperItemId) < wholePaper)
+        {
+            spendBuffer = Mathf.Max(0f, spendBuffer - paperCost);
+            return false;
+        }
+
+        if (!TrySpendStack(cargo, PaperItemId, wholePaper))
+        {
+            spendBuffer = Mathf.Max(0f, spendBuffer - paperCost);
+            return false;
+        }
+
+        spendBuffer = Mathf.Max(0f, spendBuffer - wholePaper);
+        return true;
     }
 
     private static void FillGasCloudFacts(ScoutedObjectState state, GasCloudConfig cloud, GasCloudTypeConfig type, float remainingLiters)

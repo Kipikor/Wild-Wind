@@ -67,6 +67,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
             WorldConfigDatabase config = LoadConfig(report);
             ValidateConfigDatabase(config, report);
+            ValidateLocalizationConfig(report);
+            ValidateCargoStorageModel(config, report);
+            ValidateR1ShipMechanics(config, report);
             ValidateProductionSimulation(config, report);
 
             ValidateWorldDataManifest(report);
@@ -131,7 +134,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Section("Паспорт проверки");
         report.Info("Кнопка: Wild Wind/Провести большой тест.");
         report.Info("Назначение: один общий дотошный протокол по текущей сборке игры.");
-        report.Info("Сейчас покрыто: CSV-конфиги, производства, мир 100x100 км, чанки, высотные зоны, активный пузырь, визуальные зависимости, настройки, ветер/аэродинамика.");
+        report.Info("Сейчас покрыто: CSV-конфиги, дерево технологий, дерево кораблей, производства, потребности островов/кораблей, скорость их удовлетворения, пассажироперевозки, типы грузов и отсеки, мир 100x100 км, чанки, высотные зоны, активный пузырь, визуальные зависимости, настройки, ветер/аэродинамика, лётная физика.");
         report.Info("Допуски: размер мира +-1 м, размер чанка +-1 м, среднее обновление пузыря <= " + streamerAverageBudgetMs.ToString("0.#") + " мс, симуляция производств " + productionSimulationMinutes.ToString("0.#") + " мин.");
         report.Info("Принцип: FAIL = сломано или противоречит текущему ТЗ; WARN = подозрительно, но можно продолжать; OK = проверено явно.");
     }
@@ -199,6 +202,29 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return config;
     }
 
+    private void ValidateLocalizationConfig(BigTestReport report)
+    {
+        report.Section("Localization");
+        bool defaultLanguageIsRussian = WildWindLocalization.DefaultLanguage == WildWindLanguage.Ru;
+        report.Check(defaultLanguageIsRussian, "Default UI language is Russian.");
+
+        bool valid = WildWindLocalization.ValidateDefaultConfig(WildWindStartScreen.RequiredLocalizationKeys, out List<string> errors);
+        if (valid)
+        {
+            report.Pass("Localization config is loaded and all start screen keys have ru/en text.");
+        }
+        else
+        {
+            for (int i = 0; i < errors.Count; i++)
+            {
+                report.Fail(errors[i]);
+            }
+        }
+
+        bool missingKeyDetected = !WildWindLocalization.TryGet("big_test_missing_key_probe", out _);
+        report.Check(missingKeyDetected, "Missing localization keys are detectable before runtime rendering.");
+    }
+
     private void ValidateConfigDatabase(WorldConfigDatabase config, BigTestReport report)
     {
         if (config == null || !config.isLoaded)
@@ -218,11 +244,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(config.leviathanZones.Count >= 1, "Leviathan_zone.csv содержит зоны левиафанов: " + config.leviathanZones.Count + ".");
         report.Check(config.technologies.Count >= 1, "Technology.csv содержит технологии: " + config.technologies.Count + ".");
         report.Check(config.specialModules.Count >= 1, "Special_module.csv содержит спецмодули: " + config.specialModules.Count + ".");
+        report.Check(config.shipTreeEntries.Count >= 7, "Ship_tree.csv содержит дерево кораблей: " + config.shipTreeEntries.Count + ".");
         report.Check(config.islandIndustries.Count >= 6, "Production_industry.csv содержит производственные линии: " + config.islandIndustries.Count + ".");
         report.Check(config.industryRecipes.Count >= 6, "Production_recipe.csv содержит производственные рецепты: " + config.industryRecipes.Count + ".");
         report.Check(config.islandArchetypes.Count == 5, "Island_archetype.csv содержит 5 типов островов: " + config.islandArchetypes.Count + ".");
         report.Check(config.islandArchetypeStages.Count >= 10, "Island_archetype_stage.csv содержит стадии развития островов: " + config.islandArchetypeStages.Count + ".");
-        report.Check(config.islandSocialNeeds.Count == 5, "Island_social_need.csv содержит 5 общественных потребностей: " + config.islandSocialNeeds.Count + ".");
+        report.Check(config.islandSocialNeeds.Count == 7, "Island_social_need.csv содержит 7 общественных потребностей: " + config.islandSocialNeeds.Count + ".");
         report.Check(config.islandBuildings.Count >= 30, "Island_building.csv содержит производственные и сервисные здания: " + config.islandBuildings.Count + ".");
 
         CheckUniqueIds(config.items, item => item.id, "предметов", report);
@@ -236,6 +263,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         CheckUniqueIds(config.leviathanZones, zone => zone.id, "зон левиафанов", report);
         CheckUniqueIds(config.technologies, tech => tech.id, "технологий", report);
         CheckUniqueIds(config.specialModules, module => module.id, "спецмодулей", report);
+        CheckUniqueIds(config.shipTreeEntries, ship => ship.shipId, "кораблей в Ship_tree.csv", report);
         CheckUniqueIds(config.islandIndustries, industry => industry.id, "линий производств", report);
         CheckUniqueIds(config.industryRecipes, recipe => recipe.id, "рецептов производств", report);
         CheckUniqueIds(config.islandArchetypes, archetype => archetype.id, "типов островов", report);
@@ -243,13 +271,168 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         CheckUniqueIds(config.islandSocialNeeds, need => need.id, "общественных потребностей", report);
         CheckUniqueIds(config.islandBuildings, building => building.id, "островных зданий", report);
 
+        ValidateShipTreeConfig(config, report);
         ValidateConfigReferences(config, report);
         ValidateIslandDevelopmentConfig(config, report);
         ValidateIndustryConfig(config, report);
     }
 
+    private static void ValidateShipTreeConfig(WorldConfigDatabase config, BigTestReport report)
+    {
+        if (config == null || config.shipTreeEntries == null)
+        {
+            report.Fail("Ship_tree.csv не загружен.");
+            return;
+        }
+
+        bool entriesValid = config.shipTreeEntries.Count >= 7;
+        bool hasPioneerRoot = false;
+        int r1Count = 0;
+        HashSet<string> roleIds = new HashSet<string>();
+
+        for (int i = 0; i < config.shipTreeEntries.Count; i++)
+        {
+            ShipTreeEntryConfig entry = config.shipTreeEntries[i];
+            if (entry == null)
+            {
+                entriesValid = false;
+                continue;
+            }
+
+            bool isRoot = entry.rank == 0;
+            hasPioneerRoot |= entry.shipId == "pioneer" &&
+                isRoot &&
+                (entry.parentShipIds == null || entry.parentShipIds.Count == 0);
+            if (entry.rank == 1)
+            {
+                r1Count++;
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.roleId))
+            {
+                roleIds.Add(entry.roleId);
+            }
+
+            entriesValid &= !string.IsNullOrWhiteSpace(entry.shipId) &&
+                !string.IsNullOrWhiteSpace(entry.localNameRu) &&
+                !string.IsNullOrWhiteSpace(entry.localNameEn) &&
+                !string.IsNullOrWhiteSpace(entry.classNameRu) &&
+                !string.IsNullOrWhiteSpace(entry.roleId) &&
+                !string.IsNullOrWhiteSpace(entry.roleNameRu) &&
+                !string.IsNullOrWhiteSpace(entry.summaryRu) &&
+                (isRoot || (entry.parentShipIds != null && entry.parentShipIds.Count > 0)) &&
+                (string.IsNullOrWhiteSpace(entry.requiredTechnologyId) || config.GetTechnology(entry.requiredTechnologyId) != null) &&
+                config.GetHull(entry.hullId) != null &&
+                config.GetEngine(entry.engineId) != null &&
+                config.GetPropeller(entry.propellerId) != null &&
+                config.GetClaudiumLoop(entry.claudiumLoopId) != null &&
+                config.GetSpecialModule(entry.specialModuleId) != null &&
+                AllIdsExistAllowEmpty(entry.upgradeHullIds, config.GetHull) &&
+                AllIdsExistAllowEmpty(entry.upgradeEngineIds, config.GetEngine) &&
+                AllIdsExistAllowEmpty(entry.upgradePropellerIds, config.GetPropeller) &&
+                AllIdsExistAllowEmpty(entry.upgradeClaudiumLoopIds, config.GetClaudiumLoop) &&
+                AllIdsExistAllowEmpty(entry.upgradeSpecialModuleIds, config.GetSpecialModule);
+
+            if (entry.parentShipIds != null)
+            {
+                for (int j = 0; j < entry.parentShipIds.Count; j++)
+                {
+                    string parentId = entry.parentShipIds[j];
+                    ShipTreeEntryConfig parent = config.GetShipTreeEntry(parentId);
+                    entriesValid &= parent != null &&
+                        parent.shipId != entry.shipId &&
+                        parent.rank <= entry.rank;
+                }
+            }
+        }
+
+        report.Check(entriesValid && hasPioneerRoot && r1Count >= 6 && roleIds.Count >= 6,
+            "Ship_tree.csv задаёт скромное текущее дерево: Пионер R0, минимум шесть R1-кораблей и основные роли.");
+
+        report.Check(!ShipTreeHasCycles(config),
+            "Дерево кораблей не содержит циклов по parent_ship_id.");
+
+        bool r1CatalogMirrored = true;
+        for (int i = 0; i < R1ShipDesignCatalog.All.Count; i++)
+        {
+            R1ShipDesignDefinition design = R1ShipDesignCatalog.All[i];
+            ShipTreeEntryConfig entry = design != null ? config.GetShipTreeEntry(design.shipId) : null;
+            r1CatalogMirrored &= design != null &&
+                entry != null &&
+                entry.rank == 1 &&
+                entry.requiredTechnologyId == design.requiredTechId &&
+                entry.hullId == design.hullId &&
+                entry.engineId == design.engineId &&
+                entry.propellerId == design.propellerId &&
+                entry.claudiumLoopId == design.claudiumLoopId &&
+                entry.specialModuleId == design.specialModuleId;
+        }
+
+        report.Check(r1CatalogMirrored,
+            "Ship_tree.csv синхронизирован с R1ShipDesignCatalog по текущим R1-кораблям.");
+    }
+
+    private static bool ShipTreeHasCycles(WorldConfigDatabase config)
+    {
+        if (config == null || config.shipTreeEntries == null) return true;
+
+        HashSet<string> visiting = new HashSet<string>();
+        HashSet<string> visited = new HashSet<string>();
+        for (int i = 0; i < config.shipTreeEntries.Count; i++)
+        {
+            ShipTreeEntryConfig entry = config.shipTreeEntries[i];
+            if (entry == null || string.IsNullOrWhiteSpace(entry.shipId)) return true;
+            if (ShipTreeVisitHasCycle(entry, config, visiting, visited))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ShipTreeVisitHasCycle(ShipTreeEntryConfig entry, WorldConfigDatabase config, HashSet<string> visiting, HashSet<string> visited)
+    {
+        if (entry == null || config == null || visiting == null || visited == null) return true;
+        if (visited.Contains(entry.shipId)) return false;
+        if (!visiting.Add(entry.shipId)) return true;
+
+        if (entry.parentShipIds != null)
+        {
+            for (int i = 0; i < entry.parentShipIds.Count; i++)
+            {
+                ShipTreeEntryConfig parent = config.GetShipTreeEntry(entry.parentShipIds[i]);
+                if (parent == null || ShipTreeVisitHasCycle(parent, config, visiting, visited))
+                {
+                    return true;
+                }
+            }
+        }
+
+        visiting.Remove(entry.shipId);
+        visited.Add(entry.shipId);
+        return false;
+    }
+
     private static void ValidateConfigReferences(WorldConfigDatabase config, BigTestReport report)
     {
+        bool obsoleteResourcesRemoved = config.GetItem("sulfur") == null &&
+            config.GetItem("wood") == null;
+        report.Check(obsoleteResourcesRemoved, "Item.csv очищен от неактуальных ресурсов: серы и древесины нет.");
+
+        bool baseProductionsValid = true;
+        for (int i = 0; i < config.productions.Count; i++)
+        {
+            IslandProductionConfig production = config.productions[i];
+            baseProductionsValid &= production != null &&
+                !string.IsNullOrWhiteSpace(production.id) &&
+                config.GetItem(production.productionItemId) != null &&
+                production.productionCountBasePerMinute > 0f &&
+                ItemAmountsReferenceExistingItems(production.consumptions, c => c.itemId, c => c.countPerMinute, config);
+        }
+
+        report.Check(baseProductionsValid, "Базовые Island_production ссылаются только на текущие предметы и имеют валидную скорость.");
+
         bool islandsValid = true;
         int islandsWithoutBaseProduction = 0;
         for (int i = 0; i < config.islands.Count; i++)
@@ -382,12 +565,21 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             TechnologyConfig tech = config.technologies[i];
             techValid &= tech != null &&
                 !string.IsNullOrWhiteSpace(tech.id) &&
+                !string.IsNullOrWhiteSpace(tech.localNameRu) &&
+                !string.IsNullOrWhiteSpace(tech.localNameEn) &&
+                tech.rank >= 0 &&
+                !string.IsNullOrWhiteSpace(tech.branch) &&
+                !string.IsNullOrWhiteSpace(tech.unlockSummaryRu) &&
                 tech.cycleTimeSeconds >= 0 &&
                 tech.requiredCycles > 0 &&
                 AllIdsExistAllowEmpty(tech.prerequisiteTechnologyIds, config.GetTechnology) &&
                 ItemAmountsReferenceExistingItems(tech.cycleCost, c => c.itemId, c => c.amount, config);
         }
 
+        bool techTreeValid = TechnologyTreeMetadataValid(config);
+
+        bool hasShipNeedServiceModule = false;
+        bool hasCargoStorageModule = false;
         for (int i = 0; i < config.specialModules.Count; i++)
         {
             SpecialModuleConfig module = config.specialModules[i];
@@ -397,10 +589,951 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             techValid &= module != null &&
                 !string.IsNullOrWhiteSpace(module.id) &&
                 module.baseMassKg >= 0f &&
+                module.needWorkforceRecoveryPerHour >= 0f &&
+                module.needHealthRecoveryPerHour >= 0f &&
+                module.needSafetyRecoveryPerHour >= 0f &&
+                module.needComfortRecoveryPerHour >= 0f &&
+                module.needCreativityRecoveryPerHour >= 0f &&
+                module.needRepairRecoveryPerHour >= 0f &&
+                module.needCapitalConnectionRecoveryPerHour >= 0f &&
+                module.cargoVanCapacityUnits >= 0f &&
+                module.passengerSeatCapacity >= 0f &&
+                module.bulkHoldCapacityLiters >= 0f &&
+                module.liquidTankCapacityLiters >= 0f &&
+                module.gasCylinderCapacityLiters >= 0f &&
+                module.miningImpactDamageTakenMultiplier >= 0f &&
+                module.surveyPaperToInfoEfficiency >= 0f &&
+                module.leviathanAlarmGenerationMultiplier >= 0f &&
+                module.harpoonWeaponCostPerMinute >= 0f &&
+                module.harpoonMaxCarcassMassKg >= 0f &&
+                module.harpoonFlightDamage >= 0f &&
+                module.harpoonRangeMeters >= 0f &&
+                module.refrigeratedHoldCapacityLiters >= 0f &&
+                module.refrigeratedHoldPowerDrawKw >= 0f &&
+                module.shipDockSlots >= 0f &&
+                module.dockedShipMassFactor > 0f &&
+                module.dockSupportClaudiumPerTonHour >= 0f &&
                 techReferenceOk;
+
+            if (module != null)
+            {
+                hasShipNeedServiceModule |= module.needWorkforceRecoveryPerHour > 0f ||
+                    module.needHealthRecoveryPerHour > 0f ||
+                    module.needSafetyRecoveryPerHour > 0f ||
+                    module.needComfortRecoveryPerHour > 0f ||
+                    module.needCreativityRecoveryPerHour > 0f ||
+                    module.needRepairRecoveryPerHour > 0f ||
+                    module.needCapitalConnectionRecoveryPerHour > 0f;
+
+                hasCargoStorageModule |= module.cargoVanCapacityUnits > 0f ||
+                    module.passengerSeatCapacity > 0f ||
+                    module.bulkHoldCapacityLiters > 0f ||
+                    module.liquidTankCapacityLiters > 0f ||
+                    module.gasCylinderCapacityLiters > 0f ||
+                    module.refrigeratedHoldCapacityLiters > 0f ||
+                    module.shipDockSlots > 0f;
+            }
         }
 
-        report.Check(techValid, "Технологии и спецмодули имеют валидные зависимости, стоимость и массу.");
+        report.Check(techValid && techTreeValid, "Текущее дерево технологий имеет ранги, ветки, описания, валидные зависимости и не содержит циклов.");
+        report.Check(techValid && hasShipNeedServiceModule, "Технологии и спецмодули имеют валидные зависимости, стоимость, массу и корабельные сервисные мощности.");
+        report.Check(techValid && hasCargoStorageModule, "Спецмодули могут задавать грузовые отсеки: фургон, салон, кузов, цистерну, баллоны или док.");
+    }
+
+    private static bool TechnologyTreeMetadataValid(WorldConfigDatabase config)
+    {
+        if (config == null || config.technologies == null || config.technologies.Count == 0) return false;
+
+        string[] expectedBranches =
+        {
+            "Старт",
+            "Фундамент",
+            "Общая инженерия",
+            "Вода и корпус",
+            "Пассажиры",
+            "Ремонт и логистика",
+            "Руда",
+            "Разведка",
+            "Охота",
+            "Водомерка",
+            "Булат",
+            "Шершень",
+            "Егерь",
+            "Опора",
+            "Паровоз"
+        };
+
+        bool branchesPresent = true;
+        for (int i = 0; i < expectedBranches.Length; i++)
+        {
+            branchesPresent &= TechnologyBranchExists(config, expectedBranches[i]);
+        }
+
+        return branchesPresent &&
+            TechnologyRanksRespectPrerequisites(config) &&
+            !TechnologyTreeHasCycles(config);
+    }
+
+    private static bool TechnologyBranchExists(WorldConfigDatabase config, string branch)
+    {
+        if (config == null || config.technologies == null || string.IsNullOrWhiteSpace(branch)) return false;
+
+        for (int i = 0; i < config.technologies.Count; i++)
+        {
+            TechnologyConfig technology = config.technologies[i];
+            if (technology != null && technology.branch == branch)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TechnologyRanksRespectPrerequisites(WorldConfigDatabase config)
+    {
+        if (config == null || config.technologies == null) return false;
+
+        for (int i = 0; i < config.technologies.Count; i++)
+        {
+            TechnologyConfig technology = config.technologies[i];
+            if (technology == null || technology.prerequisiteTechnologyIds == null) return false;
+
+            for (int j = 0; j < technology.prerequisiteTechnologyIds.Count; j++)
+            {
+                TechnologyConfig prerequisite = config.GetTechnology(technology.prerequisiteTechnologyIds[j]);
+                if (prerequisite == null || prerequisite.rank >= technology.rank)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TechnologyTreeHasCycles(WorldConfigDatabase config)
+    {
+        if (config == null || config.technologies == null) return true;
+
+        HashSet<string> visiting = new HashSet<string>();
+        HashSet<string> visited = new HashSet<string>();
+        for (int i = 0; i < config.technologies.Count; i++)
+        {
+            TechnologyConfig technology = config.technologies[i];
+            if (technology == null || string.IsNullOrWhiteSpace(technology.id)) return true;
+
+            if (TechnologyVisitHasCycle(technology, config, visiting, visited))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TechnologyVisitHasCycle(TechnologyConfig technology, WorldConfigDatabase config, HashSet<string> visiting, HashSet<string> visited)
+    {
+        if (technology == null || config == null || visiting == null || visited == null) return true;
+        if (visited.Contains(technology.id)) return false;
+        if (!visiting.Add(technology.id)) return true;
+
+        if (technology.prerequisiteTechnologyIds != null)
+        {
+            for (int i = 0; i < technology.prerequisiteTechnologyIds.Count; i++)
+            {
+                TechnologyConfig prerequisite = config.GetTechnology(technology.prerequisiteTechnologyIds[i]);
+                if (prerequisite == null || TechnologyVisitHasCycle(prerequisite, config, visiting, visited))
+                {
+                    return true;
+                }
+            }
+        }
+
+        visiting.Remove(technology.id);
+        visited.Add(technology.id);
+        return false;
+    }
+
+    private static void ValidateCargoStorageModel(WorldConfigDatabase config, BigTestReport report)
+    {
+        report.Section("Грузовые единицы и отсеки кораблей");
+
+        if (config == null || !config.isLoaded)
+        {
+            report.Fail("Проверки грузовых отсеков остановлены: нет загруженной базы конфигов.");
+            return;
+        }
+
+        ItemConfig passengerTemplate = config.GetItem(PassengerCargoIds.ToCapitalItemId);
+        ItemConfig water = config.GetItem("water");
+        ItemConfig sampleOre = config.GetItem("windshale_ore");
+        ItemConfig dockedBoat = config.GetItem("utility_boat_ship");
+        ItemConfig carcass = config.GetItem("windcalf_carcass");
+        bool cargoMetadataValid = passengerTemplate != null &&
+            passengerTemplate.cargoUnitKind == CargoUnitKind.Passenger &&
+            passengerTemplate.cargoStorageKind == CargoStorageKind.Cabin &&
+            Mathf.Abs(config.GetItemTransportMassKg(PassengerCargoIds.ToCapitalItemId, 3) - 300f) <= 0.001f &&
+            water != null &&
+            water.cargoUnitKind == CargoUnitKind.VolumeLiter &&
+            water.cargoStorageKind == CargoStorageKind.LiquidTank &&
+            sampleOre != null &&
+            sampleOre.cargoUnitKind == CargoUnitKind.VolumeLiter &&
+            sampleOre.cargoStorageKind == CargoStorageKind.BulkHold &&
+            dockedBoat != null &&
+            dockedBoat.cargoUnitKind == CargoUnitKind.Ship &&
+            dockedBoat.cargoStorageKind == CargoStorageKind.ShipDock &&
+            carcass != null &&
+            carcass.cargoUnitKind == CargoUnitKind.VolumeLiter &&
+            carcass.cargoStorageKind == CargoStorageKind.RefrigeratedHold &&
+            Mathf.Abs(config.GetItemTransportMassKg("utility_boat_ship", 1) - 1500f) <= 0.001f;
+        report.Check(cargoMetadataValid, "Item.csv задаёт единицы груза, типы отсеков и массу единицы: пассажиры считаются местами, жидкости/сыпучка - литрами, докованные корабли дают 10% транспортной массы.");
+
+        LogisticsShipMetrics cargoMetrics = new LogisticsShipMetrics
+        {
+            cargoCompartments = new List<CargoCompartmentDefinition>
+            {
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.Cabin, capacity = 3f },
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.Van, capacity = 10f },
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.BulkHold, capacity = 20f },
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.BulkHold, capacity = 15f },
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.LiquidTank, capacity = 10f },
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.GasCylinder, capacity = 5f },
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.RefrigeratedHold, capacity = 100f },
+                new CargoCompartmentDefinition
+                {
+                    storageKind = CargoStorageKind.ShipDock,
+                    capacity = 1f,
+                    maxDockedShipClass = ShipSizeClass.Boat,
+                    dockSupportClaudiumPerTonHour = 0.02f
+                }
+            }
+        };
+        Dictionary<string, int> typedCargo = new Dictionary<string, int>
+        {
+            [PassengerCargoIds.ToCapitalItemId] = 3,
+            ["food"] = 10,
+            ["windshale_ore"] = 12,
+            ["dawnspar_ore"] = 8,
+            ["water"] = 10,
+            ["aer_silt"] = 5,
+            ["windcalf_carcass"] = 80,
+            ["utility_boat_ship"] = 1
+        };
+        bool cargoFits = CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, typedCargo, out _);
+        float typedCargoMass = CargoStoragePlanner.GetCargoMassKg(config, typedCargo);
+        float dockSupportClaudium = CargoStoragePlanner.GetDockSupportClaudiumKg(cargoMetrics, CargoStoragePlanner.GetDockedShipFullMassKg(config, typedCargo), 3600f);
+        Dictionary<string, int> passengerOverflow = new Dictionary<string, int> { [PassengerCargoIds.ToCapitalItemId] = 4 };
+        Dictionary<string, int> mixedBulkOverflow = new Dictionary<string, int>
+        {
+            ["windshale_ore"] = 10,
+            ["dawnspar_ore"] = 10,
+            ["bluebrass_ore"] = 10
+        };
+        Dictionary<string, int> dockOverflow = new Dictionary<string, int> { ["utility_boat_ship"] = 2 };
+        Dictionary<string, int> refrigeratedOverflow = new Dictionary<string, int> { ["windcalf_carcass"] = 120 };
+        bool cargoLimitsWork = cargoFits &&
+            Mathf.Abs(typedCargoMass - 1925f) <= 0.001f &&
+            Mathf.Abs(dockSupportClaudium - 0.3f) <= 0.001f &&
+            !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, passengerOverflow, out _) &&
+            !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, mixedBulkOverflow, out _) &&
+            !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, refrigeratedOverflow, out _) &&
+            !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, dockOverflow, out _);
+        report.Check(cargoLimitsWork, "Корабельные отсеки проверяют места салона, смешиваемый фургон, однотипные кузова/цистерны/баллоны, док-слот, 10% массу докованного корабля и расход клавдия на поддержку дока.");
+
+        PlayerProgress playerCargoProgress = new PlayerProgress();
+        playerCargoProgress.Normalize();
+        playerCargoProgress.AddShipCargo(PassengerCargoIds.ToCapitalItemId, 2);
+        playerCargoProgress.AddShipCargo("water", 10);
+        playerCargoProgress.AddShipCargo("utility_boat_ship", 1);
+        bool playerCargoUsesConfigMass = Mathf.Abs(playerCargoProgress.GetShipCargoMassKg(config) - 1710f) <= 0.001f &&
+            CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics.cargoCompartments, playerCargoProgress.shipCargo, out _);
+        report.Check(playerCargoUsesConfigMass, "Груз основного корабля игрока тоже считает массу через Item.csv и проходит ту же проверку отсеков.");
+    }
+
+    private static void ValidateR1ShipMechanics(WorldConfigDatabase config, BigTestReport report)
+    {
+        report.Section("R1 ships: runtime mechanics");
+
+        if (config == null || !config.isLoaded)
+        {
+            report.Fail("R1 ship checks stopped: config database is not loaded.");
+            return;
+        }
+
+        SpecialModuleConfig waterStrider = config.GetSpecialModule("water_strider_harvester");
+        SpecialModuleConfig bulat = config.GetSpecialModule("bulat_impact_hold");
+        SpecialModuleConfig hornet = config.GetSpecialModule("hornet_observation_suite");
+        SpecialModuleConfig hornetMk2 = config.GetSpecialModule("hornet_observation_suite_mk2");
+        SpecialModuleConfig jaeger = config.GetSpecialModule("jaeger_harpoon_fridge");
+        SpecialModuleConfig jaegerMk2 = config.GetSpecialModule("jaeger_harpoon_fridge_mk2");
+        SpecialModuleConfig opora = config.GetSpecialModule("opora_crane_platform");
+        SpecialModuleConfig parovoz = config.GetSpecialModule("parovoz_passenger_cabin");
+
+        ValidateR1ShipCatalog(config, report);
+
+        report.Check(waterStrider != null &&
+            waterStrider.gasHarvesterWaterOnly &&
+            waterStrider.gasHarvesterVolumeM3PerSecond > 0f &&
+            waterStrider.gasHarvesterPowerDrawKw > 0f &&
+            waterStrider.liquidTankCapacityLiters >= 1000f,
+            "Vodomerka module exists: water-only cloud harvester and 1000 l liquid tank.");
+
+        report.Check(bulat != null &&
+            bulat.miningImpactHoldCapacityKg >= 3000f &&
+            Approximately(bulat.miningImpactDamageTakenMultiplier, 0.5f, 0.001f) &&
+            bulat.bulkHoldCapacityLiters >= 3000f,
+            "Bulat module exists: 3 m3 bulk hold and 50% mining impact damage.");
+
+        report.Check(hornet != null &&
+            Approximately(hornet.surveyPaperToInfoEfficiency, 0.2f, 0.001f) &&
+            Approximately(hornet.leviathanAlarmGenerationMultiplier, 0.5f, 0.001f) &&
+            hornet.observationRadiusMeters >= 700f,
+            "Shershen base module exists: 20% paper efficiency and x0.5 leviathan alarm.");
+
+        report.Check(hornet != null &&
+            hornetMk2 != null &&
+            Approximately(hornetMk2.surveyPaperToInfoEfficiency, 0.45f, 0.001f) &&
+            Approximately(hornetMk2.leviathanAlarmGenerationMultiplier, 0.25f, 0.001f) &&
+            hornetMk2.baseMassKg > hornet.baseMassKg,
+            "Shershen upgraded instruments exist: 45% paper efficiency, x0.25 alarm, heavier module.");
+
+        report.Check(jaeger != null &&
+            Approximately(jaeger.harpoonWeaponCostPerMinute, 2f, 0.001f) &&
+            jaeger.harpoonMaxCarcassMassKg >= 100f &&
+            jaeger.refrigeratedHoldCapacityLiters >= 2500f &&
+            jaeger.refrigeratedHoldPowerDrawKw > 0f,
+            "Eger base module exists: harpoon upkeep, 100 kg target limit and powered refrigerator.");
+
+        report.Check(jaeger != null &&
+            jaegerMk2 != null &&
+            Approximately(jaegerMk2.harpoonWeaponCostPerMinute, 4f, 0.001f) &&
+            jaegerMk2.harpoonMaxCarcassMassKg >= 200f &&
+            jaegerMk2.harpoonFlightDamage > jaeger.harpoonFlightDamage &&
+            jaegerMk2.refrigeratedHoldPowerDrawKw < jaeger.refrigeratedHoldPowerDrawKw,
+            "Eger upgraded harpoon exists: 200 kg limit, more damage, lower refrigerator draw.");
+
+        report.Check(opora != null &&
+            opora.needRepairRecoveryPerHour > 0f &&
+            opora.cargoVanCapacityUnits >= 6000f,
+            "Opora module exists: repair recovery and large van deck.");
+
+        report.Check(parovoz != null &&
+            parovoz.passengerSeatCapacity >= 15f &&
+            parovoz.cargoVanCapacityUnits > 0f,
+            "Parovoz module exists: 15 passenger seats and supplies van.");
+
+        LogisticsShipMetrics fridgeMetrics = new LogisticsShipMetrics
+        {
+            cargoCompartments = new List<CargoCompartmentDefinition>
+            {
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.RefrigeratedHold, capacity = 100f }
+            }
+        };
+        bool refrigeratorAcceptsCarcass = CargoStoragePlanner.TryValidateCargoStorage(
+            config,
+            fridgeMetrics,
+            new Dictionary<string, int> { ["windcalf_carcass"] = 80 },
+            out _);
+        bool refrigeratorRejectsOverflow = !CargoStoragePlanner.TryValidateCargoStorage(
+            config,
+            fridgeMetrics,
+            new Dictionary<string, int> { ["windcalf_carcass"] = 120 },
+            out _);
+        bool refrigeratorRejectsNoFridge = !CargoStoragePlanner.TryValidateCargoStorage(
+            config,
+            new LogisticsShipMetrics
+            {
+                cargoCompartments = new List<CargoCompartmentDefinition>
+                {
+                    new CargoCompartmentDefinition { storageKind = CargoStorageKind.Van, capacity = 1000f }
+                }
+            },
+            new Dictionary<string, int> { ["windcalf_carcass"] = 1 },
+            out _);
+        report.Check(refrigeratorAcceptsCarcass && refrigeratorRejectsOverflow && refrigeratorRejectsNoFridge,
+            "Leviathan carcasses are refrigerated cargo: fit only into a refrigerator and obey liter capacity.");
+
+        bool surveyEfficiencyWorks = false;
+        if (config.gasClouds != null && config.gasClouds.Count > 0)
+        {
+            GasCloudConfig cloud = config.gasClouds[0];
+            PlayerProgress progress = new PlayerProgress();
+            progress.Normalize();
+            ScoutedObjectState state = progress.GetScoutedObjectState(ScoutedObjectKind.GasCloud, cloud.id, true);
+            state.factsComplete = true;
+            state.factsRequired = 1f;
+            state.factsProgress = 1f;
+            state.informationPotentialKg = 100f;
+
+            List<ResourceStack> cargo = new List<ResourceStack>
+            {
+                new ResourceStack { resourceId = SurveySystem.PaperItemId, amount = 10 }
+            };
+
+            SurveySystem.ObserveAndExtractWorldFromPoint(
+                config,
+                progress,
+                cloud.position,
+                1f,
+                1000f,
+                60f,
+                DateTime.UtcNow.Ticks,
+                cargo,
+                0f,
+                1f,
+                0f,
+                0.2f);
+
+            surveyEfficiencyWorks = GetStackAmountForTest(cargo, SurveySystem.PaperItemId) == 0 &&
+                GetStackAmountForTest(cargo, SurveySystem.CloudInfoItemId) == 2;
+        }
+
+        report.Check(surveyEfficiencyWorks, "Survey paper efficiency works: at 20%, 10 paper becomes exactly 2 cloud info.");
+
+        GameObject alarmShip = null;
+        GameObject alarmLeviathan = null;
+        try
+        {
+            alarmShip = new GameObject("Big Test R1 Alarm Ship");
+            alarmShip.AddComponent<Rigidbody>();
+            ShipPhysics ship = alarmShip.AddComponent<ShipPhysics>();
+            ship.enabled = false;
+            ship.leviathanAlarmGenerationMultiplier = 0.25f;
+
+            alarmLeviathan = new GameObject("Big Test R1 Alarm Leviathan");
+            alarmLeviathan.AddComponent<Rigidbody>();
+            Leviathan leviathan = alarmLeviathan.AddComponent<Leviathan>();
+            leviathan.enabled = false;
+            leviathan.alarm01 = 0f;
+            leviathan.AddAlarm(0.4f, "big test", ship);
+
+            report.Check(Approximately(leviathan.alarm01, 0.1f, 0.001f),
+                "Leviathan alarm multiplier works: x0.25 source turns 0.4 alarm into 0.1.");
+        }
+        finally
+        {
+            DestroyBigTestObject(alarmShip);
+            DestroyBigTestObject(alarmLeviathan);
+        }
+
+        float fullImpactDamage = MeasureMiningImpactDamage(1f);
+        float dampedImpactDamage = MeasureMiningImpactDamage(0.5f);
+        report.Check(fullImpactDamage > 0f &&
+            dampedImpactDamage > 0f &&
+            Approximately(dampedImpactDamage, fullImpactDamage * 0.5f, Mathf.Max(0.05f, fullImpactDamage * 0.05f)),
+            "Mining impact damping works: Bulat-style x0.5 hold halves fragment hit damage.");
+    }
+
+    private static void ValidateR1ShipCatalog(WorldConfigDatabase config, BigTestReport report)
+    {
+        ShipCatalogSO catalog = ScriptableObject.CreateInstance<ShipCatalogSO>();
+        catalog.starterHullId = "starter_hull";
+        catalog.parts = new List<ShipPartDefinitionSO>();
+
+        try
+        {
+            int expectedParts = config.hulls.Count + config.engines.Count + config.propellers.Count + config.claudiumLoops.Count + config.specialModules.Count;
+            int appliedParts = ShipAssemblyBuilder.ApplyCsvShipPartConfigs(catalog, config);
+            report.Check(appliedParts >= expectedParts && expectedParts > 0,
+                "CSV ship part configs sync into ShipCatalog: " + appliedParts + "/" + expectedParts + " parts.");
+
+            report.Check(R1ShipDesignCatalog.All.Count == 6,
+                "R1 design catalog contains all six ships: Vodomerka, Bulat, Shershen, Eger, Opora, Parovoz.");
+
+            string[] requiredR1TechnologyIds =
+            {
+                "aerodynamics",
+                "basic_geometry",
+                "steam_claudium_theory",
+                "air_pumps",
+                "mathematics",
+                "bearing_skin",
+                "ore_collector",
+                "continuous_observations",
+                "hunter_hull",
+                "support_platform",
+                "passenger_routes",
+                "water_strider_tankage",
+                "water_strider_engine_tuning",
+                "water_strider_loop_tuning",
+                "water_collection_baffles",
+                "water_strider_large_tank",
+                "water_collection_autopilot",
+                "shockproof_bulk_hold",
+                "bulat_engine_tuning",
+                "bulat_loop_tuning",
+                "ore_receiver",
+                "mining_autopilot",
+                "reinforced_observation_suite",
+                "quiet_skin",
+                "scout_engine_tuning",
+                "survey_autopilot",
+                "reinforced_harpoon",
+                "hunter_engine_tuning",
+                "armored_hunter_hull",
+                "cold_chamber",
+                "crane_tackles",
+                "short_circuit_claudium_loop",
+                "ribbed_deck_truss",
+                "removable_van_sections",
+                "cabin_standards",
+                "forced_firebox",
+                "passenger_propeller",
+                "streamlined_superstructure",
+                "route_tables"
+            };
+
+            bool allR1TechRowsExist = true;
+            for (int i = 0; i < requiredR1TechnologyIds.Length; i++)
+            {
+                allR1TechRowsExist &= config.GetTechnology(requiredR1TechnologyIds[i]) != null;
+            }
+
+            report.Check(allR1TechRowsExist,
+                "R1 technology chain has base and upgrade technology rows.");
+
+            for (int i = 0; i < R1ShipDesignCatalog.All.Count; i++)
+            {
+                R1ShipDesignDefinition design = R1ShipDesignCatalog.All[i];
+                if (design == null) continue;
+
+                bool csvRowsExist =
+                    config.GetTechnology(design.requiredTechId) != null &&
+                    config.GetHull(design.hullId) != null &&
+                    config.GetEngine(design.engineId) != null &&
+                    config.GetPropeller(design.propellerId) != null &&
+                    config.GetClaudiumLoop(design.claudiumLoopId) != null &&
+                    config.GetSpecialModule(design.specialModuleId) != null;
+                report.Check(csvRowsExist, design.displayNameRu + " has technology, hull, engine, propeller, claudium loop and role module CSV rows.");
+
+                report.Check(R1ConfiguredPartRowsExist(config, design),
+                    design.displayNameRu + " has CSV rows for all configured base and upgrade parts.");
+
+                report.Check(R1ConfiguredSlotsAllowParts(catalog, design),
+                    design.displayNameRu + " hull slots allow its own base and upgraded parts only.");
+
+                PlayerProgress progress = R1ShipDesignCatalog.CreateUnlockedProgress(design);
+                bool assembled = ShipAssemblyBuilder.TryBuild(catalog, null, progress, out ShipAssemblyResult result);
+                report.Check(assembled, assembled
+                    ? design.displayNameRu + " assembles from CSV catalog."
+                    : design.displayNameRu + " does not assemble from CSV catalog: " + result.message);
+
+                if (!assembled || result == null || result.stats == null)
+                {
+                    continue;
+                }
+
+                ShipStatBlock stats = result.stats;
+                bool coreStatsMatch =
+                    Approximately(stats.Get(ShipStatId.BaseMass, 0f), design.expectedServiceMassKg, 1f) &&
+                    Approximately(stats.Get(ShipStatId.HullMaxTakeoffMassKg, 0f), design.expectedMaxTakeoffMassKg, 0.01f) &&
+                    Approximately(stats.Get(ShipStatId.EngineMaxPower, 0f), design.expectedEnginePowerKw, 0.01f) &&
+                    Approximately(stats.Get(ShipStatId.StructureHp, 0f), design.expectedStructureHp, 0.01f) &&
+                    stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f) >= design.expectedMaxTakeoffMassKg - 0.01f &&
+                    Approximately(stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f), 28f, 0.01f) &&
+                    stats.Get(ShipStatId.PropellerMaxThrustKgf, 0f) > 0f &&
+                    stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f) > 0f;
+                report.Check(coreStatsMatch,
+                    design.displayNameRu + " core stats match R1 balance: service mass, takeoff mass, engine, lift, propeller and structure.");
+
+                report.Check(R1RoleStatsConfigured(design.shipId, stats),
+                    design.displayNameRu + " role stats are configured on the mandatory module.");
+
+                report.Check(R1LoadoutStatsMatch(design.shipId, false, stats),
+                    design.displayNameRu + " minimum configuration has required characteristics.");
+
+                bool maximumAssembled = TryBuildR1ConfiguredMaximum(catalog, config, design, out ShipAssemblyResult maximumResult, out string maximumBuildMessage);
+                report.Check(maximumAssembled, maximumBuildMessage);
+                if (maximumAssembled && maximumResult != null && maximumResult.stats != null)
+                {
+                    report.Check(R1LoadoutStatsMatch(design.shipId, true, maximumResult.stats),
+                        design.displayNameRu + " maximum configuration has required characteristics.");
+                }
+            }
+
+            ValidateR1UpgradeModules(config, report);
+        }
+        finally
+        {
+            if (catalog != null && catalog.parts != null)
+            {
+                for (int i = 0; i < catalog.parts.Count; i++)
+                {
+                    DestroyBigTestUnityObject(catalog.parts[i]);
+                }
+            }
+
+            DestroyBigTestUnityObject(catalog);
+        }
+    }
+
+    private static bool R1ConfiguredPartRowsExist(WorldConfigDatabase config, R1ShipDesignDefinition design)
+    {
+        if (config == null || design == null) return false;
+
+        bool rowsExist = true;
+        rowsExist &= AllConfiguredIdsExist(design.GetAllowedHullIds(), config.GetHull);
+        rowsExist &= AllConfiguredIdsExist(design.GetAllowedEngineIds(), config.GetEngine);
+        rowsExist &= AllConfiguredIdsExist(design.GetAllowedPropellerIds(), config.GetPropeller);
+        rowsExist &= AllConfiguredIdsExist(design.GetAllowedClaudiumLoopIds(), config.GetClaudiumLoop);
+        rowsExist &= AllConfiguredIdsExist(design.GetAllowedSpecialModuleIds(), config.GetSpecialModule);
+        return rowsExist;
+    }
+
+    private static bool R1ConfiguredSlotsAllowParts(ShipCatalogSO catalog, R1ShipDesignDefinition design)
+    {
+        if (catalog == null || design == null) return false;
+
+        List<string> hullIds = design.GetAllowedHullIds();
+        for (int i = 0; i < hullIds.Count; i++)
+        {
+            ShipPartDefinitionSO hull = catalog.GetPartById(hullIds[i]);
+            if (hull == null || !hull.IsHull) return false;
+
+            if (!SlotAllowsAll(hull, R1ShipDesignCatalog.EngineSlotId, design.GetAllowedEngineIds())) return false;
+            if (!SlotAllowsAll(hull, R1ShipDesignCatalog.PropellerSlotId, design.GetAllowedPropellerIds())) return false;
+            if (!SlotAllowsAll(hull, R1ShipDesignCatalog.ClaudiumLoopSlotId, design.GetAllowedClaudiumLoopIds())) return false;
+            if (!SlotAllowsAll(hull, R1ShipDesignCatalog.RoleModuleSlotId, design.GetAllowedSpecialModuleIds())) return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryBuildR1ConfiguredMaximum(ShipCatalogSO catalog, WorldConfigDatabase config, R1ShipDesignDefinition design, out ShipAssemblyResult result, out string message)
+    {
+        result = null;
+        message = "";
+        if (catalog == null || config == null || design == null)
+        {
+            message = "R1 upgraded assembly is missing test context.";
+            return false;
+        }
+
+        string hullId = LastConfiguredId(design.GetAllowedHullIds());
+        string engineId = LastConfiguredId(design.GetAllowedEngineIds());
+        string propellerId = LastConfiguredId(design.GetAllowedPropellerIds());
+        string claudiumLoopId = LastConfiguredId(design.GetAllowedClaudiumLoopIds());
+        string specialModuleId = LastConfiguredId(design.GetAllowedSpecialModuleIds());
+
+        PlayerProgress progress = R1ShipDesignCatalog.CreateUnlockedProgress(design);
+        progress.selectedHullId = hullId;
+        progress.InstallModule(R1ShipDesignCatalog.EngineSlotId, engineId);
+        progress.InstallModule(R1ShipDesignCatalog.PropellerSlotId, propellerId);
+        progress.InstallModule(R1ShipDesignCatalog.ClaudiumLoopSlotId, claudiumLoopId);
+        progress.InstallModule(R1ShipDesignCatalog.RoleModuleSlotId, specialModuleId);
+
+        UnlockTechnology(progress, config.GetHull(hullId)?.completedTechId);
+        UnlockTechnology(progress, config.GetEngine(engineId)?.completedTechId);
+        UnlockTechnology(progress, config.GetPropeller(propellerId)?.completedTechId);
+        UnlockTechnology(progress, config.GetClaudiumLoop(claudiumLoopId)?.completedTechId);
+        UnlockTechnology(progress, config.GetSpecialModule(specialModuleId)?.completedTechId);
+
+        bool assembled = ShipAssemblyBuilder.TryBuild(catalog, null, progress, out result);
+        string buildError = result != null ? result.message : "no assembly result";
+        message = assembled
+            ? design.displayNameRu + " maximum configured assembly builds."
+            : design.displayNameRu + " maximum configured assembly does not build: " + buildError;
+        return assembled;
+    }
+
+    private static bool R1LoadoutStatsMatch(string shipId, bool maximum, ShipStatBlock stats)
+    {
+        if (stats == null) return false;
+
+        switch (shipId)
+        {
+            case "water_strider":
+                return R1CoreLoadoutStatsMatch(stats,
+                        maximum ? 2760f : 2500f,
+                        maximum ? 4300f : 3500f,
+                        maximum ? 1500f : 1000f,
+                        maximum ? 260f : 220f,
+                        maximum ? 1050f : 940f,
+                        28f,
+                        maximum ? 4.5f : 3f,
+                        maximum ? 0.68f : 0.7f,
+                        maximum ? 4300f : 3500f) &&
+                    stats.Get(ShipStatId.GasHarvesterWaterOnly, 0f) > 0.5f &&
+                    Approximately(stats.Get(ShipStatId.GasHarvesterVolumeM3PerSecond, 0f), maximum ? 15f : 12f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.LiquidTankCapacityLiters, 0f), maximum ? 1500f : 1000f, 0.001f);
+            case "bulat":
+                return R1CoreLoadoutStatsMatch(stats,
+                        maximum ? 3320f : 3000f,
+                        maximum ? 6500f : 6000f,
+                        3000f,
+                        maximum ? 310f : 240f,
+                        maximum ? 1350f : 1250f,
+                        27f,
+                        3f,
+                        maximum ? 0.76f : 0.78f,
+                        maximum ? 6500f : 6000f) &&
+                    Approximately(stats.Get(ShipStatId.MiningImpactHoldCapacityKg, 0f), 3000f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.BulkHoldCapacityLiters, 0f), 3000f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.MiningImpactDamageTakenMultiplier, 0f), maximum ? 0.45f : 0.5f, 0.001f);
+            case "hornet":
+                return R1CoreLoadoutStatsMatch(stats,
+                        maximum ? 3610f : 3200f,
+                        3800f,
+                        maximum ? 100f : 600f,
+                        maximum ? 315f : 280f,
+                        1350f,
+                        31f,
+                        3.5f,
+                        0.66f,
+                        3800f) &&
+                    Approximately(stats.Get(ShipStatId.ObservationRadiusMeters, 0f), maximum ? 950f : 700f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.SurveyPaperToInfoEfficiency, 0f), maximum ? 0.45f : 0.2f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.LeviathanAlarmGenerationMultiplier, 0f), maximum ? 0.25f : 0.5f, 0.001f);
+            case "jaeger":
+                return R1CoreLoadoutStatsMatch(stats,
+                        maximum ? 5190f : 4700f,
+                        maximum ? 5400f : 5200f,
+                        maximum ? 200f : 500f,
+                        maximum ? 380f : 330f,
+                        maximum ? 1900f : 1600f,
+                        24f,
+                        3f,
+                        maximum ? 0.9f : 0.95f,
+                        maximum ? 5400f : 5200f) &&
+                    Approximately(stats.Get(ShipStatId.HarpoonWeaponCostPerMinute, 0f), maximum ? 4f : 2f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.HarpoonMaxCarcassMassKg, 0f), maximum ? 200f : 100f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.HarpoonFlightDamage, 0f), maximum ? 55f : 40f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.HarpoonRangeMeters, 0f), maximum ? 60f : 45f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.RefrigeratedHoldCapacityLiters, 0f), 2500f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.RefrigeratedHoldPowerDrawKw, 0f), maximum ? 55f : 70f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.NeedSafetyRecoveryPerHour, 0f), maximum ? 30f : 20f, 0.001f);
+            case "opora":
+                return R1CoreLoadoutStatsMatch(stats,
+                        maximum ? 4260f : 3600f,
+                        maximum ? 6900f : 5800f,
+                        maximum ? 2600f : 2200f,
+                        340f,
+                        maximum ? 2000f : 1400f,
+                        maximum ? 16f : 10f,
+                        4f,
+                        maximum ? 1.25f : 1.6f,
+                        maximum ? 6900f : 5800f) &&
+                    Approximately(stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f), maximum ? 38f : 30f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), maximum ? 14000f : 6000f, 0.001f);
+            case "parovoz":
+                return R1CoreLoadoutStatsMatch(stats,
+                        maximum ? 4820f : 4300f,
+                        maximum ? 6600f : 5900f,
+                        1500f,
+                        maximum ? 430f : 360f,
+                        maximum ? 1540f : 1100f,
+                        maximum ? 30f : 20f,
+                        maximum ? 3f : 2f,
+                        maximum ? 0.74f : 1.2f,
+                        maximum ? 6600f : 5900f) &&
+                    Approximately(stats.Get(ShipStatId.PassengerSeatCapacity, 0f), 15f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.NeedWorkforceRecoveryPerHour, 0f), maximum ? 5f : 4f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.NeedHealthRecoveryPerHour, 0f), maximum ? 4f : 3f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.NeedComfortRecoveryPerHour, 0f), maximum ? 8f : 5f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.NeedCapitalConnectionRecoveryPerHour, 0f), maximum ? 12f : 8f, 0.001f);
+            default:
+                return false;
+        }
+    }
+
+    private static bool R1CoreLoadoutStatsMatch(
+        ShipStatBlock stats,
+        float expectedServiceMassKg,
+        float expectedMaxTakeoffMassKg,
+        float expectedUsefulPayloadKg,
+        float expectedEnginePowerKw,
+        float expectedStructureHp,
+        float expectedPropellerMaxSpeedMS,
+        float expectedAutoVerticalSpeedMS,
+        float expectedDragCoefficient,
+        float expectedClaudiumMaxLiftKg)
+    {
+        if (stats == null) return false;
+
+        float serviceMassKg = stats.Get(ShipStatId.BaseMass, 0f);
+        float maxTakeoffMassKg = stats.Get(ShipStatId.HullMaxTakeoffMassKg, 0f);
+        float usefulPayloadKg = maxTakeoffMassKg - serviceMassKg;
+
+        return Approximately(serviceMassKg, expectedServiceMassKg, 1f) &&
+            Approximately(maxTakeoffMassKg, expectedMaxTakeoffMassKg, 0.01f) &&
+            usefulPayloadKg >= expectedUsefulPayloadKg - 1f &&
+            Approximately(stats.Get(ShipStatId.EngineMaxPower, 0f), expectedEnginePowerKw, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.StructureHp, 0f), expectedStructureHp, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f), expectedPropellerMaxSpeedMS, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.MaxAutoVerticalSpeed, 0f), expectedAutoVerticalSpeedMS, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.DragCoefficient, 0f), expectedDragCoefficient, 0.001f) &&
+            Approximately(stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f), 28f, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f), expectedClaudiumMaxLiftKg, 0.01f) &&
+            stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f) >= maxTakeoffMassKg - 0.01f;
+    }
+
+    private static bool AllConfiguredIdsExist<T>(List<string> ids, System.Func<string, T> getter) where T : class
+    {
+        if (ids == null || getter == null || ids.Count == 0) return false;
+
+        for (int i = 0; i < ids.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(ids[i]) || getter(ids[i]) == null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool SlotAllowsAll(ShipPartDefinitionSO hull, string slotId, List<string> partIds)
+    {
+        if (hull == null || hull.slots == null || string.IsNullOrWhiteSpace(slotId) || partIds == null || partIds.Count == 0)
+        {
+            return false;
+        }
+
+        ShipSlotDefinition slot = null;
+        for (int i = 0; i < hull.slots.Count; i++)
+        {
+            if (hull.slots[i] != null && hull.slots[i].slotId == slotId)
+            {
+                slot = hull.slots[i];
+                break;
+            }
+        }
+
+        if (slot == null) return false;
+
+        for (int i = 0; i < partIds.Count; i++)
+        {
+            if (!slot.AllowsPart(partIds[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string LastConfiguredId(List<string> ids)
+    {
+        if (ids == null || ids.Count == 0) return "";
+
+        for (int i = ids.Count - 1; i >= 0; i--)
+        {
+            if (!string.IsNullOrWhiteSpace(ids[i]))
+            {
+                return ids[i];
+            }
+        }
+
+        return "";
+    }
+
+    private static void UnlockTechnology(PlayerProgress progress, string technologyId)
+    {
+        if (progress == null || string.IsNullOrWhiteSpace(technologyId)) return;
+
+        progress.CompleteTechnology(technologyId);
+        progress.PurchaseNode(technologyId);
+    }
+
+    private static void ValidateR1UpgradeModules(WorldConfigDatabase config, BigTestReport report)
+    {
+        SpecialModuleConfig waterBase = config.GetSpecialModule("water_strider_harvester");
+        SpecialModuleConfig waterMk2 = config.GetSpecialModule("water_strider_harvester_mk2");
+        report.Check(waterBase != null &&
+            waterMk2 != null &&
+            waterMk2.gasHarvesterWaterOnly &&
+            waterMk2.gasHarvesterVolumeM3PerSecond > waterBase.gasHarvesterVolumeM3PerSecond &&
+            waterMk2.liquidTankCapacityLiters >= 1500f &&
+            waterMk2.baseMassKg > waterBase.baseMassKg,
+            "Water Strider upgraded harvester keeps water-only mode and grows to a 1.5 t tank.");
+
+        SpecialModuleConfig bulatBase = config.GetSpecialModule("bulat_impact_hold");
+        SpecialModuleConfig bulatMk2 = config.GetSpecialModule("bulat_impact_hold_mk2");
+        report.Check(bulatBase != null &&
+            bulatMk2 != null &&
+            bulatMk2.miningImpactHoldCapacityKg >= 3000f &&
+            bulatMk2.bulkHoldCapacityLiters >= 3000f &&
+            bulatMk2.miningImpactDamageTakenMultiplier <= bulatBase.miningImpactDamageTakenMultiplier &&
+            bulatMk2.baseMassKg > bulatBase.baseMassKg,
+            "Bulat upgraded impact hold preserves the 3 m3 ore role and improves impact damping.");
+
+        SpecialModuleConfig hornetBase = config.GetSpecialModule("hornet_observation_suite");
+        SpecialModuleConfig hornetMk2 = config.GetSpecialModule("hornet_observation_suite_mk2");
+        report.Check(hornetBase != null &&
+            hornetMk2 != null &&
+            hornetMk2.surveyPaperToInfoEfficiency > hornetBase.surveyPaperToInfoEfficiency &&
+            hornetMk2.leviathanAlarmGenerationMultiplier < hornetBase.leviathanAlarmGenerationMultiplier &&
+            hornetMk2.baseMassKg > hornetBase.baseMassKg,
+            "Hornet upgraded instruments improve paper-to-info efficiency and reduce leviathan alarm.");
+
+        SpecialModuleConfig jaegerBase = config.GetSpecialModule("jaeger_harpoon_fridge");
+        SpecialModuleConfig jaegerMk2 = config.GetSpecialModule("jaeger_harpoon_fridge_mk2");
+        report.Check(jaegerBase != null &&
+            jaegerMk2 != null &&
+            jaegerMk2.harpoonMaxCarcassMassKg >= 200f &&
+            Approximately(jaegerMk2.harpoonWeaponCostPerMinute, jaegerBase.harpoonWeaponCostPerMinute * 2f, 0.001f) &&
+            jaegerMk2.refrigeratedHoldCapacityLiters >= jaegerBase.refrigeratedHoldCapacityLiters,
+            "Eger upgraded harpoon catches 200 kg carcasses and doubles weapon drain while keeping cold storage.");
+
+        SpecialModuleConfig oporaBase = config.GetSpecialModule("opora_crane_platform");
+        SpecialModuleConfig oporaMk2 = config.GetSpecialModule("opora_crane_platform_mk2");
+        report.Check(oporaBase != null &&
+            oporaMk2 != null &&
+            oporaMk2.needRepairRecoveryPerHour > oporaBase.needRepairRecoveryPerHour &&
+            oporaMk2.cargoVanCapacityUnits >= 14000f &&
+            oporaMk2.baseMassKg > oporaBase.baseMassKg,
+            "Opora upgraded crane improves repair throughput and expands van capacity.");
+
+        SpecialModuleConfig parovozBase = config.GetSpecialModule("parovoz_passenger_cabin");
+        SpecialModuleConfig parovozMk2 = config.GetSpecialModule("parovoz_passenger_cabin_mk2");
+        report.Check(parovozBase != null &&
+            parovozMk2 != null &&
+            parovozBase.passengerSeatCapacity >= 15f &&
+            parovozBase.needHealthRecoveryPerHour > 0f &&
+            parovozBase.needComfortRecoveryPerHour > 0f &&
+            parovozBase.needCapitalConnectionRecoveryPerHour > 0f &&
+            parovozMk2.needComfortRecoveryPerHour > parovozBase.needComfortRecoveryPerHour &&
+            parovozMk2.passengerSeatCapacity >= parovozBase.passengerSeatCapacity,
+            "Parovoz cabin has passenger seats, onboard needs and an upgraded comfort service.");
+    }
+
+    private static bool R1RoleStatsConfigured(string shipId, ShipStatBlock stats)
+    {
+        if (stats == null) return false;
+
+        switch (shipId)
+        {
+            case "water_strider":
+                return stats.Get(ShipStatId.GasHarvesterWaterOnly, 0f) > 0.5f &&
+                    stats.Get(ShipStatId.GasHarvesterVolumeM3PerSecond, 0f) > 0f &&
+                    stats.Get(ShipStatId.LiquidTankCapacityLiters, 0f) >= 1000f;
+            case "bulat":
+                return stats.Get(ShipStatId.MiningImpactHoldCapacityKg, 0f) >= 3000f &&
+                    Approximately(stats.Get(ShipStatId.MiningImpactDamageTakenMultiplier, 0f), 0.5f, 0.001f) &&
+                    stats.Get(ShipStatId.BulkHoldCapacityLiters, 0f) >= 3000f;
+            case "hornet":
+                return stats.Get(ShipStatId.ObservationRadiusMeters, 0f) >= 700f &&
+                    Approximately(stats.Get(ShipStatId.SurveyPaperToInfoEfficiency, 0f), 0.2f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.LeviathanAlarmGenerationMultiplier, 0f), 0.5f, 0.001f);
+            case "jaeger":
+                return Approximately(stats.Get(ShipStatId.HarpoonWeaponCostPerMinute, 0f), 2f, 0.001f) &&
+                    stats.Get(ShipStatId.HarpoonMaxCarcassMassKg, 0f) >= 100f &&
+                    stats.Get(ShipStatId.RefrigeratedHoldCapacityLiters, 0f) >= 2500f &&
+                    stats.Get(ShipStatId.RefrigeratedHoldPowerDrawKw, 0f) > 0f &&
+                    stats.Get(ShipStatId.NeedSafetyRecoveryPerHour, 0f) > 0f;
+            case "opora":
+                return stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f) > 0f &&
+                    stats.Get(ShipStatId.CargoVanCapacityUnits, 0f) >= 6000f;
+            case "parovoz":
+                return stats.Get(ShipStatId.PassengerSeatCapacity, 0f) >= 15f &&
+                    stats.Get(ShipStatId.CargoVanCapacityUnits, 0f) >= 250f &&
+                    stats.Get(ShipStatId.NeedHealthRecoveryPerHour, 0f) > 0f &&
+                    stats.Get(ShipStatId.NeedComfortRecoveryPerHour, 0f) > 0f &&
+                    stats.Get(ShipStatId.NeedCapitalConnectionRecoveryPerHour, 0f) > 0f;
+            default:
+                return false;
+        }
     }
 
     private static void ValidateIslandDevelopmentConfig(WorldConfigDatabase config, BigTestReport report)
@@ -417,8 +1550,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             config.GetItem("paper") != null &&
             config.GetItem("weapon") != null &&
             config.GetItem("gunpowder") != null &&
-            config.GetItem("design_experience") != null;
-        report.Check(coreItemsExist, "Магистральные ресурсы и конструкторский опыт заведены в Item.csv.");
+            config.GetItem(PassengerCargoIds.ToCapitalItemId) != null &&
+            config.GetItem(PassengerCargoIds.ToIslandTemplateItemId) != null &&
+            config.GetItem(PassengerCargoIds.ToShipTemplateItemId) != null &&
+            config.GetItem("design_experience") != null &&
+            config.GetItem("fundamental_experience") != null;
+        report.Check(coreItemsExist, "Магистральные ресурсы, пассажиры, фундаментальный и конструкторский опыт заведены в Item.csv.");
 
         bool archetypesValid = true;
         bool hasFarming = false;
@@ -493,6 +1630,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         bool needsValid = true;
         HashSet<IslandNeedKind> needKinds = new HashSet<IslandNeedKind>();
+        bool hasRepairNeed = false;
+        bool hasCapitalConnectionNeed = false;
         for (int i = 0; i < config.islandSocialNeeds.Count; i++)
         {
             IslandSocialNeedConfig need = config.islandSocialNeeds[i];
@@ -503,13 +1642,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
 
             needKinds.Add(need.kind);
+            hasRepairNeed |= need.kind == IslandNeedKind.Repair && need.recoveryItemId == "tools";
+            hasCapitalConnectionNeed |= need.kind == IslandNeedKind.CapitalConnection && need.recoveryItemId == PassengerCargoIds.ToIslandTemplateItemId;
             needsValid &= config.GetItem(need.recoveryItemId) != null &&
                 need.maxValue > 0f &&
                 need.restorePerItem > 0f &&
                 need.loadDecayPerHour > 0f;
         }
 
-        report.Check(needsValid && needKinds.Count == 5, "Пять общественных потребностей валидны и восстанавливаются ресурсами.");
+        report.Check(needsValid && needKinds.Count == 7 && hasRepairNeed && hasCapitalConnectionNeed, "Семь общественных потребностей валидны: пять базовых, ремонт и связь со столицей.");
 
         bool buildingsValid = true;
         bool hasProcessing = false;
@@ -535,7 +1676,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 building.healthLoad <= 5 &&
                 building.safetyLoad <= 5 &&
                 building.comfortLoad <= 5 &&
-                building.creativityLoad <= 5;
+                building.creativityLoad <= 5 &&
+                building.GetNeedLoad(IslandNeedKind.Repair) <= 5 &&
+                building.GetNeedLoad(IslandNeedKind.CapitalConnection) <= 5;
 
             buildingsValid &= constructionOk && techOk && loadsOk && building.maxUpgradeLevel >= 0;
 
@@ -571,32 +1714,154 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         PlayerProgress progress = new PlayerProgress();
         progress.Normalize();
-        IslandProductionState capital = progress.GetIslandProductionState("capital", true);
-        capital.SetResourceAmount("food", 5);
-        capital.SetResourceAmount("medicines", 5);
-        capital.SetResourceAmount("weapon", 5);
-        capital.SetResourceAmount("cloth", 5);
-        capital.SetResourceAmount("paper", 5);
+        IslandProductionState needIsland = progress.GetIslandProductionState("Island1", true);
+        needIsland.development.completedStage = 2;
+        needIsland.development.socialNeedsUnlocked = true;
+        needIsland.SetResourceAmount("food", 200);
+        needIsland.SetResourceAmount("medicines", 200);
+        needIsland.SetResourceAmount("weapon", 200);
+        needIsland.SetResourceAmount("cloth", 200);
+        needIsland.SetResourceAmount("paper", 200);
+        needIsland.SetResourceAmount("tools", 200);
+        needIsland.SetResourceAmount(PassengerCargoIds.ToIslandItemId("Island1"), 2);
 
         IslandSocietySimulator.EnsureIslandStates(config, progress);
         for (int i = 0; i < config.islandSocialNeeds.Count; i++)
         {
             IslandSocialNeedConfig need = config.islandSocialNeeds[i];
-            IslandSocietyNeedState state = capital.GetSocietyNeedState(need.id, true);
+            IslandSocietyNeedState state = needIsland.GetSocietyNeedState(need.id, true);
             state.currentValue = 0f;
             state.initialized = true;
         }
 
         int restored = IslandSocietySimulator.Advance(config, progress, 1f);
-        bool restoredAllNeeds = restored >= 5;
+        bool restoredAllNeeds = restored >= config.islandSocialNeeds.Count;
         for (int i = 0; i < config.islandSocialNeeds.Count; i++)
         {
             IslandSocialNeedConfig need = config.islandSocialNeeds[i];
-            IslandSocietyNeedState state = capital.GetSocietyNeedState(need.id, false);
+            IslandSocietyNeedState state = needIsland.GetSocietyNeedState(need.id, false);
             restoredAllNeeds &= state != null && state.currentValue > 0f;
         }
 
-        report.Check(restoredAllNeeds, "Остров сам восстанавливает общественные потребности ресурсами со склада.");
+        report.Check(restoredAllNeeds, "Остров сам восстанавливает базовые потребности, ремонт и связь со столицей ресурсами со склада.");
+
+        PlayerProgress passengerProgress = new PlayerProgress();
+        passengerProgress.Normalize();
+        IslandProductionState passengerIsland = passengerProgress.GetIslandProductionState("Island1", true);
+        passengerIsland.development.completedStage = 3;
+        passengerIsland.development.socialNeedsUnlocked = true;
+        IslandProductionState passengerCapital = passengerProgress.GetIslandProductionState("capital", true);
+        int passengerEvents = PassengerTrafficSimulator.Advance(config, passengerProgress, 240f);
+        string islandPassengerItemId = PassengerCargoIds.ToIslandItemId("Island1");
+        int islandToCapitalPassengers = passengerIsland.GetResourceAmount(PassengerCargoIds.ToCapitalItemId);
+        int capitalToIslandPassengers = passengerCapital.GetResourceAmount(islandPassengerItemId);
+        report.Check(passengerEvents > 0 && islandToCapitalPassengers >= 1 && capitalToIslandPassengers >= 1,
+            "Пассажиропоток создаёт груз остров -> столица и столица -> остров.");
+
+        passengerCapital.AddResource(PassengerCargoIds.ToCapitalItemId, islandToCapitalPassengers);
+        int absorbedPassengers = PassengerTrafficSimulator.AbsorbCapitalPassengers(passengerCapital);
+        report.Check(absorbedPassengers >= islandToCapitalPassengers && passengerCapital.GetResourceAmount(PassengerCargoIds.ToCapitalItemId) == 0,
+            "Столица поглощает выгруженных пассажиров до столицы.");
+
+        passengerCapital.TrySpendResource(islandPassengerItemId, capitalToIslandPassengers);
+        passengerIsland.AddResource(islandPassengerItemId, capitalToIslandPassengers);
+        IslandSocietySimulator.EnsureIslandStates(config, passengerProgress);
+        IslandSocialNeedConfig connectionNeed = config.GetIslandSocialNeed("need_capital_connection");
+        IslandSocietyNeedState connectionState = connectionNeed != null ? passengerIsland.GetSocietyNeedState(connectionNeed.id, true) : null;
+        if (connectionState != null)
+        {
+            connectionState.currentValue = 0f;
+            connectionState.initialized = true;
+        }
+
+        int passengerRestore = IslandSocietySimulator.Advance(config, passengerProgress, 1f);
+        report.Check(connectionState != null && connectionState.currentValue > 0f && passengerRestore > 0,
+            "Доставленные пассажиры до конкретного острова закрывают потребность связи со столицей.");
+
+        IslandSocialNeedConfig healthNeed = config.GetIslandSocialNeed("need_health");
+        PlayerProgress slowHealthProgress = new PlayerProgress();
+        slowHealthProgress.Normalize();
+        IslandProductionState slowHealthIsland = slowHealthProgress.GetIslandProductionState("Island1", true);
+        slowHealthIsland.development.completedStage = 2;
+        slowHealthIsland.development.socialNeedsUnlocked = true;
+        slowHealthIsland.SetResourceAmount("medicines", 200);
+        IslandSocietySimulator.EnsureIslandStates(config, slowHealthProgress);
+        IslandSocietyNeedState slowHealthState = healthNeed != null ? slowHealthIsland.GetSocietyNeedState(healthNeed.id, true) : null;
+        if (slowHealthState != null)
+        {
+            slowHealthState.currentValue = 0f;
+            slowHealthState.initialized = true;
+        }
+
+        IslandSocietySimulator.Advance(config, slowHealthProgress, 60f);
+        float slowHealthRecovery = slowHealthState != null ? slowHealthState.currentValue : 0f;
+
+        PlayerProgress hospitalProgress = new PlayerProgress();
+        hospitalProgress.Normalize();
+        IslandProductionState hospitalIsland = hospitalProgress.GetIslandProductionState("Island1", true);
+        hospitalIsland.development.completedStage = 2;
+        hospitalIsland.development.socialNeedsUnlocked = true;
+        hospitalIsland.SetResourceAmount("medicines", 200);
+        IslandBuildingState hospitalBuilding = hospitalIsland.GetBuildingState("hospital", true);
+        hospitalBuilding.built = true;
+        hospitalBuilding.level = 3;
+        hospitalBuilding.modernizationLevel = 1;
+        IslandSocietySimulator.EnsureIslandStates(config, hospitalProgress);
+        IslandSocietyNeedState fastHealthState = healthNeed != null ? hospitalIsland.GetSocietyNeedState(healthNeed.id, true) : null;
+        if (fastHealthState != null)
+        {
+            fastHealthState.currentValue = 0f;
+            fastHealthState.initialized = true;
+        }
+
+        IslandSocietySimulator.Advance(config, hospitalProgress, 60f);
+        float fastHealthRecovery = fastHealthState != null ? fastHealthState.currentValue : 0f;
+        report.Check(healthNeed != null && slowHealthRecovery > 0f && fastHealthRecovery > slowHealthRecovery * 5f,
+            "Скорость удовлетворения потребности ограничена сервисом: без больницы здоровье восстановилось на " + slowHealthRecovery.ToString("0.##") + ", с больницей III - на " + fastHealthRecovery.ToString("0.##") + ".");
+
+        LogisticsShipDefinition shipNeedDefinition = new LogisticsShipDefinition
+        {
+            shipId = "big_test_large_logistics",
+            displayName = "Большой тестовый корабль",
+            healthNeedLoad = 3,
+            repairNeedEnabled = true,
+            capitalConnectionEnabled = true,
+            crewCapacity = 80,
+            passengerCapacity = 120,
+            repairNeedLoad = 3,
+            capitalConnectionNeedLoad = 4
+        };
+        LogisticsShipState shipNeedState = new LogisticsShipState { shipId = shipNeedDefinition.shipId };
+        shipNeedState.AddCargo("medicines", 50);
+        shipNeedState.AddCargo("tools", 50);
+        shipNeedState.AddCargo(PassengerCargoIds.ToShipItemId(shipNeedDefinition.shipId), 2);
+        IslandProductionState shipNeedCapital = new IslandProductionState { islandId = "capital" };
+        LogisticsShipMetrics serviceShipMetrics = new LogisticsShipMetrics
+        {
+            needHealthRecoveryPerHour = 120f,
+            needRepairRecoveryPerHour = 80f,
+            needCapitalConnectionRecoveryPerHour = 40f
+        };
+        ShipboardNeedsSimulator.AdvanceLogisticsShip(config, shipNeedDefinition, shipNeedState, serviceShipMetrics, shipNeedCapital, 60f);
+        ShipboardNeedState shipHealthState = shipNeedState.GetSocietyNeedState("need_health", false);
+        ShipboardNeedState shipRepairState = shipNeedState.GetSocietyNeedState("need_repair", false);
+        ShipboardNeedState shipConnectionState = shipNeedState.GetSocietyNeedState("need_capital_connection", false);
+        bool shipNeedsRestored = shipHealthState != null &&
+            shipRepairState != null &&
+            shipConnectionState != null &&
+            shipHealthState.currentValue > 0f &&
+            shipRepairState.currentValue > 0f &&
+            shipConnectionState.currentValue > 0f &&
+            shipNeedState.GetCargoAmount("medicines") < 50 &&
+            shipNeedState.GetCargoAmount("tools") < 50 &&
+            shipNeedState.GetCargoAmount(PassengerCargoIds.ToShipItemId(shipNeedDefinition.shipId)) < 2;
+        report.Check(shipNeedsRestored, "Корабельные сервисные модули ускоряют удовлетворение здоровья, ремонта и связи со столицей.");
+
+        int shipPassengerEvents = ShipboardNeedsSimulator.AdvanceLogisticsShip(config, shipNeedDefinition, shipNeedState, serviceShipMetrics, shipNeedCapital, 180f);
+        report.Check(shipPassengerEvents > 0 &&
+            shipNeedState.GetCargoAmount(PassengerCargoIds.ToCapitalItemId) >= 1 &&
+            shipNeedCapital.GetResourceAmount(PassengerCargoIds.ToShipItemId(shipNeedDefinition.shipId)) >= 1,
+            "Крупный корабль генерирует пассажиров до столицы, а столица генерирует пассажиров до корабля.");
 
         PlayerProgress developmentProgress = new PlayerProgress();
         developmentProgress.Normalize();
@@ -1321,8 +2586,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
     private void ValidateShipWindAerodynamics(BigTestReport report)
     {
-        report.Section("Корабль, ветер и аэродинамика");
+        report.Section("Корабль, ветер и лётная физика");
         GameObject testShip = null;
+        Scene probeScene = default;
         try
         {
             testShip = new GameObject("Big Test Temporary ShipPhysics");
@@ -1339,12 +2605,103 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ship.dragCoefficient = 1.2f;
             ship.windVelocity = new Vector3(0f, 0f, 10f);
             report.Check(Approximately(ship.EffectiveWindVelocity.magnitude, 12f, 0.001f), "Плохая аэродинамика 1.2 усиливает воздействие ветра до 12 м/с.");
+
+            probeScene = SceneManager.CreateScene("Wild Wind Big Test Flight Probe", new CreateSceneParameters(LocalPhysicsMode.Physics3D));
+            report.Check(probeScene.IsValid(), "Изолированная сцена для проверки лётной физики создана.");
+            if (!probeScene.IsValid())
+            {
+                return;
+            }
+
+            SceneManager.MoveGameObjectToScene(testShip, probeScene);
+            PhysicsScene physicsScene = probeScene.GetPhysicsScene();
+            report.Check(physicsScene.IsValid(), "Изолированная 3D physics-сцена валидна.");
+            if (!physicsScene.IsValid())
+            {
+                return;
+            }
+
+            ConfigureFlightProbeShip(ship, body);
+            float expectedMass = ship.baseMass + ship.cargoMassKg;
+            report.Check(Approximately(body.mass, expectedMass, 0.001f), "Rigidbody получает сухую массу и груз: " + body.mass.ToString("0.#") + " кг.");
+
+            float fuelBeforeLift = ship.engineFuelStockKg;
+            float claudiumBeforeLift = ship.claudiumStock;
+            if (TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
+            {
+                float expectedLiftN = body.mass * 9.81f;
+                report.Check(Approximately(ship.claudiumRequestedLiftKg, body.mass, 0.5f), "Клавдиевый контур запрашивает триммируемую массу корабля: " + ship.claudiumRequestedLiftKg.ToString("0.#") + " кг.");
+                report.Check(Approximately(ship.claudiumCurrentLiftN, expectedLiftN, expectedLiftN * 0.02f), "Клавдиевый контур выдаёт подъёмную силу примерно веса корабля: " + ship.claudiumCurrentLiftN.ToString("0.#") + " Н.");
+                report.Check(ship.engineGeneratedPowerKw + 0.001f >= ship.claudiumPowerDrawKw, "Двигатель покрывает мощность клавдиевого контура: " + ship.engineGeneratedPowerKw.ToString("0.#") + " / " + ship.claudiumPowerDrawKw.ToString("0.#") + " кВт.");
+                report.Check(ship.engineFuelStockKg < fuelBeforeLift && ship.claudiumStock < claudiumBeforeLift, "Подъём тратит топливо и клавдий в одном физическом тике.");
+            }
+
+            ship.claudiumStock = 0f;
+            if (TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
+            {
+                report.Check(Approximately(ship.claudiumCurrentLiftN, 0f, 0.001f), "Без клавдия подъёмная сила падает в ноль.");
+            }
+
+            ConfigureFlightProbeShip(ship, body);
+            ResetFlightProbeBody(body, new Vector3(0f, 1000f, 0f), Quaternion.identity, true);
+            float hoverStartY = body.position.y;
+            if (StepShipPhysicsProbe(ship, physicsScene, 20, report))
+            {
+                float hoverDrift = Mathf.Abs(body.position.y - hoverStartY);
+                report.Check(IsFinite(body.position) && IsFinite(body.linearVelocity), "Сбалансированный полёт не создаёт NaN/Infinity в позиции и скорости.");
+                report.Check(hoverDrift <= 0.25f && Mathf.Abs(body.linearVelocity.y) <= 0.5f, "При рабочем клавдиевом контуре корабль держит высоту: дрейф " + hoverDrift.ToString("0.###") + " м, vy " + body.linearVelocity.y.ToString("0.###") + " м/с.");
+            }
+
+            ConfigureFlightProbeShip(ship, body);
+            ship.claudiumStock = 0f;
+            ResetFlightProbeBody(body, new Vector3(0f, 1000f, 0f), Quaternion.identity, true);
+            if (StepShipPhysicsProbe(ship, physicsScene, 10, report))
+            {
+                report.Check(body.linearVelocity.y < -0.75f, "Без клавдия корабль реально начинает падать: vy " + body.linearVelocity.y.ToString("0.###") + " м/с.");
+            }
+
+            ConfigureFlightProbeShip(ship, body);
+            ship.claudiumStock = 0f;
+            ship.thrustInput = 1f;
+            ship.enginePowerLever = 1f;
+            ResetFlightProbeBody(body, Vector3.zero, Quaternion.identity, false);
+            if (StepShipPhysicsProbe(ship, physicsScene, 15, report))
+            {
+                Vector3 horizontalVelocity = body.linearVelocity;
+                horizontalVelocity.y = 0f;
+                report.Check(horizontalVelocity.z > 0.75f && ship.propellerThrustKgf > 0f, "Винт с доступной мощностью разгоняет корабль вперёд: v " + horizontalVelocity.magnitude.ToString("0.###") + " м/с, тяга " + ship.propellerThrustKgf.ToString("0.#") + " кгс.");
+            }
+
+            ConfigureForwardSpeedProbeShip(ship, body);
+            float expectedMaxSpeed = CalculateExpectedForwardMaxSpeed(ship);
+            ResetFlightProbeBody(body, Vector3.zero, Quaternion.identity, false);
+            if (StepShipPhysicsProbe(ship, physicsScene, 2000, report))
+            {
+                Vector3 terminalVelocity = body.linearVelocity;
+                terminalVelocity.y = 0f;
+                float actualSpeed = terminalVelocity.magnitude;
+                float tolerance = Mathf.Max(1f, expectedMaxSpeed * 0.08f);
+                report.Check(expectedMaxSpeed > 0f && IsFinite(expectedMaxSpeed), "Расчётная максимальная скорость для тестового корабля конечна: " + expectedMaxSpeed.ToString("0.###") + " м/с.");
+                report.Check(Mathf.Abs(actualSpeed - expectedMaxSpeed) <= tolerance, "Симуляция полного газа сходится к расчётной скорости: расчёт " + expectedMaxSpeed.ToString("0.###") + " м/с, факт " + actualSpeed.ToString("0.###") + " м/с, допуск " + tolerance.ToString("0.###") + " м/с.");
+            }
         }
         finally
         {
             if (testShip != null)
             {
-                Destroy(testShip);
+                if (Application.isPlaying)
+                {
+                    Destroy(testShip);
+                }
+                else
+                {
+                    DestroyImmediate(testShip);
+                }
+            }
+
+            if (probeScene.IsValid())
+            {
+                SceneManager.UnloadSceneAsync(probeScene);
             }
         }
     }
@@ -1464,7 +2821,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         SetAtLeast(storage, "food", 500);
         SetAtLeast(storage, "water", 500);
         SetAtLeast(storage, "aerolite", 500);
-        SetAtLeast(storage, "wood", 500);
         SetAtLeast(storage, "metal", 500);
         SetAtLeast(storage, "mechanisms", 500);
         SetAtLeast(storage, "tools", 500);
@@ -1472,7 +2828,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         SetAtLeast(storage, "weapon", 500);
         SetAtLeast(storage, "cloth", 500);
         SetAtLeast(storage, "charcoal", 1200);
-        SetAtLeast(storage, "sulfur", 500);
+        SetAtLeast(storage, "fulgur", 500);
         SetAtLeast(storage, "alcohol", 240);
         SetAtLeast(storage, "claudium", 500);
         SetAtLeast(storage, "claudite", 500);
@@ -1619,6 +2975,284 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return true;
     }
 
+    private static int GetStackAmountForTest(List<ResourceStack> cargo, string itemId)
+    {
+        if (cargo == null || string.IsNullOrWhiteSpace(itemId)) return 0;
+        for (int i = 0; i < cargo.Count; i++)
+        {
+            ResourceStack stack = cargo[i];
+            if (stack != null && stack.resourceId == itemId)
+            {
+                return Mathf.Max(0, stack.amount);
+            }
+        }
+
+        return 0;
+    }
+
+    private static float MeasureMiningImpactDamage(float damageMultiplier)
+    {
+        GameObject probe = null;
+        try
+        {
+            probe = new GameObject("Big Test Mining Impact Probe");
+            Rigidbody body = probe.AddComponent<Rigidbody>();
+            body.mass = 2000f;
+
+            ShipPhysics ship = probe.AddComponent<ShipPhysics>();
+            ship.enabled = false;
+            ship.baseMass = 2000f;
+            ship.cargoMassKg = 0f;
+            ship.miningImpactHoldCapacityKg = 1000f;
+            ship.miningImpactDamageTakenMultiplier = Mathf.Max(0f, damageMultiplier);
+            ship.miningImpactMinDamageSpeedMS = 0f;
+            ship.miningImpactDamageScale = 10f;
+
+            DamageableShip damageable = probe.AddComponent<DamageableShip>();
+            damageable.debugLogging = false;
+            damageable.shipPhysics = ship;
+            damageable.maxStructureHp = 10000f;
+            damageable.ResetDamageState();
+
+            ship.TryCollectMiningFragment("windshale_ore", 500, 5f, out _);
+            return Mathf.Max(0f, 10000f - damageable.structureHp);
+        }
+        finally
+        {
+            DestroyBigTestObject(probe);
+        }
+    }
+
+    private static void DestroyBigTestObject(GameObject target)
+    {
+        if (target == null) return;
+
+        DestroyBigTestUnityObject(target);
+    }
+
+    private static void DestroyBigTestUnityObject(UnityEngine.Object target)
+    {
+        if (target == null) return;
+
+        if (Application.isPlaying)
+        {
+            UnityEngine.Object.Destroy(target);
+        }
+        else
+        {
+            UnityEngine.Object.DestroyImmediate(target);
+        }
+    }
+
+    private static void ConfigureFlightProbeShip(ShipPhysics ship, Rigidbody body)
+    {
+        if (ship == null || body == null) return;
+
+        ship.baseMass = 1000f;
+        ship.cargoMassKg = 200f;
+        ship.hullMaxTakeoffMassKg = 1600f;
+        ship.enginePowerKwAt100 = 240f;
+        ship.engineFuelEfficiency = 0.5f;
+        ship.engineFuelEnergyKwhPerKg = 4f;
+        ship.engineFuelStockKg = 20f;
+        ship.enginePowerLever = 1f;
+        ship.claudiumStock = 20f;
+        ship.claudiumConsumptionPerTonSecond = 0.01f;
+        ship.claudiumLiftEfficiency = 10f;
+        ship.claudiumMaxLiftKg = 1500f;
+        ship.claudiumLiftSmoothing = 1000f;
+        ship.claudiumCurrentLiftN = 0f;
+        ship.claudiumPowerDrawWatts = 0f;
+        ship.claudiumPowerDrawKw = 0f;
+        ship.claudiumRequestedLiftKg = 0f;
+        ship.gasHarvesterEnabled = false;
+        ship.gasHarvesterWaterOnly = false;
+        ship.gasHarvesterPowerDrawKw = 0f;
+        ship.gasHarvesterPowerDrawActualKw = 0f;
+        ship.miningImpactDamageTakenMultiplier = 1f;
+        ship.surveyPaperToInfoEfficiency = 1f;
+        ship.leviathanAlarmGenerationMultiplier = 1f;
+        ship.harpoonWeaponCostPerMinute = 0f;
+        ship.harpoonMaxCarcassMassKg = 0f;
+        ship.refrigeratedHoldCapacityLiters = 0f;
+        ship.refrigeratedHoldPowerDrawKw = 0f;
+        ship.baseObservationRadiusMeters = 0f;
+        ship.observationRadiusMeters = 0f;
+        ship.observationFactsAtHalfRadiusPerSecond = 0f;
+        ship.leviathanHuntAutopilotEnabled = false;
+        ship.airDensity = 1.225f;
+        ship.dragCoefficient = 0.7f;
+        ship.frontalArea = 6f;
+        ship.sideResistance = 1f;
+        ship.verticalAreaFactor = 4f;
+        ship.windVelocity = Vector3.zero;
+        ship.autoStabilizeAtStart = false;
+        ship.altitudeHold = false;
+        ship.cruiseControl = false;
+        ship.headingHold = false;
+        ship.routeEnabled = false;
+        ship.positionHold = false;
+        if (ship.waypoints == null)
+        {
+            ship.waypoints = new List<Vector3>();
+        }
+        ship.waypoints.Clear();
+        ship.currentWaypointIndex = 0;
+        ship.targetSpeedMS = 0f;
+        ship.targetHeading = 0f;
+        ship.thrustInput = 0f;
+        ship.turnInput = 0f;
+        ship.liftInput = 0f;
+        ship.propellerMaxSpeedMS = 30f;
+        ship.propellerEfficiency = 1f;
+        ship.propellerMaxThrustKgf = 500f;
+        ship.gyroTurnTorque = 12000f;
+        ship.gyroTurnDamping = 0.8f;
+        ship.RefreshRuntimeShipSettings();
+        ship.StabilizeForFlightStart(false);
+        body.useGravity = true;
+        body.linearDamping = 0f;
+        body.angularDamping = 2f;
+    }
+
+    private static void ConfigureForwardSpeedProbeShip(ShipPhysics ship, Rigidbody body)
+    {
+        ConfigureFlightProbeShip(ship, body);
+        if (ship == null || body == null) return;
+
+        ship.baseMass = 800f;
+        ship.cargoMassKg = 0f;
+        ship.enginePowerKwAt100 = 120f;
+        ship.engineFuelEfficiency = 1f;
+        ship.engineFuelStockKg = 20f;
+        ship.enginePowerLever = 1f;
+        ship.claudiumStock = 0f;
+        ship.claudiumCurrentLiftN = 0f;
+        ship.claudiumPowerDrawKw = 0f;
+        ship.claudiumPowerDrawWatts = 0f;
+        ship.airDensity = 1.225f;
+        ship.dragCoefficient = 1f;
+        ship.frontalArea = 10f;
+        ship.sideResistance = 0f;
+        ship.propellerEfficiency = 1f;
+        ship.propellerMaxThrustKgf = 500f;
+        ship.propellerMaxSpeedMS = 60f;
+        ship.windVelocity = Vector3.zero;
+        ship.RefreshRuntimeShipSettings();
+        ship.StabilizeForFlightStart(false);
+        ship.thrustInput = 1f;
+        ship.enginePowerLever = 1f;
+        body.useGravity = false;
+    }
+
+    private static float CalculateExpectedForwardMaxSpeed(ShipPhysics ship)
+    {
+        if (ship == null) return 0f;
+
+        float dragPerSpeedSquared = ship.CurrentAeroDrag;
+        float staticThrustN = Mathf.Max(0f, ship.propellerMaxThrustKgf) * 9.81f;
+        float usefulPowerW = Mathf.Max(0f, ship.enginePowerKwAt100 * ship.enginePowerLever - ship.claudiumPowerDrawKw - ship.gasHarvesterPowerDrawActualKw - ship.refrigeratedHoldPowerDrawActualKw)
+            * Mathf.Clamp01(ship.propellerEfficiency)
+            * 1000f;
+
+        if (dragPerSpeedSquared <= 0f || staticThrustN <= 0f || usefulPowerW <= 0f)
+        {
+            return 0f;
+        }
+
+        float staticLimitedSpeed = Mathf.Sqrt(staticThrustN / dragPerSpeedSquared);
+        float powerTransitionSpeed = usefulPowerW / staticThrustN;
+        float expectedSpeed = staticLimitedSpeed <= powerTransitionSpeed
+            ? staticLimitedSpeed
+            : Mathf.Pow(usefulPowerW / dragPerSpeedSquared, 1f / 3f);
+
+        if (ship.propellerMaxSpeedMS > 0f)
+        {
+            expectedSpeed = Mathf.Min(expectedSpeed, ship.propellerMaxSpeedMS);
+        }
+
+        return expectedSpeed;
+    }
+
+    private static void ResetFlightProbeBody(Rigidbody body, Vector3 position, Quaternion rotation, bool useGravity)
+    {
+        if (body == null) return;
+
+        body.useGravity = useGravity;
+        body.linearVelocity = Vector3.zero;
+        body.angularVelocity = Vector3.zero;
+        body.position = position;
+        body.rotation = rotation;
+        body.transform.SetPositionAndRotation(position, rotation);
+        body.Sleep();
+        body.WakeUp();
+    }
+
+    private static bool StepShipPhysicsProbe(ShipPhysics ship, PhysicsScene physicsScene, int steps, BigTestReport report)
+    {
+        if (ship == null)
+        {
+            report.Fail("Проба лётной физики не получила ShipPhysics.");
+            return false;
+        }
+
+        if (!physicsScene.IsValid())
+        {
+            report.Fail("Проба лётной физики не получила валидную PhysicsScene.");
+            return false;
+        }
+
+        int stepCount = Mathf.Max(0, steps);
+        float deltaTime = Mathf.Max(Time.fixedDeltaTime, 0.001f);
+        for (int i = 0; i < stepCount; i++)
+        {
+            if (!TryInvokePrivateMethod(ship, "FixedUpdate", report))
+            {
+                return false;
+            }
+
+            try
+            {
+                physicsScene.Simulate(deltaTime);
+            }
+            catch (Exception exception)
+            {
+                report.Fail("Проба лётной физики не смогла просимулировать physics-шаг: " + exception.Message);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryInvokePrivateMethod(object target, string methodName, BigTestReport report)
+    {
+        if (target == null)
+        {
+            report.Fail("Не удалось вызвать " + methodName + ": целевой объект отсутствует.");
+            return false;
+        }
+
+        System.Reflection.MethodInfo method = target.GetType().GetMethod(methodName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        if (method == null)
+        {
+            report.Fail("В " + target.GetType().Name + " не найден внутренний метод " + methodName + ".");
+            return false;
+        }
+
+        try
+        {
+            method.Invoke(target, null);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Exception root = exception.InnerException ?? exception;
+            report.Fail("Внутренний метод " + target.GetType().Name + "." + methodName + " упал: " + root.GetType().Name + " - " + root.Message);
+            return false;
+        }
+    }
+
     private static float ReadPrivateFloat(object target, string fieldName, float fallback)
     {
         if (target == null) return fallback;
@@ -1636,6 +3270,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private static bool Approximately(float actual, float expected, float tolerance)
     {
         return Mathf.Abs(actual - expected) <= tolerance;
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     private static string FormatKm(float meters)

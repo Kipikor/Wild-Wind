@@ -47,7 +47,7 @@ public static class MiningSetupEditor
         meta.progress.SelectHull("starter_hull");
         ShipAssemblyBuilder.AutoInstallRequiredModules(meta.CurrentCatalog, meta.techTree, meta.progress, out _);
         meta.progress.InstallModule("utility_01", "starter_mining_hold");
-        meta.progress.SetShipCargoAmount("wood", 100);
+        meta.progress.SetShipCargoAmount("charcoal", 100);
         meta.progress.SetShipCargoAmount("claudium", 50);
         meta.progress.SetShipCargoAmount("weapon", 5);
         meta.progress.shipWeaponSpendBufferKg = 0f;

@@ -116,7 +116,7 @@ public static class ProductionTestSceneBuilder
         meta.spawnConfigIslandsOnPlay = true;
         meta.configIslandVisualRadius = 20f;
         meta.showDockingDebugUI = true;
-        meta.productionDebugResourceId = focus == IslandIndustryKind.Processing ? "windshale_ore" : "wood";
+        meta.productionDebugResourceId = focus == IslandIndustryKind.Processing ? "windshale_ore" : "charcoal";
         meta.productionDebugAmount = 25;
 
         meta.progress = new PlayerProgress();
@@ -233,7 +233,6 @@ public static class ProductionTestSceneBuilder
 
         if (!focus.HasValue || focus.Value == IslandIndustryKind.Manufacturing)
         {
-            storage.SetResourceAmount("wood", Mathf.Max(storage.GetResourceAmount("wood"), 120));
             storage.SetResourceAmount("metal", Mathf.Max(storage.GetResourceAmount("metal"), 80));
             storage.SetResourceAmount("mechanisms", Mathf.Max(storage.GetResourceAmount("mechanisms"), 40));
             storage.SetResourceAmount("charcoal", Mathf.Max(storage.GetResourceAmount("charcoal"), 80));
@@ -241,7 +240,7 @@ public static class ProductionTestSceneBuilder
 
         if (!focus.HasValue || focus.Value == IslandIndustryKind.Reaction)
         {
-            storage.SetResourceAmount("sulfur", Mathf.Max(storage.GetResourceAmount("sulfur"), 80));
+            storage.SetResourceAmount("fulgur", Mathf.Max(storage.GetResourceAmount("fulgur"), 80));
             storage.SetResourceAmount("charcoal", Mathf.Max(storage.GetResourceAmount("charcoal"), 120));
             storage.SetResourceAmount("alcohol", Mathf.Max(storage.GetResourceAmount("alcohol"), 40));
         }
@@ -253,7 +252,6 @@ public static class ProductionTestSceneBuilder
 
         if (!focus.HasValue || focus.Value == IslandIndustryKind.Assembly)
         {
-            storage.SetResourceAmount("wood", Mathf.Max(storage.GetResourceAmount("wood"), 160));
             storage.SetResourceAmount("metal", Mathf.Max(storage.GetResourceAmount("metal"), 120));
             storage.SetResourceAmount("mechanisms", Mathf.Max(storage.GetResourceAmount("mechanisms"), 40));
             storage.SetResourceAmount("tools", Mathf.Max(storage.GetResourceAmount("tools"), 40));

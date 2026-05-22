@@ -116,7 +116,7 @@ public partial class MetaGameState : MonoBehaviour
     [InspectorName("Ширина интерфейса")]
     public int debugUiWidth = 380;
     [InspectorName("Ресурс для отладки склада")]
-    public string productionDebugResourceId = "wood";
+    public string productionDebugResourceId = "charcoal";
     [InspectorName("Количество для отладки склада")]
     public int productionDebugAmount = 25;
 
@@ -127,7 +127,21 @@ public partial class MetaGameState : MonoBehaviour
 
     public GameSessionMode CurrentMode => progress != null ? progress.currentMode : startingMode;
     public bool IsDocked => CurrentMode == GameSessionMode.Docked;
-    public string SavePath => Path.Combine(Application.persistentDataPath, saveFileName);
+    public string EffectiveSaveFileName
+    {
+        get
+        {
+            string selectedFileName = WildWindSaveSlots.GetSelectedSaveFileNameOrEmpty();
+            if (!string.IsNullOrWhiteSpace(selectedFileName) && saveFileName == WildWindSaveSlots.DefaultSaveFileName)
+            {
+                return selectedFileName;
+            }
+
+            return string.IsNullOrWhiteSpace(saveFileName) ? WildWindSaveSlots.DefaultSaveFileName : saveFileName;
+        }
+    }
+
+    public string SavePath => Path.Combine(Application.persistentDataPath, EffectiveSaveFileName);
 
     private bool initialized;
     private bool isAdvancingProcesses;
@@ -165,6 +179,7 @@ public partial class MetaGameState : MonoBehaviour
         public float engineLiftKg;
         public float claudiumMaxLiftKg;
         public float hullLimitKg;
+        public List<CargoCompartmentDefinition> cargoCompartments;
     }
 
     private void EnsureWorldConfigLoaded()
@@ -214,7 +229,7 @@ public partial class MetaGameState : MonoBehaviour
         ShipCatalogSO activeCatalog = ActiveCatalog;
         if (activeCatalog == null) return;
 
-        ShipAssemblyBuilder.ApplySpecialModuleConfigs(activeCatalog, worldConfig);
+        ShipAssemblyBuilder.ApplyCsvShipPartConfigs(activeCatalog, worldConfig);
     }
 
     private void EnsureLogisticsFleet()
@@ -1536,7 +1551,7 @@ public partial class MetaGameState : MonoBehaviour
 
             if (!ApplyOneCargoTransferUnit(operation, islandStorage))
             {
-                StopCargoTransfer("Погрузка остановлена: не хватает товара или грузоподъемности.");
+                StopCargoTransfer("Погрузка остановлена: не хватает товара, грузоподъемности или подходящего отсека.");
                 break;
             }
 
@@ -1568,7 +1583,11 @@ public partial class MetaGameState : MonoBehaviour
         if (operation.loadToShip)
         {
             CargoCapacityInfo capacity = CalculateCargoCapacity();
-            if (capacity.currentCargoKg + 1f > capacity.maxCargoKg + 0.001f) return false;
+            Dictionary<string, int> cargoAfterLoad = CargoStoragePlanner.ToCargoMap(progress.shipCargo);
+            cargoAfterLoad[operation.itemId] = cargoAfterLoad.TryGetValue(operation.itemId, out int current) ? current + 1 : 1;
+            float cargoMassAfterLoad = CargoStoragePlanner.GetCargoMassKg(worldConfig, cargoAfterLoad);
+            if (cargoMassAfterLoad > capacity.maxCargoKg + 0.001f) return false;
+            if (!CargoStoragePlanner.TryValidateCargoStorage(worldConfig, capacity.cargoCompartments, cargoAfterLoad, out _)) return false;
             if (!islandStorage.TrySpendResource(operation.itemId, 1)) return false;
 
             progress.AddShipCargo(operation.itemId, 1);
@@ -1808,10 +1827,19 @@ public partial class MetaGameState : MonoBehaviour
 
         EnsureProgressInitialized();
         CargoCapacityInfo capacity = CalculateCargoCapacity();
-        int freeKg = Mathf.FloorToInt(Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg));
-        if (!capacity.assemblyValid || freeKg < amount)
+        float addedMassKg = worldConfig != null ? worldConfig.GetItemTransportMassKg(resourceId, amount) : amount;
+        float freeKg = Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg);
+        if (!capacity.assemblyValid || freeKg + 0.001f < addedMassKg)
         {
-            reason = $"Не хватает грузоподъемности: нужно {amount} кг, свободно {freeKg} кг.";
+            reason = $"Не хватает грузоподъемности: нужно {addedMassKg:F1} кг, свободно {freeKg:F1} кг.";
+            return false;
+        }
+
+        Dictionary<string, int> cargoAfterAdd = CargoStoragePlanner.ToCargoMap(progress.shipCargo);
+        cargoAfterAdd[resourceId] = cargoAfterAdd.TryGetValue(resourceId, out int current) ? current + amount : amount;
+        if (!CargoStoragePlanner.TryValidateCargoStorage(worldConfig, capacity.cargoCompartments, cargoAfterAdd, out string storageError))
+        {
+            reason = storageError;
             return false;
         }
 
@@ -1894,7 +1922,7 @@ public partial class MetaGameState : MonoBehaviour
             assemblyValid = false,
             canFly = false,
             reason = "сборка корабля не проверена.",
-            currentCargoKg = progress != null ? progress.GetShipCargoMassKg() : 0f
+            currentCargoKg = progress != null ? progress.GetShipCargoMassKg(worldConfig) : 0f
         };
 
         ShipCatalogSO activeCatalog = ActiveCatalog;
@@ -1924,6 +1952,7 @@ public partial class MetaGameState : MonoBehaviour
         ShipPhysics activeShip = GetActiveShip();
         ShipStatBlock stats = result.stats;
         info.assemblyValid = true;
+        info.cargoCompartments = CargoStoragePlanner.BuildStatCompartments(stats);
         if (activeShip != null)
         {
             info.emptyMassKg = activeShip.baseMass;
@@ -1947,7 +1976,7 @@ public partial class MetaGameState : MonoBehaviour
         return Mathf.Max(0f, enginePowerKw) * Mathf.Max(0f, liftKgPerKw);
     }
 
-    private static CargoCapacityInfo CompleteCargoCapacity(CargoCapacityInfo info)
+    private CargoCapacityInfo CompleteCargoCapacity(CargoCapacityInfo info)
     {
         info.allowedTakeoffMassKg = Mathf.Min(info.engineLiftKg, Mathf.Min(info.claudiumMaxLiftKg, info.hullLimitKg));
         info.maxCargoKg = Mathf.Max(0f, info.allowedTakeoffMassKg - info.emptyMassKg);
@@ -1987,6 +2016,12 @@ public partial class MetaGameState : MonoBehaviour
             return info;
         }
 
+        if (!CargoStoragePlanner.TryValidateCargoStorage(worldConfig, info.cargoCompartments, progress != null ? progress.shipCargo : null, out string storageError))
+        {
+            info.reason = storageError;
+            return info;
+        }
+
         info.canFly = true;
         info.reason = "масса в норме.";
         return info;
@@ -1996,7 +2031,7 @@ public partial class MetaGameState : MonoBehaviour
     {
         if (ship == null || progress == null) return;
 
-        ship.cargoMassKg = Mathf.Max(0, progress.GetShipCargoMassKg());
+        ship.cargoMassKg = Mathf.Max(0f, progress.GetShipCargoMassKg(worldConfig));
         RefreshShipConsumablesFromCargo(ship, true);
         ship.RefreshRuntimeShipSettings();
     }
@@ -2031,7 +2066,7 @@ public partial class MetaGameState : MonoBehaviour
         if (resetPendingConsumption)
         {
             RefreshShipConsumablesFromCargo(ship, true);
-            ship.cargoMassKg = Mathf.Max(0, progress.GetShipCargoMassKg());
+            ship.cargoMassKg = Mathf.Max(0f, progress.GetShipCargoMassKg(worldConfig));
             ship.RefreshRuntimeShipSettings();
             return;
         }
@@ -2041,7 +2076,7 @@ public partial class MetaGameState : MonoBehaviour
         string claudiumResourceId = GetClaudiumResourceId(ship);
         SyncCargoResourceFromRuntime(claudiumResourceId, ref syncedClaudiumResourceId, ref pendingClaudiumConsumedKg, ref ship.claudiumStock);
 
-        ship.cargoMassKg = Mathf.Max(0, progress.GetShipCargoMassKg());
+        ship.cargoMassKg = Mathf.Max(0f, progress.GetShipCargoMassKg(worldConfig));
         ship.RefreshRuntimeShipSettings();
     }
 
@@ -2170,7 +2205,7 @@ public partial class MetaGameState : MonoBehaviour
     private string GetStartingEngineFuelId()
     {
         string fuelId = shipLoader != null && shipLoader.targetShip != null ? shipLoader.targetShip.engineFuelId : "";
-        return string.IsNullOrWhiteSpace(fuelId) ? "wood" : fuelId;
+        return string.IsNullOrWhiteSpace(fuelId) ? "charcoal" : fuelId;
     }
 
     private void AddStartingIslandSupplies()
@@ -2664,7 +2699,7 @@ public partial class MetaGameState : MonoBehaviour
         if (progress.cargoTransfer != null && progress.cargoTransfer.active)
         {
             int remaining = progress.cargoTransfer.GetRemainingUnits();
-            GUILayout.Label($"Идет погрузка: осталось {remaining} кг, следующая операция через {FormatRemaining(progress.cargoTransfer.nextOperationUtcTicks)}");
+            GUILayout.Label($"Идет погрузка: осталось {remaining} ед., следующая операция через {FormatRemaining(progress.cargoTransfer.nextOperationUtcTicks)}");
             return;
         }
 
@@ -2690,14 +2725,20 @@ public partial class MetaGameState : MonoBehaviour
         IslandProductionState storage = progress.GetIslandProductionState(island.id, true);
         EnsureCargoPlan(island.id);
 
-        int plannedCargoMass = GetPlannedCargoMassKg();
+        Dictionary<string, int> plannedCargo = GetPlannedCargoMap();
+        float plannedCargoMass = CargoStoragePlanner.GetCargoMassKg(worldConfig, plannedCargo);
         int operationCount = GetCargoPlanOperationCount();
         bool overload = plannedCargoMass > capacity.maxCargoKg + 0.001f;
+        bool storageOk = CargoStoragePlanner.TryValidateCargoStorage(worldConfig, capacity.cargoCompartments, plannedCargo, out string storageError);
 
         GUILayout.Label($"План: {plannedCargoMass}/{capacity.maxCargoKg:F0} кг, операций: {operationCount}, время: {operationCount * island.timeForOneItemLoadSeconds:F1} сек");
         if (overload)
         {
             GUILayout.Label("План перегружает корабль.");
+        }
+        if (!storageOk)
+        {
+            GUILayout.Label("План не помещается в отсеки: " + storageError);
         }
 
         for (int i = 0; i < worldConfig.items.Count; i++)
@@ -2707,7 +2748,7 @@ public partial class MetaGameState : MonoBehaviour
             DrawCargoPlanRow(item, storage);
         }
 
-        GUI.enabled = operationCount > 0 && !overload && capacity.emptyMassKg <= capacity.allowedTakeoffMassKg + 0.001f;
+        GUI.enabled = operationCount > 0 && !overload && storageOk && capacity.emptyMassKg <= capacity.allowedTakeoffMassKg + 0.001f;
         if (GUILayout.Button(new GUIContent("Подтвердить погрузку", "Сначала выполняется выгрузка с борта на склад, затем загрузка со склада на борт. Каждая единица товара занимает время из Island.csv.")))
         {
             StartCargoTransfer(island, storage);
@@ -2723,7 +2764,8 @@ public partial class MetaGameState : MonoBehaviour
         entry.targetShipAmount = Mathf.Clamp(entry.targetShipAmount, 0, shipAmount + storageAmount);
 
         string itemName = worldConfig.GetItemNameRu(item.id);
-        GUILayout.Label($"{itemName}: склад {storageAmount} кг, борт {shipAmount} кг, цель {entry.targetShipAmount} кг");
+        string unitLabel = GetCargoAmountUnitLabel(item);
+        GUILayout.Label($"{itemName}: склад {storageAmount} {unitLabel}, борт {shipAmount} {unitLabel}, цель {entry.targetShipAmount} {unitLabel}");
 
         GUILayout.BeginHorizontal();
         GUI.enabled = entry.targetShipAmount > 0;
@@ -2737,7 +2779,7 @@ public partial class MetaGameState : MonoBehaviour
 
         GUILayout.BeginHorizontal();
         GUI.enabled = shipAmount > 0;
-        if (GUILayout.Button(new GUIContent("Унич. 1 борт", "Мгновенно уничтожает 1 кг этого товара на корабле.")))
+        if (GUILayout.Button(new GUIContent("Унич. 1 борт", "Мгновенно уничтожает 1 единицу этого товара на корабле.")))
         {
             progress.TrySpendShipCargo(item.id, 1);
             ApplyCargoMassToShip(GetActiveShip());
@@ -2754,7 +2796,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         GUI.enabled = storageAmount > 0;
-        if (GUILayout.Button(new GUIContent("Унич. 1 склад", "Мгновенно уничтожает 1 кг этого товара на складе острова.")))
+        if (GUILayout.Button(new GUIContent("Унич. 1 склад", "Мгновенно уничтожает 1 единицу этого товара на складе острова.")))
         {
             storage.TrySpendResource(item.id, 1);
             ResetCargoPlan();
@@ -2771,7 +2813,7 @@ public partial class MetaGameState : MonoBehaviour
         GUILayout.EndHorizontal();
 
         GUILayout.BeginHorizontal();
-        GUILayout.Label("Уничтожить, кг", GUILayout.Width(110f));
+        GUILayout.Label("Уничтожить", GUILayout.Width(110f));
         entry.destroyAmountText = GUILayout.TextField(entry.destroyAmountText ?? "1", GUILayout.Width(60f));
         int destroyAmount = ParseCargoAmount(entry.destroyAmountText, Mathf.Max(shipAmount, storageAmount));
 
@@ -2794,6 +2836,25 @@ public partial class MetaGameState : MonoBehaviour
 
         GUI.enabled = true;
         GUILayout.EndHorizontal();
+    }
+
+    private static string GetCargoAmountUnitLabel(ItemConfig item)
+    {
+        if (item == null) return "ед.";
+
+        switch (item.cargoStorageKind)
+        {
+            case CargoStorageKind.Cabin:
+                return "мест";
+            case CargoStorageKind.BulkHold:
+            case CargoStorageKind.LiquidTank:
+            case CargoStorageKind.GasCylinder:
+                return "л";
+            case CargoStorageKind.ShipDock:
+                return "шт.";
+            default:
+                return "ед.";
+        }
     }
 
     private void EnsureCargoPlan(string islandId)
@@ -2844,17 +2905,22 @@ public partial class MetaGameState : MonoBehaviour
         return Mathf.Clamp(amount, 0, Mathf.Max(0, max));
     }
 
-    private int GetPlannedCargoMassKg()
+    private Dictionary<string, int> GetPlannedCargoMap()
     {
-        int total = 0;
+        Dictionary<string, int> map = new Dictionary<string, int>();
         for (int i = 0; i < cargoPlan.Count; i++)
         {
             CargoPlanEntry entry = cargoPlan[i];
-            if (entry == null) continue;
-            total += Mathf.Max(0, entry.targetShipAmount);
+            if (entry == null || string.IsNullOrWhiteSpace(entry.itemId) || entry.targetShipAmount <= 0) continue;
+            map[entry.itemId] = entry.targetShipAmount;
         }
 
-        return total;
+        return map;
+    }
+
+    private float GetPlannedCargoMassKg()
+    {
+        return CargoStoragePlanner.GetCargoMassKg(worldConfig, GetPlannedCargoMap());
     }
 
     private int GetCargoPlanOperationCount()
@@ -2878,6 +2944,12 @@ public partial class MetaGameState : MonoBehaviour
         if (GetPlannedCargoMassKg() > capacity.maxCargoKg + 0.001f)
         {
             lastSaveMessage = "Нельзя начать погрузку: план перегружает корабль.";
+            return;
+        }
+
+        if (!CargoStoragePlanner.TryValidateCargoStorage(worldConfig, capacity.cargoCompartments, GetPlannedCargoMap(), out string storageError))
+        {
+            lastSaveMessage = "Нельзя начать погрузку: " + storageError;
             return;
         }
 

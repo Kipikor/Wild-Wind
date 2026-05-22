@@ -29,8 +29,7 @@ public class GasHarvesterFleetController : MonoBehaviour
     [Header("Debug")]
     public bool debugLogging;
     public bool debugStockAllIslandFuelAndClaudium = true;
-    public int debugMinIslandWoodKg = 500;
-    public int debugMinIslandCharcoalKg = 500;
+    public int debugMinIslandFuelKg = 500;
     public int debugMinIslandClaudiumKg = 250;
 
     [InspectorName("Gas harvesters")]
@@ -147,8 +146,7 @@ public class GasHarvesterFleetController : MonoBehaviour
             if (island == null || string.IsNullOrWhiteSpace(island.id)) continue;
 
             IslandProductionState storage = progress.GetIslandProductionState(island.id, true);
-            changed += SetStorageAtLeast(storage, "wood", debugMinIslandWoodKg);
-            changed += SetStorageAtLeast(storage, "charcoal", debugMinIslandCharcoalKg);
+            changed += SetStorageAtLeast(storage, "charcoal", debugMinIslandFuelKg);
             changed += SetStorageAtLeast(storage, ResolveClaudiumResourceId(null), debugMinIslandClaudiumKg);
         }
 
@@ -494,15 +492,16 @@ public class GasHarvesterFleetController : MonoBehaviour
 
         state.harvestBufferKg += harvestedLiters;
         int wholeKg = Mathf.FloorToInt(state.harvestBufferKg + 0.0001f);
+        string outputItemId = metrics.harvesterWaterOnly ? "water" : cloudType.condensateItemId;
         if (wholeKg > 0)
         {
-            state.AddCargo(cloudType.condensateItemId, wholeKg);
+            state.AddCargo(outputItemId, wholeKg);
             state.harvestBufferKg -= wholeKg;
         }
 
         float newRemainingLiters = GetCloudRemainingLiters(progress, config, cloud.id);
         state.lastKnownPosition = cloud.position;
-        state.lastError = $"Harvested {wholeKg} kg {cloudType.condensateItemId}, cloud left {newRemainingLiters:F1} kg.";
+        state.lastError = $"Harvested {wholeKg} kg {outputItemId}, cloud left {newRemainingLiters:F1} kg.";
         if (wholeKg > 0 || newRemainingLiters <= 0.001f)
         {
             LogEvent(state, $"cycle at {cloud.id}: +{wholeKg}kg, buffer={state.harvestBufferKg:F2}, left={newRemainingLiters:F1}, cargo={FormatCargo(state.cargo)}");
@@ -680,7 +679,7 @@ public class GasHarvesterFleetController : MonoBehaviour
         metrics.emptyMassKg = stats.Get(ShipStatId.BaseMass, 0f);
         metrics.enginePowerKw = stats.Get(ShipStatId.EngineMaxPower, 0f);
         metrics.engineFuelEfficiency = Mathf.Clamp(stats.Get(ShipStatId.EngineFuelEfficiency, 0.32f), 0.01f, 0.95f);
-        metrics.engineFuelId = string.IsNullOrWhiteSpace(stats.EngineFuelId) ? "wood" : stats.EngineFuelId;
+        metrics.engineFuelId = string.IsNullOrWhiteSpace(stats.EngineFuelId) ? "charcoal" : stats.EngineFuelId;
         metrics.propellerMaxSpeedMS = stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f);
         metrics.maxAutoVerticalSpeedMS = stats.Get(ShipStatId.MaxAutoVerticalSpeed, 1f);
         metrics.maxStructuralVerticalSpeedMS = stats.Get(ShipStatId.MaxStructuralVerticalSpeed, 1f);
@@ -692,6 +691,7 @@ public class GasHarvesterFleetController : MonoBehaviour
         metrics.harvesterPowerDrawKw = stats.Get(ShipStatId.GasHarvesterPowerDrawKw, 0f);
         metrics.harvesterRadiusMeters = stats.Get(ShipStatId.GasHarvesterRadiusMeters, 0f);
         metrics.harvesterCycleSeconds = Mathf.Max(0.1f, stats.Get(ShipStatId.GasHarvesterCycleSeconds, 5f));
+        metrics.harvesterWaterOnly = stats.Get(ShipStatId.GasHarvesterWaterOnly, 0f) > 0.5f;
         metrics.engineLiftKg = metrics.enginePowerKw * metrics.claudiumLiftEfficiency;
         metrics.allowedTakeoffMassKg = Mathf.Min(metrics.engineLiftKg, Mathf.Min(metrics.claudiumMaxLiftKg, metrics.hullLimitKg));
         metrics.maxCargoKg = Mathf.Max(0f, metrics.allowedTakeoffMassKg - metrics.emptyMassKg);
@@ -1042,7 +1042,7 @@ public class GasHarvesterFleetController : MonoBehaviour
     {
         if (string.IsNullOrWhiteSpace(itemId)) return false;
         if (itemId == defaultClaudiumResourceId) return true;
-        return itemId == "wood" || itemId == "coal";
+        return itemId == "charcoal";
     }
 
     private string ResolveClaudiumResourceId(GasHarvesterShipDefinition definition)
@@ -1171,6 +1171,7 @@ public struct GasHarvesterShipMetrics
     public float harvesterPowerDrawKw;
     public float harvesterRadiusMeters;
     public float harvesterCycleSeconds;
+    public bool harvesterWaterOnly;
 }
 
 public struct GasHarvesterLegEstimate

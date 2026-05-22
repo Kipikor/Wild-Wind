@@ -28,7 +28,7 @@ public sealed class WorldSimulationTick : MonoBehaviour
     [SerializeField, InspectorName("Upper Technical Visibility, m")] private float upperTechnicalVisibilityMeters = 14000f;
 
     [Header("Debug")]
-    [SerializeField, InspectorName("Log Ticks")] private bool logTicks;
+    [SerializeField, InspectorName("Log Ticks")] private bool logTicks = false;
 
     [SerializeField, HideInInspector] private long tickCount;
     [SerializeField, HideInInspector] private float totalSimulatedSeconds;

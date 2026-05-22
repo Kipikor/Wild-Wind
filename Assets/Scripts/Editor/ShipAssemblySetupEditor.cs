@@ -194,7 +194,7 @@ public static class ShipAssemblySetupEditor
         engine.description = "Базовый общий двигатель: крутит винт и питает клавдиевый контур.";
         engine.kind = ShipPartKind.Module;
         engine.prefab = prefab;
-        engine.engineFuelId = "wood";
+        engine.engineFuelId = "charcoal";
         engine.slots.Clear();
         engine.compatibleSlotTypeIds = new List<string> { "engine_main" };
         engine.grantedSlots.Clear();
@@ -516,9 +516,9 @@ public static class ShipAssemblySetupEditor
         physics.hullMaxTakeoffMassKg = 3000f;
         physics.targetTrimMass = 900f;
         physics.enginePowerKwAt100 = 190f;
-        physics.engineFuelId = "wood";
-        physics.engineFuelEfficiency = 0.32f;
-        physics.engineFuelEnergyKwhPerKg = 4f;
+        physics.engineFuelId = "charcoal";
+        physics.engineFuelEfficiency = 0.18f;
+        physics.engineFuelEnergyKwhPerKg = 8f;
         physics.engineFuelStockKg = 0f;
         physics.enginePowerLever = 0.88f;
         physics.gyroTurnTorque = 12000f;

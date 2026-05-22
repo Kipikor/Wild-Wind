@@ -568,7 +568,8 @@ public class Leviathan : MonoBehaviour
     {
         if (isCarcass || amount <= 0f || alarmRamActive) return;
 
-        alarm01 = Mathf.Clamp01(alarm01 + amount);
+        float sourceMultiplier = sourceShip != null ? Mathf.Max(0f, sourceShip.leviathanAlarmGenerationMultiplier) : 1f;
+        alarm01 = Mathf.Clamp01(alarm01 + amount * sourceMultiplier);
         if (alarm01 >= 1f)
         {
             StartAlarmRamAttack(sourceShip != null ? sourceShip : FindFirstObjectByType<ShipPhysics>(), reason);
@@ -1503,6 +1504,12 @@ public class HarpoonTether : MonoBehaviour
             return;
         }
 
+        if (ownerShip != null && !ownerShip.TrySpendHarpoonUpkeep(Time.fixedDeltaTime, out string upkeepReason))
+        {
+            Detach(upkeepReason);
+            return;
+        }
+
         Vector3 shipPoint = shipBody.worldCenterOfMass;
         Vector3 targetPoint = targetBody.worldCenterOfMass;
         Vector3 delta = targetPoint - shipPoint;
@@ -1765,7 +1772,7 @@ public class ShipPhysics : MonoBehaviour
     [Tooltip("Мощность, которую двигатель выдает на ручке 100%, в киловаттах.")]
     public float enginePowerKwAt100 = 80f;
     [Tooltip("Тип топлива. Энергоемкость берется из Item.csv по этому id.")]
-    public string engineFuelId = "wood";
+    public string engineFuelId = "charcoal";
     [Tooltip("Доля энергии топлива, которая превращается в полезную мощность двигателя.")]
     public float engineFuelEfficiency = 0.32f;
     [HideInInspector] public float engineFuelEnergyKwhPerKg = 4f;
@@ -1807,6 +1814,8 @@ public class ShipPhysics : MonoBehaviour
     public float gasHarvesterRadiusMeters;
     [Tooltip("Длительность одного цикла добычи. Контакт с облаком проверяется в начале и в конце цикла.")]
     public float gasHarvesterCycleSeconds = 5f;
+    [Tooltip("Если включено, харвестер грубо фильтрует любой конденсат в воду и теряет остальные фракции.")]
+    public bool gasHarvesterWaterOnly;
     [HideInInspector] public float gasHarvesterPowerDrawActualKw;
     [HideInInspector] public float gasHarvesterCycleProgressSeconds;
     [HideInInspector] public float gasHarvesterBufferKg;
@@ -1816,6 +1825,10 @@ public class ShipPhysics : MonoBehaviour
     [Header("Майнинг")]
     [Tooltip("Противоударный кузов ловит падающие куски. Пойманная руда складывается в общий груз корабля.")]
     public float miningImpactHoldCapacityKg;
+    [Tooltip("Множитель урона от пойманных падающих рудных глыб. 0.5 = противоударный кузов получает вдвое меньше.")]
+    public float miningImpactDamageTakenMultiplier = 1f;
+    public float miningImpactMinDamageSpeedMS = 4f;
+    public float miningImpactDamageScale = 10f;
     [Tooltip("Радиус сбора падающих кусков вокруг корабля.")]
     public float miningCatchRadiusMeters = 10f;
     [Tooltip("Дальность временной кнопки выстрела по глыбе.")]
@@ -1835,6 +1848,10 @@ public class ShipPhysics : MonoBehaviour
     [Range(0f, 1f)] public float observationCloudInfoEfficiency;
     [Tooltip("Доля потенциальной научной информации о левиафанах, которую прибор может снять, перерабатывая бумагу.")]
     [Range(0f, 1f)] public float observationLeviathanInfoEfficiency;
+    [Tooltip("Сколько единиц информации получается из 1 единицы бумаги. 0.2 = 5 бумаги на 1 опыт.")]
+    [Range(0.01f, 1f)] public float surveyPaperToInfoEfficiency = 1f;
+    [Tooltip("Множитель тревоги левиафанов от этого корабля. 0.5 = тревога растёт вдвое медленнее.")]
+    [Min(0f)] public float leviathanAlarmGenerationMultiplier = 1f;
     [HideInInspector] public string surveyLastMessage = "";
 
     [Header("Оружие")]
@@ -1869,6 +1886,20 @@ public class ShipPhysics : MonoBehaviour
     public float harpoonCarcassCollectionRadiusMeters = 14f;
     [Tooltip("Скорость, с которой лебедка укорачивает трос после того, как цель стала тушей.")]
     public float harpoonCarcassWinchSpeedMS = 7f;
+    [Tooltip("Сколько оружия в минуту расходуется, пока гарпун держит цель.")]
+    public float harpoonWeaponCostPerMinute;
+    [Tooltip("Максимальная масса туши, которую этот гарпун может удержать и поднять. 0 = без ограничения.")]
+    public float harpoonMaxCarcassMassKg;
+    private float harpoonWeaponSpendBufferKg;
+
+    [Header("Холодильник туш")]
+    [Tooltip("Вместимость холодильника для туш, л. 1000 л = 1 м3.")]
+    public float refrigeratedHoldCapacityLiters;
+    [Tooltip("Сколько мощности холодильник забирает при включении независимо от заполнения.")]
+    public float refrigeratedHoldPowerDrawKw;
+    [Tooltip("Холодильник активен. Если выключить, туши считаются нестабильным грузом.")]
+    public bool refrigeratedHoldEnabled = true;
+    [HideInInspector] public float refrigeratedHoldPowerDrawActualKw;
     [Header("Охотничий автопилот")]
     [Tooltip("Если включено, корабль сам подходит к ближайшему левиафану, стреляет гарпуном и забирает тушу после подтяжки.")]
     public bool leviathanHuntAutopilotEnabled;
@@ -2072,6 +2103,11 @@ public class ShipPhysics : MonoBehaviour
 
     public bool TryCollectMiningFragment(string oreItemId, int amountKg, out string reason)
     {
+        return TryCollectMiningFragment(oreItemId, amountKg, 0f, out reason);
+    }
+
+    public bool TryCollectMiningFragment(string oreItemId, int amountKg, float impactSpeedMS, out string reason)
+    {
         reason = "";
         if (string.IsNullOrWhiteSpace(oreItemId) || amountKg <= 0)
         {
@@ -2081,6 +2117,15 @@ public class ShipPhysics : MonoBehaviour
         if (miningImpactHoldCapacityKg <= 0f)
         {
             reason = "На корабле нет противоударного кузова.";
+            miningLastMessage = reason;
+            return false;
+        }
+
+        ApplyMiningImpactDamage(amountKg, impactSpeedMS);
+
+        if (amountKg > miningImpactHoldCapacityKg + 0.001f)
+        {
+            reason = $"Глыба слишком тяжёлая для противоударного кузова: {amountKg}/{miningImpactHoldCapacityKg:0} кг.";
             miningLastMessage = reason;
             return false;
         }
@@ -2110,6 +2155,50 @@ public class ShipPhysics : MonoBehaviour
 
         miningLastMessage = "Поймано в груз " + amountKg + " кг: " + oreItemId + ".";
         return true;
+    }
+
+    private void ApplyMiningImpactDamage(int amountKg, float impactSpeedMS)
+    {
+        float speed = Mathf.Max(0f, impactSpeedMS);
+        if (amountKg <= 0 || speed < Mathf.Max(0f, miningImpactMinDamageSpeedMS)) return;
+
+        DamageableShip damageableShip = GetComponentInParent<DamageableShip>();
+        if (damageableShip == null) return;
+
+        float targetMass = GetTotalMassKg();
+        float sourceMass = Mathf.Max(1f, amountKg);
+        float reducedMass = sourceMass * targetMass / Mathf.Max(1f, sourceMass + targetMass);
+        float energyKJ = 0.5f * reducedMass * speed * speed / 1000f;
+        DamageHitContext context = new DamageHitContext
+        {
+            shellType = DamageShellType.Impact,
+            shellName = "Падающая рудная глыба",
+            sourceName = "MiningRockImpact",
+            impactEnergyKJ = energyKJ,
+            impactDamagePerKJ = Mathf.Max(0f, miningImpactDamageScale),
+            impactSpeedMS = speed,
+            impactSourceMassKg = sourceMass,
+            impactTargetMassKg = targetMass,
+            impactSourceDamageMultiplier = Mathf.Max(0f, miningImpactDamageTakenMultiplier),
+            hitPoint = transform.position,
+            hitNormal = Vector3.up,
+            incomingDirection = Vector3.down,
+            velocity = Vector3.down * speed
+        };
+
+        damageableShip.ApplyHit(new ArmorSurface
+        {
+            zoneId = "mining_impact_hold",
+            displayNameRu = "противоударный кузов",
+            armorMm = 0f,
+            baseArmorMm = 0f,
+            armorIntegrity01 = 1f,
+            ricochetAngleDeg = 90f,
+            overmatchCaliberMultiplier = 3f,
+            structureDamageMultiplier = 1f,
+            highExplosiveSurfaceDamageMultiplier = 1f,
+            ramDamageMultiplier = 1f
+        }, context);
     }
 
     public bool TryShootNearestMiningRock(out string reason)
@@ -2219,14 +2308,20 @@ public class ShipPhysics : MonoBehaviour
             return false;
         }
 
-        Leviathan target = requireSurveyed
-            ? FindNearestSurveyedLeviathan(Mathf.Max(0f, harpoonRangeMeters), "", maxTargetMassKg)
-            : Leviathan.FindNearest(transform.position, Mathf.Max(0f, harpoonRangeMeters), true, "", maxTargetMassKg);
+        Leviathan target = FindNearestHarpoonTarget(Mathf.Max(0f, harpoonRangeMeters), "", maxTargetMassKg, requireSurveyed);
         if (target == null)
         {
-            reason = maxTargetMassKg > 0f
-                ? $"В радиусе гарпуна нет живого левиафана не тяжелее {maxTargetMassKg:0} кг."
-                : "В радиусе гарпуна нет живого левиафана.";
+            if (harpoonMaxCarcassMassKg > 0f)
+            {
+                reason = $"В радиусе гарпуна нет живого левиафана с тушей не тяжелее {harpoonMaxCarcassMassKg:0} кг.";
+            }
+            else
+            {
+                reason = maxTargetMassKg > 0f
+                    ? $"В радиусе гарпуна нет живого левиафана не тяжелее {maxTargetMassKg:0} кг."
+                    : "В радиусе гарпуна нет живого левиафана.";
+            }
+
             harpoonLastMessage = reason;
             return false;
         }
@@ -2260,6 +2355,38 @@ public class ShipPhysics : MonoBehaviour
         reason = activeHarpoon.lastMessage;
         harpoonLastMessage = reason;
         return activeHarpoon.IsAttached;
+    }
+
+    private Leviathan FindNearestHarpoonTarget(float rangeMeters, string ignoredLeviathanId, float maxTargetMassKg, bool requireSurveyed)
+    {
+        PlayerProgress progress = null;
+        if (requireSurveyed)
+        {
+            MetaGameState meta = ResolveMetaGameState();
+            progress = meta != null ? meta.progress : null;
+            if (progress == null) return null;
+        }
+
+        Leviathan best = null;
+        float bestSqr = Mathf.Max(0f, rangeMeters) * Mathf.Max(0f, rangeMeters);
+        Leviathan.GetActiveLeviathans(huntTargetBuffer, true);
+        for (int i = 0; i < huntTargetBuffer.Count; i++)
+        {
+            Leviathan leviathan = huntTargetBuffer[i];
+            if (leviathan == null) continue;
+            if (!string.IsNullOrWhiteSpace(ignoredLeviathanId) && leviathan.leviathanId == ignoredLeviathanId) continue;
+            if (maxTargetMassKg > 0f && leviathan.massKg > maxTargetMassKg) continue;
+            if (harpoonMaxCarcassMassKg > 0f && leviathan.carcassMassKg > harpoonMaxCarcassMassKg) continue;
+            if (requireSurveyed && !progress.HasObjectFacts(ScoutedObjectKind.Leviathan, leviathan.leviathanId)) continue;
+
+            float sqr = (leviathan.transform.position - transform.position).sqrMagnitude;
+            if (sqr > bestSqr) continue;
+
+            best = leviathan;
+            bestSqr = sqr;
+        }
+
+        return best;
     }
 
     private Leviathan FindNearestSurveyedLeviathan(float rangeMeters, string ignoredLeviathanId, float maxMassKg)
@@ -2399,6 +2526,13 @@ public class ShipPhysics : MonoBehaviour
             return false;
         }
 
+        if (refrigeratedHoldCapacityLiters <= 0f)
+        {
+            reason = "На корабле нет холодильника для туш.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
         MetaGameState meta = ResolveMetaGameState();
         if (meta == null || meta.progress == null)
         {
@@ -2408,6 +2542,28 @@ public class ShipPhysics : MonoBehaviour
         }
 
         int amountKg = Mathf.Max(1, target.carcassMassKg);
+        if (harpoonMaxCarcassMassKg > 0f && amountKg > harpoonMaxCarcassMassKg)
+        {
+            reason = $"Гарпун не удержит такую тушу: {amountKg}/{harpoonMaxCarcassMassKg:0} кг.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        if (amountKg > refrigeratedHoldCapacityLiters + 0.001f)
+        {
+            reason = $"Холодильник мал для туши: {amountKg}/{refrigeratedHoldCapacityLiters:0} л.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        if (refrigeratedHoldPowerDrawKw > 0f && enginePowerKwAt100 > 0f &&
+            claudiumPowerDrawKw + refrigeratedHoldPowerDrawKw > enginePowerKwAt100 + 0.001f)
+        {
+            reason = "Холодильнику туш не хватает мощности после клавдиевого контура.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
         if (!meta.TryAddShipCargoFromRuntime(target.carcassItemId, amountKg, out reason))
         {
             harpoonLastMessage = reason;
@@ -2419,6 +2575,30 @@ public class ShipPhysics : MonoBehaviour
         tether.Detach("Туша погружена.");
         Destroy(target.gameObject);
         return true;
+    }
+
+    public bool TrySpendHarpoonUpkeep(float deltaSeconds, out string reason)
+    {
+        reason = "";
+        float cost = Mathf.Max(0f, harpoonWeaponCostPerMinute) * Mathf.Max(0f, deltaSeconds) / 60f;
+        if (cost <= 0f) return true;
+
+        MetaGameState meta = ResolveMetaGameState();
+        if (meta == null || meta.progress == null)
+        {
+            reason = "Гарпун ждёт MetaGameState для списания оружия.";
+            harpoonLastMessage = reason;
+            return false;
+        }
+
+        string resourceId = string.IsNullOrWhiteSpace(weaponResourceId) ? "weapon" : weaponResourceId;
+        bool spent = meta.TrySpendFractionalShipCargoFromRuntime(resourceId, cost, ref harpoonWeaponSpendBufferKg, out reason);
+        if (!spent)
+        {
+            harpoonLastMessage = "Гарпун сорвался: " + reason;
+        }
+
+        return spent;
     }
 
     public string GetHarpoonStatusRu()
@@ -2567,7 +2747,7 @@ public class ShipPhysics : MonoBehaviour
             ? leviathanHuntIgnoredTargetId
             : "";
         float maxAutoTargetMassKg = Mathf.Max(0f, leviathanHuntMaxTargetMassKg);
-        Leviathan nearest = FindNearestSurveyedLeviathan(Mathf.Max(0f, leviathanHuntSearchRangeMeters), ignoredTarget, maxAutoTargetMassKg);
+        Leviathan nearest = FindNearestHarpoonTarget(Mathf.Max(0f, leviathanHuntSearchRangeMeters), ignoredTarget, maxAutoTargetMassKg, true);
         if (nearest == null)
         {
             routeEnabled = false;
@@ -2880,7 +3060,7 @@ public class ShipPhysics : MonoBehaviour
 
     private void ApplyPropellerThrust()
     {
-        float residualPowerKw = Mathf.Max(0f, engineGeneratedPowerKw - claudiumPowerDrawKw - gasHarvesterPowerDrawActualKw);
+        float residualPowerKw = Mathf.Max(0f, engineGeneratedPowerKw - claudiumPowerDrawKw - gasHarvesterPowerDrawActualKw - refrigeratedHoldPowerDrawActualKw);
         float thrustDirection = Mathf.Sign(thrustInput);
         float propellerEngagement = Mathf.Clamp01(Mathf.Abs(thrustInput));
 
@@ -3305,17 +3485,30 @@ public class ShipPhysics : MonoBehaviour
 
     private float CalculatePoweredModulePowerRequestKw(float claudiumPowerKw)
     {
-        if (!gasHarvesterEnabled || gasHarvesterVolumeM3PerSecond <= 0f || gasHarvesterPowerDrawKw <= 0f)
+        float requestKw = 0f;
+        refrigeratedHoldPowerDrawActualKw = 0f;
+
+        float refrigeratorKw = GetRefrigeratedHoldPowerRequestKw();
+        if (refrigeratorKw > 0f && claudiumPowerKw + refrigeratorKw <= enginePowerKwAt100 + 0.001f)
         {
-            return 0f;
+            refrigeratedHoldPowerDrawActualKw = refrigeratorKw;
+            requestKw += refrigeratorKw;
         }
 
-        if (claudiumPowerKw + gasHarvesterPowerDrawKw > enginePowerKwAt100 + 0.001f)
+        if (gasHarvesterEnabled && gasHarvesterVolumeM3PerSecond > 0f && gasHarvesterPowerDrawKw > 0f &&
+            claudiumPowerKw + requestKw + gasHarvesterPowerDrawKw <= enginePowerKwAt100 + 0.001f)
         {
-            return 0f;
+            requestKw += gasHarvesterPowerDrawKw;
         }
 
-        return gasHarvesterPowerDrawKw;
+        return requestKw;
+    }
+
+    private float GetRefrigeratedHoldPowerRequestKw()
+    {
+        return refrigeratedHoldEnabled && refrigeratedHoldCapacityLiters > 0f
+            ? Mathf.Max(0f, refrigeratedHoldPowerDrawKw)
+            : 0f;
     }
 
     private float CalculateClaudiumPowerKwForLift(float liftKg)
@@ -3443,7 +3636,8 @@ public class ShipPhysics : MonoBehaviour
             meta.progress.shipCargo,
             observationRockInfoEfficiency,
             observationCloudInfoEfficiency,
-            observationLeviathanInfoEfficiency);
+            observationLeviathanInfoEfficiency,
+            surveyPaperToInfoEfficiency);
 
         bool hasScientificGear = observationRockInfoEfficiency > 0f
             || observationCloudInfoEfficiency > 0f
@@ -3472,14 +3666,15 @@ public class ShipPhysics : MonoBehaviour
             return;
         }
 
-        if (claudiumPowerDrawKw + gasHarvesterPowerDrawKw > enginePowerKwAt100 + 0.001f)
+        float refrigeratorKw = refrigeratedHoldPowerDrawActualKw;
+        if (claudiumPowerDrawKw + refrigeratorKw + gasHarvesterPowerDrawKw > enginePowerKwAt100 + 0.001f)
         {
             gasHarvesterLastMessage = "Харвестер выключен: после клавдиевого контура не хватает мощности до лимита 100%.";
             ResetGasHarvesterCycle();
             return;
         }
 
-        if (engineGeneratedPowerKw + 0.001f < claudiumPowerDrawKw + gasHarvesterPowerDrawKw || !engineHasFuel)
+        if (engineGeneratedPowerKw + 0.001f < claudiumPowerDrawKw + refrigeratorKw + gasHarvesterPowerDrawKw || !engineHasFuel)
         {
             gasHarvesterLastMessage = "Харвестер ждет мощность или топливо.";
             ResetGasHarvesterCycle();
@@ -3550,10 +3745,13 @@ public class ShipPhysics : MonoBehaviour
         int wholeKg = Mathf.FloorToInt(gasHarvesterBufferKg + 0.0001f);
         if (wholeKg > 0)
         {
-            if (meta.TryAddShipCargoFromRuntime(endCloud.condensateItemId, wholeKg, out string cargoError))
+            string outputItemId = gasHarvesterWaterOnly ? "water" : endCloud.condensateItemId;
+            if (meta.TryAddShipCargoFromRuntime(outputItemId, wholeKg, out string cargoError))
             {
                 gasHarvesterBufferKg -= wholeKg;
-                gasHarvesterLastMessage = $"Добыто {wholeKg} кг: {endCloud.condensateItemId}. Остаток облака {endCloud.remainingVolumeLiters:F1} кг.";
+                gasHarvesterLastMessage = gasHarvesterWaterOnly
+                    ? $"Добыто {wholeKg} кг воды грубой фильтрацией. Остаток облака {endCloud.remainingVolumeLiters:F1} кг."
+                    : $"Добыто {wholeKg} кг: {endCloud.condensateItemId}. Остаток облака {endCloud.remainingVolumeLiters:F1} кг.";
             }
             else
             {

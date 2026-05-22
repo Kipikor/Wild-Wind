@@ -297,14 +297,14 @@ public sealed class WorldRegionRuntime : MonoBehaviour
 
         string[] names =
         {
-            "Соляной причал", "Медная марь", "Тихий док", "Лесная банка", "Пороховой пост",
+            "Соляной причал", "Медная марь", "Тихий док", "Тканевая банка", "Пороховой пост",
             "Восточная верфь", "Сухая гавань", "Башня аптекарей", "Янтарный рынок", "Серый маяк",
             "Платформа угольщиков", "Грозовой склад", "Певчая пристань", "Северная мельница"
         };
 
         string[] roles =
         {
-            "Еда и вода", "Руда и металл", "Доставка", "Древесина", "Порох",
+            "Еда и вода", "Руда и металл", "Доставка", "Ткань", "Порох",
             "Корабельные работы", "Топливо", "Медицина", "Торговля", "Навигация",
             "Уголь", "Опасные товары", "Пассажиры", "Механизмы"
         };
@@ -330,7 +330,7 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     {
         string[] resources =
         {
-            "water_vapor", "claudium_trace", "food_spores", "sulfur_haze", "cloth_fiber",
+            "water_vapor", "claudium_trace", "food_spores", "fulgur_trace", "cloth_fiber",
             "cold_mist", "storm_charge", "crystal_dust"
         };
 

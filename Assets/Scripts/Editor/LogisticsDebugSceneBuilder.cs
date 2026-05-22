@@ -173,14 +173,14 @@ public static class LogisticsDebugSceneBuilder
         {
             new LogisticsRouteDefinition
             {
-                routeId = "debug_food_wood_tools",
-                displayName = "Debug food wood tools",
+                routeId = "debug_food_charcoal_tools",
+                displayName = "Debug food charcoal tools",
                 loop = true,
                 stops = new List<LogisticsRouteStop>
                 {
                     Stop("Island1", null, Orders(("food", 20))),
-                    Stop("Island6", Orders(("food", 10)), Orders(("wood", 10))),
-                    Stop("Island5", Orders(("food", 10), ("wood", 10)), Orders(("tools", 20)))
+                    Stop("Island6", Orders(("food", 10)), Orders(("charcoal", 10))),
+                    Stop("Island5", Orders(("food", 10), ("charcoal", 10)), Orders(("tools", 20)))
                 }
             },
             new LogisticsRouteDefinition
@@ -191,15 +191,15 @@ public static class LogisticsDebugSceneBuilder
                 stops = new List<LogisticsRouteStop>
                 {
                     Stop("Island5", null, Orders(("tools", 10))),
-                    Stop("Island6", Orders(("tools", 5)), Orders(("wood", 10))),
-                    Stop("Island1", Orders(("tools", 5), ("wood", 10)), Orders(("food", 10)))
+                    Stop("Island6", Orders(("tools", 5)), Orders(("charcoal", 10))),
+                    Stop("Island1", Orders(("tools", 5), ("charcoal", 10)), Orders(("food", 10)))
                 }
             }
         };
 
         fleet.ships = new List<LogisticsShipDefinition>
         {
-            Ship("debug_logi_01", "Debug Hauler 01", "debug_food_wood_tools", "Island1"),
+            Ship("debug_logi_01", "Debug Hauler 01", "debug_food_charcoal_tools", "Island1"),
             Ship("debug_logi_02", "Debug Hauler 02", "debug_tools_food_reverse", "Island5")
         };
     }
@@ -212,13 +212,13 @@ public static class LogisticsDebugSceneBuilder
         meta.progress.lastProcessUtcTicks = DateTime.UtcNow.Ticks;
         meta.progress.nextShopRefreshUtcTicks = DateTime.UtcNow.AddHours(1).Ticks;
         meta.progress.shopSeed = 1;
-        meta.progress.SetShipCargoAmount("wood", 50);
+        meta.progress.SetShipCargoAmount("charcoal", 50);
         meta.progress.SetShipCargoAmount("claudium", 25);
 
-        PrimeStorage(meta.progress, "capital", ("wood", 500), ("claudium", 500), ("food", 200), ("tools", 200), ("metal", 100), ("mechanisms", 100));
-        PrimeStorage(meta.progress, "Island1", ("food", 500), ("wood", 500), ("claudium", 500));
-        PrimeStorage(meta.progress, "Island5", ("tools", 500), ("wood", 500), ("claudium", 500));
-        PrimeStorage(meta.progress, "Island6", ("wood", 500), ("food", 200), ("tools", 200), ("claudium", 500));
+        PrimeStorage(meta.progress, "capital", ("charcoal", 500), ("claudium", 500), ("food", 200), ("tools", 200), ("metal", 100), ("mechanisms", 100));
+        PrimeStorage(meta.progress, "Island1", ("food", 500), ("charcoal", 500), ("claudium", 500));
+        PrimeStorage(meta.progress, "Island5", ("tools", 500), ("charcoal", 500), ("claudium", 500));
+        PrimeStorage(meta.progress, "Island6", ("charcoal", 500), ("food", 200), ("tools", 200), ("claudium", 500));
 
         meta.progress.logisticsShips.Clear();
         meta.logisticsFleet?.EnsureRuntimeShips(meta.progress);

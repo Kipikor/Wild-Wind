@@ -47,7 +47,7 @@ public static class GasHarvestingSetupEditor
         meta.progress.SelectHull("starter_hull");
         ShipAssemblyBuilder.AutoInstallRequiredModules(meta.CurrentCatalog, meta.techTree, meta.progress, out _);
         meta.progress.InstallModule("utility_01", "starter_gas_harvester");
-        meta.progress.SetShipCargoAmount("wood", 80);
+        meta.progress.SetShipCargoAmount("charcoal", 80);
         meta.progress.SetShipCargoAmount("claudium", 35);
         meta.ApplySelectedShip();
 

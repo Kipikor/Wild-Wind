@@ -69,7 +69,7 @@ public class MiningFragment : MonoBehaviour
         float radius = Mathf.Max(0.1f, ship.miningCatchRadiusMeters);
         if (Vector3.Distance(transform.position, ship.transform.position) > radius) return;
 
-        if (ship.TryCollectMiningFragment(oreItemId, amountKg, out _))
+        if (ship.TryCollectMiningFragment(oreItemId, amountKg, fallSpeedMS, out _))
         {
             Destroy(gameObject);
         }

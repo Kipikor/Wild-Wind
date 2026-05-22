@@ -1,7 +1,46 @@
-id_technology,local_name_ru,local_name_en,cycle_time_seconds,required_cycles,required_technology,cycle_cost_item,cycle_cost_amount
-basic_airship,Основы воздушного судна,Airship Basics,0,1,"","",
-improved_frames,Усиленные корпуса,Improved Frames,20,2,"basic_airship","wood,metal","2,1"
-combustion_engines,Тяговые двигатели,Combustion Engines,25,2,"basic_airship","charcoal,mechanisms","2,1"
-advanced_propellers,Винтовая школа,Propeller School,20,2,"improved_frames","wood,tools","2,2"
-claudium_control,Клавдиевые контуры,Claudium Control,30,3,"basic_airship","claudium,mechanisms","1,1"
-heavy_lift,Тяжелый подъем,Heavy Lift,35,3,"improved_frames,claudium_control","metal,claudium,mechanisms","2,2,1"
+id_technology,local_name_ru,local_name_en,rank,branch,cycle_time_seconds,required_cycles,required_technology,cycle_cost_item,cycle_cost_amount,unlock_summary_ru
+basic_airship,Основы воздухоплавания,Airship Basics,0,Старт,0,1,"","","",Стартовый Пионер и базовая сборка корабля
+aerodynamics,Аэродинамика,Aerodynamics,0,Фундамент,0,1,"","fundamental_experience","5",Глобально снижает сопротивление кораблей и открывает скоростные решения
+basic_geometry,Базовая геометрия,Basic Geometry,0,Фундамент,0,1,"","fundamental_experience","5",Глобально ускоряет погрузку и открывает несущие формы
+air_pumps,Воздушные насосы,Air Pumps,0,Фундамент,0,1,"","fundamental_experience","5",Глобально повышает КПД паровых установок
+mathematics,Математика,Mathematics,0,Фундамент,0,1,"","fundamental_experience","5",Усиливает генерацию фундаментального опыта и открывает автопилоты
+steam_claudium_theory,Пароклавдиевая теория,Steam-Claudium Theory,1,Фундамент,0,1,"basic_geometry","fundamental_experience","10",Глобально снижает расход клавдия и открывает контуры R1
+improved_frames,Улучшенные рамы,Improved Frames,1,Общая инженерия,20,1,"basic_airship,basic_geometry","fundamental_experience,aerolite,metal","3,2,1",Лёгкие и курьерские корпуса
+combustion_engines,Паровые котлы,Steam Boilers,1,Общая инженерия,25,1,"basic_airship,air_pumps","fundamental_experience,charcoal,mechanisms","3,2,1",Угольные и спиртовые двигатели
+claudium_control,Управление клавдием,Claudium Control,2,Общая инженерия,25,1,"basic_airship,steam_claudium_theory","fundamental_experience,claudium,mechanisms","4,1,1",Лёгкие и экономичные клавдиевые контуры
+passenger_routes,Пассажирские маршруты,Passenger Routes,1,Пассажиры,30,1,"basic_airship,mathematics","fundamental_experience,design_experience,paper,cloth","6,3,4,3",Открывает Паровоз и пассажирские перевозки R1
+support_platform,Опорная платформа,Support Platform,2,Ремонт и логистика,35,1,"steam_claudium_theory,basic_geometry","fundamental_experience,design_experience,tools,metal","8,4,4,5",Открывает Опору и ремонтные платформы R1
+advanced_propellers,Школа винтов,Propeller School,2,Общая инженерия,20,1,"improved_frames,aerodynamics","fundamental_experience,aerolite,tools","3,2,2",Скоростные и грузовые винты
+heavy_lift,Тяжёлая подъёмность,Heavy Lift,3,Общая инженерия,35,1,"improved_frames,claudium_control,steam_claudium_theory","fundamental_experience,design_experience,metal,claudium,mechanisms","5,2,2,2,1",Грузовые корпуса тяжёлые котлы и тяжёлые контуры
+bearing_skin,Несущая обшивка,Bearing Skin,2,Вода и корпус,30,1,"basic_geometry,steam_claudium_theory,mathematics,aerodynamics","fundamental_experience,design_experience,aerolite,paper","8,3,4,2",Открывает Водомерку и аэродинамичные R1 корпуса
+ore_collector,Рудный сборщик,Ore Collector,3,Руда,30,1,"bearing_skin,improved_frames","fundamental_experience,design_experience,tools,aerolite","6,3,4,4",Открывает Булат и сбор руды с глыб
+continuous_observations,Сплошные наблюдения,Continuous Observations,3,Разведка,35,1,"bearing_skin,mathematics","fundamental_experience,design_experience,paper,tools","6,3,6,2",Открывает Шершень и сбор сведений разведчиками
+hunter_hull,Охотничий корпус,Hunter Hull,3,Охота,40,1,"bearing_skin,combustion_engines","fundamental_experience,design_experience,weapon,metal,tools","8,4,4,4,3",Открывает Егеря гарпун и охоту на малых левиафанов
+water_strider_tankage,Баки Водомерки,Water Strider Tankage,3,Водомерка,25,1,"bearing_skin","fundamental_experience,design_experience,tools,cloth,paper","4,3,3,5,2",Улучшение баков Водомерки
+water_strider_engine_tuning,Топка Водомерки,Water Strider Engine Tuning,3,Водомерка,25,1,"bearing_skin,air_pumps","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,3,2",Улучшенный двигатель Водомерки
+water_strider_loop_tuning,Контур Водомерки,Water Strider Loop Tuning,3,Водомерка,25,1,"bearing_skin,steam_claudium_theory","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,4,2",Улучшенный клавдиевый контур Водомерки
+water_collection_baffles,Водосборные жалюзи,Water Collection Baffles,3,Водомерка,25,1,"bearing_skin","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,5,3",Улучшенный сборщик воды из облаков
+water_strider_large_tank,Полуторатонный бак,Water Strider Large Tank,4,Водомерка,30,1,"water_strider_tankage,water_strider_engine_tuning,water_strider_loop_tuning","fundamental_experience,design_experience,tools,cloth,paper","6,4,5,8,3",Большой бак и усиленная несущая обшивка Водомерки
+water_collection_autopilot,Автопилот водосбора,Water Collection Autopilot,5,Водомерка,30,1,"water_collection_baffles,water_strider_large_tank,mathematics","fundamental_experience,design_experience,tools,paper","5,4,2,6",Режим автопилота для сбора воды и повышенная вертикаль
+shockproof_bulk_hold,Противоударный кузов,Shockproof Bulk Hold,4,Булат,25,1,"ore_collector","fundamental_experience,design_experience,tools,cloth,paper","5,3,5,3,2",Противоударный кузов и усиленный корпус Булата
+bulat_engine_tuning,Форсаж Булата,Bulat Engine Tuning,4,Булат,25,1,"ore_collector,air_pumps","fundamental_experience,design_experience,tools,cloth,paper","5,3,5,3,2",Улучшенный двигатель Булата
+bulat_loop_tuning,Контур Булата,Bulat Loop Tuning,4,Булат,25,1,"ore_collector,steam_claudium_theory","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,4,2",Улучшенный контур Булата
+ore_receiver,Рудоприёмник,Ore Receiver,4,Булат,25,1,"ore_collector","fundamental_experience,design_experience,tools,cloth,paper","5,3,5,3,2",Улучшенная приёмка рудных глыб
+mining_autopilot,Автопилот добычи,Mining Autopilot,5,Булат,30,1,"ore_receiver,shockproof_bulk_hold,mathematics","fundamental_experience,design_experience,tools,paper","5,4,2,6",Режим автопилота для добычи руды
+reinforced_observation_suite,Усиленные приборы,Reinforced Observation Suite,4,Шершень,30,1,"continuous_observations","fundamental_experience,design_experience,tools,cloth,paper","6,4,4,4,8",Приборы Шершня с высоким КПД бумаги в сведения
+quiet_skin,Тихая обшивка,Quiet Skin,4,Шершень,25,1,"continuous_observations,bearing_skin","fundamental_experience,design_experience,tools,cloth,paper","5,3,3,5,3",Снижает тревогу левиафанов от разведки
+scout_engine_tuning,Разведочная топка,Scout Engine Tuning,4,Шершень,25,1,"continuous_observations,air_pumps","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,3,2",Улучшенный двигатель Шершня
+survey_autopilot,Автопилот разведки,Survey Autopilot,5,Шершень,30,1,"continuous_observations,quiet_skin,mathematics","fundamental_experience,design_experience,tools,paper","5,4,2,6",Автономные маршруты наблюдений
+reinforced_harpoon,Усиленный гарпун,Reinforced Harpoon,4,Егерь,30,1,"hunter_hull","fundamental_experience,design_experience,weapon,tools,paper","7,4,6,4,2",Гарпун на 200 кг туши и повышенный расход оружия
+hunter_engine_tuning,Боевой форсаж,Hunter Engine Tuning,4,Егерь,25,1,"hunter_hull,air_pumps","fundamental_experience,design_experience,tools,cloth,paper","6,4,5,3,2",Улучшенный но всё ещё прожорливый двигатель Егеря
+armored_hunter_hull,Бронекорпус Егеря,Armored Hunter Hull,4,Егерь,30,1,"hunter_hull,bearing_skin","fundamental_experience,design_experience,tools,cloth,paper","6,4,5,5,2",Усиленный корпус и контур Егеря
+cold_chamber,Холодильная камера,Cold Chamber,4,Егерь,25,1,"hunter_hull","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,4,3",Снижает энергозатраты холодильника
+crane_tackles,Крановые тали,Crane Tackles,4,Опора,25,1,"support_platform","fundamental_experience,design_experience,tools,cloth,paper","5,3,6,3,2",Улучшает скорость превращения инструментов в ремонт
+short_circuit_claudium_loop,Короткозамкнутый контур,Short Circuit Claudium Loop,4,Опора,30,1,"support_platform,steam_claudium_theory","fundamental_experience,design_experience,tools,cloth,paper","6,4,5,4,2",Повышает грузоподъёмность Опоры ценой расхода клавдия
+ribbed_deck_truss,Ребристая палубная ферма,Ribbed Deck Truss,4,Опора,30,1,"support_platform,basic_geometry","fundamental_experience,design_experience,tools,cloth,paper","6,4,6,4,2",Усиленный корпус Опоры и снятие жёсткого ограничения скорости
+removable_van_sections,Съёмные фургонные секции,Removable Van Sections,5,Опора,25,1,"support_platform,ribbed_deck_truss","fundamental_experience,design_experience,tools,cloth,paper","5,3,5,6,2",Большой фургон Опоры
+cabin_standards,Салонные стандарты,Cabin Standards,4,Паровоз,25,1,"passenger_routes","fundamental_experience,design_experience,tools,cloth,paper","5,3,3,8,3",Улучшенный салон и обслуживание пассажиров
+forced_firebox,Форсированная топка,Forced Firebox,4,Паровоз,25,1,"passenger_routes,air_pumps","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,3,2",Более мощный котёл Паровоза
+passenger_propeller,Пассажирский винт,Passenger Propeller,4,Паровоз,25,1,"passenger_routes,advanced_propellers","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,3,2",Скорость пассажирского хода до 30 м/с
+streamlined_superstructure,Обтекаемая надстройка,Streamlined Superstructure,4,Паровоз,30,1,"passenger_routes,bearing_skin,aerodynamics","fundamental_experience,design_experience,tools,cloth,paper","6,4,5,6,3",Хорошая аэродинамика и прочность корпуса Паровоза
+route_tables,Маршрутные таблицы,Route Tables,4,Паровоз,25,1,"passenger_routes,mathematics","fundamental_experience,design_experience,tools,paper","5,3,2,8",Улучшенный автопилот и маршрутный контур Паровоза

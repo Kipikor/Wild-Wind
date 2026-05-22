@@ -1,5 +1,16 @@
 id_engine,local_name_ru,local_name_en,complited_tech,base_mass_kg,fuel_id,max_power_kw,fuel_efficiency
-starter_engine,Паровой двигатель I,Steam Engine I,,380,wood,190,0.32
+starter_engine,Паровой двигатель I,Steam Engine I,,950,charcoal,190,0.18
 charcoal_engine,Угольный двигатель,Charcoal Engine,combustion_engines,450,charcoal,260,0.35
 alcohol_engine,Спиртовой двигатель,Alcohol Engine,combustion_engines,340,alcohol,230,0.38
 heavy_boiler,Тяжёлый котёл,Heavy Boiler,heavy_lift,700,charcoal,420,0.34
+water_strider_engine,Удачная топка Водомерки,Water Strider Boiler,bearing_skin,900,charcoal,220,0.22
+bulat_engine,Горная топка Булата,Bulat Mining Boiler,ore_collector,1050,charcoal,240,0.22
+hornet_engine,Разведочная топка Шершня,Hornet Scout Boiler,continuous_observations,1100,charcoal,280,0.24
+jaeger_engine,Боевой котёл Егеря,Jaeger Hunting Boiler,hunter_hull,1650,charcoal,330,0.14
+opora_engine,Опорная топка платформы,Opora Platform Boiler,support_platform,1700,charcoal,340,0.2
+parovoz_engine,Пассажирский котёл Паровоза,Parovoz Passenger Boiler,passenger_routes,1800,charcoal,360,0.17
+water_strider_engine_mk2,Настроенная топка Водомерки,Water Strider Tuned Boiler,water_strider_engine_tuning,980,charcoal,260,0.25
+bulat_engine_mk2,Форсированная топка Булата,Bulat Forced Boiler,bulat_engine_tuning,1180,charcoal,310,0.24
+hornet_engine_mk2,Форсированная топка Шершня,Hornet Forced Boiler,scout_engine_tuning,1190,charcoal,315,0.26
+jaeger_engine_mk2,Форсированный котёл Егеря,Jaeger Forced Boiler,hunter_engine_tuning,1770,charcoal,380,0.18
+parovoz_engine_mk2,Форсированный котёл Паровоза,Parovoz Forced Firebox,forced_firebox,1950,charcoal,430,0.19

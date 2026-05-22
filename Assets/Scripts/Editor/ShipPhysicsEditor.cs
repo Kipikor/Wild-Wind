@@ -565,7 +565,7 @@ public class ShipPhysicsEditor : Editor
         float engineLoopLiftKg = Mathf.Max(0f, ship.enginePowerKwAt100) * Mathf.Max(0f, ship.claudiumLiftEfficiency);
         float allowedTakeoffKg = Mathf.Min(engineLoopLiftKg, Mathf.Min(Mathf.Max(0f, ship.claudiumMaxLiftKg), Mathf.Max(0f, ship.hullMaxTakeoffMassKg)));
         float maxCargoKg = Mathf.Max(0f, allowedTakeoffKg - Mathf.Max(0f, ship.baseMass));
-        int currentCargoKg = meta.progress.GetShipCargoMassKg();
+        float currentCargoKg = meta.progress.GetShipCargoMassKg(meta.WorldConfig);
 
         EditorGUILayout.LabelField("Сухая масса", ship.baseMass.ToString("0") + " кг");
         EditorGUILayout.LabelField("Грузоподъемность", currentCargoKg.ToString("0") + " / " + maxCargoKg.ToString("0") + " кг");
@@ -693,7 +693,7 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Любой ресурс по ID", EditorStyles.boldLabel);
         customCheatResourceId = EditorGUILayout.TextField(new GUIContent("ID ресурса", "Можно вписать любой технический ID, даже если его еще нет в Item.csv."), customCheatResourceId);
-        customCheatAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent("Количество, кг", "Точное значение, которое будет записано."), customCheatAmount));
+        customCheatAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent("Количество", "Точное количество в единицах предмета: места для пассажиров, литры для жидкостей/газа/сыпучки, штуки для товаров."), customCheatAmount));
 
         EditorGUILayout.BeginHorizontal();
         GUI.enabled = !string.IsNullOrWhiteSpace(customCheatResourceId);
@@ -720,7 +720,7 @@ public class ShipPhysicsEditor : Editor
     private void DrawResourceAmountField(string label, MetaGameState meta, ShipPhysics ship, IslandProductionState dockStorage, string resourceId, int currentAmount, ResourceCheatTarget target)
     {
         EditorGUI.BeginChangeCheck();
-        int newAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent(label, "Точное количество в килограммах. 0 удаляет ресурс из списка."), currentAmount));
+        int newAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent(label, "Точное количество в единицах предмета: места для пассажиров, литры для жидкостей/газа/сыпучки, штуки для товаров. 0 удаляет ресурс из списка."), currentAmount));
         if (EditorGUI.EndChangeCheck())
         {
             SetResourceCheat(meta, ship, dockStorage, resourceId, newAmount, target);
@@ -758,7 +758,7 @@ public class ShipPhysicsEditor : Editor
         if (ship == null || meta == null || meta.progress == null) return;
 
         Undo.RecordObject(ship, "Apply Cargo Cheat Mass");
-        ship.cargoMassKg = meta.progress.GetShipCargoMassKg();
+        ship.cargoMassKg = meta.progress.GetShipCargoMassKg(meta.WorldConfig);
         ship.engineFuelStockKg = string.IsNullOrWhiteSpace(ship.engineFuelId) ? 0f : meta.progress.GetShipCargoAmount(ship.engineFuelId);
         string claudiumResourceId = string.IsNullOrWhiteSpace(ship.claudiumResourceId) ? "claudium" : ship.claudiumResourceId;
         ship.claudiumStock = meta.progress.GetShipCargoAmount(claudiumResourceId);
@@ -856,7 +856,7 @@ public static class LeviathanHuntingSetupEditor
         meta.EnsureProgressInitialized();
         meta.progress.SelectHull("starter_hull");
         ShipAssemblyBuilder.AutoInstallRequiredModules(meta.CurrentCatalog, meta.techTree, meta.progress, out _);
-        meta.progress.SetShipCargoAmount("wood", 18);
+        meta.progress.SetShipCargoAmount("charcoal", 18);
         meta.progress.SetShipCargoAmount("claudium", 8);
         meta.progress.SetShipCargoAmount("weapon", 5);
         meta.progress.shipWeaponSpendBufferKg = 0f;

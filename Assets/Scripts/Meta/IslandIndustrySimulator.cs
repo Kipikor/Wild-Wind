@@ -104,6 +104,7 @@ public static class IslandIndustrySimulator
         int changed = 0;
         float deltaMinutes = Mathf.Max(0f, (float)new TimeSpan(toTicks - fromTicks).TotalMinutes);
         changed += IslandDevelopmentSimulator.Advance(config, progress, fromTicks, toTicks);
+        changed += PassengerTrafficSimulator.Advance(config, progress, deltaMinutes);
         changed += IslandSocietySimulator.Advance(config, progress, deltaMinutes);
 
         for (int i = 0; i < config.islandIndustries.Count; i++)
