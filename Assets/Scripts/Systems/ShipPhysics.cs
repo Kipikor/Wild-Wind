@@ -1760,6 +1760,8 @@ public class LeviathanManager : MonoBehaviour
 [RequireComponent(typeof(Rigidbody))]
 public class ShipPhysics : MonoBehaviour
 {
+    private const float EngineAfterburnerPowerMultiplier = 1.2f;
+
     private Rigidbody rb;
 
     [Header("Параметры корабля")]
@@ -1775,6 +1777,8 @@ public class ShipPhysics : MonoBehaviour
     public string engineFuelId = "charcoal";
     [Tooltip("Доля энергии топлива, которая превращается в полезную мощность двигателя.")]
     public float engineFuelEfficiency = 0.32f;
+    [Tooltip("Разрешает двигателю использовать форсажную зону сверх номинальных 100% мощности.")]
+    public bool engineAfterburnerEnabled;
     [HideInInspector] public float engineFuelEnergyKwhPerKg = 4f;
     [HideInInspector] public float engineFuelStockKg = 0f;
 
@@ -1935,6 +1939,10 @@ public class ShipPhysics : MonoBehaviour
     public float sideResistance = 2.0f; // Сопротивление боковому сносу (эффект киля)
     public float verticalAreaFactor = 4.0f; // Во сколько раз площадь "пуза" больше лобовой площади
 
+    [Header("Боковая всенаправленная тяга")]
+    [Tooltip("Максимальная боковая сила для ручного скольжения A/D, в килограмм-силах.")]
+    public float lateralOmniThrustKgf = 260f;
+
     [Header("Лимиты скорости подъема")]
     public float maxStructuralVerticalSpeed = 5.0f; // Предел прочности (конструкционный)
     public float maxAutoVerticalSpeed = 1.0f;        // Лимит автопилота
@@ -1946,6 +1954,21 @@ public class ShipPhysics : MonoBehaviour
     public float CurrentAeroDrag => 0.5f * airDensity * dragCoefficient * frontalArea;
     public float CurrentWindAerodynamicFactor => Mathf.Max(0f, dragCoefficient);
     public Vector3 EffectiveWindVelocity => GetEffectiveWindVelocity();
+    public float EnginePowerLeverLimit => engineAfterburnerEnabled ? EngineAfterburnerPowerMultiplier : 1f;
+    public float EnginePowerCapacityKw => Mathf.Max(0f, enginePowerKwAt100) * EnginePowerLeverLimit;
+
+    public float CalculateEnginePowerLeverForPropellerEngagement(float propellerEngagement)
+    {
+        float maxLever = EnginePowerLeverLimit;
+        if (enginePowerKwAt100 <= 0f)
+        {
+            return 0f;
+        }
+
+        float supportLever = Mathf.Clamp(CalculateCurrentSupportPowerDrawKw() / enginePowerKwAt100, 0f, maxLever);
+        float remainingLever = Mathf.Max(0f, maxLever - supportLever);
+        return Mathf.Clamp(supportLever + Mathf.Clamp01(propellerEngagement) * remainingLever, supportLever, maxLever);
+    }
 
     [Header("Автопилот и Системы")]
     public bool autoStabilizeAtStart = true; // Новая галочка
@@ -1988,9 +2011,10 @@ public class ShipPhysics : MonoBehaviour
 
     [Header("Текущее управление (для чтения/записи из интерфейса)")]
     [HideInInspector] public float thrustInput; // -1 полный реверс, 0 нет тяги, 1 полный ход вперед
+    [HideInInspector] public float sideInput;   // -1 скольжение влево, 1 скольжение вправо
     [HideInInspector] public float turnInput;   // -1 влево, 1 вправо
     [HideInInspector] public float targetTrimMass = 1000f; // Масса для триммирования (кг)
-    [HideInInspector] public float liftInput;   // -1 вниз, 1 вверх (Точная доводка +-10%)
+    [HideInInspector] public float liftInput;   // Legacy: altitude is target-driven; kept at 0 by flight controls.
 
     // ==========================================
     // МОДУЛИ (Дочерние объекты)
@@ -2039,6 +2063,7 @@ public class ShipPhysics : MonoBehaviour
         rb = GetComponent<Rigidbody>();
 
         rb.mass = GetTotalMassKg();
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.useGravity = true;
         ConfigureYawOnlyRigidbody();
         EnforceYawOnlyRotation(true);
@@ -2057,6 +2082,7 @@ public class ShipPhysics : MonoBehaviour
         if (rb != null)
         {
             rb.mass = GetTotalMassKg();
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
             ConfigureYawOnlyRigidbody();
             EnforceYawOnlyRotation(true);
         }
@@ -2448,6 +2474,7 @@ public class ShipPhysics : MonoBehaviour
         targetHoldPosition = transform.position;
         targetSpeedMS = 0f;
         thrustInput = 0f;
+        sideInput = 0f;
         turnInput = 0f;
     }
 
@@ -2628,6 +2655,7 @@ public class ShipPhysics : MonoBehaviour
                 targetHoldPosition = transform.position;
                 targetSpeedMS = 0f;
                 thrustInput = 0f;
+                sideInput = 0f;
                 turnInput = 0f;
                 leviathanHuntAutopilotMessage = "Автоохота выключена, удерживаю текущую позицию.";
             }
@@ -2761,6 +2789,7 @@ public class ShipPhysics : MonoBehaviour
             targetAltitude = transform.position.y;
             targetSpeedMS = 0f;
             thrustInput = 0f;
+            sideInput = 0f;
             turnInput = 0f;
 
             if (!string.IsNullOrWhiteSpace(ignoredTarget))
@@ -2837,6 +2866,7 @@ public class ShipPhysics : MonoBehaviour
         routeWasEnabled = false;
         targetSpeedMS = 0f;
         thrustInput = 0f;
+        sideInput = 0f;
         turnInput = 0f;
 
         positionHold = true;
@@ -2965,6 +2995,7 @@ public class ShipPhysics : MonoBehaviour
         if (altitudeHold && rb != null)
         {
             targetAltitude = rb.position.y;
+            PrimeClaudiumLiftForHover(rb.mass);
         }
 
         currentGasLift = 0f;
@@ -2983,6 +3014,7 @@ public class ShipPhysics : MonoBehaviour
         }
 
         thrustInput = 0f;
+        sideInput = 0f;
         turnInput = 0f;
         liftInput = 0f;
         PerformAutoStabilization();
@@ -3024,6 +3056,7 @@ public class ShipPhysics : MonoBehaviour
         rb.AddForce(Vector3.up * totalLift, ForceMode.Force);
 
         ApplyPropellerThrust();
+        ApplyLateralOmniThrust();
 
         ApplyGyroTurn();
 
@@ -3060,11 +3093,12 @@ public class ShipPhysics : MonoBehaviour
 
     private void ApplyPropellerThrust()
     {
-        float residualPowerKw = Mathf.Max(0f, engineGeneratedPowerKw - claudiumPowerDrawKw - gasHarvesterPowerDrawActualKw - refrigeratedHoldPowerDrawActualKw);
         float thrustDirection = Mathf.Sign(thrustInput);
         float propellerEngagement = Mathf.Clamp01(Mathf.Abs(thrustInput));
+        float supportPowerKw = CalculateCurrentSupportPowerDrawKw();
+        float residualPowerKw = Mathf.Max(0f, engineGeneratedPowerKw - supportPowerKw);
 
-        propellerInputPowerKw = residualPowerKw * propellerEngagement;
+        propellerInputPowerKw = Mathf.Min(residualPowerKw, CalculatePropellerPowerRequestKw(propellerEngagement, supportPowerKw));
         propellerCalculatedEfficiency = Mathf.Clamp01(propellerEfficiency);
         propellerUsefulPowerKw = propellerInputPowerKw * propellerCalculatedEfficiency;
         if (propellerMaxSpeedMS <= 0f
@@ -3097,6 +3131,44 @@ public class ShipPhysics : MonoBehaviour
         rb.AddForce(thrustAxis * (propellerThrustKgf * 9.81f), ForceMode.Force);
     }
 
+    private float CalculateCurrentSupportPowerDrawKw()
+    {
+        float modulePowerKw = Mathf.Max(0f, refrigeratedHoldPowerDrawActualKw);
+        if (gasHarvesterEnabled && gasHarvesterVolumeM3PerSecond > 0f && gasHarvesterPowerDrawKw > 0f)
+        {
+            modulePowerKw += Mathf.Max(gasHarvesterPowerDrawActualKw, gasHarvesterPowerDrawKw);
+        }
+
+        return Mathf.Clamp(
+            Mathf.Max(0f, claudiumPowerDrawKw) + modulePowerKw,
+            0f,
+            EnginePowerCapacityKw);
+    }
+
+    private float CalculatePropellerPowerRequestKw(float propellerEngagement, float supportPowerKw)
+    {
+        float availablePowerKw = Mathf.Max(0f, EnginePowerCapacityKw - Mathf.Max(0f, supportPowerKw));
+        return availablePowerKw * Mathf.Clamp01(propellerEngagement);
+    }
+
+    private void ApplyLateralOmniThrust()
+    {
+        float input = Mathf.Clamp(sideInput, -1f, 1f);
+        float forceN = Mathf.Abs(input) * Mathf.Max(0f, lateralOmniThrustKgf) * 9.81f;
+        if (forceN <= 0.001f)
+        {
+            return;
+        }
+
+        Vector3 sideAxis = Vector3.ProjectOnPlane(transform.right, Vector3.up);
+        if (sideAxis.sqrMagnitude < 0.001f)
+        {
+            sideAxis = Quaternion.Euler(0f, transform.eulerAngles.y, 0f) * Vector3.right;
+        }
+
+        rb.AddForce(sideAxis.normalized * (forceN * Mathf.Sign(input)), ForceMode.Force);
+    }
+
     private void UpdateRouteModeState()
     {
         if (routeEnabled && !routeWasEnabled)
@@ -3125,6 +3197,7 @@ public class ShipPhysics : MonoBehaviour
             positionHoldWasEnabled = false;
             targetSpeedMS = 0f;
             turnInput = 0f;
+            sideInput = 0f;
             routeWasEnabled = false;
         }
     }
@@ -3173,7 +3246,7 @@ public class ShipPhysics : MonoBehaviour
 
             float response = 1f - Mathf.Exp(-Mathf.Max(0.01f, speedDamping) * 6f * Time.fixedDeltaTime);
             thrustInput = Mathf.Lerp(thrustInput, desiredOutput, response);
-            enginePowerLever = Mathf.Lerp(enginePowerLever, Mathf.Clamp01(Mathf.Abs(desiredOutput)), response);
+            enginePowerLever = Mathf.Lerp(enginePowerLever, CalculateEnginePowerLeverForPropellerEngagement(Mathf.Abs(desiredOutput)), response);
         }
     }
 
@@ -3248,6 +3321,7 @@ public class ShipPhysics : MonoBehaviour
         targetAltitude = holdPosition.y;
         targetSpeedMS = 0f;
         thrustInput = 0f;
+        sideInput = 0f;
         turnInput = 0f;
     }
 
@@ -3519,9 +3593,11 @@ public class ShipPhysics : MonoBehaviour
 
     private void UpdateEnginePowerOutput(float minimumPowerKw)
     {
-        float maxLever = 1.2f;
+        float maxLever = EnginePowerLeverLimit;
         engineMinimumPowerLever = enginePowerKwAt100 > 0f ? Mathf.Clamp(minimumPowerKw / enginePowerKwAt100, 0f, maxLever) : 0f;
-        enginePowerLever = Mathf.Clamp(enginePowerLever, engineMinimumPowerLever, maxLever);
+        float propellerLever = Mathf.Clamp01(Mathf.Abs(thrustInput)) * Mathf.Max(0f, maxLever - engineMinimumPowerLever);
+        float requestedLever = engineMinimumPowerLever + propellerLever;
+        enginePowerLever = Mathf.Clamp(Mathf.Max(enginePowerLever, requestedLever), engineMinimumPowerLever, maxLever);
 
         engineGeneratedPowerKw = Mathf.Max(0f, enginePowerKwAt100) * enginePowerLever;
         engineEfficiencyCurrent = Mathf.Clamp01(engineFuelEfficiency);
@@ -3560,33 +3636,48 @@ public class ShipPhysics : MonoBehaviour
         {
             if (!wasAltitudeHold)
             {
-                targetAltitude = rb.position.y;
+                if (targetAltitude <= 0f)
+                {
+                    targetAltitude = rb.position.y;
+                }
+
                 wasAltitudeHold = true;
                 altIntegral = 0f;
+                if (Mathf.Abs(targetAltitude - rb.position.y) <= Mathf.Max(2f, altDriftTolerance * 2f) &&
+                    Mathf.Abs(rb.linearVelocity.y) <= 0.5f)
+                {
+                    PrimeClaudiumLiftForHover(mass);
+                }
             }
 
-            targetAltitude += liftInput * 8.0f * Time.fixedDeltaTime;
+            targetAltitude = Mathf.Max(0f, targetAltitude);
 
-            float currentAcceleration = (claudiumCurrentLiftN / Mathf.Max(mass, 1f)) - 9.81f;
-            float lookAheadTime = 1.2f;
-            float predictedHeight = rb.position.y + rb.linearVelocity.y * lookAheadTime + 0.5f * currentAcceleration * lookAheadTime * lookAheadTime;
-            float altitudeError = targetAltitude - predictedHeight;
+            float altitudeError = targetAltitude - rb.position.y;
+            float driftTolerance = Mathf.Max(0f, altDriftTolerance);
+            float absError = Mathf.Abs(altitudeError);
+            float correctedError = absError > driftTolerance
+                ? altitudeError - Mathf.Sign(altitudeError) * driftTolerance
+                : 0f;
 
-            if (Mathf.Abs(altitudeError) > altDriftTolerance)
+            if (Mathf.Abs(correctedError) > 0.001f)
             {
-                altIntegral += (targetAltitude - rb.position.y) * Time.fixedDeltaTime * 0.05f;
+                altIntegral += correctedError * Time.fixedDeltaTime * 0.05f;
                 altIntegral = Mathf.Clamp(altIntegral, -0.25f, 0.25f);
+            }
+            else
+            {
+                altIntegral = Mathf.MoveTowards(altIntegral, 0f, Time.fixedDeltaTime * 0.25f);
             }
 
             float targetVerticalSpeed = 0f;
-            if (Mathf.Abs(altitudeError) > 0.001f)
+            if (Mathf.Abs(correctedError) > 0.001f)
             {
-                targetVerticalSpeed = Mathf.Sqrt(2f * 0.25f * Mathf.Abs(altitudeError)) * Mathf.Sign(altitudeError);
+                targetVerticalSpeed = correctedError * Mathf.Max(0f, altStiffness);
                 targetVerticalSpeed = Mathf.Clamp(targetVerticalSpeed, -maxAutoVerticalSpeed, maxAutoVerticalSpeed);
             }
 
             float velocityError = targetVerticalSpeed - rb.linearVelocity.y;
-            float desiredAcceleration = velocityError * altDamping - currentAcceleration * 1.5f + altIntegral + liftInput * 0.1f;
+            float desiredAcceleration = velocityError * Mathf.Max(0f, altDamping) + altIntegral;
             float requestedKg = mass * Mathf.Max(0f, 9.81f + desiredAcceleration) / 9.81f;
 
             if (rb.linearVelocity.y > maxStructuralVerticalSpeed * 0.9f)
@@ -3600,7 +3691,25 @@ public class ShipPhysics : MonoBehaviour
 
         wasAltitudeHold = false;
         altIntegral = 0f;
-        return Mathf.Max(0f, trimMass * (1f + liftInput * 0.1f));
+        return Mathf.Max(0f, trimMass);
+    }
+
+    private void PrimeClaudiumLiftForHover(float mass)
+    {
+        if (claudiumMaxLiftKg <= 0f || enginePowerKwAt100 <= 0f || claudiumLiftEfficiency <= 0f || claudiumStock <= 0f)
+        {
+            return;
+        }
+
+        float hoverLiftKg = Mathf.Max(0f, mass);
+        float powerLimitedLiftKg = EnginePowerCapacityKw * claudiumLiftEfficiency;
+        hoverLiftKg = Mathf.Min(hoverLiftKg, claudiumMaxLiftKg, Mathf.Max(0f, powerLimitedLiftKg));
+
+        claudiumCurrentLiftN = hoverLiftKg * 9.81f;
+        claudiumRequestedLiftKg = hoverLiftKg;
+        claudiumPowerDrawKw = claudiumLiftEfficiency > 0f ? CalculateClaudiumPowerKwForLift(hoverLiftKg) : 0f;
+        claudiumPowerDrawWatts = claudiumPowerDrawKw * 1000f;
+        activeLiftForce = claudiumCurrentLiftN;
     }
 
     void UpdateClaudium()
@@ -3786,7 +3895,7 @@ public class ShipPhysics : MonoBehaviour
 
     private void UpdateEngineThrottles()
     {
-        enginePowerLever = Mathf.Clamp(enginePowerLever, 0f, 1.2f);
+        enginePowerLever = Mathf.Clamp(enginePowerLever, 0f, EnginePowerLeverLimit);
         propellerPitch = Mathf.Clamp(thrustInput, -1f, 1f);
     }
 

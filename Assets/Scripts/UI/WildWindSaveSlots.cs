@@ -50,6 +50,12 @@ public static class WildWindSaveSlots
         return pending;
     }
 
+    public static void ClearPendingGameplayLaunch()
+    {
+        PlayerPrefs.DeleteKey(PendingGameplayLaunchPlayerPrefsKey);
+        PlayerPrefs.Save();
+    }
+
     public static string CreateNewWorldSaveFileName()
     {
         return "wild_wind_world_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".json";
@@ -68,6 +74,11 @@ public static class WildWindSaveSlots
         for (int i = 0; i < files.Length; i++)
         {
             string path = files[i];
+            if (WildWindBigTestRunner.IsBigTestTemporarySaveFileName(Path.GetFileName(path)))
+            {
+                continue;
+            }
+
             FileInfo info = new FileInfo(path);
             if (!TryCreateSlotInfo(path, info, out WildWindSaveSlotInfo slot))
             {

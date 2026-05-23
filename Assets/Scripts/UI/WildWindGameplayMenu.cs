@@ -123,20 +123,19 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
             return;
         }
 
-        if (!currentMeta.TrySaveGameForSessionExit())
+        if (!WildWindSessionFlow.TrySaveAndExitToMenu(currentMeta, menuSceneName, out string error))
         {
+            Debug.LogWarning("[WildWindGameplayMenu] Save and exit failed: " + error, this);
             SetStatus("game.menu.status_save_failed");
-            return;
         }
-
-        SetStatus("game.menu.status_saved");
-        ExitToMenu();
     }
 
     private void ExitToMenu()
     {
-        SetPaused(false);
-        SceneManager.LoadScene(menuSceneName);
+        if (!WildWindSessionFlow.TryExitToMenuWithoutSave(ResolveMeta(), menuSceneName, out string error))
+        {
+            Debug.LogWarning("[WildWindGameplayMenu] Exit to menu failed: " + error, this);
+        }
     }
 
     private void SetPaused(bool paused)

@@ -415,17 +415,11 @@ public sealed class WildWindStartScreen : MonoBehaviour
     private void StartNewWorld()
     {
         SetStatus("status.new_world");
-        string fileName = WildWindSaveSlots.CreateNewWorldSaveFileName();
-        int seed = WorldSaveSlotFactory.CreateSeed();
-        if (!WorldSaveSlotFactory.TryCreateNewWorldSave(fileName, seed, out string error))
+        if (!WildWindSessionFlow.TryCreateNewWorldAndEnter(gameplaySceneName, out _, out _, out string error))
         {
             Debug.LogError("[WildWindStartScreen] New world save failed: " + error, this);
             SetStatus("error.new_world_save_failed");
-            return;
         }
-
-        WildWindSaveSlots.SetSelectedSaveFileName(fileName);
-        LoadGameplayScene();
     }
 
     private void ContinueFromSlot(string fileName)
@@ -437,20 +431,11 @@ public sealed class WildWindStartScreen : MonoBehaviour
         }
 
         SetStatus("status.loading_save");
-        WildWindSaveSlots.SetSelectedSaveFileName(fileName);
-        LoadGameplayScene();
-    }
-
-    private void LoadGameplayScene()
-    {
-        if (string.IsNullOrWhiteSpace(gameplaySceneName))
+        if (!WildWindSessionFlow.TryContinueWorldAndEnter(fileName, gameplaySceneName, out string error))
         {
-            SetStatus("status.missing_scene");
-            return;
+            Debug.LogError("[WildWindStartScreen] Continue save failed: " + error, this);
+            SetStatus(string.IsNullOrWhiteSpace(gameplaySceneName) ? "status.missing_scene" : "error.no_save_selected");
         }
-
-        WildWindSaveSlots.MarkPendingGameplayLaunch();
-        SceneManager.LoadScene(gameplaySceneName);
     }
 
     private void ExitGame()

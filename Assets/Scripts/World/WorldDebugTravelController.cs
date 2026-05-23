@@ -35,6 +35,15 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     [SerializeField, Range(5f, 500f), InspectorName("Min Camera Distance, m")] private float minCameraDistanceMeters = HardMinCameraDistanceMeters;
     [SerializeField, Range(500f, 2000f), InspectorName("Max Camera Distance, m")] private float maxCameraDistanceMeters = HardMaxCameraDistanceMeters;
     [SerializeField, Range(5f, 2000f), InspectorName("Takeoff Camera Distance, m")] private float takeoffCameraDistanceMeters = 620f;
+    [SerializeField, Range(0.05f, 2f), InspectorName("Takeoff Camera Blend, s")] private float takeoffCameraBlendSeconds = 0.65f;
+    [SerializeField, Range(0.02f, 1.5f), InspectorName("Flight Pivot Smooth, s")] private float flightCameraPivotSmoothSeconds = 0.22f;
+    [SerializeField, Range(0.04f, 2f), InspectorName("Flight Vertical Pivot Smooth, s")] private float flightCameraVerticalPivotSmoothSeconds = 0.62f;
+    [SerializeField, Range(0.04f, 2f), InspectorName("Flight Camera Height Smooth, s")] private float flightCameraHeightSmoothSeconds = 0.48f;
+    [SerializeField, Range(0.02f, 1f), InspectorName("Flight Camera Rotation Smooth, s")] private float flightCameraRotationSmoothSeconds = 0.14f;
+    [SerializeField, Range(0.02f, 1.5f), InspectorName("Flight Orbit Heading Smooth, s")] private float flightCameraOrbitHeadingSmoothSeconds = 0.38f;
+    [SerializeField, Range(0f, 45f), InspectorName("Tail Auto Align Window, deg")] private float tailAutoAlignWindowDegrees = 15f;
+    [SerializeField, Range(0f, 1f), InspectorName("Tail Auto Align Delay, s")] private float tailAutoAlignDelaySeconds = 0.12f;
+    [SerializeField, Range(0.02f, 1.5f), InspectorName("Tail Auto Align Smooth, s")] private float tailAutoAlignSmoothSeconds = 0.24f;
     [SerializeField, Range(-20f, 80f), InspectorName("Min Camera Pitch")] private float minCameraPitchDegrees = 6f;
     [SerializeField, Range(0f, 85f), InspectorName("Max Camera Pitch")] private float maxCameraPitchDegrees = 58f;
 
@@ -50,6 +59,20 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     private float cameraOrbitDistanceMeters;
     private Vector3 lastCameraOrbitPivot;
     private bool cameraWasOrbitingPlayerShip;
+    private bool takeoffCameraBlendActive;
+    private float takeoffCameraBlendStartedAt;
+    private Vector3 takeoffCameraBlendStartPosition;
+    private Quaternion takeoffCameraBlendStartRotation;
+    private bool hasSmoothedCameraOrbitPivot;
+    private Vector3 smoothedCameraOrbitPivot;
+    private float smoothedCameraOrbitPivotYVelocity;
+    private bool hasSmoothedCameraOrbitHeading;
+    private float smoothedCameraOrbitHeadingDegrees;
+    private float smoothedCameraOrbitHeadingVelocity;
+    private float cameraHeightVelocity;
+    private bool hasCameraOrbitManualDrag;
+    private float lastCameraOrbitControlTime = -999f;
+    private float cameraOrbitTailAlignVelocity;
     private float wheelTickAccumulator;
     private float lastWheelScrollDelta;
     private float lastWheelTickTime = -1f;
@@ -92,7 +115,7 @@ public sealed class WorldDebugTravelController : MonoBehaviour
             return;
         }
 
-        Vector3 input = ReadMovementInput();
+        Vector3 input = IsPlayerShipFlightTarget(movementTarget) ? Vector3.zero : ReadMovementInput();
         if (input.sqrMagnitude > 0.0001f)
         {
             if (!IsFlightPhysicsControlActive(movementTarget))
@@ -113,8 +136,6 @@ public sealed class WorldDebugTravelController : MonoBehaviour
             focus.position = movementTarget.position;
         }
 
-        gameplaySession?.RefreshRuntimeBubble();
-        bubbleStreamer?.RefreshNow();
         HandleCameraTargetTransition(movementTarget);
         UpdateCameraOrbitInput();
     }
@@ -194,7 +215,8 @@ public sealed class WorldDebugTravelController : MonoBehaviour
             GetMinimumCameraDistanceMeters(),
             GetMaximumCameraDistanceMeters());
         cameraWasOrbitingPlayerShip = IsPlayerShipFlightTarget(target);
-        ApplyCamera(true, target);
+        BeginTakeoffCameraBlend();
+        ApplyCamera(false, target);
     }
 
     public void AdjustCameraOrbitForTests(float yawDeltaDegrees, float pitchDeltaDegrees, float zoomSteps)
@@ -353,8 +375,15 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     {
         InitializeCameraOrbit(GetEffectiveCameraOffset());
 
-        Vector2 dragDelta = ReadCameraOrbitDragDelta();
-        if (dragDelta.sqrMagnitude > 0.0001f)
+        Vector2 dragDelta = ReadCameraOrbitDragDelta(out bool orbitControlActive);
+        bool hasDragDelta = dragDelta.sqrMagnitude > 0.0001f;
+        if (orbitControlActive)
+        {
+            lastCameraOrbitControlTime = Time.unscaledTime;
+            cameraOrbitTailAlignVelocity = 0f;
+        }
+
+        if (hasDragDelta)
         {
             float effectiveOrbitSensitivity = GetOrbitSensitivityForDistance(cameraOrbitDistanceMeters);
             cameraOrbitYawDegrees = NormalizeDegrees(cameraOrbitYawDegrees + dragDelta.x * effectiveOrbitSensitivity);
@@ -362,6 +391,7 @@ public sealed class WorldDebugTravelController : MonoBehaviour
                 cameraOrbitPitchDegrees - dragDelta.y * effectiveOrbitSensitivity,
                 minCameraPitchDegrees,
                 maxCameraPitchDegrees);
+            hasCameraOrbitManualDrag = true;
         }
 
         float scroll = ReadCameraZoomScroll();
@@ -369,6 +399,8 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         {
             ApplyProgressiveZoom(scroll);
         }
+
+        ApplyTailAutoAlignmentAfterOrbitInput(orbitControlActive);
     }
 
     private Vector3 GetEffectiveCameraOffset()
@@ -404,12 +436,14 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         cameraOrbitInitialized = true;
     }
 
-    private Vector2 ReadCameraOrbitDragDelta()
+    private Vector2 ReadCameraOrbitDragDelta(out bool orbitControlActive)
     {
+        orbitControlActive = false;
 #if ENABLE_INPUT_SYSTEM
         Mouse mouse = Mouse.current;
         if (mouse != null && mouse.rightButton.isPressed)
         {
+            orbitControlActive = true;
             return mouse.delta.ReadValue();
         }
 #endif
@@ -417,11 +451,64 @@ public sealed class WorldDebugTravelController : MonoBehaviour
 #if ENABLE_LEGACY_INPUT_MANAGER
         if (Input.GetMouseButton(1))
         {
+            orbitControlActive = true;
             return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * 18f;
         }
 #endif
 
         return Vector2.zero;
+    }
+
+    private void ApplyTailAutoAlignmentAfterOrbitInput(bool orbitControlActive)
+    {
+        if (orbitControlActive)
+        {
+            return;
+        }
+
+        Transform target = GetMovementTarget();
+        bool isPlayerShipFlightTarget = IsPlayerShipFlightTarget(target);
+        if (!isPlayerShipFlightTarget)
+        {
+            hasCameraOrbitManualDrag = false;
+            cameraOrbitTailAlignVelocity = 0f;
+            return;
+        }
+
+        if (!hasCameraOrbitManualDrag)
+        {
+            cameraOrbitTailAlignVelocity = 0f;
+            return;
+        }
+
+        float alignWindow = Mathf.Max(0f, tailAutoAlignWindowDegrees);
+        if (alignWindow <= 0.001f ||
+            Time.unscaledTime - lastCameraOrbitControlTime < Mathf.Max(0f, tailAutoAlignDelaySeconds))
+        {
+            return;
+        }
+
+        float tailDelta = Mathf.DeltaAngle(cameraOrbitYawDegrees, 0f);
+        if (Mathf.Abs(tailDelta) > alignWindow)
+        {
+            cameraOrbitTailAlignVelocity = 0f;
+            return;
+        }
+
+        cameraOrbitYawDegrees = NormalizeDegrees(Mathf.SmoothDampAngle(
+            cameraOrbitYawDegrees,
+            0f,
+            ref cameraOrbitTailAlignVelocity,
+            Mathf.Max(0.001f, tailAutoAlignSmoothSeconds),
+            float.PositiveInfinity,
+            GetCameraDeltaTime()));
+
+        if (Mathf.Abs(Mathf.DeltaAngle(cameraOrbitYawDegrees, 0f)) <= 0.05f &&
+            Mathf.Abs(cameraOrbitTailAlignVelocity) <= 0.05f)
+        {
+            cameraOrbitYawDegrees = 0f;
+            cameraOrbitTailAlignVelocity = 0f;
+        }
     }
 
     private float ReadCameraZoomScroll()
@@ -483,14 +570,26 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         float effectiveFollowSharpness = controlSettings != null ? controlSettings.DebugCameraFollowSharpness : followSharpness;
         Vector3 localOrbitOffset = Quaternion.Euler(cameraOrbitPitchDegrees, cameraOrbitYawDegrees, 0f) *
             (Vector3.back * cameraOrbitDistanceMeters);
-        Vector3 orbitOffset = GetCameraOrbitFrame(target) * localOrbitOffset;
+        Vector3 orbitOffset = GetCameraOrbitFrame(target, snap) * localOrbitOffset;
 
-        lastCameraOrbitPivot = GetCameraOrbitPivot(target);
+        Vector3 rawOrbitPivot = GetCameraOrbitPivot(target);
+        lastCameraOrbitPivot = GetSmoothedCameraOrbitPivot(target, rawOrbitPivot, snap);
         Vector3 targetPosition = lastCameraOrbitPivot + orbitOffset;
-        worldCamera.transform.position = snap
+        Quaternion targetRotation = GetCameraLookRotation(targetPosition, lastCameraOrbitPivot);
+
+        if (!snap && TryApplyTakeoffCameraBlend(targetPosition, targetRotation))
+        {
+            return;
+        }
+
+        Vector3 nextPosition = snap
             ? targetPosition
-            : Vector3.Lerp(worldCamera.transform.position, targetPosition, effectiveFollowSharpness);
-        worldCamera.transform.LookAt(lastCameraOrbitPivot);
+            : GetSmoothedCameraPosition(target, targetPosition, effectiveFollowSharpness);
+        worldCamera.transform.position = nextPosition;
+        Quaternion lookRotation = GetCameraLookRotation(nextPosition, lastCameraOrbitPivot);
+        worldCamera.transform.rotation = snap
+            ? lookRotation
+            : GetSmoothedCameraRotation(target, lookRotation);
     }
 
     private Transform GetMovementTarget()
@@ -524,20 +623,149 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         return target.position + GetEffectiveCameraLookOffset();
     }
 
-    private Quaternion GetCameraOrbitFrame(Transform target)
+    private Vector3 GetSmoothedCameraOrbitPivot(Transform target, Vector3 rawPivot, bool snap)
+    {
+        bool smoothFlightPivot = IsPlayerShipFlightTarget(target);
+        float resetDistance = Mathf.Max(80f, cameraOrbitDistanceMeters * 0.4f);
+        if (!smoothFlightPivot || snap || !hasSmoothedCameraOrbitPivot ||
+            (rawPivot - smoothedCameraOrbitPivot).sqrMagnitude > resetDistance * resetDistance)
+        {
+            smoothedCameraOrbitPivot = rawPivot;
+            smoothedCameraOrbitPivotYVelocity = 0f;
+            cameraHeightVelocity = 0f;
+            hasSmoothedCameraOrbitPivot = smoothFlightPivot;
+            return rawPivot;
+        }
+
+        float dt = GetCameraDeltaTime();
+        float smoothSeconds = Mathf.Max(0.001f, flightCameraPivotSmoothSeconds);
+        float alpha = 1f - Mathf.Exp(-dt / smoothSeconds);
+        Vector3 nextPivot = Vector3.Lerp(smoothedCameraOrbitPivot, rawPivot, alpha);
+        nextPivot.y = Mathf.SmoothDamp(
+            smoothedCameraOrbitPivot.y,
+            rawPivot.y,
+            ref smoothedCameraOrbitPivotYVelocity,
+            Mathf.Max(0.001f, flightCameraVerticalPivotSmoothSeconds),
+            float.PositiveInfinity,
+            dt);
+        smoothedCameraOrbitPivot = nextPivot;
+        return smoothedCameraOrbitPivot;
+    }
+
+    private Vector3 GetSmoothedCameraPosition(Transform target, Vector3 targetPosition, float effectiveFollowSharpness)
+    {
+        Vector3 currentPosition = worldCamera.transform.position;
+        Vector3 nextPosition = Vector3.Lerp(currentPosition, targetPosition, effectiveFollowSharpness);
+        if (!IsPlayerShipFlightTarget(target))
+        {
+            cameraHeightVelocity = 0f;
+            return nextPosition;
+        }
+
+        nextPosition.y = Mathf.SmoothDamp(
+            currentPosition.y,
+            targetPosition.y,
+            ref cameraHeightVelocity,
+            Mathf.Max(0.001f, flightCameraHeightSmoothSeconds),
+            float.PositiveInfinity,
+            GetCameraDeltaTime());
+        return nextPosition;
+    }
+
+    private Quaternion GetSmoothedCameraRotation(Transform target, Quaternion targetRotation)
     {
         if (!IsPlayerShipFlightTarget(target))
         {
+            return targetRotation;
+        }
+
+        float smoothSeconds = Mathf.Max(0.001f, flightCameraRotationSmoothSeconds);
+        float alpha = 1f - Mathf.Exp(-GetCameraDeltaTime() / smoothSeconds);
+        return Quaternion.Slerp(worldCamera.transform.rotation, targetRotation, alpha);
+    }
+
+    private static float GetCameraDeltaTime()
+    {
+        return Mathf.Max(0.0001f, Mathf.Max(Time.unscaledDeltaTime, Time.deltaTime));
+    }
+
+    private void BeginTakeoffCameraBlend()
+    {
+        if (worldCamera == null)
+        {
+            return;
+        }
+
+        takeoffCameraBlendActive = true;
+        takeoffCameraBlendStartedAt = Time.unscaledTime;
+        takeoffCameraBlendStartPosition = worldCamera.transform.position;
+        takeoffCameraBlendStartRotation = worldCamera.transform.rotation;
+    }
+
+    private bool TryApplyTakeoffCameraBlend(Vector3 targetPosition, Quaternion targetRotation)
+    {
+        if (!takeoffCameraBlendActive)
+        {
+            return false;
+        }
+
+        float duration = Mathf.Max(0.01f, takeoffCameraBlendSeconds);
+        float ratio = Mathf.Clamp01((Time.unscaledTime - takeoffCameraBlendStartedAt) / duration);
+        float easedRatio = Mathf.SmoothStep(0f, 1f, ratio);
+
+        worldCamera.transform.position = Vector3.Lerp(takeoffCameraBlendStartPosition, targetPosition, easedRatio);
+        worldCamera.transform.rotation = Quaternion.Slerp(takeoffCameraBlendStartRotation, targetRotation, easedRatio);
+
+        if (ratio >= 1f)
+        {
+            takeoffCameraBlendActive = false;
+        }
+
+        return true;
+    }
+
+    private static Quaternion GetCameraLookRotation(Vector3 cameraPosition, Vector3 pivot)
+    {
+        Vector3 direction = pivot - cameraPosition;
+        return direction.sqrMagnitude > 0.001f
+            ? Quaternion.LookRotation(direction.normalized, Vector3.up)
+            : Quaternion.identity;
+    }
+
+    private Quaternion GetCameraOrbitFrame(Transform target, bool snap)
+    {
+        if (!IsPlayerShipFlightTarget(target))
+        {
+            hasSmoothedCameraOrbitHeading = false;
+            smoothedCameraOrbitHeadingVelocity = 0f;
             return Quaternion.identity;
         }
 
         Vector3 flatForward = Vector3.ProjectOnPlane(target.forward, Vector3.up);
         if (flatForward.sqrMagnitude <= 0.001f)
         {
-            return Quaternion.identity;
+            return Quaternion.Euler(0f, smoothedCameraOrbitHeadingDegrees, 0f);
         }
 
-        return Quaternion.LookRotation(flatForward.normalized, Vector3.up);
+        float rawHeading = NormalizeDegrees(Mathf.Atan2(flatForward.x, flatForward.z) * Mathf.Rad2Deg);
+        if (snap || !hasSmoothedCameraOrbitHeading)
+        {
+            smoothedCameraOrbitHeadingDegrees = rawHeading;
+            smoothedCameraOrbitHeadingVelocity = 0f;
+            hasSmoothedCameraOrbitHeading = true;
+        }
+        else
+        {
+            smoothedCameraOrbitHeadingDegrees = Mathf.SmoothDampAngle(
+                smoothedCameraOrbitHeadingDegrees,
+                rawHeading,
+                ref smoothedCameraOrbitHeadingVelocity,
+                Mathf.Max(0.001f, flightCameraOrbitHeadingSmoothSeconds),
+                float.PositiveInfinity,
+                GetCameraDeltaTime());
+        }
+
+        return Quaternion.Euler(0f, smoothedCameraOrbitHeadingDegrees, 0f);
     }
 
     private void HandleCameraTargetTransition(Transform movementTarget)

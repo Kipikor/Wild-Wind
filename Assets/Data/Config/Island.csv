@@ -1,5 +1,5 @@
 id_island,local_name_ru,local_name_en,position_x,position_y,position_z,archetype_id,Island_production,docking_radius,time_for_one_item_load
-capital,Столица,Capital,0,0,0,,,80,1
+capital,Столица,Capital,0,2500,0,,,80,1
 Island1,Фермерский остров 1,Farming Island 1,350,88,525,farming,Island_production_food,10,1.5
 Island2,Угольный остров 1,Coal Island 1,484,77,-510,coal,Island_production_charcoal,10,1.5
 Island3,Туманный остров 1,Mist Island 1,787,21,165,mist,Island_production_water,10,1.5
@@ -28,3 +28,4 @@ Island25,Туманный остров 7,Mist Island 7,-718,15,-176,mist,Island_
 Island26,Фермерский остров 10,Farming Island 10,-242,8,-519,farming,Island_production_food,10,1.5
 Island27,Клавдиевый остров 1,Claudium Island 1,-420,3200,610,claudium,Island_production_claudium,18,1.5
 Island28,Клавдиевый остров 2,Claudium Island 2,690,3600,-340,claudium,Island_production_claudium,18,1.5
+starter_delivery_island,Ближний остров,Nearby Island,1000,2500,0,coal,Island_production_charcoal,120,0.5

@@ -10,6 +10,11 @@ jaeger_claudium_loop,Контур Егеря,Jaeger Claudium Loop,hunter_hull,52
 opora_claudium_loop,Контур Опоры,Opora Claudium Loop,support_platform,480,0.0035,45,10000,1.8
 fuel_tender_claudium_loop,Экономичный контур Топливщика,Fuel Tender Efficient Loop,support_platform,500,0.003,50,10000,2
 parovoz_claudium_loop,Контур Паровоза,Parovoz Claudium Loop,passenger_routes,520,0.005,28,5900,2
+liquid_tanker_claudium_loop,Контур Жидковоза,Liquid Tanker Claudium Loop,liquid_tender_tanks,500,0.0035,45,12000,2
+gletcher_claudium_loop,Контур Глетчера,Gletcher Claudium Loop,bulk_gas_tender,500,0.0035,45,9000,2
+vakhta_claudium_loop,Контур Вахты,Vakhta Claudium Loop,workforce_health_tender,560,0.0035,45,11000,2
+boxvan_tender_claudium_loop,Контур Фургонщика,Boxvan Tender Claudium Loop,boxed_goods_tender,500,0.0035,45,10000,2
+stapel_claudium_loop,Контур Стапеля,Stapel Claudium Loop,field_flying_dock,750,0.0032,55,16000,1.8
 water_strider_claudium_loop_mk2,Настроенный контур Водомерки,Water Strider Tuned Loop,water_strider_loop_tuning,430,0.0052,28,4300,2.6
 bulat_claudium_loop_mk2,Настроенный контур Булата,Bulat Tuned Loop,bulat_loop_tuning,470,0.0052,28,6500,2.3
 jaeger_claudium_loop_mk2,Усиленный контур Егеря,Jaeger Reinforced Loop,armored_hunter_hull,560,0.0054,28,5400,2

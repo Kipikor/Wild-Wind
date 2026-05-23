@@ -8,7 +8,6 @@ using UnityEngine.SceneManagement;
 public static class StartScreenSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/StartScreen.unity";
-    private const string GameplayScenePath = "Assets/Scenes/SampleScene.unity";
     private const string WorldScenePath = "Assets/Scenes/WildWindWorldScene.unity";
     private const string RootName = "Wild Wind Start Screen";
 
@@ -99,8 +98,7 @@ public static class StartScreenSceneBuilder
     {
         List<EditorBuildSettingsScene> scenes = new List<EditorBuildSettingsScene>();
         AddSceneIfExists(scenes, ScenePath, true);
-        AddSceneIfExists(scenes, GameplayScenePath, true);
-        AddSceneIfExists(scenes, WorldScenePath, false);
+        AddSceneIfExists(scenes, WorldScenePath, true);
         EditorBuildSettings.scenes = scenes.ToArray();
     }
 
@@ -122,5 +120,116 @@ public static class StartScreenSceneBuilder
             Directory.CreateDirectory(folder);
             AssetDatabase.Refresh();
         }
+    }
+}
+
+/// <summary>
+/// Keeps the editor workflow anchored at the real game entry point.
+/// Normal Play starts from StartScreen, and after Play the editor returns there.
+/// </summary>
+[InitializeOnLoad]
+public static class WildWindEditorStartSceneGuard
+{
+    private const string StartScenePath = StartScreenSceneBuilder.ScenePath;
+    private const string WorldScenePath = "Assets/Scenes/WildWindWorldScene.unity";
+    private const string SuppressNextPlayStartSceneKey = "WildWind.SuppressNextPlayStartScene";
+
+    static WildWindEditorStartSceneGuard()
+    {
+        EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+        EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        EditorApplication.delayCall -= EnsureNormalPlayStartsAtStartScreen;
+        EditorApplication.delayCall += EnsureNormalPlayStartsAtStartScreen;
+    }
+
+    public static void UseWorldSceneForNextPlay()
+    {
+        SessionState.SetBool(SuppressNextPlayStartSceneKey, true);
+        SceneAsset worldScene = LoadSceneAsset(WorldScenePath);
+        if (worldScene != null)
+        {
+            EditorSceneManager.playModeStartScene = worldScene;
+        }
+    }
+
+    private static void OnPlayModeStateChanged(PlayModeStateChange state)
+    {
+        if (Application.isBatchMode)
+        {
+            return;
+        }
+
+        if (state == PlayModeStateChange.ExitingEditMode)
+        {
+            if (SessionState.GetBool(SuppressNextPlayStartSceneKey, false))
+            {
+                SessionState.SetBool(SuppressNextPlayStartSceneKey, false);
+                return;
+            }
+
+            WildWindBigTestRunner.ClearEditorBigTestLaunchPending();
+            EnsureNormalPlayStartsAtStartScreen();
+            return;
+        }
+
+        if (state == PlayModeStateChange.EnteredEditMode)
+        {
+            WildWindBigTestRunner.ClearEditorBigTestLaunchPending();
+            EnsureNormalPlayStartsAtStartScreen();
+            EditorApplication.delayCall -= OpenStartScreenAfterPlay;
+            EditorApplication.delayCall += OpenStartScreenAfterPlay;
+        }
+    }
+
+    private static void EnsureNormalPlayStartsAtStartScreen()
+    {
+        if (Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            return;
+        }
+
+        SceneAsset startScene = LoadSceneAsset(StartScenePath);
+        if (startScene != null && EditorSceneManager.playModeStartScene != startScene)
+        {
+            EditorSceneManager.playModeStartScene = startScene;
+        }
+    }
+
+    private static void OpenStartScreenAfterPlay()
+    {
+        if (Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            return;
+        }
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (activeScene.path == StartScenePath)
+        {
+            return;
+        }
+
+        if (!File.Exists(StartScenePath))
+        {
+            Debug.LogWarning("[WildWindEditorStartSceneGuard] Start scene is missing: " + StartScenePath);
+            return;
+        }
+
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+        {
+            Debug.LogWarning("[WildWindEditorStartSceneGuard] StartScreen was not opened because modified scenes were not saved.");
+            return;
+        }
+
+        EditorSceneManager.OpenScene(StartScenePath, OpenSceneMode.Single);
+    }
+
+    private static SceneAsset LoadSceneAsset(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return null;
+        }
+
+        return AssetDatabase.LoadAssetAtPath<SceneAsset>(path);
     }
 }

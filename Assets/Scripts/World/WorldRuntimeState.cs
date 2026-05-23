@@ -204,7 +204,7 @@ public sealed class WorldRuntimeState : MonoBehaviour
 
     public void RefreshActiveBubble(Vector3 positionMeters, float activeRadiusMeters, bool discover = true)
     {
-        InitializeFromWorld(true);
+        EnsureInitializedForCurrentWorld();
         lastKnownPlayerPosition = positionMeters;
 
         for (int i = 0; i < chunks.Count; i++)
@@ -281,6 +281,63 @@ public sealed class WorldRuntimeState : MonoBehaviour
                 state.firstDiscoveredUtcTicks = now;
             }
         }
+    }
+
+    private void EnsureInitializedForCurrentWorld()
+    {
+        ResolveReferences();
+        if (world == null)
+        {
+            if ((chunks.Count > 0 && chunkStatesById.Count != chunks.Count) ||
+                (entities.Count > 0 && entityStatesByKey.Count != entities.Count))
+            {
+                BuildRuntimeDictionaries();
+            }
+
+            return;
+        }
+
+        if (world.Chunks.Count == 0)
+        {
+            world.GenerateStarterRegion();
+        }
+
+        bool manifestMatches =
+            loadedManifestSeed == CurrentManifestSeed() &&
+            string.Equals(loadedManifestName ?? "", CurrentManifestName() ?? "", StringComparison.Ordinal);
+        bool stateShapeMatches =
+            chunks.Count == world.Chunks.Count &&
+            entities.Count == GetWorldEntityCount();
+
+        if (!manifestMatches || !stateShapeMatches)
+        {
+            InitializeFromWorld(true);
+            return;
+        }
+
+        if (chunkStatesById.Count != chunks.Count || entityStatesByKey.Count != entities.Count)
+        {
+            BuildRuntimeDictionaries();
+        }
+
+        if (index != null)
+        {
+            index.EnsureBuilt(world);
+        }
+    }
+
+    private int GetWorldEntityCount()
+    {
+        if (world == null)
+        {
+            return entities.Count;
+        }
+
+        return world.Islands.Count +
+            world.CloudFields.Count +
+            world.ResourceFields.Count +
+            world.LeviathanRegions.Count +
+            world.IcebergFields.Count;
     }
 
     public bool TryGetChunkState(string chunkId, out ChunkRuntimeState state)

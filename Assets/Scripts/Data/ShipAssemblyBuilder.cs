@@ -373,10 +373,13 @@ public static class ShipAssemblyBuilder
 
         if (R1ShipDesignCatalog.TryGetByHullId(hullConfig.id, out R1ShipDesignDefinition r1Design))
         {
-            slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.EngineSlotId, "Маршевый двигатель", "engine_main", r1Design.GetAllowedEngineIds()));
-            slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.PropellerSlotId, "Винт", "propeller_main", r1Design.GetAllowedPropellerIds()));
-            slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.ClaudiumLoopSlotId, "Клавдиевый контур", "claudium_loop", r1Design.GetAllowedClaudiumLoopIds()));
-            slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.RoleModuleSlotId, "Ролевой модуль", "utility", r1Design.GetAllowedSpecialModuleIds()));
+            AddDesignSlots(slots, r1Design);
+            return slots;
+        }
+
+        if (R2TenderDesignCatalog.TryGetByHullId(hullConfig.id, out R1ShipDesignDefinition r2TenderDesign))
+        {
+            AddDesignSlots(slots, r2TenderDesign);
             return slots;
         }
 
@@ -408,6 +411,16 @@ public static class ShipAssemblyBuilder
             allowedPartIds = new List<string>()
         });
         return slots;
+    }
+
+    private static void AddDesignSlots(List<ShipSlotDefinition> slots, R1ShipDesignDefinition design)
+    {
+        if (slots == null || design == null) return;
+
+        slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.EngineSlotId, "Маршевый двигатель", "engine_main", design.GetAllowedEngineIds()));
+        slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.PropellerSlotId, "Винт", "propeller_main", design.GetAllowedPropellerIds()));
+        slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.ClaudiumLoopSlotId, "Клавдиевый контур", "claudium_loop", design.GetAllowedClaudiumLoopIds()));
+        slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.RoleModuleSlotId, "Ролевой модуль", "utility", design.GetAllowedSpecialModuleIds()));
     }
 
     private static ShipSlotDefinition CreateRequiredSlot(string slotId, string displayName, string slotTypeId, string allowedPartId = "")

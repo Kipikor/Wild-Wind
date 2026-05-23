@@ -16,6 +16,8 @@ public class MetaGameSaveData
     public WorldManifestData worldManifest;
     [InspectorName("World Runtime")]
     public WorldRuntimeSaveData worldRuntime;
+    [InspectorName("Gameplay Session")]
+    public GameplaySessionSaveData gameplaySession;
 }
 
 public partial class MetaGameState : MonoBehaviour
@@ -523,7 +525,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureScoutSystems();
 
         bool loadedGame = false;
-        if (loadSavedGameOnAwake)
+        if (loadSavedGameOnAwake && !WildWindBigTestRunner.IsMainWorldCheckInProgress)
         {
             loadedGame = LoadGame();
         }
@@ -652,6 +654,7 @@ public partial class MetaGameState : MonoBehaviour
         if (!progress.receivedStartingPaper)
         {
             AddStartingIslandSupplies();
+            WildWindStarterDelivery.SeedNewGame(progress);
             progress.receivedStartingPaper = true;
         }
 
@@ -1050,6 +1053,98 @@ public partial class MetaGameState : MonoBehaviour
         return TryBeginFlightSession(null);
     }
 
+    public bool TryLoadShipCargoFromCurrentDock(string itemId, int amount, out string message, bool autoSave = true)
+    {
+        message = "";
+        EnsureProgressInitialized();
+
+        if (!TryResolveCurrentIslandStorage(out IslandConfig island, out IslandProductionState storage, out message))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        {
+            message = "Некорректный груз.";
+            return false;
+        }
+
+        if (storage.GetResourceAmount(itemId) < amount)
+        {
+            message = "На складе не хватает " + worldConfig.GetItemNameRu(itemId) + ".";
+            return false;
+        }
+
+        Dictionary<string, int> plannedCargo = BuildShipCargoMap(itemId, amount);
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        float plannedMassKg = CargoStoragePlanner.GetCargoMassKg(worldConfig, plannedCargo);
+        if (plannedMassKg > capacity.maxCargoKg + 0.001f)
+        {
+            message = "Нельзя загрузить: корабль перегружен.";
+            return false;
+        }
+
+        if (!CargoStoragePlanner.TryValidateCargoStorage(worldConfig, capacity.cargoCompartments, plannedCargo, out string storageError))
+        {
+            message = "Нельзя загрузить: " + storageError;
+            return false;
+        }
+
+        if (!storage.TrySpendResource(itemId, amount))
+        {
+            message = "Не удалось списать груз со склада " + GetIslandDisplayName(island) + ".";
+            return false;
+        }
+
+        progress.AddShipCargo(itemId, amount);
+        ApplyCargoMassToShip(GetActiveShip());
+        if (autoSave)
+        {
+            AutoSaveIfDocked();
+        }
+
+        message = "Загружено: " + worldConfig.GetItemNameRu(itemId) + " x" + amount + ".";
+        return true;
+    }
+
+    public bool TryUnloadShipCargoToCurrentDock(string itemId, int amount, out string message, bool autoSave = true)
+    {
+        message = "";
+        EnsureProgressInitialized();
+
+        if (!TryResolveCurrentIslandStorage(out IslandConfig island, out IslandProductionState storage, out message))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        {
+            message = "Некорректный груз.";
+            return false;
+        }
+
+        if (!progress.TrySpendShipCargo(itemId, amount))
+        {
+            message = "В трюме не хватает " + worldConfig.GetItemNameRu(itemId) + ".";
+            return false;
+        }
+
+        storage.AddResource(itemId, amount);
+        ApplyCargoMassToShip(GetActiveShip());
+        if (autoSave)
+        {
+            AutoSaveIfDocked();
+        }
+
+        message = "Выгружено на склад " + GetIslandDisplayName(island) + ": " + worldConfig.GetItemNameRu(itemId) + " x" + amount + ".";
+        return true;
+    }
+
+    public bool TryGetCurrentIslandStorage(out IslandConfig island, out IslandProductionState storage)
+    {
+        return TryResolveCurrentIslandStorage(out island, out storage, out _);
+    }
+
     public bool AutoInstallRequiredModules(bool applyAndSave, out string message)
     {
         EnsureProgressInitialized();
@@ -1381,6 +1476,7 @@ public partial class MetaGameState : MonoBehaviour
     private bool TrySaveGame(bool allowFlightSave)
     {
         EnsureProgressInitialized();
+        WildWindGameplaySession gameplaySession = WildWindGameplaySession.EnsureSessionForLoadedWorld(this, EffectiveSaveFileName);
 
         if (!IsDocked && !allowFlightSave)
         {
@@ -1423,7 +1519,8 @@ public partial class MetaGameState : MonoBehaviour
             version = MetaGameSaveData.CurrentVersion,
             progress = progress,
             worldManifest = CaptureWorldManifestForSave(),
-            worldRuntime = CaptureWorldRuntimeForSave()
+            worldRuntime = CaptureWorldRuntimeForSave(),
+            gameplaySession = CaptureGameplaySessionForSave(gameplaySession)
         };
 
         try
@@ -1461,6 +1558,7 @@ public partial class MetaGameState : MonoBehaviour
 
             progress = saveData.progress;
             ApplyWorldSaveData(saveData);
+            ApplyGameplaySessionSaveData(saveData.gameplaySession);
             progress.Normalize();
 
             initialized = false;
@@ -1490,6 +1588,41 @@ public partial class MetaGameState : MonoBehaviour
     {
         ResolveWorldSaveReferences();
         return worldRuntimeState != null ? worldRuntimeState.CreateSaveData() : null;
+    }
+
+    private GameplaySessionSaveData CaptureGameplaySessionForSave(WildWindGameplaySession gameplaySession)
+    {
+        if (gameplaySession != null)
+        {
+            return gameplaySession.CreateSaveData();
+        }
+
+        ResolveWorldSaveReferences();
+        WorldManifestData manifest = worldRuntime != null
+            ? WorldManifestData.FromRuntime(worldRuntime, "slot_" + Path.GetFileNameWithoutExtension(EffectiveSaveFileName))
+            : null;
+        return GameplaySessionSaveData.CreateInitial(manifest, EffectiveSaveFileName, progress);
+    }
+
+    private void ApplyGameplaySessionSaveData(GameplaySessionSaveData gameplaySessionData)
+    {
+        WildWindGameplaySession gameplaySession = WildWindGameplaySession.EnsureSessionForLoadedWorld(this, EffectiveSaveFileName);
+        if (gameplaySession == null)
+        {
+            return;
+        }
+
+        if (gameplaySessionData != null && gameplaySessionData.IsUsable)
+        {
+            gameplaySession.ApplySaveData(gameplaySessionData);
+            return;
+        }
+
+        ResolveWorldSaveReferences();
+        WorldManifestData manifest = worldRuntime != null
+            ? WorldManifestData.FromRuntime(worldRuntime, "slot_" + Path.GetFileNameWithoutExtension(EffectiveSaveFileName))
+            : null;
+        gameplaySession.ApplySaveData(GameplaySessionSaveData.CreateInitial(manifest, EffectiveSaveFileName, progress));
     }
 
     private void ApplyWorldSaveData(MetaGameSaveData saveData)
@@ -2391,12 +2524,15 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         if (body == null) return;
+        body.interpolation = RigidbodyInterpolation.Interpolate;
 
         if (docked)
         {
             if (progress.hasCurrentDockPosition)
             {
-                ship.transform.position = progress.currentDockPosition;
+                body.position = progress.currentDockPosition;
+                body.transform.position = progress.currentDockPosition;
+                Physics.SyncTransforms();
             }
 
             body.isKinematic = false;
@@ -2410,7 +2546,10 @@ public partial class MetaGameState : MonoBehaviour
         {
             if (progress.hasCurrentFlightPose)
             {
-                ship.transform.SetPositionAndRotation(progress.currentFlightPosition, progress.currentFlightRotation);
+                body.position = progress.currentFlightPosition;
+                body.rotation = progress.currentFlightRotation;
+                body.transform.SetPositionAndRotation(progress.currentFlightPosition, progress.currentFlightRotation);
+                Physics.SyncTransforms();
             }
 
             body.isKinematic = false;
@@ -2426,7 +2565,11 @@ public partial class MetaGameState : MonoBehaviour
     {
         if (!IsDocked || progress == null) return;
 
-        progress.currentDockPosition = GetCurrentShipPosition();
+        ShipPhysics ship = GetActiveShip();
+        WildWindGameplaySession gameplaySession = FindFirstObjectByType<WildWindGameplaySession>();
+        progress.currentDockPosition = ship != null
+            ? ship.transform.position
+            : gameplaySession != null ? gameplaySession.PlayerPosition : Vector3.zero;
         progress.hasCurrentDockPosition = true;
     }
 
@@ -2435,7 +2578,14 @@ public partial class MetaGameState : MonoBehaviour
         if (CurrentMode != GameSessionMode.Flight || progress == null) return;
 
         ShipPhysics ship = GetActiveShip();
-        if (ship == null) return;
+        if (ship == null)
+        {
+            WildWindGameplaySession gameplaySession = FindFirstObjectByType<WildWindGameplaySession>();
+            if (gameplaySession == null) return;
+
+            progress.SetFlightPose(gameplaySession.PlayerPosition, gameplaySession.PlayerRotation);
+            return;
+        }
 
         progress.SetFlightPose(ship.transform.position, ship.transform.rotation);
     }
@@ -2955,6 +3105,73 @@ public partial class MetaGameState : MonoBehaviour
             default:
                 return "ед.";
         }
+    }
+
+    private bool TryResolveCurrentIslandStorage(out IslandConfig island, out IslandProductionState storage, out string message)
+    {
+        island = null;
+        storage = null;
+        message = "";
+
+        EnsureProgressInitialized();
+        if (!IsDocked || progress.currentDockKind != DockingLocationKind.Island)
+        {
+            message = "Сначала нужна стыковка с островом.";
+            return false;
+        }
+
+        island = worldConfig.GetIsland(progress.currentDockId);
+        if (island == null)
+        {
+            message = "Текущий остров не найден: " + progress.currentDockId + ".";
+            return false;
+        }
+
+        storage = progress.GetIslandProductionState(island.id, true);
+        if (storage == null)
+        {
+            message = "Склад острова не найден: " + island.id + ".";
+            return false;
+        }
+
+        return true;
+    }
+
+    private Dictionary<string, int> BuildShipCargoMap(string itemId, int deltaAmount)
+    {
+        Dictionary<string, int> cargo = new Dictionary<string, int>();
+        if (progress == null)
+        {
+            return cargo;
+        }
+
+        progress.shipCargo ??= new List<ResourceStack>();
+        for (int i = 0; i < progress.shipCargo.Count; i++)
+        {
+            ResourceStack stack = progress.shipCargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0)
+            {
+                continue;
+            }
+
+            cargo[stack.resourceId] = stack.amount;
+        }
+
+        if (!string.IsNullOrWhiteSpace(itemId) && deltaAmount != 0)
+        {
+            cargo.TryGetValue(itemId, out int current);
+            int next = Mathf.Max(0, current + deltaAmount);
+            if (next > 0)
+            {
+                cargo[itemId] = next;
+            }
+            else
+            {
+                cargo.Remove(itemId);
+            }
+        }
+
+        return cargo;
     }
 
     private void EnsureCargoPlan(string islandId)

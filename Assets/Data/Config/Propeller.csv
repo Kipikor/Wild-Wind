@@ -10,5 +10,10 @@ jaeger_propeller,Охотничий винт Егеря,Jaeger Hunting Propeller
 opora_propeller,Нижний винт Опоры,Opora Downthrust Propeller,support_platform,300,10,0.55,360
 fuel_tender_propeller,Маршрутный винт Топливщика,Fuel Tender Route Propeller,support_platform,220,16,0.7,300
 parovoz_propeller,Пассажирский винт Паровоза,Parovoz Passenger Propeller,passenger_routes,230,20,0.72,300
+liquid_tanker_propeller,Тяговый винт Жидковоза,Liquid Tanker Pull Propeller,liquid_tender_tanks,220,18,0.68,300
+gletcher_propeller,Тендерный винт Глетчера,Gletcher Tender Propeller,bulk_gas_tender,220,17,0.68,280
+vakhta_propeller,Служебный винт Вахты,Vakhta Service Propeller,workforce_health_tender,240,16,0.7,290
+boxvan_tender_propeller,Маршрутный винт Фургонщика,Boxvan Tender Route Propeller,boxed_goods_tender,210,18,0.75,300
+stapel_propeller,Доковый винт Стапеля,Stapel Dock Propeller,field_flying_dock,330,14,0.55,360
 opora_propeller_mk2,Свободный нижний винт Опоры,Opora Free Downthrust Propeller,ribbed_deck_truss,330,16,0.58,390
 parovoz_propeller_mk2,Скоростной пассажирский винт,Parovoz Passenger Propeller II,passenger_propeller,260,30,0.76,360

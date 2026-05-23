@@ -152,10 +152,13 @@ public class ShipLoader : MonoBehaviour
     {
         if (ship == null) return;
 
-        if (ship.GetComponent<Rigidbody>() == null)
+        Rigidbody body = ship.GetComponent<Rigidbody>();
+        if (body == null)
         {
-            ship.gameObject.AddComponent<Rigidbody>();
+            body = ship.gameObject.AddComponent<Rigidbody>();
         }
+
+        body.interpolation = RigidbodyInterpolation.Interpolate;
 
         if (ship.GetComponent<ShipAssemblyRuntime>() == null)
         {

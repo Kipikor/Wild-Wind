@@ -16,7 +16,23 @@ public enum WildWindInputKey
     LeftShift,
     RightShift,
     Space,
-    X
+    X,
+    LeftCtrl,
+    RightCtrl
+}
+
+public struct WildWindFlightInputState
+{
+    public float thrust;
+    public float lateral;
+    public float lift;
+    public float turn;
+
+    public bool HasAnyInput =>
+        Mathf.Abs(thrust) > 0.001f ||
+        Mathf.Abs(lateral) > 0.001f ||
+        Mathf.Abs(lift) > 0.001f ||
+        Mathf.Abs(turn) > 0.001f;
 }
 
 public sealed class WildWindControlSettings : MonoBehaviour
@@ -36,6 +52,24 @@ public sealed class WildWindControlSettings : MonoBehaviour
     [SerializeField, InspectorName("Sprint")] private WildWindInputKey sprintKey = WildWindInputKey.LeftShift;
     [SerializeField, InspectorName("Sprint Alt")] private WildWindInputKey sprintAltKey = WildWindInputKey.RightShift;
 
+    [Header("Flight Keys")]
+    [SerializeField, InspectorName("Thrust Forward")] private WildWindInputKey flightThrustForwardKey = WildWindInputKey.W;
+    [SerializeField, InspectorName("Thrust Backward")] private WildWindInputKey flightThrustBackwardKey = WildWindInputKey.S;
+    [SerializeField, InspectorName("Slide Left")] private WildWindInputKey flightSlideLeftKey = WildWindInputKey.A;
+    [SerializeField, InspectorName("Slide Right")] private WildWindInputKey flightSlideRightKey = WildWindInputKey.D;
+    [SerializeField, InspectorName("Turn Left")] private WildWindInputKey flightTurnLeftKey = WildWindInputKey.Q;
+    [SerializeField, InspectorName("Turn Right")] private WildWindInputKey flightTurnRightKey = WildWindInputKey.E;
+    [SerializeField, InspectorName("Target Altitude Up")] private WildWindInputKey flightAscendKey = WildWindInputKey.LeftShift;
+    [SerializeField, InspectorName("Target Altitude Up Alt")] private WildWindInputKey flightAscendAltKey = WildWindInputKey.RightShift;
+    [SerializeField, InspectorName("Target Altitude Down")] private WildWindInputKey flightDescendKey = WildWindInputKey.LeftCtrl;
+    [SerializeField, InspectorName("Target Altitude Down Alt")] private WildWindInputKey flightDescendAltKey = WildWindInputKey.RightCtrl;
+
+    [Header("Flight Assist Rates")]
+    [SerializeField, Range(1f, 80f), InspectorName("Target Speed Change, m/s per sec")] private float flightTargetSpeedChangeMetersPerSecond = 8f;
+    [SerializeField, Range(5f, 400f), InspectorName("Target Altitude Change, m/s")] private float flightTargetAltitudeChangeMetersPerSecond = 70f;
+    [SerializeField, Range(5f, 180f), InspectorName("Target Heading Change, deg/s")] private float flightTargetHeadingChangeDegreesPerSecond = 45f;
+    [SerializeField, Range(0f, 80f), InspectorName("Max Reverse Target Speed, m/s")] private float flightMaxReverseTargetSpeedMetersPerSecond = 25f;
+
     [Header("Debug Travel Camera")]
     [SerializeField, InspectorName("Camera Offset")] private Vector3 debugCameraOffset = new Vector3(-760f, 240f, -820f);
     [SerializeField, InspectorName("Camera Look Offset")] private Vector3 debugCameraLookOffset = new Vector3(120f, 20f, 120f);
@@ -47,6 +81,10 @@ public sealed class WildWindControlSettings : MonoBehaviour
     public Vector3 DebugCameraOffset => debugCameraOffset;
     public Vector3 DebugCameraLookOffset => debugCameraLookOffset;
     public float DebugCameraFollowSharpness => debugCameraFollowSharpness;
+    public float FlightTargetSpeedChangeMetersPerSecond => flightTargetSpeedChangeMetersPerSecond;
+    public float FlightTargetAltitudeChangeMetersPerSecond => flightTargetAltitudeChangeMetersPerSecond;
+    public float FlightTargetHeadingChangeDegreesPerSecond => flightTargetHeadingChangeDegreesPerSecond;
+    public float FlightMaxReverseTargetSpeedMetersPerSecond => flightMaxReverseTargetSpeedMetersPerSecond;
 
     public Vector3 ReadDebugTravelInput()
     {
@@ -69,6 +107,48 @@ public sealed class WildWindControlSettings : MonoBehaviour
     public bool IsSprintPressed()
     {
         return IsKeyPressed(sprintKey) || IsKeyPressed(sprintAltKey);
+    }
+
+    public WildWindFlightInputState ReadFlightInput()
+    {
+        return new WildWindFlightInputState
+        {
+            thrust = ReadAxis(flightThrustForwardKey, flightThrustBackwardKey),
+            lateral = ReadAxis(flightSlideRightKey, flightSlideLeftKey),
+            lift = ReadAxisPair(flightAscendKey, flightAscendAltKey, flightDescendKey, flightDescendAltKey),
+            turn = ReadAxis(flightTurnRightKey, flightTurnLeftKey)
+        };
+    }
+
+    public static WildWindFlightInputState ReadDefaultFlightInput()
+    {
+        return new WildWindFlightInputState
+        {
+            thrust = ReadAxis(WildWindInputKey.W, WildWindInputKey.S),
+            lateral = ReadAxis(WildWindInputKey.D, WildWindInputKey.A),
+            lift = ReadAxisPair(WildWindInputKey.LeftShift, WildWindInputKey.RightShift, WildWindInputKey.LeftCtrl, WildWindInputKey.RightCtrl),
+            turn = ReadAxis(WildWindInputKey.E, WildWindInputKey.Q)
+        };
+    }
+
+    private static float ReadAxis(WildWindInputKey positiveKey, WildWindInputKey negativeKey)
+    {
+        float value = 0f;
+        if (IsKeyPressed(positiveKey)) value += 1f;
+        if (IsKeyPressed(negativeKey)) value -= 1f;
+        return Mathf.Clamp(value, -1f, 1f);
+    }
+
+    private static float ReadAxisPair(
+        WildWindInputKey positiveKey,
+        WildWindInputKey positiveAltKey,
+        WildWindInputKey negativeKey,
+        WildWindInputKey negativeAltKey)
+    {
+        float value = 0f;
+        if (IsKeyPressed(positiveKey) || IsKeyPressed(positiveAltKey)) value += 1f;
+        if (IsKeyPressed(negativeKey) || IsKeyPressed(negativeAltKey)) value -= 1f;
+        return Mathf.Clamp(value, -1f, 1f);
     }
 
     public static bool IsKeyPressed(WildWindInputKey key)
@@ -116,6 +196,8 @@ public sealed class WildWindControlSettings : MonoBehaviour
             WildWindInputKey.RightShift => keyboard.rightShiftKey.isPressed,
             WildWindInputKey.Space => keyboard.spaceKey.isPressed,
             WildWindInputKey.X => keyboard.xKey.isPressed,
+            WildWindInputKey.LeftCtrl => keyboard.leftCtrlKey.isPressed,
+            WildWindInputKey.RightCtrl => keyboard.rightCtrlKey.isPressed,
             _ => false
         };
     }
@@ -136,6 +218,8 @@ public sealed class WildWindControlSettings : MonoBehaviour
             WildWindInputKey.RightShift => Input.GetKey(KeyCode.RightShift),
             WildWindInputKey.Space => Input.GetKey(KeyCode.Space),
             WildWindInputKey.X => Input.GetKey(KeyCode.X),
+            WildWindInputKey.LeftCtrl => Input.GetKey(KeyCode.LeftControl),
+            WildWindInputKey.RightCtrl => Input.GetKey(KeyCode.RightControl),
             _ => false
         };
     }

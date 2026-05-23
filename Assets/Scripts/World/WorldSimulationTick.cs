@@ -134,11 +134,6 @@ public sealed class WorldSimulationTick : MonoBehaviour
             runtimeState.RefreshActiveBubble(focusPosition, world.ActiveBubbleRadiusMeters);
         }
 
-        if (refreshBubbleEachTick && streamer != null)
-        {
-            streamer.RefreshNow();
-        }
-
         int touched = 0;
         float extracted = 0f;
         if (simulateFarResources && runtimeState != null)

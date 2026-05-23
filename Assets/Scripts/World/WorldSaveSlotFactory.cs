@@ -30,6 +30,11 @@ public static class WorldSaveSlotFactory
             return false;
         }
 
+        if (saveData.gameplaySession != null)
+        {
+            saveData.gameplaySession.selectedSaveFileName = Path.GetFileName(fileName ?? "");
+        }
+
         try
         {
             string folder = Path.GetDirectoryName(path);
@@ -53,13 +58,20 @@ public static class WorldSaveSlotFactory
         WorldManifestData manifest = GenerateStarterManifest(seed);
         PlayerProgress progress = new PlayerProgress();
         progress.Normalize();
+        progress.selectedHullId = GameplaySessionSaveData.DefaultStarterHullId;
+        progress.SetDocked(
+            GameplaySessionSaveData.DefaultDockId,
+            DockingLocationKind.Island,
+            GameplaySessionSaveData.ResolveStarterDockPosition(manifest, GameplaySessionSaveData.DefaultDockId));
+        WildWindStarterDelivery.SeedNewGame(progress);
 
         return new MetaGameSaveData
         {
             version = MetaGameSaveData.CurrentVersion,
             progress = progress,
             worldManifest = manifest,
-            worldRuntime = WorldRuntimeSaveData.CreateInitial(manifest)
+            worldRuntime = WorldRuntimeSaveData.CreateInitial(manifest),
+            gameplaySession = GameplaySessionSaveData.CreateInitial(manifest, "", progress)
         };
     }
 

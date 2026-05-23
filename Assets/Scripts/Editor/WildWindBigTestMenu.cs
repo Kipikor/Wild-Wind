@@ -10,23 +10,15 @@ public static class WildWindBigTestMenu
     {
         if (EditorApplication.isPlaying)
         {
-            WildWindBigTestRunner runner = EnsureRunnerInActiveScene();
-            runner.ResetRunStateForEditor();
-            runner.RunBigTest();
-            Selection.activeGameObject = runner.gameObject;
+            Debug.LogWarning("[WildWindBigTest] Stop Play Mode before running the big test. The test starts from Edit Mode so it cannot consume the current gameplay launch/save.");
             return;
         }
 
         WorldSceneBuilder.BuildFinalWorldScene();
-        WildWindBigTestRunner preparedRunner = EnsureRunnerInActiveScene();
-        preparedRunner.runOnStart = true;
-        preparedRunner.logFullReportToConsole = true;
-        preparedRunner.writeReportFile = true;
-        preparedRunner.productionSimulationMinutes = 12f;
-        preparedRunner.streamerAverageBudgetMs = 250f;
-        preparedRunner.ResetRunStateForEditor();
+        RemoveSceneBigTestRunnersFromActiveScene();
+        WildWindSaveSlots.ClearPendingGameplayLaunch();
+        WildWindBigTestRunner.MarkEditorBigTestLaunchPending();
 
-        EditorUtility.SetDirty(preparedRunner);
         Scene scene = SceneManager.GetActiveScene();
         if (scene.IsValid())
         {
@@ -37,8 +29,8 @@ public static class WildWindBigTestMenu
             }
         }
 
-        Selection.activeGameObject = preparedRunner.gameObject;
         Debug.Log("[WildWindBigTest] Сцена большого теста готова. Включаю Play Mode, протокол появится в Console и TestReports/WildWindBigTestReport.txt.");
+        WildWindEditorStartSceneGuard.UseWorldSceneForNextPlay();
         EditorApplication.isPlaying = true;
     }
 
@@ -46,39 +38,22 @@ public static class WildWindBigTestMenu
     public static bool ValidateRunBigTest()
     {
         return !EditorApplication.isCompiling &&
-            (EditorApplication.isPlaying || !EditorApplication.isPlayingOrWillChangePlaymode);
+            !EditorApplication.isPlaying &&
+            !EditorApplication.isPlayingOrWillChangePlaymode;
     }
 
-    private static WildWindBigTestRunner EnsureRunnerInActiveScene()
+    private static void RemoveSceneBigTestRunnersFromActiveScene()
     {
-        WildWindBigTestRunner runner = Object.FindFirstObjectByType<WildWindBigTestRunner>();
-        if (runner == null)
+        WildWindBigTestRunner[] runners = Object.FindObjectsByType<WildWindBigTestRunner>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < runners.Length; i++)
         {
-            GameObject runnerObject = new GameObject("Wild Wind Big Test Runner");
-            Transform root = GameObject.Find("Wild Wind World") != null ? GameObject.Find("Wild Wind World").transform : null;
-            if (root != null)
+            WildWindBigTestRunner runner = runners[i];
+            if (runner == null)
             {
-                runnerObject.transform.SetParent(root, false);
+                continue;
             }
 
-            Undo.RegisterCreatedObjectUndo(runnerObject, "Create Wild Wind Big Test Runner");
-            runner = runnerObject.AddComponent<WildWindBigTestRunner>();
+            Object.DestroyImmediate(runner.gameObject);
         }
-        else
-        {
-            Undo.RecordObject(runner, "Configure Wild Wind Big Test Runner");
-        }
-
-        runner.world = Object.FindFirstObjectByType<WorldRegionRuntime>();
-        runner.worldIndex = Object.FindFirstObjectByType<WorldEntityIndex>();
-        runner.runtimeState = Object.FindFirstObjectByType<WorldRuntimeState>();
-        runner.simulationTick = Object.FindFirstObjectByType<WorldSimulationTick>();
-        runner.streamer = Object.FindFirstObjectByType<WorldBubbleStreamer>();
-        runner.focus = runner.world != null ? runner.world.Focus : null;
-        runner.visualTuner = Object.FindFirstObjectByType<VisualPlayModeTuner>();
-        runner.settings = Object.FindFirstObjectByType<WildWindSettingsRoot>();
-        runner.metaGameState = Object.FindFirstObjectByType<MetaGameState>();
-        EditorUtility.SetDirty(runner);
-        return runner;
     }
 }

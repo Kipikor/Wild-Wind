@@ -17,11 +17,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private const int MinimumExpectedCheckCount = 320;
     private const string BigTestSessionSavePrefix = "wild_wind_big_test_session_";
 
+    public const string BigTestEditorLaunchPlayerPrefsKey = "WildWind.BigTestEditorLaunch";
     public const string DefaultStartSceneName = "StartScreen";
     public const string DefaultWorldSceneName = "WildWindWorldScene";
 
     public static bool SuppressRunOnStartForAutomation { get; set; }
     public static bool IsSessionLoopLaunchInProgress => sessionLoopLaunchInProgress;
+    public static bool IsMainWorldCheckInProgress => activeRunInProgress && !sessionLoopLaunchInProgress;
 
     private static bool autoRunConsumedThisPlaySession;
     private static bool activeRunInProgress;
@@ -52,7 +54,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     };
 
     [Header("Большой тест")]
-    [SerializeField, InspectorName("Запускать при старте Play Mode")] public bool runOnStart = true;
+    [SerializeField, InspectorName("Запускать при старте Play Mode")] public bool runOnStart;
     [SerializeField, InspectorName("Писать полный протокол в Console")] public bool logFullReportToConsole = true;
     [SerializeField, InspectorName("Сохранять текстовый протокол")] public bool writeReportFile = true;
     [SerializeField, InspectorName("Папка протоколов от корня проекта")] public string reportFolder = "TestReports";
@@ -70,6 +72,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     [SerializeField, InspectorName("Настройки")] public WildWindSettingsRoot settings;
     [SerializeField, InspectorName("Мета-состояние")] public MetaGameState metaGameState;
 
+    [SerializeField, InspectorName("Gameplay Session")] public WildWindGameplaySession gameplaySession;
+    [SerializeField, InspectorName("Gameplay HUD")] public WildWindGameplayHud gameplayHud;
+
     private bool hasRun;
     private bool becamePersistentForSceneLoop;
 
@@ -84,27 +89,85 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         sessionLoopLaunchInProgress = false;
     }
 
+#if UNITY_EDITOR
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void BootstrapExplicitEditorLaunch()
+    {
+        if (!IsEditorBigTestLaunchPending() ||
+            activeRunInProgress ||
+            autoRunConsumedThisPlaySession ||
+            SceneManager.GetActiveScene().name != DefaultWorldSceneName)
+        {
+            return;
+        }
+
+        WildWindBigTestRunner runner = FindFirstObjectByType<WildWindBigTestRunner>();
+        if (runner == null)
+        {
+            GameObject runnerObject = new GameObject("Wild Wind Big Test Runner");
+            runner = runnerObject.AddComponent<WildWindBigTestRunner>();
+        }
+
+        runner.runOnStart = false;
+        runner.logFullReportToConsole = true;
+        runner.writeReportFile = true;
+        runner.productionSimulationMinutes = 12f;
+        runner.streamerAverageBudgetMs = 250f;
+        runner.hasRun = false;
+
+        autoRunConsumedThisPlaySession = true;
+        runner.RunBigTest();
+    }
+#endif
+
     public static bool IsBigTestTemporarySaveFileName(string fileName)
     {
         return !string.IsNullOrWhiteSpace(fileName) &&
             fileName.StartsWith(BigTestSessionSavePrefix, StringComparison.OrdinalIgnoreCase);
     }
 
+    public static bool IsEditorBigTestLaunchPending()
+    {
+        return PlayerPrefs.GetInt(BigTestEditorLaunchPlayerPrefsKey, 0) == 1;
+    }
+
+    public static void MarkEditorBigTestLaunchPending()
+    {
+        PlayerPrefs.SetInt(BigTestEditorLaunchPlayerPrefsKey, 1);
+        PlayerPrefs.Save();
+    }
+
+    public static void ClearEditorBigTestLaunchPending()
+    {
+        PlayerPrefs.DeleteKey(BigTestEditorLaunchPlayerPrefsKey);
+        PlayerPrefs.Save();
+    }
+
     private IEnumerator Start()
     {
-        if (!runOnStart || SuppressRunOnStartForAutomation || autoRunConsumedThisPlaySession || activeRunInProgress)
+        if (!CanAutoRunOnStart(this))
         {
             yield break;
         }
 
         yield return null;
-        if (!runOnStart || SuppressRunOnStartForAutomation || autoRunConsumedThisPlaySession || activeRunInProgress)
+        if (!CanAutoRunOnStart(this))
         {
             yield break;
         }
 
         autoRunConsumedThisPlaySession = true;
         RunBigTest();
+    }
+
+    private static bool CanAutoRunOnStart(WildWindBigTestRunner runner)
+    {
+        return runner != null &&
+            runner.runOnStart &&
+            IsEditorBigTestLaunchPending() &&
+            !SuppressRunOnStartForAutomation &&
+            !autoRunConsumedThisPlaySession &&
+            !activeRunInProgress;
     }
 
     [ContextMenu("Провести большой тест")]
@@ -151,6 +214,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         BigTestSideEffectSnapshot sideEffects = BigTestSideEffectSnapshot.Capture();
         BigTestReport report = new BigTestReport(this);
         Stopwatch totalWatch = Stopwatch.StartNew();
+
+        yield return EnsureWorldSceneForBigTest(report);
 
         RunChecked(report, () =>
         {
@@ -219,6 +284,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     {
         activeRunInProgress = false;
         sessionLoopLaunchInProgress = false;
+        ClearEditorBigTestLaunchPending();
     }
 
     private void RunChecked(BigTestReport report, Action action)
@@ -259,6 +325,33 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
             yield return current;
         }
+    }
+
+    private IEnumerator EnsureWorldSceneForBigTest(BigTestReport report)
+    {
+        ResolveReferences();
+        Scene scene = SceneManager.GetActiveScene();
+        if (scene.name == DefaultWorldSceneName &&
+            world != null &&
+            world.Profile != null &&
+            world.Manifest != null &&
+            world.Manifest.IsUsable)
+        {
+            yield break;
+        }
+
+        report.Info("Big test is switching to " + DefaultWorldSceneName + " before world checks.");
+        if (transform.parent != null)
+        {
+            transform.SetParent(null);
+        }
+
+        DontDestroyOnLoad(gameObject);
+        becamePersistentForSceneLoop = true;
+        SceneManager.LoadScene(DefaultWorldSceneName);
+        yield return WaitForActiveScene(DefaultWorldSceneName);
+        DisableDuplicateBigTestRunners();
+        ResolveReferences();
     }
 
     private IEnumerator RestoreAndValidateSideEffects(BigTestSideEffectSnapshot snapshot, BigTestReport report)
@@ -324,6 +417,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         if (visualTuner == null) visualTuner = FindFirstObjectByType<VisualPlayModeTuner>();
         if (settings == null) settings = FindFirstObjectByType<WildWindSettingsRoot>();
         if (metaGameState == null) metaGameState = FindFirstObjectByType<MetaGameState>();
+        if (gameplaySession == null) gameplaySession = FindFirstObjectByType<WildWindGameplaySession>();
+        if (gameplayHud == null) gameplayHud = FindFirstObjectByType<WildWindGameplayHud>();
     }
 
     private void DescribeTestScope(BigTestReport report)
@@ -411,10 +506,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         List<string> requiredKeys = new List<string>();
         requiredKeys.AddRange(WildWindStartScreen.RequiredLocalizationKeys);
         requiredKeys.AddRange(WildWindGameplayMenu.RequiredLocalizationKeys);
+        requiredKeys.AddRange(WildWindGameplayHud.RequiredLocalizationKeys);
         bool valid = WildWindLocalization.ValidateDefaultConfig(requiredKeys, out List<string> errors);
         if (valid)
         {
-            report.Pass("Localization config is loaded and all start/gameplay menu keys have ru/en text.");
+            report.Pass("Localization config is loaded and all start/gameplay HUD/menu keys have ru/en text.");
         }
         else
         {
@@ -1380,6 +1476,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
 
             ValidateR1UpgradeModules(config, report);
+            ValidateR2TenderCatalog(config, catalog, report);
         }
         finally
         {
@@ -1755,6 +1852,163 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             parovozMk2.needComfortRecoveryPerHour > parovozBase.needComfortRecoveryPerHour &&
             parovozMk2.passengerSeatCapacity >= parovozBase.passengerSeatCapacity,
             "Parovoz cabin has passenger seats, onboard needs and an upgraded comfort service.");
+    }
+
+    private static void ValidateR2TenderCatalog(WorldConfigDatabase config, ShipCatalogSO catalog, BigTestReport report)
+    {
+        report.Check(R2TenderDesignCatalog.All.Count == 5,
+            "R2 tender catalog contains five follow-up tenders: Liquid Tanker, Gletcher, Vakhta, Boxvan Tender and Stapel.");
+
+        string[] requiredR2TenderTechnologyIds =
+        {
+            "liquid_tender_tanks",
+            "bulk_gas_tender",
+            "workforce_health_tender",
+            "boxed_goods_tender",
+            "field_flying_dock"
+        };
+
+        bool allTenderTechRowsExist = true;
+        for (int i = 0; i < requiredR2TenderTechnologyIds.Length; i++)
+        {
+            allTenderTechRowsExist &= config.GetTechnology(requiredR2TenderTechnologyIds[i]) != null;
+        }
+
+        report.Check(allTenderTechRowsExist,
+            "R2 tender technology rows exist for liquid, bulk/gas, workforce/health, boxed goods and field dock roles.");
+
+        for (int i = 0; i < R2TenderDesignCatalog.All.Count; i++)
+        {
+            R1ShipDesignDefinition design = R2TenderDesignCatalog.All[i];
+            if (design == null) continue;
+
+            ShipTreeEntryConfig entry = config.GetShipTreeEntry(design.shipId);
+            bool treeEntrySynced = entry != null &&
+                entry.rank == 2 &&
+                entry.requiredTechnologyId == design.requiredTechId &&
+                entry.hullId == design.hullId &&
+                entry.engineId == design.engineId &&
+                entry.propellerId == design.propellerId &&
+                entry.claudiumLoopId == design.claudiumLoopId &&
+                entry.specialModuleId == design.specialModuleId;
+            report.Check(treeEntrySynced,
+                design.displayNameRu + " is present in Ship_tree.csv as a rank 2 tender and matches its configured loadout.");
+
+            report.Check(R1ConfiguredPartRowsExist(config, design),
+                design.displayNameRu + " has CSV rows for hull, engine, propeller, claudium loop and role module.");
+
+            report.Check(R1ConfiguredSlotsAllowParts(catalog, design),
+                design.displayNameRu + " hull slots are locked to its tender loadout.");
+
+            PlayerProgress progress = R1ShipDesignCatalog.CreateUnlockedProgress(design);
+            bool assembled = ShipAssemblyBuilder.TryBuild(catalog, null, progress, out ShipAssemblyResult result);
+            report.Check(assembled, assembled
+                ? design.displayNameRu + " assembles from CSV catalog."
+                : design.displayNameRu + " does not assemble from CSV catalog: " + result.message);
+
+            if (!assembled || result == null || result.stats == null)
+            {
+                continue;
+            }
+
+            report.Check(R2TenderCoreStatsMatch(design, result.stats),
+                design.displayNameRu + " core tender stats match configured mass, engine, lift and structure.");
+
+            report.Check(R2TenderRoleStatsConfigured(design.shipId, result.stats),
+                design.displayNameRu + " role stats are configured on the mandatory module.");
+
+            report.Check(R2TenderCargoRulesMatch(config, design.shipId, result.stats),
+                design.displayNameRu + " cargo rules preserve its specialized tender role.");
+        }
+    }
+
+    private static bool R2TenderCoreStatsMatch(R1ShipDesignDefinition design, ShipStatBlock stats)
+    {
+        if (design == null || stats == null) return false;
+
+        return Approximately(stats.Get(ShipStatId.BaseMass, 0f), design.expectedServiceMassKg, 1f) &&
+            Approximately(stats.Get(ShipStatId.HullMaxTakeoffMassKg, 0f), design.expectedMaxTakeoffMassKg, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.EngineMaxPower, 0f), design.expectedEnginePowerKw, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.StructureHp, 0f), design.expectedStructureHp, 0.01f) &&
+            Approximately(stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f), design.expectedClaudiumLiftEfficiency, 0.01f) &&
+            stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f) >= design.expectedMaxTakeoffMassKg - 0.01f &&
+            stats.Get(ShipStatId.PropellerMaxThrustKgf, 0f) > 0f &&
+            stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f) > 0f;
+    }
+
+    private static bool R2TenderRoleStatsConfigured(string shipId, ShipStatBlock stats)
+    {
+        if (stats == null) return false;
+
+        switch (shipId)
+        {
+            case "liquid_tanker":
+                return Approximately(stats.Get(ShipStatId.LiquidTankCapacityLiters, 0f), 8000f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 0f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.BulkHoldCapacityLiters, 0f), 0f, 0.001f);
+            case "gletcher":
+                return Approximately(stats.Get(ShipStatId.BulkHoldCapacityLiters, 0f), 3000f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.GasCylinderCapacityLiters, 0f), 4000f, 0.001f);
+            case "vakhta":
+                return Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 5000f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.NeedWorkforceRecoveryPerHour, 0f), 55f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.NeedHealthRecoveryPerHour, 0f), 40f, 0.001f) &&
+                    ContainsId(stats.AllowedCargoItemIds, "food") &&
+                    ContainsId(stats.AllowedCargoItemIds, "medicines");
+            case "boxvan_tender":
+                return Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 5700f, 0.001f) &&
+                    ContainsId(stats.AllowedCargoItemIds, "food") &&
+                    ContainsId(stats.AllowedCargoItemIds, "tools") &&
+                    !ContainsId(stats.AllowedCargoItemIds, "charcoal");
+            case "stapel":
+                return Approximately(stats.Get(ShipStatId.ShipDockSlots, 0f), 2f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.ShipDockMaxClass, 0f), (float)ShipSizeClass.Boat, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f), 40f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 1200f, 0.001f) &&
+                    ContainsId(stats.AllowedCargoItemIds, "charcoal") &&
+                    ContainsId(stats.AllowedCargoItemIds, "claudium") &&
+                    ContainsId(stats.AllowedCargoItemIds, "tools");
+            default:
+                return false;
+        }
+    }
+
+    private static bool R2TenderCargoRulesMatch(WorldConfigDatabase config, string shipId, ShipStatBlock stats)
+    {
+        if (config == null || stats == null) return false;
+
+        LogisticsShipMetrics metrics = new LogisticsShipMetrics
+        {
+            cargoCompartments = CargoStoragePlanner.BuildStatCompartments(stats)
+        };
+
+        switch (shipId)
+        {
+            case "liquid_tanker":
+                return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 8000 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["windshale_ore"] = 1 }, out _);
+            case "gletcher":
+                return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["windshale_ore"] = 3000, ["aer_silt"] = 4000 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
+            case "vakhta":
+                return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 3000, ["medicines"] = 1000 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["paper"] = 1 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _);
+            case "boxvan_tender":
+                return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1000, ["tools"] = 100 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["charcoal"] = 1 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["passengers_to_capital"] = 1 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _);
+            case "stapel":
+                return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["utility_boat_ship"] = 2 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["utility_boat_ship"] = 3 }, out _) &&
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["charcoal"] = 400, ["claudium"] = 200, ["tools"] = 20 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
+            default:
+                return false;
+        }
     }
 
     private static bool R1RoleStatsConfigured(string shipId, ShipStatBlock stats)
@@ -2695,7 +2949,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             generatedSave.worldManifest.seed == seed &&
             generatedSave.worldRuntime != null &&
             generatedSave.worldRuntime.IsUsable;
+        bool generatedSessionUsable = generatedSave != null &&
+            generatedSave.gameplaySession != null &&
+            generatedSave.gameplaySession.IsUsable &&
+            generatedSave.gameplaySession.mode == GameSessionMode.Docked &&
+            generatedSave.gameplaySession.dockId == GameplaySessionSaveData.DefaultDockId &&
+            generatedSave.progress != null &&
+            generatedSave.progress.hasCurrentDockPosition;
         report.Check(generatedUsable, "Новая игра создаёт save data с версией, seed, manifest и runtime-заготовкой.");
+
+        report.Check(generatedSessionUsable, "New world save includes a usable gameplay session with player ship pose and dock state.");
 
         string json = JsonUtility.ToJson(generatedSave, true);
         MetaGameSaveData loadedSave = JsonUtility.FromJson<MetaGameSaveData>(json);
@@ -2705,7 +2968,14 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             loadedSave.worldManifest.seed == seed &&
             loadedSave.worldRuntime != null &&
             loadedSave.worldRuntime.IsUsable;
+        bool sessionJsonRoundTrip = loadedSave != null &&
+            loadedSave.gameplaySession != null &&
+            loadedSave.gameplaySession.IsUsable &&
+            loadedSave.gameplaySession.dockId == GameplaySessionSaveData.DefaultDockId &&
+            loadedSave.gameplaySession.hasPlayerPose;
         report.Check(jsonRoundTrip, "Save slot мира проходит JSON round-trip.");
+
+        report.Check(sessionJsonRoundTrip, "GameplaySessionSaveData survives the save slot JSON round-trip.");
 
         string tempSlotName = "wild_wind_big_test_slot_" + DateTime.UtcNow.Ticks + ".json";
         string tempSlotPath = WildWindSaveSlots.GetSavePath(tempSlotName);
@@ -2724,6 +2994,24 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
 
             report.Check(slotListed, "Continue видит только настоящий игровой save slot с world manifest.");
+
+            string previousSelectedForFlow = WildWindSaveSlots.GetSelectedSaveFileNameOrEmpty();
+            bool previousPendingForFlow = PlayerPrefs.GetInt(WildWindSaveSlots.PendingGameplayLaunchPlayerPrefsKey, 0) == 1;
+            try
+            {
+                bool flowPrepared = WildWindSessionFlow.TryPrepareExistingWorldLaunch(tempSlotName, out string flowPrepareError);
+                bool flowSelected = WildWindSaveSlots.GetSelectedSaveFileNameOrEmpty() == tempSlotName;
+                bool pendingLaunchConsumed = WildWindSaveSlots.ConsumePendingGameplayLaunch();
+                bool pendingLaunchCleared = !WildWindSaveSlots.ConsumePendingGameplayLaunch();
+                report.Check(flowPrepared && flowSelected && pendingLaunchConsumed && pendingLaunchCleared,
+                    flowPrepared
+                        ? "SessionFlow готовит Continue-слот к одноразовому запуску gameplay-сцены."
+                        : "SessionFlow не смог подготовить Continue-слот: " + flowPrepareError);
+            }
+            finally
+            {
+                RestoreSessionLoopPrefs(previousSelectedForFlow, previousPendingForFlow);
+            }
         }
         finally
         {
@@ -2740,10 +3028,53 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
         }
 
-        WildWindSaveSlots.MarkPendingGameplayLaunch();
-        bool pendingLaunchConsumed = WildWindSaveSlots.ConsumePendingGameplayLaunch();
-        bool pendingLaunchCleared = !WildWindSaveSlots.ConsumePendingGameplayLaunch();
-        report.Check(pendingLaunchConsumed && pendingLaunchCleared, "Флаг перехода стартовый экран -> gameplay одноразовый.");
+        string tempSessionSlotName = BigTestSessionSavePrefix + DateTime.UtcNow.Ticks + ".json";
+        string tempSessionSlotPath = WildWindSaveSlots.GetSavePath(tempSessionSlotName);
+        try
+        {
+            File.WriteAllText(tempSessionSlotPath, json);
+            List<WildWindSaveSlotInfo> visibleSlots = WildWindSaveSlots.GetExistingSlots();
+            bool tempSessionListed = false;
+            for (int i = 0; i < visibleSlots.Count; i++)
+            {
+                if (visibleSlots[i] != null && visibleSlots[i].fileName == tempSessionSlotName)
+                {
+                    tempSessionListed = true;
+                    break;
+                }
+            }
+
+            report.Check(!tempSessionListed, "Temporary big test session save slots are hidden from Continue.");
+
+            string previousSelectedForTempSession = WildWindSaveSlots.GetSelectedSaveFileNameOrEmpty();
+            bool previousPendingForTempSession = PlayerPrefs.GetInt(WildWindSaveSlots.PendingGameplayLaunchPlayerPrefsKey, 0) == 1;
+            try
+            {
+                bool rejectedAsPlayerSlot = !WildWindSessionFlow.TryPrepareExistingWorldLaunch(tempSessionSlotName, out string tempSessionPrepareError);
+                report.Check(rejectedAsPlayerSlot,
+                    rejectedAsPlayerSlot
+                        ? "SessionFlow rejects temporary big test session saves outside the internal session loop."
+                        : "SessionFlow accepted a temporary big test session save as a player slot: " + tempSessionPrepareError);
+            }
+            finally
+            {
+                RestoreSessionLoopPrefs(previousSelectedForTempSession, previousPendingForTempSession);
+            }
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempSessionSlotPath))
+                {
+                    File.Delete(tempSessionSlotPath);
+                }
+            }
+            catch (Exception exception)
+            {
+                report.Warn("Could not delete temporary big test session save slot: " + exception.Message);
+            }
+        }
 
         GameObject probeRoot = null;
         try
@@ -2958,9 +3289,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(controls.DebugVerticalSpeedMetersPerSecond > 0f, "Вертикальная скорость debug-перелёта положительная: " + controls.DebugVerticalSpeedMetersPerSecond.ToString("0.#") + " м/с.");
         report.Check(controls.DebugSprintMultiplier >= 1f, "Множитель ускорения debug-перелёта не меньше 1: x" + controls.DebugSprintMultiplier.ToString("0.#") + ".");
         report.Check(controls.DebugCameraFollowSharpness > 0f && controls.DebugCameraFollowSharpness <= 1f, "Плавность следования камеры в диапазоне 0..1: " + controls.DebugCameraFollowSharpness.ToString("0.###") + ".");
+        report.Check(controls.FlightTargetSpeedChangeMetersPerSecond > 0f, "Скорость изменения цели круиз-контроля положительная: " + controls.FlightTargetSpeedChangeMetersPerSecond.ToString("0.#") + " м/с за сек.");
+        report.Check(controls.FlightTargetAltitudeChangeMetersPerSecond > 0f, "Скорость изменения целевой высоты положительная: " + controls.FlightTargetAltitudeChangeMetersPerSecond.ToString("0.#") + " м/с.");
+        report.Check(controls.FlightTargetHeadingChangeDegreesPerSecond > 0f, "Скорость изменения целевого курса положительная: " + controls.FlightTargetHeadingChangeDegreesPerSecond.ToString("0.#") + " град/с.");
+        report.Check(controls.FlightMaxReverseTargetSpeedMetersPerSecond >= 0f, "Лимит заднего хода для круиз-контроля не отрицательный: " + controls.FlightMaxReverseTargetSpeedMetersPerSecond.ToString("0.#") + " м/с.");
 
         WildWindGameplayMenu gameplayMenu = FindFirstObjectByType<WildWindGameplayMenu>();
         report.Check(gameplayMenu != null, gameplayMenu != null ? "Внутриигровое меню найдено в world-сессии." : "Внутриигровое меню не найдено.");
+        WildWindGameplayHud hud = FindFirstObjectByType<WildWindGameplayHud>();
+        report.Check(hud != null, hud != null ? "Внутриигровой HUD найден в world-сессии." : "Внутриигровой HUD не найден.");
     }
 
     private void ValidateShipWindAerodynamics(BigTestReport report)
@@ -3107,6 +3444,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 yield break;
             }
 
+            bool tempSlotExists = File.Exists(tempSlotPath);
+            report.Check(tempSlotExists, tempSlotExists
+                ? "Temporary session save slot exists before Continue: " + tempSlotName + "."
+                : "Temporary session save slot is missing after creation: " + tempSlotPath + ".");
+            if (!tempSlotExists)
+            {
+                yield break;
+            }
+
             if (transform.parent != null)
             {
                 transform.SetParent(null);
@@ -3116,8 +3462,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             becamePersistentForSceneLoop = true;
 
             SceneManager.LoadScene(DefaultStartSceneName);
-            yield return null;
-            yield return null;
+            yield return WaitForActiveScene(DefaultStartSceneName);
 
             Scene startScene = SceneManager.GetActiveScene();
             report.Check(startScene.name == DefaultStartSceneName, "Большой тест реально перешёл в стартовую сцену: " + startScene.name + ".");
@@ -3127,10 +3472,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             report.Check(startScreen != null && startScreen.gameplaySceneName == DefaultWorldSceneName,
                 "Стартовый экран ведёт в " + DefaultWorldSceneName + ".");
 
-            WildWindSaveSlots.SetSelectedSaveFileName(tempSlotName);
-            WildWindSaveSlots.MarkPendingGameplayLaunch();
             sessionLoopLaunchInProgress = true;
-            SceneManager.LoadScene(DefaultWorldSceneName);
+            bool firstLaunchStarted = WildWindSessionFlow.TryContinueWorldAndEnter(tempSlotName, DefaultWorldSceneName, out string firstLaunchError);
+            report.Check(firstLaunchStarted, firstLaunchStarted
+                ? "SessionFlow запустил первый Continue в world-сцену."
+                : "SessionFlow не смог запустить первый Continue: " + firstLaunchError);
+            if (!firstLaunchStarted)
+            {
+                yield break;
+            }
+
             DisableDuplicateBigTestRunners();
             yield return WaitForLoadedSessionWorld(seed, tempSlotName);
             sessionLoopLaunchInProgress = false;
@@ -3139,6 +3490,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             Scene firstWorldScene = SceneManager.GetActiveScene();
             report.Check(firstWorldScene.name == DefaultWorldSceneName, "Continue загрузил world-сцену в первый раз: " + firstWorldScene.name + ".");
             ValidateLoadedSessionWorld(seed, tempSlotName, "первый вход", report);
+
+            ValidateStarterFoodDeliveryLoop(report);
+            ValidateGameplaySessionDockFlightCycle(report);
 
             WildWindGameplayMenu gameplayMenu = FindFirstObjectByType<WildWindGameplayMenu>();
             report.Check(gameplayMenu != null, gameplayMenu != null ? "Внутриигровое меню найдено при первом входе." : "Внутриигровое меню не найдено при первом входе.");
@@ -3155,17 +3509,22 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
             bool saveExitInvoked = TryInvokePrivateMethod(gameplayMenu, "SaveAndExitToMenu", report);
             report.Check(saveExitInvoked, "Кнопка 'Сохранить и в меню' вызывается без исключений.");
-            yield return null;
-            yield return null;
+            yield return WaitForActiveScene(DefaultStartSceneName);
 
             Scene returnedScene = SceneManager.GetActiveScene();
             report.Check(returnedScene.name == DefaultStartSceneName, "Внутриигровое меню вернуло сессию на стартовый экран: " + returnedScene.name + ".");
             report.Check(File.Exists(tempSlotPath), "Save slot остался на диске после выхода в меню с сохранением.");
 
-            WildWindSaveSlots.SetSelectedSaveFileName(tempSlotName);
-            WildWindSaveSlots.MarkPendingGameplayLaunch();
             sessionLoopLaunchInProgress = true;
-            SceneManager.LoadScene(DefaultWorldSceneName);
+            bool secondLaunchStarted = WildWindSessionFlow.TryContinueWorldAndEnter(tempSlotName, DefaultWorldSceneName, out string secondLaunchError);
+            report.Check(secondLaunchStarted, secondLaunchStarted
+                ? "SessionFlow запустил повторный Continue в world-сцену."
+                : "SessionFlow не смог запустить повторный Continue: " + secondLaunchError);
+            if (!secondLaunchStarted)
+            {
+                yield break;
+            }
+
             DisableDuplicateBigTestRunners();
             yield return WaitForLoadedSessionWorld(seed, tempSlotName);
             sessionLoopLaunchInProgress = false;
@@ -3180,6 +3539,14 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             sessionLoopLaunchInProgress = false;
             RestoreSessionLoopPrefs(previousSelectedSave, previousPendingLaunch);
             TryDeleteTemporaryFile(tempSlotPath, "save slot проверки перезаходов", report);
+        }
+    }
+
+    private static IEnumerator WaitForActiveScene(string sceneName)
+    {
+        for (int i = 0; i < 120 && SceneManager.GetActiveScene().name != sceneName; i++)
+        {
+            yield return null;
         }
     }
 
@@ -3199,6 +3566,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         WorldRuntimeState loadedRuntimeState = FindFirstObjectByType<WorldRuntimeState>();
         MetaGameState loadedMeta = FindFirstObjectByType<MetaGameState>();
         WildWindGameplayMenu loadedMenu = FindFirstObjectByType<WildWindGameplayMenu>();
+        WildWindGameplaySession loadedSession = FindFirstObjectByType<WildWindGameplaySession>();
+        WildWindGameplayHud loadedHud = FindFirstObjectByType<WildWindGameplayHud>();
 
         return scene.name == DefaultWorldSceneName &&
             loadedWorld != null &&
@@ -3207,7 +3576,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             loadedRuntimeState.LoadedManifestSeed == expectedSeed &&
             loadedMeta != null &&
             loadedMeta.EffectiveSaveFileName == expectedSaveFileName &&
-            loadedMenu != null;
+            loadedMenu != null &&
+            loadedSession != null &&
+            loadedSession.IsReady &&
+            loadedSession.SelectedSaveFileName == expectedSaveFileName &&
+            loadedHud != null &&
+            loadedHud.IsReady;
     }
 
     private static void ReportSessionWorldReadinessIfNeeded(int expectedSeed, string expectedSaveFileName, string label, BigTestReport report)
@@ -3228,11 +3602,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         WorldRuntimeState loadedRuntimeState = FindFirstObjectByType<WorldRuntimeState>();
         MetaGameState loadedMeta = FindFirstObjectByType<MetaGameState>();
         WildWindGameplayMenu loadedMenu = FindFirstObjectByType<WildWindGameplayMenu>();
+        WildWindGameplaySession loadedSession = FindFirstObjectByType<WildWindGameplaySession>();
+        WildWindGameplayHud loadedHud = FindFirstObjectByType<WildWindGameplayHud>();
 
         string worldSeed = loadedWorld != null ? loadedWorld.RegionSeed.ToString() : "<нет WorldRegionRuntime>";
         string runtimeSeed = loadedRuntimeState != null ? loadedRuntimeState.LoadedManifestSeed.ToString() : "<нет WorldRuntimeState>";
         string saveFileName = loadedMeta != null ? loadedMeta.EffectiveSaveFileName : "<нет MetaGameState>";
         string menu = loadedMenu != null ? "есть" : "нет";
+
+        string session = loadedSession != null ? (loadedSession.IsReady ? "ready" : "not ready") : "none";
+        string hud = loadedHud != null ? (loadedHud.IsReady ? "ready" : "not ready") : "none";
 
         return "scene=" + scene.name +
             ", expectedScene=" + DefaultWorldSceneName +
@@ -3241,7 +3620,313 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ", runtimeSeed=" + runtimeSeed +
             ", metaSave=" + saveFileName +
             ", expectedSave=" + expectedSaveFileName +
-            ", gameplayMenu=" + menu;
+            ", gameplayMenu=" + menu +
+            ", gameplaySession=" + session +
+            ", gameplayHud=" + hud;
+    }
+
+    private void ValidateGameplaySessionDockFlightCycle(BigTestReport report)
+    {
+        WildWindGameplaySession loadedSession = FindFirstObjectByType<WildWindGameplaySession>();
+        MetaGameState loadedMeta = FindFirstObjectByType<MetaGameState>();
+
+        report.Check(loadedSession != null && loadedSession.IsReady, "GameplaySession is ready before dock-flight-dock cycle.");
+        report.Check(loadedMeta != null && loadedMeta.CurrentMode == GameSessionMode.Docked, "MetaGameState starts the session loop docked.");
+        if (loadedSession == null || loadedMeta == null)
+        {
+            return;
+        }
+
+        bool flightStarted = loadedSession.TryBeginFreeFlight(out string flightReason);
+        report.Check(flightStarted, "GameplaySession can start free flight: " + flightReason);
+        report.Check(loadedSession.CurrentMode == GameSessionMode.Flight && loadedMeta.CurrentMode == GameSessionMode.Flight,
+            "GameplaySession and MetaGameState both switch to Flight.");
+
+        bool docked = loadedSession.TryDockAtCurrentDock(out string dockReason);
+        report.Check(docked, "GameplaySession can dock back at the current dock: " + dockReason);
+        report.Check(loadedSession.CurrentMode == GameSessionMode.Docked && loadedMeta.CurrentMode == GameSessionMode.Docked,
+            "GameplaySession and MetaGameState both return to Docked.");
+    }
+
+    private void ValidateStarterFoodDeliveryLoop(BigTestReport report)
+    {
+        MetaGameState loadedMeta = FindFirstObjectByType<MetaGameState>();
+        WildWindGameplaySession loadedSession = FindFirstObjectByType<WildWindGameplaySession>();
+        WildWindGameplayHud loadedHud = FindFirstObjectByType<WildWindGameplayHud>();
+
+        report.Check(loadedMeta != null, "Starter delivery has MetaGameState.");
+        report.Check(loadedSession != null && loadedSession.IsReady, "Starter delivery has ready GameplaySession.");
+        report.Check(loadedHud != null && loadedHud.IsReady, "Starter delivery HUD is present and ready.");
+        if (loadedMeta == null || loadedMeta.progress == null || loadedSession == null || loadedHud == null)
+        {
+            return;
+        }
+
+        loadedMeta.EnsureProgressInitialized();
+        PlayerProgress progress = loadedMeta.progress;
+        WorldConfigDatabase config = loadedMeta.WorldConfig;
+        IslandConfig capital = config.GetIsland(WildWindStarterDelivery.SourceDockId);
+        IslandConfig destination = config.GetIsland(WildWindStarterDelivery.DestinationDockId);
+        report.Check(capital != null, "Starter delivery source island exists in Island.csv.");
+        report.Check(destination != null, "Starter delivery destination island exists in Island.csv.");
+        if (capital == null || destination == null)
+        {
+            return;
+        }
+
+        float distance = Vector3.Distance(capital.position, destination.position);
+        report.Check(Approximately(distance, WildWindStarterDelivery.ExpectedDestinationDistanceMeters, 1f),
+            "Starter delivery destination is 1 km from the capital: " + distance.ToString("0.#") + " m.");
+        report.Check(progress.currentMode == GameSessionMode.Docked && progress.currentDockId == WildWindStarterDelivery.SourceDockId,
+            "Starter delivery begins docked at the capital.");
+        report.Check(WildWindStarterDelivery.GetCapitalFood(progress) >= WildWindStarterDelivery.DeliveryAmount,
+            "Capital starts with food for the first delivery: " + WildWindStarterDelivery.GetCapitalFood(progress) + ".");
+        report.Check(WildWindStarterDelivery.GetDestinationFood(progress) == 0,
+            "Nearby island starts without delivered food.");
+        report.Check(loadedHud.IsDockedPanelVisible, "Starter delivery HUD shows docked/city controls at the capital.");
+
+        int capitalBefore = WildWindStarterDelivery.GetCapitalFood(progress);
+        bool loaded = loadedHud.TryLoadStarterFood();
+        report.Check(loaded, "Starter delivery HUD loads food from capital into the ship.");
+        report.Check(WildWindStarterDelivery.GetShipFood(progress) == WildWindStarterDelivery.DeliveryAmount,
+            "Ship cargo contains the delivery food.");
+        report.Check(WildWindStarterDelivery.GetCapitalFood(progress) == capitalBefore - WildWindStarterDelivery.DeliveryAmount,
+            "Capital stock decreases after loading food.");
+
+        bool tookOff = loadedHud.TryTakeOff();
+        report.Check(tookOff, "Starter delivery HUD starts flight from the capital.");
+        report.Check(progress.currentMode == GameSessionMode.Flight && loadedHud.IsFlightPanelVisible,
+            "Starter delivery switches to flight mode and HUD flight controls.");
+        report.Check(loadedHud.IsFlightControlsVisible, "Starter delivery flight HUD exposes direct movement controls.");
+        report.Check(loadedHud.IsFlightCompassVisible, "Starter delivery flight HUD shows the scrolling heading compass.");
+        ValidateStarterFlightControls(report, loadedSession, destination.position);
+
+        WorldDebugTravelController travelController = FindFirstObjectByType<WorldDebugTravelController>();
+        Camera gameplayCamera = Camera.main;
+        travelController?.ApplyCameraForTests(true);
+        bool cameraTracksShip = travelController != null &&
+            loadedSession.PlayerShipRoot != null &&
+            travelController.CurrentMovementTarget == loadedSession.PlayerShipRoot &&
+            gameplayCamera != null &&
+            Vector3.Distance(gameplayCamera.transform.position, loadedSession.PlayerPosition) < 2500f;
+        report.Check(cameraTracksShip,
+            cameraTracksShip
+                ? "Flight camera follows the visible player ship after takeoff."
+                : "Flight camera is not bound to the player ship after takeoff.");
+        if (travelController != null)
+        {
+            bool takeoffCameraClose = Mathf.Abs(travelController.CameraOrbitDistanceMeters - travelController.TakeoffCameraDistanceMeters) <= 0.25f;
+            bool orbitPivotOnShip = loadedSession.PlayerShipRoot != null &&
+                Vector3.Distance(travelController.LastCameraOrbitPivot, loadedSession.PlayerPosition) <= 0.25f;
+            report.Check(takeoffCameraClose && orbitPivotOnShip,
+                "Flight camera snaps to the configured ship-bound orbit distance after takeoff.");
+
+            float yawBefore = travelController.CameraOrbitYawDegrees;
+            float distanceBefore = travelController.CameraOrbitDistanceMeters;
+            travelController.AdjustCameraOrbitForTests(22f, -4f, -1f);
+            bool orbitChanged = Mathf.Abs(Mathf.DeltaAngle(yawBefore, travelController.CameraOrbitYawDegrees)) > 10f &&
+                travelController.CameraOrbitDistanceMeters > distanceBefore;
+            report.Check(orbitChanged, "Flight camera supports orbit rotation and mouse-wheel zoom around the ship.");
+
+            travelController.ApplyCameraForTests(true);
+            loadedHud.RefreshCompassForTests();
+            bool compassTracksCamera = gameplayCamera != null &&
+                Mathf.Abs(Mathf.DeltaAngle(loadedHud.LastCompassHeadingDegrees, gameplayCamera.transform.eulerAngles.y)) <= 1f;
+            report.Check(compassTracksCamera, "Flight compass heading is bound to the camera view direction.");
+        }
+
+        Vector3 destinationDock = FindDockPositionOrConfigPosition(WildWindStarterDelivery.DestinationDockId, destination.position);
+        bool dockedAtDestination = loadedSession.TryDockAt(
+            WildWindStarterDelivery.DestinationDockId,
+            DockingLocationKind.Island,
+            destinationDock,
+            out string dockReason);
+        report.Check(dockedAtDestination, "Starter delivery can dock at the nearby island: " + dockReason);
+        report.Check(progress.currentMode == GameSessionMode.Docked && progress.currentDockId == WildWindStarterDelivery.DestinationDockId,
+            "Starter delivery arrives docked at the nearby island.");
+
+        bool unloaded = loadedHud.TryUnloadStarterFood();
+        report.Check(unloaded, "Starter delivery HUD unloads food at the nearby island.");
+        report.Check(WildWindStarterDelivery.GetShipFood(progress) == 0,
+            "Ship cargo is empty after starter delivery.");
+        report.Check(WildWindStarterDelivery.GetDestinationFood(progress) >= WildWindStarterDelivery.DeliveryAmount,
+            "Nearby island received the delivered food.");
+        report.Check(WildWindStarterDelivery.IsCompleted(progress),
+            "Starter delivery mission is marked completed.");
+    }
+
+    private void ValidateStarterFlightControls(BigTestReport report, WildWindGameplaySession loadedSession, Vector3 destinationPosition)
+    {
+        WildWindFlightControlBridge controls = FindFirstObjectByType<WildWindFlightControlBridge>();
+        report.Check(controls != null && controls.IsReady, "Flight control bridge is present and bound to the player ship.");
+        if (controls == null || loadedSession == null || loadedSession.PlayerShipRoot == null)
+        {
+            return;
+        }
+
+        ShipPhysics ship = controls.ControlledShip;
+        report.Check(ship != null, "Flight control bridge exposes ShipPhysics for direct, assist and autopilot controls.");
+        report.Check(controls.IsConnectedToGameplayShip, "Flight control bridge is connected to the visible gameplay ship, not a stray ShipPhysics.");
+        if (ship == null)
+        {
+            return;
+        }
+
+        controls.ClearAllControlModes();
+        float leverAltitudeBefore = ship.targetAltitude;
+        controls.NudgeManualThrust(1f);
+        controls.NudgeManualLift(1f);
+        controls.NudgeManualTurn(-1f);
+        controls.NudgeManualThrust(1f);
+        controls.NudgeManualLift(1f);
+        controls.NudgeManualTurn(-1f);
+        controls.ApplyForTests();
+        bool leverClickWritten = Approximately(ship.thrustInput, 0.4f, 0.001f) &&
+            controls.ManualThrustNotch == 2 &&
+            Approximately(ship.liftInput, 0f, 0.001f) &&
+            ship.altitudeHold &&
+            ship.targetAltitude > leverAltitudeBefore &&
+            Approximately(ship.turnInput, -0.5f, 0.001f);
+        report.Check(leverClickWritten, "Manual HUD lever clicks latch into ShipPhysics, while altitude buttons move the target height.");
+
+        controls.ClearAllControlModes();
+        controls.SetDirectInput(0.75f, 0.25f, -0.5f);
+        controls.ApplyForTests();
+        bool directControlWritten = Approximately(ship.thrustInput, 0.8f, 0.001f) &&
+            controls.ManualThrustNotch == 4 &&
+            Approximately(ship.sideInput, 0f, 0.001f) &&
+            Approximately(ship.liftInput, 0f, 0.001f) &&
+            Approximately(ship.turnInput, -0.5f, 0.001f) &&
+            ship.altitudeHold &&
+            !ship.headingHold &&
+            !ship.cruiseControl;
+        report.Check(directControlWritten, "Direct flight controls write thrust and turn, while altitude remains target-driven.");
+
+        controls.ClearAllControlModes();
+        float keyboardAltitudeBefore = ship.targetAltitude;
+        controls.ApplyFlightInputForTests(new WildWindFlightInputState
+        {
+            thrust = 1f,
+            lateral = -1f,
+            lift = 1f,
+            turn = -1f
+        }, 0.2f);
+        controls.ApplyForTests();
+        bool keyboardManualWritten = Approximately(ship.thrustInput, 0.2f, 0.001f) &&
+            controls.ManualThrustNotch == 1 &&
+            Approximately(ship.sideInput, -1f, 0.001f) &&
+            Approximately(ship.liftInput, 0f, 0.001f) &&
+            ship.targetAltitude > keyboardAltitudeBefore &&
+            Approximately(ship.turnInput, -1f, 0.001f);
+        controls.ApplyFlightInputForTests(new WildWindFlightInputState { thrust = 1f }, 0.5f);
+        controls.ApplyFlightInputForTests(new WildWindFlightInputState { thrust = 1f }, 0.3f);
+        controls.ApplyForTests();
+        bool keyboardHoldRepeats = Approximately(ship.thrustInput, 0.6f, 0.001f) &&
+            controls.ManualThrustNotch == 3;
+        controls.ApplyFlightInputForTests(new WildWindFlightInputState(), 0.2f);
+        controls.ApplyForTests();
+        bool keyboardReleaseKeepsThrottle = Approximately(ship.thrustInput, 0.6f, 0.001f) &&
+            Approximately(ship.sideInput, 0f, 0.001f) &&
+            Approximately(ship.liftInput, 0f, 0.001f) &&
+            Approximately(ship.turnInput, 0f, 0.001f);
+        controls.ApplyFlightInputForTests(new WildWindFlightInputState { thrust = -1f }, 0.1f);
+        controls.ApplyForTests();
+        bool keyboardReverseStep = Approximately(ship.thrustInput, 0.4f, 0.001f) &&
+            controls.ManualThrustNotch == 2;
+        report.Check(keyboardManualWritten && keyboardHoldRepeats && keyboardReleaseKeepsThrottle && keyboardReverseStep,
+            "Keyboard W/S adjusts the manual thrust telegraph by 20% notches, while vertical keys move target altitude.");
+
+        controls.CycleAltitudeMode();
+        controls.CycleHeadingMode();
+        controls.CycleSpeedMode();
+        bool triSwitchAssist = controls.AltitudeMode == WildWindAxisControlMode.Autopilot &&
+            controls.HeadingMode == WildWindAxisControlMode.Assist &&
+            controls.SpeedMode == WildWindAxisControlMode.Autopilot;
+        controls.CycleAltitudeMode();
+        controls.CycleHeadingMode();
+        controls.CycleSpeedMode();
+        bool triSwitchAutopilot = controls.AltitudeMode == WildWindAxisControlMode.Assist &&
+            controls.HeadingMode == WildWindAxisControlMode.Autopilot &&
+            controls.SpeedMode == WildWindAxisControlMode.Manual;
+        report.Check(triSwitchAssist && triSwitchAutopilot,
+            "Altitude toggles between target hold and autopilot target assignment; heading still uses assist/autopilot/manual states.");
+
+        controls.ClearAllControlModes();
+        controls.SetAltitudeAssist(true);
+        controls.NudgeTargetAltitude(80f);
+        controls.SetHeadingAssist(true);
+        controls.NudgeTargetHeading(15f);
+        float assistAltitudeBefore = ship.targetAltitude;
+        float assistHeadingBefore = ship.targetHeading;
+        controls.ApplyFlightInputForTests(new WildWindFlightInputState
+        {
+            lift = 1f,
+            turn = 1f
+        }, 1f);
+        controls.ApplyForTests();
+        bool assistControlWritten = ship.altitudeHold &&
+            ship.headingHold &&
+            !ship.cruiseControl &&
+            ship.targetAltitude > loadedSession.PlayerPosition.y &&
+            ship.targetAltitude > assistAltitudeBefore &&
+            Mathf.DeltaAngle(assistHeadingBefore, ship.targetHeading) > 0f;
+        report.Check(assistControlWritten, "Independent assist toggles hold target altitude and heading; linear thrust remains manual unless autopilot is enabled.");
+
+        controls.SetAutopilotAltitude(true);
+        controls.SetAutopilotHeading(true);
+        controls.SetAutopilotSpeed(true);
+        float autopilotSpeedBefore = controls.TargetSpeedMS;
+        float autopilotAltitudeBefore = ship.targetAltitude;
+        float autopilotHeadingBefore = ship.targetHeading;
+        controls.ApplyFlightInputForTests(new WildWindFlightInputState
+        {
+            thrust = 1f,
+            lateral = 1f,
+            lift = -1f,
+            turn = -1f
+        }, 1f);
+        bool autopilotKeyboardIgnored = Approximately(controls.TargetSpeedMS, autopilotSpeedBefore, 0.001f) &&
+            Approximately(ship.targetAltitude, autopilotAltitudeBefore, 0.001f) &&
+            Approximately(Mathf.DeltaAngle(ship.targetHeading, autopilotHeadingBefore), 0f, 0.001f);
+        report.Check(autopilotKeyboardIgnored, "Keyboard flight input is ignored on axes switched to autopilot.");
+
+        bool targetCopied = controls.SetTargetFromActiveTask();
+        controls.SetAutopilotAltitude(true);
+        controls.SetAutopilotHeading(true);
+        controls.SetAutopilotSpeed(true);
+        controls.ToggleAutoDockOnArrival();
+        controls.ApplyForTests();
+        float targetDistance = controls.HasAutopilotTarget
+            ? Vector3.Distance(controls.AutopilotTarget, FindDockPositionOrConfigPosition(WildWindStarterDelivery.DestinationDockId, destinationPosition))
+            : float.PositiveInfinity;
+        bool autopilotWritten = targetCopied &&
+            controls.IsFullAutopilot &&
+            controls.AutoDockOnArrival &&
+            controls.HasAutopilotTarget &&
+            targetDistance <= 2f &&
+            ship.altitudeHold &&
+            ship.headingHold &&
+            ship.cruiseControl;
+        report.Check(autopilotWritten, "Semi-autopilots can combine into full autopilot with task target and auto-dock permission.");
+
+        controls.ClearAllControlModes();
+        controls.ClearAutopilotTarget();
+        controls.ApplyForTests();
+    }
+
+    private static Vector3 FindDockPositionOrConfigPosition(string dockId, Vector3 fallback)
+    {
+        DockingPort[] docks = FindObjectsByType<DockingPort>(FindObjectsSortMode.None);
+        for (int i = 0; i < docks.Length; i++)
+        {
+            DockingPort dock = docks[i];
+            if (dock != null && dock.dockId == dockId)
+            {
+                return dock.DockPosition;
+            }
+        }
+
+        return fallback;
     }
 
     private void ValidateLoadedSessionWorld(int expectedSeed, string expectedSaveFileName, string label, BigTestReport report)
@@ -3250,6 +3935,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         WorldRuntimeState loadedRuntimeState = FindFirstObjectByType<WorldRuntimeState>();
         MetaGameState loadedMeta = FindFirstObjectByType<MetaGameState>();
         WildWindGameplayMenu loadedMenu = FindFirstObjectByType<WildWindGameplayMenu>();
+        WildWindGameplaySession loadedSession = FindFirstObjectByType<WildWindGameplaySession>();
+        WildWindGameplayHud loadedHud = FindFirstObjectByType<WildWindGameplayHud>();
 
         report.Check(loadedWorld != null, "WorldRegionRuntime найден после сценария '" + label + "'.");
         report.Check(loadedWorld != null && loadedWorld.RegionSeed == expectedSeed,
@@ -3259,6 +3946,20 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(loadedMeta != null && loadedMeta.EffectiveSaveFileName == expectedSaveFileName,
             "MetaGameState после сценария '" + label + "' смотрит в выбранный save slot.");
         report.Check(loadedMenu != null, "Внутриигровое меню поднялось после сценария '" + label + "'.");
+        report.Check(loadedSession != null && loadedSession.IsReady,
+            "GameplaySession is ready after session scenario '" + label + "'.");
+        string expectedDockId = loadedMeta != null && loadedMeta.progress != null && !string.IsNullOrWhiteSpace(loadedMeta.progress.currentDockId)
+            ? loadedMeta.progress.currentDockId
+            : GameplaySessionSaveData.DefaultDockId;
+        DockingLocationKind expectedDockKind = loadedMeta != null && loadedMeta.progress != null
+            ? loadedMeta.progress.currentDockKind
+            : DockingLocationKind.Island;
+        report.Check(loadedSession != null && loadedSession.CurrentDockId == expectedDockId && loadedSession.CurrentDockKind == expectedDockKind,
+            "GameplaySession knows the saved dock after session scenario '" + label + "': " + expectedDockId + ".");
+        report.Check(loadedSession != null && loadedSession.PlayerShipRoot != null,
+            "GameplaySession has a player ship root after session scenario '" + label + "'.");
+        report.Check(loadedHud != null && loadedHud.IsReady,
+            "Gameplay HUD is ready after session scenario '" + label + "'.");
     }
 
     private void DisableDuplicateBigTestRunners()
@@ -3851,8 +4552,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ship.targetSpeedMS = 0f;
         ship.targetHeading = 0f;
         ship.thrustInput = 0f;
+        ship.sideInput = 0f;
         ship.turnInput = 0f;
         ship.liftInput = 0f;
+        ship.lateralOmniThrustKgf = 260f;
         ship.propellerMaxSpeedMS = 30f;
         ship.propellerEfficiency = 1f;
         ship.propellerMaxThrustKgf = 500f;

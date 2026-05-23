@@ -401,6 +401,11 @@ public sealed class VisualPlayModeTuner : MonoBehaviour
             return;
         }
 
+        if (Application.isPlaying && !useCompositionRig)
+        {
+            return;
+        }
+
         visualCamera.transform.position = cameraPosition;
         Vector3 direction = cameraTarget - cameraPosition;
         if (direction.sqrMagnitude > 0.001f)

@@ -10,6 +10,11 @@ jaeger_engine,Боевой котёл Егеря,Jaeger Hunting Boiler,hunter_hu
 opora_engine,Опорная топка тендера,Opora Tender Boiler,support_platform,1700,charcoal,400,0.36
 fuel_tender_engine,Экономичная топка Топливщика,Fuel Tender Economical Boiler,support_platform,1500,charcoal,400,0.4
 parovoz_engine,Пассажирский котёл Паровоза,Parovoz Passenger Boiler,passenger_routes,1800,charcoal,360,0.17
+liquid_tanker_engine,Котёл Жидковоза,Liquid Tanker Boiler,liquid_tender_tanks,1450,charcoal,360,0.34
+gletcher_engine,Котёл Глетчера,Gletcher Boiler,bulk_gas_tender,1300,charcoal,300,0.34
+vakhta_engine,Котёл Вахты,Vakhta Boiler,workforce_health_tender,1500,charcoal,330,0.32
+boxvan_tender_engine,Котёл Фургонщика,Boxvan Tender Boiler,boxed_goods_tender,1350,charcoal,320,0.36
+stapel_engine,Медленный котёл Стапеля,Stapel Slow Boiler,field_flying_dock,1900,charcoal,360,0.26
 water_strider_engine_mk2,Настроенная топка Водомерки,Water Strider Tuned Boiler,water_strider_engine_tuning,980,charcoal,260,0.25
 bulat_engine_mk2,Форсированная топка Булата,Bulat Forced Boiler,bulat_engine_tuning,1180,charcoal,310,0.24
 hornet_engine_mk2,Форсированная топка Шершня,Hornet Forced Boiler,scout_engine_tuning,1190,charcoal,315,0.26

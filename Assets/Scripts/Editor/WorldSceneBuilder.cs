@@ -10,6 +10,8 @@ public static class WorldSceneBuilder
     private const string MaterialFolder = "Assets/Data/World/Materials";
     private const string VisualMaterialFolder = "Assets/Data/VisualTarget/Materials";
     private const string SpaceCloudWavesMaterialPath = VisualMaterialFolder + "/M_SpaceCloudWaves_CloudSea.mat";
+    private const string ShipCatalogPath = "Assets/Data/ShipCatalog.asset";
+    private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
 
     [MenuItem("Wild Wind/World/Build Final World Scene")]
     public static void BuildFinalWorldScene()
@@ -29,12 +31,14 @@ public static class WorldSceneBuilder
         Camera camera = CreateCameraAndLight(focus);
         CreateLocalStormSurface(root);
         CreateStarterIsland(root);
-        CreateStarterShipProxy(root, focus);
+        ShipPhysics starterShip = CreateStarterShipProxy(root, focus);
         CreateWorldDataPreview(root, runtime, focus.position);
         WorldEntityIndex index = CreateWorldEntityIndex(root, runtime);
         WorldRuntimeState runtimeState = CreateWorldRuntimeState(root, runtime, index, focus);
         WorldBubbleStreamer streamer = CreateWorldBubbleStreamer(root, runtime, focus, index, runtimeState);
         CreateWorldSimulationTick(root, runtime, index, runtimeState, focus, streamer);
+        CreateGameplayMeta(root, runtime, index, runtimeState, starterShip);
+        CreateGameplaySession(root);
         VisualPlayModeTuner tuner = CreateVisualTuner(root, focus);
         CreateDebugTravelController(root, focus, camera, tuner, streamer, settings != null ? settings.Controls : null);
 
@@ -180,7 +184,7 @@ public static class WorldSceneBuilder
         }
     }
 
-    private static void CreateStarterShipProxy(Transform root, Transform focus)
+    private static ShipPhysics CreateStarterShipProxy(Transform root, Transform focus)
     {
         Transform ship = new GameObject("Player Ship Proxy").transform;
         ship.SetParent(root, false);
@@ -195,6 +199,14 @@ public static class WorldSceneBuilder
         CreatePrimitive("Keel Cabin", PrimitiveType.Cube, ship, new Vector3(0f, -115f, 0f), new Vector3(160f, 70f, 95f), wood);
         CreatePrimitive("Balloon Band Front", PrimitiveType.Cube, ship, new Vector3(-150f, 0f, 0f), new Vector3(16f, 220f, 220f), band);
         CreatePrimitive("Balloon Band Back", PrimitiveType.Cube, ship, new Vector3(150f, 0f, 0f), new Vector3(16f, 220f, 220f), band);
+
+        Rigidbody body = ship.gameObject.AddComponent<Rigidbody>();
+        body.interpolation = RigidbodyInterpolation.Interpolate;
+        body.useGravity = false;
+        body.isKinematic = true;
+        ShipPhysics physics = ship.gameObject.AddComponent<ShipPhysics>();
+        EditorUtility.SetDirty(physics);
+        return physics;
     }
 
     private static void CreateWorldDataPreview(Transform root, WorldRegionRuntime runtime, Vector3 focusPosition)
@@ -299,6 +311,49 @@ public static class WorldSceneBuilder
         tick.Configure(runtime, index, runtimeState, focus, streamer);
         EditorUtility.SetDirty(tick);
         return tick;
+    }
+
+    private static WildWindGameplaySession CreateGameplaySession(Transform root)
+    {
+        GameObject sessionObject = new GameObject(WildWindGameplaySession.SessionObjectName);
+        sessionObject.transform.SetParent(root, false);
+        WildWindGameplaySession session = sessionObject.AddComponent<WildWindGameplaySession>();
+        EditorUtility.SetDirty(session);
+        return session;
+    }
+
+    private static MetaGameState CreateGameplayMeta(
+        Transform root,
+        WorldRegionRuntime runtime,
+        WorldEntityIndex index,
+        WorldRuntimeState runtimeState,
+        ShipPhysics starterShip)
+    {
+        ShipCatalogSO catalog = AssetDatabase.LoadAssetAtPath<ShipCatalogSO>(ShipCatalogPath);
+        TechTreeDefinitionSO techTree = AssetDatabase.LoadAssetAtPath<TechTreeDefinitionSO>(TechTreePath);
+
+        GameObject loaderObject = new GameObject("Player Ship Loader");
+        loaderObject.transform.SetParent(root, false);
+        ShipLoader loader = loaderObject.AddComponent<ShipLoader>();
+        loader.catalog = catalog;
+        loader.targetShip = starterShip;
+        loader.spawnPoint = starterShip != null ? starterShip.transform : null;
+        loader.spawnedParent = root;
+        EditorUtility.SetDirty(loader);
+
+        GameObject metaObject = new GameObject("MetaGameState");
+        metaObject.transform.SetParent(root, false);
+        MetaGameState meta = metaObject.AddComponent<MetaGameState>();
+        meta.catalog = catalog;
+        meta.techTree = techTree;
+        meta.shipLoader = loader;
+        meta.worldRuntime = runtime;
+        meta.worldIndex = index;
+        meta.worldRuntimeState = runtimeState;
+        meta.loadSavedGameOnAwake = false;
+        meta.showDockingDebugUI = false;
+        EditorUtility.SetDirty(meta);
+        return meta;
     }
 
     private static VisualPlayModeTuner CreateVisualTuner(Transform root, Transform focus)

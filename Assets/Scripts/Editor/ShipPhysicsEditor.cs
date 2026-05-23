@@ -300,7 +300,7 @@ public class ShipPhysicsEditor : Editor
         }
         EditorGUILayout.EndHorizontal();
 
-        EditorGUILayout.Slider(liftInputProp, -1f, 1f, new GUIContent("Подъем точный (+-10%)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("targetAltitude"), new GUIContent("Целевая высота (м)"));
         EditorGUILayout.Slider(thrustInputProp, -1f, 1f, new GUIContent("Тяга (назад/вперед)"));
         EditorGUILayout.Slider(turnInputProp, -1f, 1f, new GUIContent("Поворот (ввод штурвала)"));
         
