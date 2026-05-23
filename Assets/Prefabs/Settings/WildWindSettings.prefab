@@ -101,6 +101,20 @@ MonoBehaviour:
   downKey: 5
   sprintKey: 7
   sprintAltKey: 8
+  flightThrustForwardKey: 1
+  flightThrustBackwardKey: 3
+  flightSlideLeftKey: 2
+  flightSlideRightKey: 4
+  flightTurnLeftKey: 5
+  flightTurnRightKey: 6
+  flightAscendKey: 7
+  flightAscendAltKey: 8
+  flightDescendKey: 11
+  flightDescendAltKey: 12
+  flightTargetSpeedChangeMetersPerSecond: 8
+  flightTargetAltitudeChangeMetersPerSecond: 70
+  flightTargetHeadingChangeDegreesPerSecond: 45
+  flightMaxReverseTargetSpeedMetersPerSecond: 25
   debugCameraOffset: {x: -760, y: 240, z: -820}
   debugCameraLookOffset: {x: 120, y: 20, z: 120}
   debugCameraFollowSharpness: 0.16

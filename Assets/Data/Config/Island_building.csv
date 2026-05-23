@@ -20,3 +20,16 @@ engine_workshop,Моторостроительный цех,Engine Workshop,Manu
 machine_node_shop,Узловой цех,Machine Node Shop,Manufacturing,Manufacturing,,,5,0.75,2,0,1,0,1,"aerolite,tools","18,6",Собирает агрегаты приводы буры гарпуны и пушки.
 light_industry,Лёгкая промышленность,Light Industry,Manufacturing,Manufacturing,,,5,0.5,2,0,0,1,0,"cloth,tools","10,3",Делает базовые общественные товары и простые изделия.
 cybernetic_node,Кибернетический узел,Cybernetic Node,Manufacturing,Manufacturing,,,5,1,0,0,2,0,3,"aerolite,paper,claudium","16,8,4",Производит узлы связанные с технологиями автоматонов.
+cargo_dock,Грузовой док,Cargo Dock,Service,Generation,cargo_speed,,5,0.5,0,0,0,0,0,"aerolite,tools","14,3",Ускоряет погрузку и выгрузку.
+aviation_hq,Штаб воздухоплавания,Aviation HQ,Service,Generation,pilot_limits,,5,0.75,0,0,1,0,2,"paper,tools,cloth","8,4,4",Открывает автоматических пилотов и их допуски.
+mooring_pier,Причал,Mooring Pier,Service,Generation,mooring,,5,0.5,0,0,0,0,0,"aerolite,tools","18,3",Позволяет швартоваться кораблям без специальных средств.
+repair_dock,Ремонтный док,Repair Dock,Service,Generation,repair,,5,0.75,2,0,0,1,1,"aerolite,tools","20,6",Ускоряет удешевляет и расширяет ремонт кораблей.
+canteen,Столовая,Canteen,Service,Generation,need_workforce,,5,0.5,0,0,0,0,0,"food,cloth,tools","8,3,2",Улучшает конвертацию еды в рабочую силу.
+hospital,Больница,Hospital,Service,Generation,need_health,,5,0.75,0,0,0,0,1,"medicines,cloth,tools","8,4,3",Улучшает конвертацию медикаментов в здоровье.
+atelier,Ателье,Atelier,Service,Generation,need_comfort,,5,0.5,1,0,0,0,1,"cloth,tools","10,3",Улучшает конвертацию ткани в комфорт.
+guard_post,Охранный пост,Guard Post,Service,Generation,need_safety,,5,0.5,0,0,1,0,0,"weapon,aerolite","5,8",Улучшает конвертацию оружия в безопасность.
+academy,Академия,Academy,Service,Generation,need_creativity,,5,0.75,0,0,0,1,2,"paper,tools,cloth","12,4,3",Улучшает конвертацию бумаги в творчество.
+maintenance_post,Пост обслуживания,Maintenance Post,Service,Generation,need_repair,,5,0.5,1,0,0,0,1,"tools,aerolite","4,8",Поддерживает ремонтные смены острова и корабельные бригады.
+passenger_terminal,Пассажирский терминал,Passenger Terminal,Service,Generation,need_capital_connection,,5,0.5,1,0,1,1,1,"aerolite,cloth,paper,tools","12,6,4,3",Собирает пассажиров и поддерживает регулярную связь со столицей.
+island_expansion_yard,Наращивание острова,Island Expansion Yard,Service,Assembly,island_expansion,,5,1.5,2,0,0,1,1,"aerolite,claudium,tools","40,6,8",Добавляет новые места строительства на развитом острове.
+claudium_spiral,Клавдиевая спираль,Claudium Spiral,Service,Generation,launch_boost,,5,1,0,0,1,0,1,"claudium,aerolite,tools","10,20,5",Даёт кораблям временное ускорение при старте с острова.
