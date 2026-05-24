@@ -550,6 +550,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(config.islandArchetypeStages.Count >= 10, "Island_archetype_stage.csv содержит стадии развития островов: " + config.islandArchetypeStages.Count + ".");
         report.Check(config.islandSocialNeeds.Count == 7, "Island_social_need.csv содержит 7 общественных потребностей: " + config.islandSocialNeeds.Count + ".");
         report.Check(config.islandBuildings.Count >= 30, "Island_building.csv содержит производственные и сервисные здания: " + config.islandBuildings.Count + ".");
+        report.Check(config.flagshipExpeditions.Count >= 1, "Expedition.csv содержит экспедиции флагманов: " + config.flagshipExpeditions.Count + ".");
 
         CheckUniqueIds(config.items, item => item.id, "предметов", report);
         CheckUniqueIds(config.islands, island => island.id, "островов", report);
@@ -569,6 +570,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         CheckUniqueIds(config.islandArchetypeStages, stage => stage.id, "стадий островов", report);
         CheckUniqueIds(config.islandSocialNeeds, need => need.id, "общественных потребностей", report);
         CheckUniqueIds(config.islandBuildings, building => building.id, "островных зданий", report);
+        CheckUniqueIds(config.flagshipExpeditions, expedition => expedition.expeditionId, "экспедиций флагманов", report);
 
         ValidateShipTreeConfig(config, report);
         ValidateConfigReferences(config, report);
@@ -731,6 +733,23 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         report.Check(baseProductionsValid, "Базовые Island_production ссылаются только на текущие предметы и имеют валидную скорость.");
+
+        bool flagshipExpeditionsValid = true;
+        for (int i = 0; i < config.flagshipExpeditions.Count; i++)
+        {
+            FlagshipExpeditionDefinition expedition = config.flagshipExpeditions[i];
+            flagshipExpeditionsValid &= expedition != null &&
+                !string.IsNullOrWhiteSpace(expedition.expeditionId) &&
+                !string.IsNullOrWhiteSpace(expedition.displayNameRu) &&
+                !string.IsNullOrWhiteSpace(expedition.regionId) &&
+                !string.IsNullOrWhiteSpace(expedition.sceneName) &&
+                expedition.minimumFlagshipRank >= FlagshipInteriorSimulator.MinimumFlagshipRank &&
+                expedition.moraleDrainMultiplier > 0f &&
+                expedition.returnDockKind == DockingLocationKind.Island &&
+                config.GetIsland(expedition.returnDockId) != null;
+        }
+
+        report.Check(flagshipExpeditionsValid, "Expedition.csv задает флагманские регионы с R3+ входом, сценой, множителем морали и возвратом в существующий док.");
 
         bool islandsValid = true;
         int islandsWithoutBaseProduction = 0;
@@ -936,7 +955,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         report.Check(techValid && techTreeValid, "Текущее дерево технологий имеет ранги, ветки, описания, валидные зависимости и не содержит циклов.");
         report.Check(techValid && hasShipNeedServiceModule, "Технологии и спецмодули имеют валидные зависимости, стоимость, массу и корабельные сервисные мощности.");
-        report.Check(techValid && hasCargoStorageModule, "Спецмодули могут задавать грузовые отсеки: фургон, салон, кузов, цистерну, баллоны или док.");
+        report.Check(techValid && hasCargoStorageModule, "Спецмодули могут задавать общий грузовой лимит, пассажирские места и док-слоты.");
     }
 
     private static bool TechnologyTreeMetadataValid(WorldConfigDatabase config)
@@ -1074,31 +1093,26 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             passengerTemplate.cargoStorageKind == CargoStorageKind.Cabin &&
             Mathf.Abs(config.GetItemTransportMassKg(PassengerCargoIds.ToCapitalItemId, 3) - 300f) <= 0.001f &&
             water != null &&
-            water.cargoUnitKind == CargoUnitKind.VolumeLiter &&
-            water.cargoStorageKind == CargoStorageKind.LiquidTank &&
+            water.cargoUnitKind == CargoUnitKind.Piece &&
+            water.cargoStorageKind == CargoStorageKind.Van &&
             sampleOre != null &&
-            sampleOre.cargoUnitKind == CargoUnitKind.VolumeLiter &&
-            sampleOre.cargoStorageKind == CargoStorageKind.BulkHold &&
+            sampleOre.cargoUnitKind == CargoUnitKind.Piece &&
+            sampleOre.cargoStorageKind == CargoStorageKind.Van &&
             dockedBoat != null &&
             dockedBoat.cargoUnitKind == CargoUnitKind.Ship &&
             dockedBoat.cargoStorageKind == CargoStorageKind.ShipDock &&
             carcass != null &&
-            carcass.cargoUnitKind == CargoUnitKind.VolumeLiter &&
-            carcass.cargoStorageKind == CargoStorageKind.RefrigeratedHold &&
+            carcass.cargoUnitKind == CargoUnitKind.Piece &&
+            carcass.cargoStorageKind == CargoStorageKind.Van &&
             Mathf.Abs(config.GetItemTransportMassKg("utility_boat_ship", 1) - 1500f) <= 0.001f;
-        report.Check(cargoMetadataValid, "Item.csv задаёт единицы груза, типы отсеков и массу единицы: пассажиры считаются местами, жидкости/сыпучка - литрами, докованные корабли дают 10% транспортной массы.");
+        report.Check(cargoMetadataValid, "Грузовые item нормализуются к штукам и общему грузовому трюму, пассажиры остаются местами, докованные корабли дают 10% транспортной массы.");
 
         LogisticsShipMetrics cargoMetrics = new LogisticsShipMetrics
         {
             cargoCompartments = new List<CargoCompartmentDefinition>
             {
                 new CargoCompartmentDefinition { storageKind = CargoStorageKind.Cabin, capacity = 3f },
-                new CargoCompartmentDefinition { storageKind = CargoStorageKind.Van, capacity = 10f },
-                new CargoCompartmentDefinition { storageKind = CargoStorageKind.BulkHold, capacity = 20f },
-                new CargoCompartmentDefinition { storageKind = CargoStorageKind.BulkHold, capacity = 15f },
-                new CargoCompartmentDefinition { storageKind = CargoStorageKind.LiquidTank, capacity = 10f },
-                new CargoCompartmentDefinition { storageKind = CargoStorageKind.GasCylinder, capacity = 5f },
-                new CargoCompartmentDefinition { storageKind = CargoStorageKind.RefrigeratedHold, capacity = 100f },
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.Van, capacity = 200f },
                 new CargoCompartmentDefinition
                 {
                     storageKind = CargoStorageKind.ShipDock,
@@ -1130,15 +1144,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ["bluebrass_ore"] = 10
         };
         Dictionary<string, int> dockOverflow = new Dictionary<string, int> { ["utility_boat_ship"] = 2 };
-        Dictionary<string, int> refrigeratedOverflow = new Dictionary<string, int> { ["windcalf_carcass"] = 120 };
+        Dictionary<string, int> genericCargoOverflow = new Dictionary<string, int> { ["water"] = 201 };
         bool cargoLimitsWork = cargoFits &&
             Mathf.Abs(typedCargoMass - 1925f) <= 0.001f &&
             Mathf.Abs(dockSupportClaudium - 0.3f) <= 0.001f &&
             !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, passengerOverflow, out _) &&
-            !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, mixedBulkOverflow, out _) &&
-            !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, refrigeratedOverflow, out _) &&
+            CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, mixedBulkOverflow, out _) &&
+            !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, genericCargoOverflow, out _) &&
             !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, dockOverflow, out _);
-        report.Check(cargoLimitsWork, "Корабельные отсеки проверяют места салона, смешиваемый фургон, однотипные кузова/цистерны/баллоны, док-слот, 10% массу докованного корабля и расход клавдия на поддержку дока.");
+        report.Check(cargoLimitsWork, "Корабельные отсеки проверяют места салона, общий грузовой лимит по кг, док-слот, 10% массу докованного корабля и расход клавдия на поддержку дока.");
 
         LogisticsShipMetrics fuelOnlyMetrics = new LogisticsShipMetrics
         {
@@ -1152,10 +1166,24 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 }
             }
         };
-        bool cargoItemWhitelistWorks =
+        bool legacyWhitelistIgnoredForGeneralCargo =
             CargoStoragePlanner.TryValidateCargoStorage(config, fuelOnlyMetrics, new Dictionary<string, int> { ["charcoal"] = 50, ["claudium"] = 40 }, out _) &&
-            !CargoStoragePlanner.TryValidateCargoStorage(config, fuelOnlyMetrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
-        report.Check(cargoItemWhitelistWorks, "Грузовой отсек может быть ограничен конкретными item id, например только углем и клавдием.");
+            CargoStoragePlanner.TryValidateCargoStorage(config, fuelOnlyMetrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
+        report.Check(legacyWhitelistIgnoredForGeneralCargo, "Обычные грузовые отсеки больше не фильтруют item id: любой товар подходит, если хватает веса.");
+
+        PlayerProgress tankProgress = new PlayerProgress();
+        tankProgress.Normalize();
+        tankProgress.AddShipCargo("charcoal", 10);
+        tankProgress.shipEngineFuelTank.Add("charcoal", 30f, 50f);
+        tankProgress.shipClaudiumTank.Add("claudium", 12.5f, 25f);
+        bool internalTanksAreSeparate =
+            tankProgress.GetShipCargoAmount("charcoal") == 10 &&
+            Approximately(tankProgress.GetShipCargoMassKg(config), 10f, 0.001f) &&
+            Approximately(tankProgress.GetShipPayloadMassKg(config), 52.5f, 0.001f) &&
+            tankProgress.shipEngineFuelTank.TrySpend("charcoal", 5.5f) &&
+            tankProgress.GetShipCargoAmount("charcoal") == 10 &&
+            Approximately(tankProgress.shipEngineFuelTank.GetAmount("charcoal"), 24.5f, 0.001f);
+        report.Check(internalTanksAreSeparate, "Топливо и клавдий в баках считаются массой корабля, но не становятся грузом и не тратят cargo-стек.");
 
         PlayerProgress playerCargoProgress = new PlayerProgress();
         playerCargoProgress.Normalize();
@@ -1239,7 +1267,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             fuelTender.cargoVanCapacityUnits >= 6400f &&
             ContainsId(fuelTender.allowedCargoItemIds, "charcoal") &&
             ContainsId(fuelTender.allowedCargoItemIds, "claudium"),
-            "Fuel tender module exists: large van capacity locked to charcoal and claudium.");
+            "Fuel tender module exists: large generic cargo capacity with legacy fuel cargo tags.");
 
         report.Check(parovoz != null &&
             parovoz.passengerSeatCapacity >= 15f &&
@@ -1263,7 +1291,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             fridgeMetrics,
             new Dictionary<string, int> { ["windcalf_carcass"] = 120 },
             out _);
-        bool refrigeratorRejectsNoFridge = !CargoStoragePlanner.TryValidateCargoStorage(
+        bool genericHoldAcceptsCarcass = CargoStoragePlanner.TryValidateCargoStorage(
             config,
             new LogisticsShipMetrics
             {
@@ -1274,8 +1302,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             },
             new Dictionary<string, int> { ["windcalf_carcass"] = 1 },
             out _);
-        report.Check(refrigeratorAcceptsCarcass && refrigeratorRejectsOverflow && refrigeratorRejectsNoFridge,
-            "Leviathan carcasses are refrigerated cargo: fit only into a refrigerator and obey liter capacity.");
+        report.Check(refrigeratorAcceptsCarcass && refrigeratorRejectsOverflow && genericHoldAcceptsCarcass,
+            "Leviathan carcasses are ordinary cargo by weight: old refrigerator capacity contributes generic kg capacity.");
 
         bool surveyEfficiencyWorks = false;
         if (config.gasClouds != null && config.gasClouds.Count > 0)
@@ -1918,7 +1946,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 design.displayNameRu + " role stats are configured on the mandatory module.");
 
             report.Check(R2TenderCargoRulesMatch(config, design.shipId, result.stats),
-                design.displayNameRu + " cargo rules preserve its specialized tender role.");
+                design.displayNameRu + " cargo rules use simplified weight-based freight.");
         }
     }
 
@@ -1986,26 +2014,29 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         {
             case "liquid_tanker":
                 return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 8000 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["windshale_ore"] = 1 }, out _);
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _) &&
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["windshale_ore"] = 1 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 8001 }, out _);
             case "gletcher":
                 return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["windshale_ore"] = 3000, ["aer_silt"] = 4000 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _) &&
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 7001 }, out _);
             case "vakhta":
                 return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 3000, ["medicines"] = 1000 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["paper"] = 1 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _);
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["paper"] = 1 }, out _) &&
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _) &&
+                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["passengers_to_capital"] = 1 }, out _);
             case "boxvan_tender":
                 return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1000, ["tools"] = 100 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["charcoal"] = 1 }, out _) &&
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["charcoal"] = 1 }, out _) &&
                     !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["passengers_to_capital"] = 1 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _);
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["water"] = 1 }, out _);
             case "stapel":
                 return CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["utility_boat_ship"] = 2 }, out _) &&
                     !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["utility_boat_ship"] = 3 }, out _) &&
                     CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["charcoal"] = 400, ["claudium"] = 200, ["tools"] = 20 }, out _) &&
-                    !CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
+                    CargoStoragePlanner.TryValidateCargoStorage(config, metrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
             default:
                 return false;
         }
@@ -2379,6 +2410,135 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             shipNeedState.GetCargoAmount(PassengerCargoIds.ToCapitalItemId) >= 1 &&
             shipNeedCapital.GetResourceAmount(PassengerCargoIds.ToShipItemId(shipNeedDefinition.shipId)) >= 1,
             "Крупный корабль генерирует пассажиров до столицы, а столица генерирует пассажиров до корабля.");
+
+        PlayerProgress smallShipInteriorProgress = new PlayerProgress();
+        smallShipInteriorProgress.Normalize();
+        smallShipInteriorProgress.selectedHullId = "starter_hull";
+        long flagshipStartTicks = DateTime.UtcNow.Ticks;
+        FlagshipInteriorSimulator.Advance(config, smallShipInteriorProgress, flagshipStartTicks, flagshipStartTicks + TimeSpan.FromHours(3).Ticks);
+        report.Check(smallShipInteriorProgress.flagshipInteriors.Count == 0, "R0-R2 ships do not create flagship interiors or social needs.");
+
+        WorldConfigDatabase syntheticFlagshipConfig = new WorldConfigDatabase();
+        syntheticFlagshipConfig.shipTreeEntries.Add(new ShipTreeEntryConfig
+        {
+            shipId = "synthetic_flagship",
+            localNameRu = "Synthetic Flagship",
+            rank = 3,
+            hullId = "synthetic_flagship_hull"
+        });
+        PlayerProgress playerFlagshipRouteProgress = new PlayerProgress();
+        playerFlagshipRouteProgress.Normalize();
+        playerFlagshipRouteProgress.selectedHullId = "synthetic_flagship_hull";
+        FlagshipInteriorState playerFlagshipRoute = FlagshipInteriorSimulator.EnsurePlayerFlagshipInterior(syntheticFlagshipConfig, playerFlagshipRouteProgress);
+        FlagshipExpeditionDefinition syntheticExpedition = new FlagshipExpeditionDefinition
+        {
+            expeditionId = "synthetic_expedition",
+            displayNameRu = "Synthetic Expedition",
+            regionId = "synthetic_region",
+            returnDockId = "capital",
+            returnDockKind = DockingLocationKind.Island,
+            minimumFlagshipRank = 3,
+            moraleDrainMultiplier = 2f
+        };
+        playerFlagshipRouteProgress.activeExpedition.Begin(syntheticExpedition, flagshipStartTicks);
+        bool playerFlagshipRouteStarted = FlagshipInteriorSimulator.StartExpedition(
+            playerFlagshipRouteProgress,
+            FlagshipInteriorSimulator.PlayerFlagshipId,
+            flagshipStartTicks,
+            out _);
+        FlagshipNeedState playerFlagshipRouteMorale = playerFlagshipRoute != null
+            ? playerFlagshipRoute.GetNeedState(FlagshipNeedIds.Morale, true)
+            : null;
+        if (playerFlagshipRouteMorale != null)
+        {
+            playerFlagshipRouteMorale.currentValue = playerFlagshipRouteMorale.maxValue;
+            playerFlagshipRouteMorale.initialized = true;
+        }
+        float playerFlagshipRouteMoraleBefore = playerFlagshipRouteMorale != null ? playerFlagshipRouteMorale.currentValue : 0f;
+        FlagshipInteriorSimulator.Advance(syntheticFlagshipConfig, playerFlagshipRouteProgress, flagshipStartTicks, flagshipStartTicks + TimeSpan.FromHours(1).Ticks);
+        bool playerFlagshipRouteMoraleDrained = playerFlagshipRouteMorale != null &&
+            playerFlagshipRouteMorale.currentValue <= playerFlagshipRouteMoraleBefore - 7.5f;
+        bool playerFlagshipRouteReturned = FlagshipInteriorSimulator.CompleteExpeditionReturn(
+            playerFlagshipRouteProgress,
+            FlagshipInteriorSimulator.PlayerFlagshipId,
+            out _);
+        playerFlagshipRouteProgress.activeExpedition.Clear();
+        report.Check(playerFlagshipRoute != null &&
+            playerFlagshipRoute.flagshipId == FlagshipInteriorSimulator.PlayerFlagshipId &&
+            playerFlagshipRoute.rank == 3 &&
+            playerFlagshipRouteStarted &&
+            playerFlagshipRouteProgress.activeExpedition != null &&
+            !playerFlagshipRouteProgress.activeExpedition.active &&
+            playerFlagshipRouteMoraleDrained &&
+            playerFlagshipRouteReturned &&
+            !playerFlagshipRoute.expeditionActive &&
+            playerFlagshipRouteMorale != null &&
+            Approximately(playerFlagshipRouteMorale.currentValue, playerFlagshipRouteMorale.maxValue, 0.001f),
+            "Selected R3+ hull creates player flagship expedition state, drains morale by region multiplier and returns home cleanly.");
+
+        PlayerProgress flagshipProgress = new PlayerProgress();
+        flagshipProgress.Normalize();
+        flagshipProgress.AddShipCargo("food", 20);
+        flagshipProgress.AddShipCargo("tools", 20);
+        flagshipProgress.AddShipCargo(PassengerCargoIds.ToShipItemId("test_flagship"), 2);
+        int flagshipPassengerCargoBefore = flagshipProgress.GetShipCargoAmount(PassengerCargoIds.ToShipItemId("test_flagship"));
+        FlagshipInteriorState flagship = flagshipProgress.GetFlagshipInteriorState("test_flagship", true);
+        flagship.rank = 3;
+        flagship.crewCapacity = 6;
+        FlagshipInteriorSimulator.EnsureDefaultInterior(flagship);
+        bool flagshipExpeditionStarted = FlagshipInteriorSimulator.StartExpedition(flagshipProgress, "test_flagship", flagshipStartTicks, out _);
+
+        FlagshipNeedState flagshipStamina = flagship.GetNeedState(FlagshipNeedIds.Stamina, true);
+        FlagshipNeedState flagshipMaintenance = flagship.GetNeedState(FlagshipNeedIds.Maintenance, true);
+        FlagshipNeedState flagshipMorale = flagship.GetNeedState(FlagshipNeedIds.Morale, true);
+        float flagshipMoraleBefore = flagshipMorale.currentValue;
+        flagshipStamina.currentValue = 0f;
+        flagshipMaintenance.currentValue = 0f;
+        flagshipStamina.initialized = true;
+        flagshipMaintenance.initialized = true;
+        flagshipMorale.initialized = true;
+
+        int flagshipRecoveryEvents = FlagshipInteriorSimulator.Advance(config, flagshipProgress, flagshipStartTicks, flagshipStartTicks + TimeSpan.FromHours(1).Ticks);
+        bool flagshipNeedsRecovered = flagshipRecoveryEvents > 0 &&
+            flagshipStamina.currentValue > 0f &&
+            flagshipMaintenance.currentValue > 0f &&
+            flagshipMorale.currentValue < flagshipMoraleBefore &&
+            flagshipProgress.GetShipCargoAmount("food") < 20 &&
+            flagshipProgress.GetShipCargoAmount("tools") < 20 &&
+            flagshipProgress.GetShipCargoAmount(PassengerCargoIds.ToShipItemId("test_flagship")) == flagshipPassengerCargoBefore;
+        bool flagshipMoraleRestoredByReturn = FlagshipInteriorSimulator.CompleteExpeditionReturn(flagshipProgress, "test_flagship", out _) &&
+            !flagship.expeditionActive &&
+            Approximately(flagshipMorale.currentValue, flagshipMorale.maxValue, 0.001f);
+        report.Check(flagshipExpeditionStarted && flagshipNeedsRecovered && flagshipMoraleRestoredByReturn,
+            "R3+ flagship service rooms restore stamina and maintenance, while morale is an expedition timer restored only by returning home.");
+
+        FlagshipFailureState testFailure = FlagshipInteriorSimulator.AddFailure(
+            flagship,
+            "engine_room",
+            FlagshipFailureSeverity.Major,
+            FlagshipFailureEffectKind.EfficiencyPenalty,
+            "",
+            0.45f,
+            200f,
+            flagshipStartTicks);
+        FlagshipInteriorSimulator.SetRoomMode(flagshipProgress, "test_flagship", "repair_workshop", FlagshipRoomMode.Off);
+        FlagshipInteriorSimulator.Advance(config, flagshipProgress, flagshipStartTicks, flagshipStartTicks + TimeSpan.FromMinutes(30).Ticks);
+        bool noRepairWhenWorkshopOff = testFailure != null && Approximately(testFailure.autoRepairProgress, 0f, 0.001f);
+
+        for (int i = 0; i < FlagshipNeedIds.All.Length; i++)
+        {
+            FlagshipNeedState need = flagship.GetNeedState(FlagshipNeedIds.All[i], true);
+            need.currentValue = need.maxValue;
+        }
+
+        FlagshipInteriorSimulator.SetRoomMode(flagshipProgress, "test_flagship", "repair_workshop", FlagshipRoomMode.Full);
+        FlagshipInteriorSimulator.Advance(config, flagshipProgress, flagshipStartTicks + TimeSpan.FromMinutes(30).Ticks, flagshipStartTicks + TimeSpan.FromMinutes(60).Ticks);
+        bool autoRepairProgressed = testFailure != null && testFailure.autoRepairProgress > 0f && testFailure.autoRepairProgress < testFailure.repairWorkRequired;
+        bool manualRepairCompleted = testFailure != null &&
+            FlagshipInteriorSimulator.CompleteManualRepair(flagshipProgress, "test_flagship", testFailure.failureId, out _) &&
+            flagship.FindFailure(testFailure.failureId, out _) == null;
+        report.Check(noRepairWhenWorkshopOff && autoRepairProgressed && manualRepairCompleted,
+            "Flagship failures wait without repair rooms, progress under auto-repair and can be cleared instantly by a manual repair puzzle.");
 
         PlayerProgress developmentProgress = new PlayerProgress();
         developmentProgress.Normalize();
@@ -3131,31 +3291,127 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return;
         }
 
-        simulationTick.Configure(world, worldIndex, runtimeState, focus, streamer);
-        WorldSimulationTick.EnvironmentSample violent = simulationTick.EvaluateEnvironment(500f);
-        WorldSimulationTick.EnvironmentSample calm = simulationTick.EvaluateEnvironment(1500f);
-        WorldSimulationTick.EnvironmentSample habitation = simulationTick.EvaluateEnvironment(2500f);
-        WorldSimulationTick.EnvironmentSample thin = simulationTick.EvaluateEnvironment(12000f);
-        WorldSimulationTick.EnvironmentSample ice = simulationTick.EvaluateEnvironment(45000f);
-        WorldSimulationTick.EnvironmentSample beyond = simulationTick.EvaluateEnvironment(100000f);
+        Vector3 originalFocusPosition = focus != null ? focus.position : Vector3.zero;
+        Vector3 tickProbePosition = SelectFarSimulationProbePosition(originalFocusPosition);
+        bool focusMoved = focus != null && (focus.position - tickProbePosition).sqrMagnitude > 0.001f;
 
-        report.Check(violent.band == WorldAltitudeBand.ViolentStorm && violent.visibilityMeters <= 150f, "Tick знает яростную бурю: видимость около 100 м.");
-        report.Check(calm.band == WorldAltitudeBand.CalmStorm && calm.visibilityMeters >= 900f && calm.visibilityMeters <= 1200f, "Tick знает спокойную бурю: видимость около 1000 м.");
-        report.Check(habitation.band == WorldAltitudeBand.Habitation && Approximately(habitation.claudiumLift01, 1f, 0.001f), "Tick знает зону обитания: клавдиевая подъёмная сила полная.");
-        report.Check(thin.band == WorldAltitudeBand.ThinAir && thin.windMetersPerSecond > habitation.windMetersPerSecond && thin.claudiumLift01 < habitation.claudiumLift01, "Tick знает разреженную зону: ветер сильнее, подъёмная сила падает.");
-        report.Check(ice.band == WorldAltitudeBand.Ice && ice.windMetersPerSecond <= 0.001f && ice.stormDamagePerMinute > 0f, "Tick знает ледяную зону: ветра нет, холод опасен.");
-        report.Check(beyond.band == WorldAltitudeBand.BeyondClaudiumLift && Approximately(beyond.claudiumLift01, 0f, 0.001f), "Tick знает потолок клавдия: на 100 км подъёмной силы нет.");
+        try
+        {
+            if (focus != null)
+            {
+                focus.position = tickProbePosition;
+            }
 
-        long beforeTicks = simulationTick.TickCount;
-        float beforeSeconds = simulationTick.TotalSimulatedSeconds;
-        WorldSimulationTick.TickResult result = simulationTick.TickOnce(60f);
+            simulationTick.Configure(world, worldIndex, runtimeState, focus, streamer);
+            WorldSimulationTick.EnvironmentSample violent = simulationTick.EvaluateEnvironment(500f);
+            WorldSimulationTick.EnvironmentSample calm = simulationTick.EvaluateEnvironment(1500f);
+            WorldSimulationTick.EnvironmentSample habitation = simulationTick.EvaluateEnvironment(2500f);
+            WorldSimulationTick.EnvironmentSample thin = simulationTick.EvaluateEnvironment(12000f);
+            WorldSimulationTick.EnvironmentSample ice = simulationTick.EvaluateEnvironment(45000f);
+            WorldSimulationTick.EnvironmentSample beyond = simulationTick.EvaluateEnvironment(100000f);
 
-        report.Check(simulationTick.TickCount == beforeTicks + 1, "Один ручной tick увеличивает счётчик сердцебиений.");
-        report.Check(simulationTick.TotalSimulatedSeconds >= beforeSeconds + 59.9f, "Один ручной tick продвигает игровое время на 60 секунд.");
-        report.Check(runtimeState.ActiveChunkCount > 0, "Tick обновляет runtime-пузырь и активные чанки: " + runtimeState.ActiveChunkCount + ".");
-        report.Check(result.touchedEntities > 0, "Tick двигает фоновую симуляцию дальних добываемых сущностей: " + result.touchedEntities + ".");
-        report.Check(result.extractedKg > 0f, "Tick списывает небольшой фоновый объём ресурсов вдали: " + result.extractedKg.ToString("0.##") + " кг.");
-        report.Info("Последний tick: " + simulationTick.LastSummary + ".");
+            report.Check(violent.band == WorldAltitudeBand.ViolentStorm && violent.visibilityMeters <= 150f, "Tick знает яростную бурю: видимость около 100 м.");
+            report.Check(calm.band == WorldAltitudeBand.CalmStorm && calm.visibilityMeters >= 900f && calm.visibilityMeters <= 1200f, "Tick знает спокойную бурю: видимость около 1000 м.");
+            report.Check(habitation.band == WorldAltitudeBand.Habitation && Approximately(habitation.claudiumLift01, 1f, 0.001f), "Tick знает зону обитания: клавдиевая подъёмная сила полная.");
+            report.Check(thin.band == WorldAltitudeBand.ThinAir && thin.windMetersPerSecond > habitation.windMetersPerSecond && thin.claudiumLift01 < habitation.claudiumLift01, "Tick знает разреженную зону: ветер сильнее, подъёмная сила падает.");
+            report.Check(ice.band == WorldAltitudeBand.Ice && ice.windMetersPerSecond <= 0.001f && ice.stormDamagePerMinute > 0f, "Tick знает ледяную зону: ветра нет, холод опасен.");
+            report.Check(beyond.band == WorldAltitudeBand.BeyondClaudiumLift && Approximately(beyond.claudiumLift01, 0f, 0.001f), "Tick знает потолок клавдия: на 100 км подъёмной силы нет.");
+
+            long beforeTicks = simulationTick.TickCount;
+            float beforeSeconds = simulationTick.TotalSimulatedSeconds;
+            WorldSimulationTick.TickResult result = simulationTick.TickOnce(60f);
+
+            report.Check(simulationTick.TickCount == beforeTicks + 1, "Один ручной tick увеличивает счётчик сердцебиений.");
+            report.Check(simulationTick.TotalSimulatedSeconds >= beforeSeconds + 59.9f, "Один ручной tick продвигает игровое время на 60 секунд.");
+            report.Check(runtimeState.ActiveChunkCount > 0, "Tick обновляет runtime-пузырь и активные чанки: " + runtimeState.ActiveChunkCount + ".");
+            report.Check(result.touchedEntities > 0, "Tick двигает фоновую симуляцию дальних добываемых сущностей: " + result.touchedEntities + ".");
+            report.Check(result.extractedKg > 0f, "Tick списывает небольшой фоновый объём ресурсов вдали: " + result.extractedKg.ToString("0.##") + " кг.");
+            report.Info("Последний tick: " + simulationTick.LastSummary + ", probe=" + FormatVector(tickProbePosition) + ".");
+        }
+        finally
+        {
+            if (focusMoved)
+            {
+                focus.position = originalFocusPosition;
+                runtimeState.RefreshActiveBubble(originalFocusPosition, world.ActiveBubbleRadiusMeters);
+                if (streamer != null)
+                {
+                    streamer.RefreshNow();
+                }
+            }
+        }
+    }
+
+    private Vector3 SelectFarSimulationProbePosition(Vector3 originalPosition)
+    {
+        float probeAltitude = originalPosition.y > 1000f ? originalPosition.y : 2500f;
+        Vector3[] candidates =
+        {
+            new Vector3(originalPosition.x, probeAltitude, originalPosition.z),
+            new Vector3(0f, 2500f, -9000f),
+            new Vector3(-9000f, 2500f, 0f),
+            new Vector3(9000f, 2500f, -9000f),
+            new Vector3(-18000f, 2500f, -12000f),
+            new Vector3(18000f, 2500f, 18000f)
+        };
+
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            if (HasExtractableEntityOutsideActiveBubble(candidates[i]))
+            {
+                return candidates[i];
+            }
+        }
+
+        return originalPosition;
+    }
+
+    private bool HasExtractableEntityOutsideActiveBubble(Vector3 probePosition)
+    {
+        if (world == null || runtimeState == null)
+        {
+            return false;
+        }
+
+        if (worldIndex != null)
+        {
+            worldIndex.EnsureBuilt(world);
+        }
+
+        float sqrRadius = world.ActiveBubbleRadiusMeters * world.ActiveBubbleRadiusMeters;
+        for (int i = 0; i < runtimeState.Entities.Count; i++)
+        {
+            WorldRuntimeState.EntityRuntimeState state = runtimeState.Entities[i];
+            if (state == null ||
+                !IsFarSimulatedExtractableKind(state.kind) ||
+                state.depleted ||
+                state.remainingAmount <= 0.001f)
+            {
+                continue;
+            }
+
+            if (worldIndex != null &&
+                worldIndex.TryGet(state.kind, state.id, out WorldEntityQueryResult record))
+            {
+                if (HorizontalSqrDistance(record.positionMeters, probePosition) > sqrRadius)
+                {
+                    return true;
+                }
+            }
+            else if (!state.activeInBubble)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsFarSimulatedExtractableKind(WorldEntityKind kind)
+    {
+        return kind == WorldEntityKind.CloudField ||
+            kind == WorldEntityKind.ResourceField ||
+            kind == WorldEntityKind.IcebergField;
     }
 
     private void ValidateBubbleStreaming(BigTestReport report)
@@ -4767,6 +5023,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private static string FormatKm(float meters)
     {
         return (meters / 1000f).ToString("0.#") + " км";
+    }
+
+    private static float HorizontalSqrDistance(Vector3 a, Vector3 b)
+    {
+        float dx = a.x - b.x;
+        float dz = a.z - b.z;
+        return dx * dx + dz * dz;
     }
 
     private static string FormatVector(Vector3 value)

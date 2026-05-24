@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEditor.Toolbars;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -150,18 +151,26 @@ public static class WildWindEditorStartSceneGuard
     public static bool PlayStartsAtStartScreen
     {
         get => EditorPrefs.GetBool(PlayStartsAtStartScreenEditorPrefKey, true);
-        private set
+        private set => SetPlayStartsAtStartScreen(value);
+    }
+
+    public static void SetPlayStartsAtStartScreen(bool value)
+    {
+        if (PlayStartsAtStartScreen == value)
         {
-            EditorPrefs.SetBool(PlayStartsAtStartScreenEditorPrefKey, value);
-            if (value)
-            {
-                EnsureNormalPlayStartsAtStartScreen();
-            }
-            else
-            {
-                EditorApplication.delayCall -= OpenStartScreenAfterPlay;
-                ClearStartScreenPlayOverrideIfOwned();
-            }
+            return;
+        }
+
+        EditorPrefs.SetBool(PlayStartsAtStartScreenEditorPrefKey, value);
+        WildWindPlayModeToolbarToggle.Refresh();
+        if (value)
+        {
+            EnsureNormalPlayStartsAtStartScreen();
+        }
+        else
+        {
+            EditorApplication.delayCall -= OpenStartScreenAfterPlay;
+            ClearStartScreenPlayOverrideIfOwned();
         }
     }
 
@@ -342,5 +351,39 @@ public static class WildWindEditorStartSceneGuard
         }
 
         return AssetDatabase.LoadAssetAtPath<SceneAsset>(path);
+    }
+}
+
+public static class WildWindPlayModeToolbarToggle
+{
+    private const string ElementPath = "Wild Wind/Start Screen Play Toggle";
+
+    public static void Refresh()
+    {
+        MainToolbar.Refresh(ElementPath);
+    }
+
+    [MainToolbarElement(ElementPath, defaultDockPosition = MainToolbarDockPosition.Middle, defaultDockIndex = 100)]
+    public static MainToolbarElement CreateToggle()
+    {
+        Texture2D icon = EditorGUIUtility.IconContent("SceneAsset Icon").image as Texture2D;
+        MainToolbarContent content = new MainToolbarContent(
+            "Start Screen",
+            icon,
+            "Normal Play starts from StartScreen and returns there after Play.");
+        return new MainToolbarToggle(
+            content,
+            WildWindEditorStartSceneGuard.PlayStartsAtStartScreen,
+            TogglePlayStartsAtStartScreen)
+        {
+            displayed = true,
+            enabled = true,
+        };
+    }
+
+    private static void TogglePlayStartsAtStartScreen(bool value)
+    {
+        WildWindEditorStartSceneGuard.SetPlayStartsAtStartScreen(value);
+        Debug.Log("[WildWindEditorStartSceneGuard] Play starts at StartScreen: " + value);
     }
 }

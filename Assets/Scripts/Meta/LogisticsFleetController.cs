@@ -198,7 +198,7 @@ public class LogisticsFleetController : MonoBehaviour
         if (state == null) return 0;
 
         LogisticsShipMetrics metrics;
-        if (!TryBuildMetrics(definition, progress, catalog, techTree, config, state.GetCargoMassKg(config), out metrics, out string metricsError))
+        if (!TryBuildMetrics(definition, progress, catalog, techTree, config, state.GetPayloadMassKg(config), out metrics, out string metricsError))
         {
             SetError(state, metricsError);
             return 0;
@@ -379,12 +379,13 @@ public class LogisticsFleetController : MonoBehaviour
 
         if (stop.refuelEngine && !string.IsNullOrWhiteSpace(metrics.engineFuelId) && stop.targetFuelKg > 0)
         {
-            movedUnits += MoveUpToTarget(islandStorage, shipCargo, metrics.engineFuelId, stop.targetFuelKg);
+            movedUnits += MoveStorageToTank(islandStorage, state.engineFuelTank, metrics.engineFuelId, stop.targetFuelKg, metrics.fuelTankCapacityKg);
         }
 
+        string claudiumResourceId = ResolveClaudiumResourceId(definition, stop.claudiumResourceId);
         if (stop.refillClaudium && stop.targetClaudiumKg > 0)
         {
-            movedUnits += MoveUpToTarget(islandStorage, shipCargo, ResolveClaudiumResourceId(definition, stop.claudiumResourceId), stop.targetClaudiumKg);
+            movedUnits += MoveStorageToTank(islandStorage, state.claudiumTank, claudiumResourceId, stop.targetClaudiumKg, metrics.claudiumTankCapacityKg);
         }
 
         movedUnits += ApplyAutomaticPassengerExchange(definition, state, stop, shipCargo, islandStorage);
@@ -394,10 +395,10 @@ public class LogisticsFleetController : MonoBehaviour
             return false;
         }
 
-        float cargoMassKg = CargoStoragePlanner.GetCargoMassKg(config, shipCargo);
-        if (cargoMassKg > metrics.maxCargoKg + 0.001f)
+        float payloadMassKg = CargoStoragePlanner.GetCargoMassKg(config, shipCargo) + state.engineFuelTank.amountKg + state.claudiumTank.amountKg;
+        if (payloadMassKg > metrics.maxCargoKg + 0.001f)
         {
-            error = $"После операций груз {cargoMassKg:F0} кг больше грузоподъемности {metrics.maxCargoKg:F0} кг.";
+            error = $"После операций полезная нагрузка {payloadMassKg:F0} кг больше грузоподъемности {metrics.maxCargoKg:F0} кг.";
             return false;
         }
 
@@ -453,7 +454,7 @@ public class LogisticsFleetController : MonoBehaviour
         }
 
         Dictionary<string, int> currentCargo = ToMap(state.cargo);
-        float currentCargoMassKg = CargoStoragePlanner.GetCargoMassKg(config, currentCargo);
+        float currentCargoMassKg = CargoStoragePlanner.GetCargoMassKg(config, currentCargo) + state.engineFuelTank.amountKg + state.claudiumTank.amountKg;
         float dockedShipFullMassKg = CargoStoragePlanner.GetDockedShipFullMassKg(config, currentCargo);
         LogisticsLegEstimate estimate = EstimateLeg(metrics, fromIsland.position, toIsland.position, currentCargoMassKg, dockedShipFullMassKg);
         if (!estimate.canFly)
@@ -463,14 +464,14 @@ public class LogisticsFleetController : MonoBehaviour
         }
 
         IslandProductionState storage = progress.GetIslandProductionState(fromIsland.id, true);
-        if (!TryTopUpForLeg(state, storage, metrics.engineFuelId, estimate.requiredFuelKg))
+        if (!TryTopUpTankForLeg(state.engineFuelTank, storage, metrics.engineFuelId, estimate.requiredFuelKg, metrics.fuelTankCapacityKg))
         {
             error = $"Не хватает топлива {metrics.engineFuelId}: нужно {estimate.requiredFuelKg} кг.";
             return false;
         }
 
         string claudiumResourceId = ResolveClaudiumResourceId(definition, currentStop != null ? currentStop.claudiumResourceId : "");
-        if (!TryTopUpForLeg(state, storage, claudiumResourceId, estimate.requiredClaudiumKg))
+        if (!TryTopUpTankForLeg(state.claudiumTank, storage, claudiumResourceId, estimate.requiredClaudiumKg, metrics.claudiumTankCapacityKg))
         {
             error = $"Не хватает клавдия: нужно {estimate.requiredClaudiumKg} кг.";
             return false;
@@ -482,20 +483,20 @@ public class LogisticsFleetController : MonoBehaviour
             return false;
         }
 
-        float toppedCargoMassKg = CargoStoragePlanner.GetCargoMassKg(config, toppedCargo);
-        if (toppedCargoMassKg > metrics.maxCargoKg + 0.001f)
+        float toppedPayloadMassKg = CargoStoragePlanner.GetCargoMassKg(config, toppedCargo) + state.engineFuelTank.amountKg + state.claudiumTank.amountKg;
+        if (toppedPayloadMassKg > metrics.maxCargoKg + 0.001f)
         {
-            error = $"После дозаправки груз {toppedCargoMassKg:F0} кг больше грузоподъемности {metrics.maxCargoKg:F0} кг.";
+            error = $"После дозаправки полезная нагрузка {toppedPayloadMassKg:F0} кг больше грузоподъемности {metrics.maxCargoKg:F0} кг.";
             return false;
         }
 
-        if (!state.TrySpendCargo(metrics.engineFuelId, estimate.requiredFuelKg))
+        if (!state.engineFuelTank.TrySpend(metrics.engineFuelId, estimate.requiredFuelKg))
         {
             error = $"Не удалось списать топливо {metrics.engineFuelId}.";
             return false;
         }
 
-        if (!state.TrySpendCargo(claudiumResourceId, estimate.requiredClaudiumKg))
+        if (!state.claudiumTank.TrySpend(claudiumResourceId, estimate.requiredClaudiumKg))
         {
             error = "Не удалось списать клавдий.";
             return false;
@@ -578,6 +579,8 @@ public class LogisticsFleetController : MonoBehaviour
         metrics.engineLiftKg = metrics.enginePowerKw * metrics.claudiumLiftEfficiency;
         metrics.allowedTakeoffMassKg = Mathf.Min(metrics.engineLiftKg, Mathf.Min(metrics.claudiumMaxLiftKg, metrics.hullLimitKg));
         metrics.maxCargoKg = Mathf.Max(0f, metrics.allowedTakeoffMassKg - metrics.emptyMassKg);
+        metrics.fuelTankCapacityKg = ShipConsumableTankMath.CalculateFuelTankCapacityKg(metrics.maxCargoKg);
+        metrics.claudiumTankCapacityKg = ShipConsumableTankMath.CalculateClaudiumTankCapacityKg(metrics.maxCargoKg);
         metrics.cruiseSpeedMS = Mathf.Max(0f, metrics.propellerMaxSpeedMS * Mathf.Clamp(cruiseSpeedFactor, 0.1f, 1f));
         metrics.cruisePowerKw = Mathf.Max(0f, metrics.enginePowerKw * Mathf.Clamp(cruisePowerLever, 0.05f, 1.2f));
         metrics.needWorkforceRecoveryPerHour = stats.Get(ShipStatId.NeedWorkforceRecoveryPerHour, 0f);
@@ -612,7 +615,7 @@ public class LogisticsFleetController : MonoBehaviour
 
         if (currentCargoKg > metrics.maxCargoKg + 0.001f)
         {
-            error = $"Грузовик перегружен: {currentCargoKg:F0}/{metrics.maxCargoKg:F0} кг.";
+            error = $"Грузовик перегружен по полезной массе: {currentCargoKg:F0}/{metrics.maxCargoKg:F0} кг.";
             return false;
         }
 
@@ -764,6 +767,46 @@ public class LogisticsFleetController : MonoBehaviour
         }
 
         return state.GetCargoAmount(resourceId) >= requiredAmount;
+    }
+
+    private static bool TryTopUpTankForLeg(ShipConsumableTankState tank, IslandProductionState storage, string resourceId, int requiredAmount, float capacityKg)
+    {
+        if (requiredAmount <= 0) return true;
+        if (tank == null || storage == null || string.IsNullOrWhiteSpace(resourceId)) return false;
+        if (requiredAmount > capacityKg + 0.001f) return false;
+        if (tank.GetAmount(resourceId) >= requiredAmount) return true;
+
+        int moved = MoveStorageToTank(storage, tank, resourceId, requiredAmount, capacityKg);
+        return moved >= 0 && tank.GetAmount(resourceId) >= requiredAmount;
+    }
+
+    private static int MoveStorageToTank(Dictionary<string, int> islandStorage, ShipConsumableTankState tank, string resourceId, int targetAmount, float capacityKg)
+    {
+        if (islandStorage == null || tank == null || string.IsNullOrWhiteSpace(resourceId) || targetAmount <= 0) return 0;
+
+        float target = Mathf.Min(targetAmount, capacityKg);
+        int needed = Mathf.FloorToInt(Mathf.Max(0f, target - tank.GetAmount(resourceId)) + 0.0001f);
+        if (needed <= 0) return 0;
+
+        int moved = Mathf.Min(needed, GetAmount(islandStorage, resourceId));
+        if (moved <= 0) return 0;
+
+        SetAmount(islandStorage, resourceId, GetAmount(islandStorage, resourceId) - moved);
+        return Mathf.RoundToInt(tank.Add(resourceId, moved, capacityKg));
+    }
+
+    private static int MoveStorageToTank(IslandProductionState storage, ShipConsumableTankState tank, string resourceId, int targetAmount, float capacityKg)
+    {
+        if (storage == null || tank == null || string.IsNullOrWhiteSpace(resourceId) || targetAmount <= 0) return 0;
+
+        float target = Mathf.Min(targetAmount, capacityKg);
+        int needed = Mathf.FloorToInt(Mathf.Max(0f, target - tank.GetAmount(resourceId)) + 0.0001f);
+        if (needed <= 0) return 0;
+
+        int moved = Mathf.Min(needed, storage.GetResourceAmount(resourceId));
+        if (moved <= 0 || !storage.TrySpendResource(resourceId, moved)) return 0;
+
+        return Mathf.RoundToInt(tank.Add(resourceId, moved, capacityKg));
     }
 
     private static void ApplyUnloadOrders(List<LogisticsCargoOrder> orders, Dictionary<string, int> shipCargo, Dictionary<string, int> islandStorage, ref int movedUnits)
@@ -1046,11 +1089,11 @@ public static class CargoStoragePlanner
 
         IReadOnlyList<string> allowedCargoItemIds = stats != null ? stats.AllowedCargoItemIds : null;
         AddStatCompartment(compartments, stats, ShipStatId.CargoVanCapacityUnits, CargoStorageKind.Van, "Фургон", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.PassengerSeatCapacity, CargoStorageKind.Cabin, "Салон", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.BulkHoldCapacityLiters, CargoStorageKind.BulkHold, "Кузов", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.LiquidTankCapacityLiters, CargoStorageKind.LiquidTank, "Цистерна", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.GasCylinderCapacityLiters, CargoStorageKind.GasCylinder, "Баллон", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.RefrigeratedHoldCapacityLiters, CargoStorageKind.RefrigeratedHold, "Холодильник", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.PassengerSeatCapacity, CargoStorageKind.Cabin, "Салон", null);
+        AddStatCompartment(compartments, stats, ShipStatId.BulkHoldCapacityLiters, CargoStorageKind.Van, "Грузовой кузов", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.LiquidTankCapacityLiters, CargoStorageKind.Van, "Грузовая цистерна", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.GasCylinderCapacityLiters, CargoStorageKind.Van, "Грузовые баллоны", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.RefrigeratedHoldCapacityLiters, CargoStorageKind.Van, "Грузовой холодильник", allowedCargoItemIds);
 
         float dockSlots = stats != null ? stats.Get(ShipStatId.ShipDockSlots, 0f) : 0f;
         if (dockSlots > 0f)
@@ -1183,12 +1226,8 @@ public static class CargoStoragePlanner
         if (cargo == null || cargo.Count == 0) return true;
         if (metrics.cargoCompartments == null || metrics.cargoCompartments.Count == 0) return true;
 
-        float vanDemand = 0f;
+        float generalCargoMassKg = 0f;
         float cabinDemand = 0f;
-        Dictionary<string, float> bulkDemands = new Dictionary<string, float>();
-        Dictionary<string, float> liquidDemands = new Dictionary<string, float>();
-        Dictionary<string, float> gasDemands = new Dictionary<string, float>();
-        float refrigeratedDemand = 0f;
         Dictionary<string, int> dockDemands = new Dictionary<string, int>();
 
         foreach (KeyValuePair<string, int> pair in cargo)
@@ -1196,56 +1235,30 @@ public static class CargoStoragePlanner
             if (string.IsNullOrWhiteSpace(pair.Key) || pair.Value <= 0) continue;
 
             CargoStorageKind storageKind = config != null ? config.GetItemStorageKind(pair.Key) : CargoStorageKind.Van;
-            if (!TryValidateCargoItemAllowed(config, metrics, pair.Key, storageKind, out error))
-            {
-                return false;
-            }
-
-            float storageAmount = config != null ? config.GetItemStorageAmount(pair.Key, pair.Value) : pair.Value;
             switch (storageKind)
             {
                 case CargoStorageKind.Cabin:
-                    cabinDemand += storageAmount;
-                    break;
-                case CargoStorageKind.BulkHold:
-                    AddDemand(bulkDemands, pair.Key, storageAmount);
-                    break;
-                case CargoStorageKind.LiquidTank:
-                    AddDemand(liquidDemands, pair.Key, storageAmount);
-                    break;
-                case CargoStorageKind.GasCylinder:
-                    AddDemand(gasDemands, pair.Key, storageAmount);
-                    break;
-                case CargoStorageKind.RefrigeratedHold:
-                    refrigeratedDemand += storageAmount;
+                    cabinDemand += Mathf.Max(0, pair.Value);
                     break;
                 case CargoStorageKind.ShipDock:
                     dockDemands[pair.Key] = Mathf.Max(0, pair.Value);
                     break;
                 default:
-                    vanDemand += storageAmount;
+                    generalCargoMassKg += config != null ? config.GetItemTransportMassKg(pair.Key, pair.Value) : Mathf.Max(0, pair.Value);
                     break;
             }
         }
 
-        if (vanDemand > GetMixedCapacity(metrics, CargoStorageKind.Van) + 0.001f)
+        float generalCargoCapacityKg = GetGeneralCargoCapacityKg(metrics);
+        if (generalCargoMassKg > generalCargoCapacityKg + 0.001f)
         {
-            error = $"Фургон перегружен: {vanDemand:F0}/{GetMixedCapacity(metrics, CargoStorageKind.Van):F0} ед.";
+            error = $"Грузовые отсеки перегружены по массе: {generalCargoMassKg:F0}/{generalCargoCapacityKg:F0} кг.";
             return false;
         }
 
         if (cabinDemand > GetMixedCapacity(metrics, CargoStorageKind.Cabin) + 0.001f)
         {
             error = $"Салон перегружен: {cabinDemand:F0}/{GetMixedCapacity(metrics, CargoStorageKind.Cabin):F0} мест.";
-            return false;
-        }
-
-        if (!TryFitSingleTypeCompartments(metrics, CargoStorageKind.BulkHold, bulkDemands, "Кузов", out error)) return false;
-        if (!TryFitSingleTypeCompartments(metrics, CargoStorageKind.LiquidTank, liquidDemands, "Цистерны", out error)) return false;
-        if (!TryFitSingleTypeCompartments(metrics, CargoStorageKind.GasCylinder, gasDemands, "Баллоны", out error)) return false;
-        if (refrigeratedDemand > GetMixedCapacity(metrics, CargoStorageKind.RefrigeratedHold) + 0.001f)
-        {
-            error = $"Холодильник перегружен: {refrigeratedDemand:F0}/{GetMixedCapacity(metrics, CargoStorageKind.RefrigeratedHold):F0} л.";
             return false;
         }
 
@@ -1268,64 +1281,6 @@ public static class CargoStoragePlanner
         }
     }
 
-    private static bool TryValidateCargoItemAllowed(
-        WorldConfigDatabase config,
-        LogisticsShipMetrics metrics,
-        string itemId,
-        CargoStorageKind storageKind,
-        out string error)
-    {
-        error = "";
-        if (string.IsNullOrWhiteSpace(itemId)) return true;
-        if (metrics.cargoCompartments == null || metrics.cargoCompartments.Count == 0) return true;
-
-        bool hasStorageKind = false;
-        for (int i = 0; i < metrics.cargoCompartments.Count; i++)
-        {
-            CargoCompartmentDefinition compartment = metrics.cargoCompartments[i];
-            if (compartment == null || compartment.storageKind != storageKind) continue;
-
-            hasStorageKind = true;
-            if (compartment.AllowsItem(itemId))
-            {
-                return true;
-            }
-        }
-
-        if (!hasStorageKind) return true;
-
-        string itemName = config != null ? config.GetItemNameRu(itemId) : itemId;
-        error = GetStorageKindLabel(storageKind) + " не принимает груз: " + itemName + ".";
-        return false;
-    }
-
-    private static string GetStorageKindLabel(CargoStorageKind storageKind)
-    {
-        switch (storageKind)
-        {
-            case CargoStorageKind.Cabin:
-                return "Салон";
-            case CargoStorageKind.BulkHold:
-                return "Кузов";
-            case CargoStorageKind.LiquidTank:
-                return "Цистерна";
-            case CargoStorageKind.GasCylinder:
-                return "Баллон";
-            case CargoStorageKind.RefrigeratedHold:
-                return "Холодильник";
-            case CargoStorageKind.ShipDock:
-                return "Док";
-            default:
-                return "Фургон";
-        }
-    }
-
-    private static void AddDemand(Dictionary<string, float> demands, string itemId, float amount)
-    {
-        if (demands == null || string.IsNullOrWhiteSpace(itemId) || amount <= 0f) return;
-        demands[itemId] = demands.TryGetValue(itemId, out float current) ? current + amount : amount;
-    }
-
     private static float GetMixedCapacity(LogisticsShipMetrics metrics, CargoStorageKind kind)
     {
         float capacity = 0f;
@@ -1341,61 +1296,20 @@ public static class CargoStoragePlanner
         return capacity;
     }
 
-    private static bool TryFitSingleTypeCompartments(
-        LogisticsShipMetrics metrics,
-        CargoStorageKind kind,
-        Dictionary<string, float> demands,
-        string label,
-        out string error)
+    private static float GetGeneralCargoCapacityKg(LogisticsShipMetrics metrics)
     {
-        error = "";
-        if (demands == null || demands.Count == 0) return true;
-
-        List<float> capacities = GetSingleTypeCapacities(metrics, kind);
-        foreach (KeyValuePair<string, float> pair in SortDemandsDescending(demands))
-        {
-            float remaining = pair.Value;
-            for (int i = 0; i < capacities.Count && remaining > 0.001f; i++)
-            {
-                float capacity = capacities[i];
-                if (capacity <= 0f) continue;
-
-                remaining -= capacity;
-                capacities.RemoveAt(i);
-                i--;
-            }
-
-            if (remaining > 0.001f)
-            {
-                error = $"{label}: не хватает отдельного отсека для {pair.Key}, осталось {remaining:F0} л.";
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static List<float> GetSingleTypeCapacities(LogisticsShipMetrics metrics, CargoStorageKind kind)
-    {
-        List<float> capacities = new List<float>();
-        if (metrics.cargoCompartments == null) return capacities;
+        float capacity = 0f;
+        if (metrics.cargoCompartments == null) return capacity;
 
         for (int i = 0; i < metrics.cargoCompartments.Count; i++)
         {
             CargoCompartmentDefinition compartment = metrics.cargoCompartments[i];
-            if (compartment == null || compartment.storageKind != kind || compartment.capacity <= 0f) continue;
-            capacities.Add(compartment.capacity);
+            if (compartment == null || compartment.capacity <= 0f) continue;
+            if (compartment.storageKind == CargoStorageKind.Cabin || compartment.storageKind == CargoStorageKind.ShipDock) continue;
+            capacity += Mathf.Max(0f, compartment.capacity);
         }
 
-        capacities.Sort((a, b) => b.CompareTo(a));
-        return capacities;
-    }
-
-    private static List<KeyValuePair<string, float>> SortDemandsDescending(Dictionary<string, float> demands)
-    {
-        List<KeyValuePair<string, float>> sorted = new List<KeyValuePair<string, float>>(demands);
-        sorted.Sort((a, b) => b.Value.CompareTo(a.Value));
-        return sorted;
+        return capacity;
     }
 
     private static bool TryFitDockSlots(
@@ -1545,6 +1459,8 @@ public class LogisticsShipState
     public long flightArrivesUtcTicks;
     public Vector3 lastKnownPosition;
     public List<ResourceStack> cargo = new List<ResourceStack>();
+    public ShipConsumableTankState engineFuelTank = new ShipConsumableTankState();
+    public ShipConsumableTankState claudiumTank = new ShipConsumableTankState { resourceId = "claudium" };
     public List<ShipboardNeedState> societyNeeds = new List<ShipboardNeedState>();
     public float passengersToCapitalProgress;
     public float passengersFromCapitalProgress;
@@ -1561,10 +1477,14 @@ public class LogisticsShipState
         targetStopIndex = Mathf.Max(-1, targetStopIndex);
         currentStopIndex = Mathf.Max(0, currentStopIndex);
         cargo ??= new List<ResourceStack>();
+        engineFuelTank ??= new ShipConsumableTankState();
+        claudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
         societyNeeds ??= new List<ShipboardNeedState>();
         passengersToCapitalProgress = Mathf.Max(0f, passengersToCapitalProgress);
         passengersFromCapitalProgress = Mathf.Max(0f, passengersFromCapitalProgress);
         lastError ??= "";
+        engineFuelTank.Normalize();
+        claudiumTank.Normalize();
 
         for (int i = cargo.Count - 1; i >= 0; i--)
         {
@@ -1614,6 +1534,11 @@ public class LogisticsShipState
     public float GetCargoMassKg(WorldConfigDatabase config)
     {
         return CargoStoragePlanner.GetCargoMassKg(config, cargo);
+    }
+
+    public float GetPayloadMassKg(WorldConfigDatabase config)
+    {
+        return GetCargoMassKg(config) + engineFuelTank.amountKg + claudiumTank.amountKg;
     }
 
     public void AddCargo(string itemId, int amount)
@@ -1940,6 +1865,8 @@ public struct LogisticsShipMetrics
     public float engineLiftKg;
     public float allowedTakeoffMassKg;
     public float maxCargoKg;
+    public float fuelTankCapacityKg;
+    public float claudiumTankCapacityKg;
     public float cruiseSpeedMS;
     public float cruisePowerKw;
     public float needWorkforceRecoveryPerHour;

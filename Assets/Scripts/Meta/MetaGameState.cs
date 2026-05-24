@@ -159,6 +159,7 @@ public partial class MetaGameState : MonoBehaviour
 
     private bool initialized;
     private bool isAdvancingProcesses;
+    private bool suppressFlagshipMoraleDrain;
     private string lastSaveMessage = "";
     private Vector2 debugScroll;
     private WorldConfigDatabase worldConfig = new WorldConfigDatabase();
@@ -188,7 +189,10 @@ public partial class MetaGameState : MonoBehaviour
         public string reason;
         public float emptyMassKg;
         public float currentCargoKg;
+        public float currentTankKg;
         public float maxCargoKg;
+        public float fuelTankCapacityKg;
+        public float claudiumTankCapacityKg;
         public float allowedTakeoffMassKg;
         public float engineLiftKg;
         public float claudiumMaxLiftKg;
@@ -996,7 +1000,13 @@ public partial class MetaGameState : MonoBehaviour
 
     public bool TryBeginFlightSession(MissionDefinitionSO mission)
     {
+        return TryBeginFlightSession(mission, null);
+    }
+
+    private bool TryBeginFlightSession(MissionDefinitionSO mission, FlagshipExpeditionDefinition expedition)
+    {
         EnsureProgressInitialized();
+        expedition?.Normalize();
 
         if (CurrentMode == GameSessionMode.Flight)
         {
@@ -1041,16 +1051,245 @@ public partial class MetaGameState : MonoBehaviour
             TrySaveGame();
         }
 
+        if (expedition != null)
+        {
+            progress.activeExpedition.Begin(expedition, GetProcessUtcNow().Ticks);
+        }
+
         progress.SetFlight(missionId);
+        bool flagshipExpeditionStarted = TryStartPlayerFlagshipExpedition(out string flagshipExpeditionMessage);
         ApplySelectedShip();
         ApplySessionModeToShip();
         lastSaveMessage = "Вылет начат. Ручное сохранение доступно у дока, выход из игры сохранит текущий полет.";
+        if (expedition != null)
+        {
+            lastSaveMessage += " Экспедиция: " + GetExpeditionDisplayName(expedition) + ".";
+        }
+        if (flagshipExpeditionStarted && !string.IsNullOrWhiteSpace(flagshipExpeditionMessage))
+        {
+            lastSaveMessage += " " + flagshipExpeditionMessage;
+        }
         return true;
     }
 
     public bool BeginFreeFlight()
     {
         return TryBeginFlightSession(null);
+    }
+
+    public bool BeginFlagshipExpedition(FlagshipExpeditionDefinition expedition)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        if (!CanBeginFlagshipExpedition(expedition, out string reason))
+        {
+            lastSaveMessage = reason;
+            return false;
+        }
+
+        bool started = TryBeginFlightSession(null, expedition);
+        if (!started)
+        {
+            progress.activeExpedition.Clear();
+            return false;
+        }
+
+        if (!TryEnterFlagshipExpeditionScene(expedition, out string transitionMessage) &&
+            !string.IsNullOrWhiteSpace(transitionMessage))
+        {
+            lastSaveMessage += " " + transitionMessage;
+        }
+
+        return true;
+    }
+
+    public bool BeginFlagshipExpedition(string expeditionId)
+    {
+        EnsureWorldConfigLoaded();
+        return BeginFlagshipExpedition(worldConfig != null ? worldConfig.GetFlagshipExpedition(expeditionId) : null);
+    }
+
+    public bool ReturnFromFlagshipExpedition()
+    {
+        EnsureProgressInitialized();
+        FlagshipExpeditionState expedition = progress.activeExpedition;
+        if (expedition == null || !expedition.active)
+        {
+            lastSaveMessage = "Нет активной экспедиции.";
+            return false;
+        }
+
+        expedition.Normalize();
+        string expeditionName = GetExpeditionDisplayName(expedition);
+        string dockId = string.IsNullOrWhiteSpace(expedition.returnDockId) ? GetCapitalIslandId() : expedition.returnDockId;
+        DockingLocationKind dockKind = expedition.returnDockKind;
+        Vector3 dockPosition = GetDockPositionOrFallback(dockId, dockKind);
+
+        progress.SetDocked(dockId, dockKind, dockPosition);
+        bool flagshipReturned = TryCompletePlayerFlagshipExpeditionAtDock(dockId, dockKind, out string flagshipReturnMessage);
+        ApplySelectedShip();
+        ApplySessionModeToShip();
+        ResetCrashDetector();
+
+        if (autoSaveOnDock)
+        {
+            TrySaveGame();
+        }
+
+        lastSaveMessage = "Флагман вернулся из экспедиции: " + expeditionName + ".";
+        if (flagshipReturned && !string.IsNullOrWhiteSpace(flagshipReturnMessage))
+        {
+            lastSaveMessage += " " + flagshipReturnMessage;
+        }
+
+        return true;
+    }
+
+    public bool CanBeginFlagshipExpedition(FlagshipExpeditionDefinition expedition, out string reason)
+    {
+        reason = "";
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        if (expedition == null)
+        {
+            reason = "Экспедиция не задана.";
+            return false;
+        }
+
+        expedition.Normalize();
+        if (progress.activeExpedition != null && progress.activeExpedition.active)
+        {
+            reason = "Экспедиция уже активна.";
+            return false;
+        }
+
+        if (!IsDockedAtCapital())
+        {
+            reason = "Экспедицию можно начать только из столицы.";
+            return false;
+        }
+
+        FlagshipInteriorState interior = FlagshipInteriorSimulator.EnsurePlayerFlagshipInterior(worldConfig, progress);
+        if (interior == null)
+        {
+            reason = "Нужен флагман R" + expedition.minimumFlagshipRank + "+. Малые R0-R2 корабли в экспедиции не идут.";
+            return false;
+        }
+
+        if (interior.rank < expedition.minimumFlagshipRank)
+        {
+            reason = "Нужен флагман R" + expedition.minimumFlagshipRank + "+, выбран R" + interior.rank + ".";
+            return false;
+        }
+
+        reason = "Экспедиция доступна.";
+        return true;
+    }
+
+    public IReadOnlyList<FlagshipExpeditionDefinition> GetFlagshipExpeditionConfigs()
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return worldConfig != null ? worldConfig.flagshipExpeditions : null;
+    }
+
+    private bool TryEnterFlagshipExpeditionScene(FlagshipExpeditionDefinition expedition, out string message)
+    {
+        message = "";
+        if (expedition == null || string.IsNullOrWhiteSpace(expedition.sceneName))
+        {
+            return true;
+        }
+
+        string targetSceneName = expedition.sceneName.Trim();
+        string activeSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (string.Equals(targetSceneName, activeSceneName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!TrySaveGame(true))
+        {
+            message = "Не удалось сохранить полет перед переходом в регион экспедиции.";
+            return false;
+        }
+
+        try
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene(targetSceneName);
+            message = "Загрузка региона экспедиции: " + targetSceneName + ".";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            message = "Не удалось загрузить регион экспедиции: " + exception.Message;
+            return false;
+        }
+    }
+
+    private static string GetExpeditionDisplayName(FlagshipExpeditionDefinition expedition)
+    {
+        if (expedition == null) return "экспедиция";
+        return string.IsNullOrWhiteSpace(expedition.displayNameRu) ? expedition.expeditionId : expedition.displayNameRu;
+    }
+
+    private static string GetExpeditionDisplayName(FlagshipExpeditionState expedition)
+    {
+        if (expedition == null) return "экспедиция";
+        return string.IsNullOrWhiteSpace(expedition.displayNameRu) ? expedition.expeditionId : expedition.displayNameRu;
+    }
+
+    private bool TryStartPlayerFlagshipExpedition(out string message)
+    {
+        message = "";
+        EnsureWorldConfigLoaded();
+
+        FlagshipInteriorState interior = FlagshipInteriorSimulator.EnsurePlayerFlagshipInterior(worldConfig, progress);
+        if (interior == null || interior.expeditionActive)
+        {
+            return false;
+        }
+
+        return FlagshipInteriorSimulator.StartExpedition(progress, FlagshipInteriorSimulator.PlayerFlagshipId, GetProcessUtcNow().Ticks, out message);
+    }
+
+    private bool TryCompletePlayerFlagshipExpeditionAtDock(string dockId, DockingLocationKind dockKind, out string message)
+    {
+        message = "";
+        if (dockKind != DockingLocationKind.Island || !IsCapitalIsland(dockId))
+        {
+            return false;
+        }
+
+        bool hadActiveExpedition = progress != null &&
+            progress.activeExpedition != null &&
+            progress.activeExpedition.active;
+        bool completed = TryCompletePlayerFlagshipExpedition(out message);
+        if (hadActiveExpedition)
+        {
+            progress.activeExpedition.Clear();
+            if (!completed && string.IsNullOrWhiteSpace(message))
+            {
+                message = "Экспедиция завершена: флагман вернулся в столицу.";
+            }
+        }
+
+        return completed || hadActiveExpedition;
+    }
+
+    private bool TryCompletePlayerFlagshipExpedition(out string message)
+    {
+        message = "";
+        FlagshipInteriorState interior = progress != null
+            ? progress.GetFlagshipInteriorState(FlagshipInteriorSimulator.PlayerFlagshipId, false)
+            : null;
+        if (interior == null || !interior.expeditionActive)
+        {
+            return false;
+        }
+
+        return FlagshipInteriorSimulator.CompleteExpeditionReturn(progress, FlagshipInteriorSimulator.PlayerFlagshipId, out message);
     }
 
     public bool TryLoadShipCargoFromCurrentDock(string itemId, int amount, out string message, bool autoSave = true)
@@ -1078,7 +1317,7 @@ public partial class MetaGameState : MonoBehaviour
         Dictionary<string, int> plannedCargo = BuildShipCargoMap(itemId, amount);
         CargoCapacityInfo capacity = CalculateCargoCapacity();
         float plannedMassKg = CargoStoragePlanner.GetCargoMassKg(worldConfig, plannedCargo);
-        if (plannedMassKg > capacity.maxCargoKg + 0.001f)
+        if (plannedMassKg + capacity.currentTankKg > capacity.maxCargoKg + 0.001f)
         {
             message = "Нельзя загрузить: корабль перегружен.";
             return false;
@@ -1175,11 +1414,19 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         progress.SetDocked(dockId, dockKind, GetCurrentShipPosition());
+        bool flagshipReturned = TryCompletePlayerFlagshipExpeditionAtDock(dockId, dockKind, out string flagshipReturnMessage);
         ApplySessionModeToShip();
 
         if (autoSaveOnDock)
         {
             TrySaveGame();
+        }
+
+        if (flagshipReturned && !string.IsNullOrWhiteSpace(flagshipReturnMessage))
+        {
+            lastSaveMessage = string.IsNullOrWhiteSpace(lastSaveMessage)
+                ? flagshipReturnMessage
+                : lastSaveMessage + " " + flagshipReturnMessage;
         }
 
         return true;
@@ -1235,6 +1482,8 @@ public partial class MetaGameState : MonoBehaviour
         Vector3 recoveryPosition = GetDockPositionOrFallback(recoveryDockId, recoveryDockKind);
 
         progress.SetDocked(recoveryDockId, recoveryDockKind, recoveryPosition);
+        bool flagshipReturned = TryCompletePlayerFlagshipExpedition(out string flagshipReturnMessage);
+        progress.activeExpedition?.Clear();
         ApplySelectedShip();
         ApplySessionModeToShip();
         ResetCrashDetector();
@@ -1253,6 +1502,11 @@ public partial class MetaGameState : MonoBehaviour
         if (!assemblyReady && !string.IsNullOrWhiteSpace(assemblyMessage))
         {
             lastSaveMessage += " " + assemblyMessage;
+        }
+
+        if (flagshipReturned && !string.IsNullOrWhiteSpace(flagshipReturnMessage))
+        {
+            lastSaveMessage += " " + flagshipReturnMessage;
         }
 
         return assemblyReady;
@@ -1383,6 +1637,8 @@ public partial class MetaGameState : MonoBehaviour
                 completedCycles += IslandProductionSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
                 completedCycles += IslandIndustrySimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
             }
+
+            completedCycles += FlagshipInteriorSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks, !suppressFlagshipMoraleDrain);
 
             completedCycles += AdvanceCargoTransfer(utcNow);
             completedCycles += AdvanceTechnologyResearch(utcNow);
@@ -1819,7 +2075,7 @@ public partial class MetaGameState : MonoBehaviour
             Dictionary<string, int> cargoAfterLoad = CargoStoragePlanner.ToCargoMap(progress.shipCargo);
             cargoAfterLoad[operation.itemId] = cargoAfterLoad.TryGetValue(operation.itemId, out int current) ? current + 1 : 1;
             float cargoMassAfterLoad = CargoStoragePlanner.GetCargoMassKg(worldConfig, cargoAfterLoad);
-            if (cargoMassAfterLoad > capacity.maxCargoKg + 0.001f) return false;
+            if (cargoMassAfterLoad + capacity.currentTankKg > capacity.maxCargoKg + 0.001f) return false;
             if (!CargoStoragePlanner.TryValidateCargoStorage(worldConfig, capacity.cargoCompartments, cargoAfterLoad, out _)) return false;
             if (!islandStorage.TrySpendResource(operation.itemId, 1)) return false;
 
@@ -2044,7 +2300,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureProgressInitialized();
         CargoCapacityInfo capacity = CalculateCargoCapacity();
         if (!capacity.assemblyValid) return 0f;
-        return Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg);
+        return Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg - capacity.currentTankKg);
     }
 
     public bool TryAddShipCargoFromRuntime(string resourceId, int amount, out string reason)
@@ -2061,7 +2317,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureProgressInitialized();
         CargoCapacityInfo capacity = CalculateCargoCapacity();
         float addedMassKg = worldConfig != null ? worldConfig.GetItemTransportMassKg(resourceId, amount) : amount;
-        float freeKg = Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg);
+        float freeKg = Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg - capacity.currentTankKg);
         if (!capacity.assemblyValid || freeKg + 0.001f < addedMassKg)
         {
             reason = $"Не хватает грузоподъемности: нужно {addedMassKg:F1} кг, свободно {freeKg:F1} кг.";
@@ -2155,7 +2411,8 @@ public partial class MetaGameState : MonoBehaviour
             assemblyValid = false,
             canFly = false,
             reason = "сборка корабля не проверена.",
-            currentCargoKg = progress != null ? progress.GetShipCargoMassKg(worldConfig) : 0f
+            currentCargoKg = progress != null ? progress.GetShipCargoMassKg(worldConfig) : 0f,
+            currentTankKg = progress != null ? progress.GetShipConsumableTankMassKg() : 0f
         };
 
         ShipCatalogSO activeCatalog = ActiveCatalog;
@@ -2213,11 +2470,15 @@ public partial class MetaGameState : MonoBehaviour
     {
         info.allowedTakeoffMassKg = Mathf.Min(info.engineLiftKg, Mathf.Min(info.claudiumMaxLiftKg, info.hullLimitKg));
         info.maxCargoKg = Mathf.Max(0f, info.allowedTakeoffMassKg - info.emptyMassKg);
+        info.fuelTankCapacityKg = ShipConsumableTankMath.CalculateFuelTankCapacityKg(info.maxCargoKg);
+        info.claudiumTankCapacityKg = ShipConsumableTankMath.CalculateClaudiumTankCapacityKg(info.maxCargoKg);
 
         if (!info.assemblyValid)
         {
             return info;
         }
+
+        ClampPlayerConsumableTanks(ref info);
 
         if (info.engineLiftKg <= 0f)
         {
@@ -2243,9 +2504,10 @@ public partial class MetaGameState : MonoBehaviour
             return info;
         }
 
-        if (info.currentCargoKg > info.maxCargoKg + 0.001f)
+        float currentPayloadKg = info.currentCargoKg + info.currentTankKg;
+        if (currentPayloadKg > info.maxCargoKg + 0.001f)
         {
-            info.reason = $"груз {info.currentCargoKg:F0} кг больше доступной грузоподъемности {info.maxCargoKg:F0} кг.";
+            info.reason = $"полезная нагрузка {currentPayloadKg:F0} кг больше доступной грузоподъемности {info.maxCargoKg:F0} кг.";
             return info;
         }
 
@@ -2260,35 +2522,49 @@ public partial class MetaGameState : MonoBehaviour
         return info;
     }
 
+    private void ClampPlayerConsumableTanks(ref CargoCapacityInfo info)
+    {
+        if (progress == null) return;
+
+        progress.shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
+        progress.shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
+        progress.shipEngineFuelTank.amountKg = Mathf.Min(progress.shipEngineFuelTank.amountKg, info.fuelTankCapacityKg);
+        progress.shipClaudiumTank.amountKg = Mathf.Min(progress.shipClaudiumTank.amountKg, info.claudiumTankCapacityKg);
+        info.currentTankKg = progress.GetShipConsumableTankMassKg();
+    }
+
     private void ApplyCargoMassToShip(ShipPhysics ship)
     {
         if (ship == null || progress == null) return;
 
-        ship.cargoMassKg = Mathf.Max(0f, progress.GetShipCargoMassKg(worldConfig));
-        RefreshShipConsumablesFromCargo(ship, true);
+        ApplyFuelConfigToShip(ship);
+        SyncTankResourceFromRuntime(progress.shipEngineFuelTank, ship.engineFuelId, ref syncedFuelResourceId, ref ship.engineFuelStockKg);
+        string claudiumResourceId = GetClaudiumResourceId(ship);
+        SyncTankResourceFromRuntime(progress.shipClaudiumTank, claudiumResourceId, ref syncedClaudiumResourceId, ref ship.claudiumStock);
+        ship.cargoMassKg = Mathf.Max(0f, progress.GetShipPayloadMassKg(worldConfig));
         ship.RefreshRuntimeShipSettings();
     }
 
-    private void RefreshShipConsumablesFromCargo(ShipPhysics ship, bool resetPendingConsumption)
+    private void RefreshShipConsumablesFromTanks(ShipPhysics ship, bool resetRuntimeStock)
     {
         if (ship == null || progress == null) return;
 
         ApplyFuelConfigToShip(ship);
-        if (resetPendingConsumption || syncedFuelResourceId != ship.engineFuelId)
+        string claudiumResourceId = GetClaudiumResourceId(ship);
+        progress.shipEngineFuelTank.SetResource(ship.engineFuelId);
+        progress.shipClaudiumTank.SetResource(claudiumResourceId);
+
+        if (resetRuntimeStock || syncedFuelResourceId != ship.engineFuelId)
         {
             syncedFuelResourceId = ship.engineFuelId;
-            pendingFuelConsumedKg = 0f;
+            ship.engineFuelStockKg = progress.shipEngineFuelTank.GetAmount(ship.engineFuelId);
         }
 
-        string claudiumResourceId = GetClaudiumResourceId(ship);
-        if (resetPendingConsumption || syncedClaudiumResourceId != claudiumResourceId)
+        if (resetRuntimeStock || syncedClaudiumResourceId != claudiumResourceId)
         {
             syncedClaudiumResourceId = claudiumResourceId;
-            pendingClaudiumConsumedKg = 0f;
+            ship.claudiumStock = progress.shipClaudiumTank.GetAmount(claudiumResourceId);
         }
-
-        ship.engineFuelStockKg = GetAvailableCargoResourceKg(ship.engineFuelId, pendingFuelConsumedKg);
-        ship.claudiumStock = GetAvailableCargoResourceKg(claudiumResourceId, pendingClaudiumConsumedKg);
     }
 
     private void SyncShipConsumablesWithCargo(bool resetPendingConsumption)
@@ -2298,27 +2574,26 @@ public partial class MetaGameState : MonoBehaviour
 
         if (resetPendingConsumption)
         {
-            RefreshShipConsumablesFromCargo(ship, true);
-            ship.cargoMassKg = Mathf.Max(0f, progress.GetShipCargoMassKg(worldConfig));
+            RefreshShipConsumablesFromTanks(ship, true);
+            ship.cargoMassKg = Mathf.Max(0f, progress.GetShipPayloadMassKg(worldConfig));
             ship.RefreshRuntimeShipSettings();
             return;
         }
 
         ApplyFuelConfigToShip(ship);
-        SyncCargoResourceFromRuntime(ship.engineFuelId, ref syncedFuelResourceId, ref pendingFuelConsumedKg, ref ship.engineFuelStockKg);
+        SyncTankResourceFromRuntime(progress.shipEngineFuelTank, ship.engineFuelId, ref syncedFuelResourceId, ref ship.engineFuelStockKg);
         string claudiumResourceId = GetClaudiumResourceId(ship);
-        SyncCargoResourceFromRuntime(claudiumResourceId, ref syncedClaudiumResourceId, ref pendingClaudiumConsumedKg, ref ship.claudiumStock);
+        SyncTankResourceFromRuntime(progress.shipClaudiumTank, claudiumResourceId, ref syncedClaudiumResourceId, ref ship.claudiumStock);
 
-        ship.cargoMassKg = Mathf.Max(0f, progress.GetShipCargoMassKg(worldConfig));
+        ship.cargoMassKg = Mathf.Max(0f, progress.GetShipPayloadMassKg(worldConfig));
         ship.RefreshRuntimeShipSettings();
     }
 
-    private void SyncCargoResourceFromRuntime(string resourceId, ref string syncedResourceId, ref float pendingConsumedKg, ref float runtimeStockKg)
+    private void SyncTankResourceFromRuntime(ShipConsumableTankState tank, string resourceId, ref string syncedResourceId, ref float runtimeStockKg)
     {
-        if (string.IsNullOrWhiteSpace(resourceId) || progress == null)
+        if (tank == null || string.IsNullOrWhiteSpace(resourceId) || progress == null)
         {
             syncedResourceId = resourceId ?? "";
-            pendingConsumedKg = 0f;
             runtimeStockKg = 0f;
             return;
         }
@@ -2326,32 +2601,19 @@ public partial class MetaGameState : MonoBehaviour
         if (syncedResourceId != resourceId)
         {
             syncedResourceId = resourceId;
-            pendingConsumedKg = 0f;
-            runtimeStockKg = progress.GetShipCargoAmount(resourceId);
+            tank.SetResource(resourceId);
+            runtimeStockKg = tank.GetAmount(resourceId);
             return;
         }
 
-        int cargoAmount = progress.GetShipCargoAmount(resourceId);
-        pendingConsumedKg = Mathf.Clamp(pendingConsumedKg, 0f, Mathf.Max(0, cargoAmount));
-        float expectedRuntimeStock = GetAvailableCargoResourceKg(resourceId, pendingConsumedKg);
-        float consumedSinceLastSync = Mathf.Max(0f, expectedRuntimeStock - Mathf.Max(0f, runtimeStockKg));
-        pendingConsumedKg += consumedSinceLastSync;
-
-        int wholeKgToSpend = Mathf.Min(cargoAmount, Mathf.FloorToInt(pendingConsumedKg + 0.0001f));
-        if (wholeKgToSpend > 0 && progress.TrySpendShipCargo(resourceId, wholeKgToSpend))
+        float storedKg = tank.GetAmount(resourceId);
+        float consumedKg = Mathf.Max(0f, storedKg - Mathf.Max(0f, runtimeStockKg));
+        if (consumedKg > 0f)
         {
-            pendingConsumedKg -= wholeKgToSpend;
-            cargoAmount = progress.GetShipCargoAmount(resourceId);
+            tank.TrySpend(resourceId, consumedKg);
         }
 
-        pendingConsumedKg = Mathf.Clamp(pendingConsumedKg, 0f, Mathf.Max(0, cargoAmount));
-        runtimeStockKg = GetAvailableCargoResourceKg(resourceId, pendingConsumedKg);
-    }
-
-    private float GetAvailableCargoResourceKg(string resourceId, float pendingConsumedKg)
-    {
-        if (progress == null || string.IsNullOrWhiteSpace(resourceId)) return 0f;
-        return Mathf.Max(0f, progress.GetShipCargoAmount(resourceId) - Mathf.Max(0f, pendingConsumedKg));
+        runtimeStockKg = tank.GetAmount(resourceId);
     }
 
     private static string GetClaudiumResourceId(ShipPhysics ship)
@@ -2424,14 +2686,15 @@ public partial class MetaGameState : MonoBehaviour
     {
         if (progress == null) return;
 
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
         if (startingFuelKg > 0)
         {
-            progress.AddShipCargo(GetStartingEngineFuelId(), startingFuelKg);
+            progress.shipEngineFuelTank.Add(GetStartingEngineFuelId(), startingFuelKg, Mathf.Max(startingFuelKg, capacity.fuelTankCapacityKg));
         }
 
         if (startingClaudiumKg > 0)
         {
-            progress.AddShipCargo("claudium", startingClaudiumKg);
+            progress.shipClaudiumTank.Add("claudium", startingClaudiumKg, Mathf.Max(startingClaudiumKg, capacity.claudiumTankCapacityKg));
         }
     }
 
@@ -2692,6 +2955,7 @@ public partial class MetaGameState : MonoBehaviour
         GUILayout.Label("Зерно магазина: " + progress.shopSeed + "  обновление через " + FormatRemaining(progress.nextShopRefreshUtcTicks));
         DrawTimeScaleUi();
         DrawSurveyDebugUi();
+        DrawFlagshipExpeditionUi();
 
         if (!string.IsNullOrWhiteSpace(lastSaveMessage))
         {
@@ -2711,6 +2975,23 @@ public partial class MetaGameState : MonoBehaviour
 
         GUILayout.EndScrollView();
         GUILayout.EndArea();
+    }
+
+    private void DrawFlagshipExpeditionUi()
+    {
+        FlagshipInteriorState interior = FlagshipInteriorSimulator.EnsurePlayerFlagshipInterior(worldConfig, progress);
+        if (interior == null) return;
+
+        FlagshipNeedState morale = interior.GetNeedState(FlagshipNeedIds.Morale, false);
+        string moraleText = morale != null
+            ? morale.currentValue.ToString("0") + "/" + morale.maxValue.ToString("0")
+            : "-";
+        string routeText = interior.expeditionActive ? "экспедиция" : "дома";
+        GUILayout.Label("Флагман: " + routeText + "  Мораль: " + moraleText);
+        if (progress.activeExpedition != null && progress.activeExpedition.active)
+        {
+            GUILayout.Label("Экспедиция: " + GetExpeditionDisplayName(progress.activeExpedition) + " / " + progress.activeExpedition.regionId);
+        }
     }
 
     private void DrawSurveyDebugUi()
@@ -2789,6 +3070,9 @@ public partial class MetaGameState : MonoBehaviour
             BeginFreeFlight();
         }
 
+        GUILayout.Space(6f);
+        DrawExpeditionDebugControls();
+
         GUILayout.Space(8f);
         GUILayout.Label("Работы в реальном времени");
 
@@ -2820,6 +3104,39 @@ public partial class MetaGameState : MonoBehaviour
         DrawIslandProductionList();
     }
 
+    private void DrawExpeditionDebugControls()
+    {
+        IReadOnlyList<FlagshipExpeditionDefinition> expeditions = GetFlagshipExpeditionConfigs();
+        if (expeditions == null || expeditions.Count == 0)
+        {
+            GUILayout.Label("Экспедиции не загружены из Expedition.csv.");
+            return;
+        }
+
+        GUILayout.Label("Экспедиции");
+        for (int i = 0; i < expeditions.Count; i++)
+        {
+            FlagshipExpeditionDefinition expedition = expeditions[i];
+            if (expedition == null) continue;
+
+            bool canBegin = CanBeginFlagshipExpedition(expedition, out string reason);
+            string label = GetExpeditionDisplayName(expedition) +
+                "  R" + expedition.minimumFlagshipRank + "+  x" + expedition.moraleDrainMultiplier.ToString("0.##");
+
+            GUI.enabled = canBegin;
+            if (GUILayout.Button(new GUIContent(label, string.IsNullOrWhiteSpace(expedition.summaryRu) ? "Стартует экспедицию флагмана." : expedition.summaryRu)))
+            {
+                BeginFlagshipExpedition(expedition.expeditionId);
+            }
+            GUI.enabled = true;
+
+            if (!canBegin && i == 0)
+            {
+                GUILayout.Label(reason);
+            }
+        }
+    }
+
     private void DrawFlightDebugUi()
     {
         GUILayout.Label("Вылет");
@@ -2829,9 +3146,9 @@ public partial class MetaGameState : MonoBehaviour
         if (ship != null)
         {
             DrawRouteEtaFlightInfo(ship);
-            GUILayout.Label($"Топливо на борту: {progress.GetShipCargoAmount(ship.engineFuelId)} кг ({ship.engineFuelStockKg:F1} доступно)");
+            GUILayout.Label($"Топливный бак: {progress.shipEngineFuelTank.GetAmount(ship.engineFuelId):F1} кг ({ship.engineFuelStockKg:F1} доступно)");
             string claudiumResourceId = GetClaudiumResourceId(ship);
-            GUILayout.Label($"Клавдий на борту: {progress.GetShipCargoAmount(claudiumResourceId)} кг ({ship.claudiumStock:F1} доступно)");
+            GUILayout.Label($"Клавдиевый бак: {progress.shipClaudiumTank.GetAmount(claudiumResourceId):F1} кг ({ship.claudiumStock:F1} доступно)");
 
             bool requestedPositionHold = GUILayout.Toggle(
                 ship.positionHold,
@@ -2852,6 +3169,15 @@ public partial class MetaGameState : MonoBehaviour
                 {
                     ship.targetHoldPosition = ship.transform.position;
                 }
+            }
+        }
+
+        if (progress.activeExpedition != null && progress.activeExpedition.active)
+        {
+            GUILayout.Label("Активная экспедиция: " + GetExpeditionDisplayName(progress.activeExpedition));
+            if (GUILayout.Button(new GUIContent("Вернуться из экспедиции", "Завершает экспедицию, возвращает флагман в столицу и восстанавливает мораль.")))
+            {
+                ReturnFromFlagshipExpedition();
             }
         }
 
@@ -2938,7 +3264,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureWorldConfigLoaded();
         CargoCapacityInfo capacity = CalculateCargoCapacity();
         GUILayout.Label($"Взлетная масса: {capacity.allowedTakeoffMassKg:F0} кг  Сухая: {capacity.emptyMassKg:F0} кг");
-        GUILayout.Label($"Груз: {capacity.currentCargoKg:F0}/{capacity.maxCargoKg:F0} кг");
+        GUILayout.Label($"Полезная масса: {(capacity.currentCargoKg + capacity.currentTankKg):F0}/{capacity.maxCargoKg:F0} кг  Груз: {capacity.currentCargoKg:F0} кг  Баки: {capacity.currentTankKg:F0} кг");
         GUILayout.Label($"Ограничения: двигатель+контур {capacity.engineLiftKg:F0} кг, контур {capacity.claudiumMaxLiftKg:F0} кг, корпус {capacity.hullLimitKg:F0} кг");
 
         if (!capacity.canFly)
@@ -2973,15 +3299,16 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         IslandProductionState storage = progress.GetIslandProductionState(island.id, true);
+        DrawShipTankRefuelUi(storage, capacity);
         EnsureCargoPlan(island.id);
 
         Dictionary<string, int> plannedCargo = GetPlannedCargoMap();
         float plannedCargoMass = CargoStoragePlanner.GetCargoMassKg(worldConfig, plannedCargo);
         int operationCount = GetCargoPlanOperationCount();
-        bool overload = plannedCargoMass > capacity.maxCargoKg + 0.001f;
+        bool overload = plannedCargoMass + capacity.currentTankKg > capacity.maxCargoKg + 0.001f;
         bool storageOk = CargoStoragePlanner.TryValidateCargoStorage(worldConfig, capacity.cargoCompartments, plannedCargo, out string storageError);
 
-        GUILayout.Label($"План: {plannedCargoMass}/{capacity.maxCargoKg:F0} кг, операций: {operationCount}, время: {operationCount * island.timeForOneItemLoadSeconds:F1} сек");
+        GUILayout.Label($"План: груз {plannedCargoMass:F0} кг, полезная масса {(plannedCargoMass + capacity.currentTankKg):F0}/{capacity.maxCargoKg:F0} кг, операций: {operationCount}, время: {operationCount * island.timeForOneItemLoadSeconds:F1} сек");
         if (overload)
         {
             GUILayout.Label("План перегружает корабль.");
@@ -3004,6 +3331,56 @@ public partial class MetaGameState : MonoBehaviour
             StartCargoTransfer(island, storage);
         }
         GUI.enabled = true;
+    }
+
+    private void DrawShipTankRefuelUi(IslandProductionState storage, CargoCapacityInfo capacity)
+    {
+        ShipPhysics ship = GetActiveShip();
+        if (ship == null || storage == null || progress == null) return;
+
+        string fuelId = string.IsNullOrWhiteSpace(ship.engineFuelId) ? GetStartingEngineFuelId() : ship.engineFuelId;
+        string claudiumId = GetClaudiumResourceId(ship);
+        GUILayout.Space(4f);
+        GUILayout.Label($"Баки: {worldConfig.GetItemNameRu(fuelId)} {progress.shipEngineFuelTank.GetAmount(fuelId):F1}/{capacity.fuelTankCapacityKg:F0} кг, {worldConfig.GetItemNameRu(claudiumId)} {progress.shipClaudiumTank.GetAmount(claudiumId):F1}/{capacity.claudiumTankCapacityKg:F0} кг");
+
+        GUILayout.BeginHorizontal();
+        GUI.enabled = storage.GetResourceAmount(fuelId) > 0 && progress.shipEngineFuelTank.GetAmount(fuelId) < capacity.fuelTankCapacityKg - 0.001f;
+        if (GUILayout.Button(new GUIContent("Заправить топливо", "Пополняет внутренний топливный бак со склада острова. Груз в трюме не тратится автоматически.")))
+        {
+            int moved = RefillTankFromStorage(progress.shipEngineFuelTank, fuelId, capacity.fuelTankCapacityKg, storage);
+            if (moved > 0)
+            {
+                ApplyCargoMassToShip(GetActiveShip());
+                AutoSaveIfDocked();
+            }
+        }
+
+        GUI.enabled = storage.GetResourceAmount(claudiumId) > 0 && progress.shipClaudiumTank.GetAmount(claudiumId) < capacity.claudiumTankCapacityKg - 0.001f;
+        if (GUILayout.Button(new GUIContent("Заправить клавдий", "Пополняет внутренний клавдиевый бак со склада острова.")))
+        {
+            int moved = RefillTankFromStorage(progress.shipClaudiumTank, claudiumId, capacity.claudiumTankCapacityKg, storage);
+            if (moved > 0)
+            {
+                ApplyCargoMassToShip(GetActiveShip());
+                AutoSaveIfDocked();
+            }
+        }
+        GUI.enabled = true;
+        GUILayout.EndHorizontal();
+    }
+
+    private static int RefillTankFromStorage(ShipConsumableTankState tank, string resourceId, float capacityKg, IslandProductionState storage)
+    {
+        if (tank == null || storage == null || string.IsNullOrWhiteSpace(resourceId) || capacityKg <= 0f) return 0;
+
+        float current = tank.GetAmount(resourceId);
+        int needed = Mathf.FloorToInt(Mathf.Max(0f, capacityKg - current) + 0.0001f);
+        if (needed <= 0) return 0;
+
+        int moved = Mathf.Min(needed, storage.GetResourceAmount(resourceId));
+        if (moved <= 0 || !storage.TrySpendResource(resourceId, moved)) return 0;
+
+        return Mathf.RoundToInt(tank.Add(resourceId, moved, capacityKg));
     }
 
     private void DrawCargoPlanRow(ItemConfig item, IslandProductionState storage)
@@ -3096,14 +3473,10 @@ public partial class MetaGameState : MonoBehaviour
         {
             case CargoStorageKind.Cabin:
                 return "мест";
-            case CargoStorageKind.BulkHold:
-            case CargoStorageKind.LiquidTank:
-            case CargoStorageKind.GasCylinder:
-                return "л";
             case CargoStorageKind.ShipDock:
                 return "шт.";
             default:
-                return "ед.";
+                return "шт.";
         }
     }
 
@@ -3258,7 +3631,7 @@ public partial class MetaGameState : MonoBehaviour
         if (island == null || storage == null || progress == null) return;
 
         CargoCapacityInfo capacity = CalculateCargoCapacity();
-        if (GetPlannedCargoMassKg() > capacity.maxCargoKg + 0.001f)
+        if (GetPlannedCargoMassKg() + capacity.currentTankKg > capacity.maxCargoKg + 0.001f)
         {
             lastSaveMessage = "Нельзя начать погрузку: план перегружает корабль.";
             return;

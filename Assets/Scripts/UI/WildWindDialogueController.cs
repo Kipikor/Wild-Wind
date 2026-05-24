@@ -11,6 +11,7 @@ using UnityEngine.InputSystem.UI;
 
 public sealed class WildWindDialogueController : MonoBehaviour
 {
+    private static readonly bool IntroDialoguesEnabled = false;
     private const string DialogueHomeId = "dialogue_intro_home";
     private const string DialogueAeroliteId = "dialogue_intro_aerolite";
     private const string DialogueCapitalId = "dialogue_intro_capital";
@@ -76,6 +77,12 @@ public sealed class WildWindDialogueController : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void InstallDialogueBootstrap()
     {
+        if (!IntroDialoguesEnabled)
+        {
+            SceneManager.sceneLoaded -= HandleSceneLoaded;
+            return;
+        }
+
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         SceneManager.sceneLoaded += HandleSceneLoaded;
         EnsureDialogueForGameplayScene();
@@ -83,11 +90,21 @@ public sealed class WildWindDialogueController : MonoBehaviour
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        if (!IntroDialoguesEnabled)
+        {
+            return;
+        }
+
         EnsureDialogueForGameplayScene();
     }
 
     private static void EnsureDialogueForGameplayScene()
     {
+        if (!IntroDialoguesEnabled)
+        {
+            return;
+        }
+
         if (Object.FindFirstObjectByType<WorldRegionRuntime>() == null)
         {
             return;

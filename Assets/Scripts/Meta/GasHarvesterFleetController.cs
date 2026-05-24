@@ -166,7 +166,7 @@ public class GasHarvesterFleetController : MonoBehaviour
         if (state == null) return 0;
 
         GasHarvesterShipMetrics metrics;
-        if (!TryBuildMetrics(definition, progress, catalog, techTree, config, state.GetCargoMassKg(), out metrics, out string metricsError))
+        if (!TryBuildMetrics(definition, progress, catalog, techTree, config, state.GetPayloadMassKg(), out metrics, out string metricsError))
         {
             SetError(state, metricsError);
             return 0;
@@ -309,7 +309,7 @@ public class GasHarvesterFleetController : MonoBehaviour
             return false;
         }
 
-        float freeCargoKg = metrics.maxCargoKg - state.GetCargoMassKg();
+        float freeCargoKg = metrics.maxCargoKg - state.GetPayloadMassKg();
         if (freeCargoKg < 1f)
         {
             error = "No free cargo space for concentrate.";
@@ -331,9 +331,9 @@ public class GasHarvesterFleetController : MonoBehaviour
             return false;
         }
 
-        GasHarvesterLegEstimate outbound = EstimateLeg(metrics, home.position, targetCloud.position, state.GetCargoMassKg());
-        GasHarvesterLegEstimate ret = EstimateLeg(metrics, targetCloud.position, home.position, state.GetCargoMassKg() + plannedHarvestKg);
-        if (!TryEstimateHarvestWorkBudget(metrics, targetCloudType, plannedHarvestKg, state.GetCargoMassKg(), out GasHarvesterWorkEstimate work, out string workError))
+        GasHarvesterLegEstimate outbound = EstimateLeg(metrics, home.position, targetCloud.position, state.GetPayloadMassKg());
+        GasHarvesterLegEstimate ret = EstimateLeg(metrics, targetCloud.position, home.position, state.GetPayloadMassKg() + plannedHarvestKg);
+        if (!TryEstimateHarvestWorkBudget(metrics, targetCloudType, plannedHarvestKg, state.GetPayloadMassKg(), out GasHarvesterWorkEstimate work, out string workError))
         {
             error = workError;
             return false;
@@ -355,32 +355,32 @@ public class GasHarvesterFleetController : MonoBehaviour
         int requiredFuelKg = outbound.requiredFuelKg + ret.requiredFuelKg + work.requiredFuelKg;
         int requiredClaudiumKg = outbound.requiredClaudiumKg + ret.requiredClaudiumKg + work.requiredClaudiumKg;
 
-        if (!TryTopUpForLeg(state, storage, metrics.engineFuelId, requiredFuelKg))
+        if (!TryTopUpTankForLeg(state.engineFuelTank, storage, metrics.engineFuelId, requiredFuelKg, metrics.fuelTankCapacityKg))
         {
             error = $"Not enough fuel {metrics.engineFuelId}: need {requiredFuelKg} kg.";
             return false;
         }
 
         string claudiumResourceId = ResolveClaudiumResourceId(definition);
-        if (!TryTopUpForLeg(state, storage, claudiumResourceId, requiredClaudiumKg))
+        if (!TryTopUpTankForLeg(state.claudiumTank, storage, claudiumResourceId, requiredClaudiumKg, metrics.claudiumTankCapacityKg))
         {
             error = $"Not enough claudium: need {requiredClaudiumKg} kg.";
             return false;
         }
 
-        if (state.GetCargoMassKg() > metrics.maxCargoKg + 0.001f)
+        if (state.GetPayloadMassKg() > metrics.maxCargoKg + 0.001f)
         {
-            error = $"Cargo after reserve loading is {state.GetCargoMassKg():F0}/{metrics.maxCargoKg:F0} kg.";
+            error = $"Payload after tank refill is {state.GetPayloadMassKg():F0}/{metrics.maxCargoKg:F0} kg.";
             return false;
         }
 
-        if (!state.TrySpendCargo(metrics.engineFuelId, outbound.requiredFuelKg))
+        if (!state.engineFuelTank.TrySpend(metrics.engineFuelId, outbound.requiredFuelKg))
         {
             error = "Could not spend outbound fuel.";
             return false;
         }
 
-        if (!state.TrySpendCargo(claudiumResourceId, outbound.requiredClaudiumKg))
+        if (!state.claudiumTank.TrySpend(claudiumResourceId, outbound.requiredClaudiumKg))
         {
             error = "Could not spend outbound claudium.";
             return false;
@@ -448,14 +448,14 @@ public class GasHarvesterFleetController : MonoBehaviour
         float cycleSeconds = Mathf.Max(0.1f, metrics.harvesterCycleSeconds);
         float sampledM3 = metrics.harvesterVolumeM3PerSecond * cycleSeconds;
         float possibleLiters = sampledM3 * Mathf.Max(0.0001f, cloudType.condensateLitersPerCubicMeter);
-        int freeWholeKg = Mathf.FloorToInt(metrics.maxCargoKg - state.GetCargoMassKg() + 0.0001f);
+        int freeWholeKg = Mathf.FloorToInt(metrics.maxCargoKg - state.GetPayloadMassKg() + 0.0001f);
         int possibleWholeKg = Mathf.FloorToInt(state.harvestBufferKg + possibleLiters + 0.0001f);
         if (freeWholeKg <= 0 || possibleWholeKg > freeWholeKg)
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, "Cargo full.");
         }
 
-        if (!TryEstimateHarvestCycle(metrics, state.GetCargoMassKg(), cycleSeconds, out float fuelKg, out float claudiumKg, out string powerError))
+        if (!TryEstimateHarvestCycle(metrics, state.GetPayloadMassKg(), cycleSeconds, out float fuelKg, out float claudiumKg, out string powerError))
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, powerError);
         }
@@ -467,22 +467,22 @@ public class GasHarvesterFleetController : MonoBehaviour
             return false;
         }
 
-        GasHarvesterLegEstimate ret = EstimateLeg(metrics, cloud.position, home.position, state.GetCargoMassKg() + possibleWholeKg);
+        GasHarvesterLegEstimate ret = EstimateLeg(metrics, cloud.position, home.position, state.GetPayloadMassKg() + possibleWholeKg);
         if (!ret.canFly)
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, ret.reason);
         }
 
         string claudiumResourceId = ResolveClaudiumResourceId(definition);
-        float fuelAfterCycle = state.GetCargoAmount(metrics.engineFuelId) - state.pendingFuelConsumptionKg - fuelKg;
-        float claudiumAfterCycle = state.GetCargoAmount(claudiumResourceId) - state.pendingClaudiumConsumptionKg - claudiumKg;
+        float fuelAfterCycle = state.engineFuelTank.GetAmount(metrics.engineFuelId) - fuelKg;
+        float claudiumAfterCycle = state.claudiumTank.GetAmount(claudiumResourceId) - claudiumKg;
         if (fuelAfterCycle + 0.001f < ret.requiredFuelKg || claudiumAfterCycle + 0.001f < ret.requiredClaudiumKg)
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, "Return reserve reached.");
         }
 
-        AccumulateConsumableSpend(state, metrics.engineFuelId, fuelKg, ref state.pendingFuelConsumptionKg);
-        AccumulateConsumableSpend(state, claudiumResourceId, claudiumKg, ref state.pendingClaudiumConsumptionKg);
+        SpendTankFuel(state.engineFuelTank, metrics.engineFuelId, fuelKg);
+        SpendTankFuel(state.claudiumTank, claudiumResourceId, claudiumKg);
 
         float harvestedLiters = HarvestCloudLiters(progress, config, cloud.id, sampledM3);
         if (harvestedLiters <= 0.001f)
@@ -507,7 +507,7 @@ public class GasHarvesterFleetController : MonoBehaviour
             LogEvent(state, $"cycle at {cloud.id}: +{wholeKg}kg, buffer={state.harvestBufferKg:F2}, left={newRemainingLiters:F1}, cargo={FormatCargo(state.cargo)}");
         }
 
-        if (newRemainingLiters <= 0.001f || state.GetCargoMassKg() >= metrics.maxCargoKg - 0.001f || GetHarvestPayloadKg(state, metrics, definition) >= Mathf.Max(1f, definition.targetCargoKg))
+        if (newRemainingLiters <= 0.001f || state.GetPayloadMassKg() >= metrics.maxCargoKg - 0.001f || GetHarvestPayloadKg(state, metrics, definition) >= Mathf.Max(1f, definition.targetCargoKg))
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, "Harvest run finished.");
         }
@@ -533,7 +533,7 @@ public class GasHarvesterFleetController : MonoBehaviour
             return false;
         }
 
-        GasHarvesterLegEstimate ret = EstimateLeg(metrics, cloud.position, home.position, state.GetCargoMassKg());
+        GasHarvesterLegEstimate ret = EstimateLeg(metrics, cloud.position, home.position, state.GetPayloadMassKg());
         if (!ret.canFly)
         {
             SetError(state, ret.reason);
@@ -541,13 +541,13 @@ public class GasHarvesterFleetController : MonoBehaviour
         }
 
         string claudiumResourceId = ResolveClaudiumResourceId(definition);
-        if (!state.TrySpendCargo(metrics.engineFuelId, ret.requiredFuelKg))
+        if (!state.engineFuelTank.TrySpend(metrics.engineFuelId, ret.requiredFuelKg))
         {
             SetError(state, "Not enough reserved fuel to return.");
             return false;
         }
 
-        if (!state.TrySpendCargo(claudiumResourceId, ret.requiredClaudiumKg))
+        if (!state.claudiumTank.TrySpend(claudiumResourceId, ret.requiredClaudiumKg))
         {
             SetError(state, "Not enough reserved claudium to return.");
             return false;
@@ -695,6 +695,8 @@ public class GasHarvesterFleetController : MonoBehaviour
         metrics.engineLiftKg = metrics.enginePowerKw * metrics.claudiumLiftEfficiency;
         metrics.allowedTakeoffMassKg = Mathf.Min(metrics.engineLiftKg, Mathf.Min(metrics.claudiumMaxLiftKg, metrics.hullLimitKg));
         metrics.maxCargoKg = Mathf.Max(0f, metrics.allowedTakeoffMassKg - metrics.emptyMassKg);
+        metrics.fuelTankCapacityKg = ShipConsumableTankMath.CalculateFuelTankCapacityKg(metrics.maxCargoKg);
+        metrics.claudiumTankCapacityKg = ShipConsumableTankMath.CalculateClaudiumTankCapacityKg(metrics.maxCargoKg);
         metrics.cruiseSpeedMS = Mathf.Max(0f, metrics.propellerMaxSpeedMS * Mathf.Clamp(cruiseSpeedFactor, 0.1f, 1f));
         metrics.cruisePowerKw = Mathf.Max(0f, metrics.enginePowerKw * Mathf.Clamp(cruisePowerLever, 0.05f, 1.2f));
 
@@ -1000,6 +1002,28 @@ public class GasHarvesterFleetController : MonoBehaviour
         return state.GetCargoAmount(resourceId) >= requiredAmount;
     }
 
+    private static bool TryTopUpTankForLeg(ShipConsumableTankState tank, IslandProductionState storage, string resourceId, int requiredAmount, float capacityKg)
+    {
+        if (requiredAmount <= 0) return true;
+        if (tank == null || storage == null || string.IsNullOrWhiteSpace(resourceId)) return false;
+        if (requiredAmount > capacityKg + 0.001f) return false;
+        if (tank.GetAmount(resourceId) >= requiredAmount) return true;
+
+        float target = Mathf.Min(requiredAmount, capacityKg);
+        int needed = Mathf.FloorToInt(Mathf.Max(0f, target - tank.GetAmount(resourceId)) + 0.0001f);
+        int moved = Mathf.Min(needed, storage.GetResourceAmount(resourceId));
+        if (moved <= 0 || !storage.TrySpendResource(resourceId, moved)) return false;
+
+        tank.Add(resourceId, moved, capacityKg);
+        return tank.GetAmount(resourceId) >= requiredAmount;
+    }
+
+    private static void SpendTankFuel(ShipConsumableTankState tank, string resourceId, float amountKg)
+    {
+        if (tank == null || amountKg <= 0f) return;
+        tank.TrySpend(resourceId, amountKg);
+    }
+
     private static int SetStorageAtLeast(IslandProductionState storage, string resourceId, int minAmount)
     {
         if (storage == null || string.IsNullOrWhiteSpace(resourceId) || minAmount <= 0) return 0;
@@ -1165,6 +1189,8 @@ public struct GasHarvesterShipMetrics
     public float engineLiftKg;
     public float allowedTakeoffMassKg;
     public float maxCargoKg;
+    public float fuelTankCapacityKg;
+    public float claudiumTankCapacityKg;
     public float cruiseSpeedMS;
     public float cruisePowerKw;
     public float harvesterVolumeM3PerSecond;

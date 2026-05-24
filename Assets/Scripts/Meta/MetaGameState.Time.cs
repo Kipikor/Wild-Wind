@@ -178,7 +178,15 @@ public partial class MetaGameState
         double cappedHours = Math.Min(elapsedHours, Math.Max(0.01f, maxOfflineCatchUpHours));
         if (cappedHours <= 0d) return false;
 
-        changedEvents = FastForwardSimulation(TimeSpan.FromHours(cappedHours));
+        suppressFlagshipMoraleDrain = true;
+        try
+        {
+            changedEvents = FastForwardSimulation(TimeSpan.FromHours(cappedHours));
+        }
+        finally
+        {
+            suppressFlagshipMoraleDrain = false;
+        }
         string capText = elapsedHours > cappedHours + 0.001d ? $" (ограничено с {elapsedHours:0.#} ч)" : "";
         lastSaveMessage = $"Offline-прогресс: прошло {cappedHours:0.#} ч{capText}, событий {changedEvents}.";
         return true;

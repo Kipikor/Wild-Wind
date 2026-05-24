@@ -46,7 +46,7 @@ public class CargoCompartmentDefinition
     public CargoStorageKind storageKind = CargoStorageKind.Van;
 
     [InspectorName("Вместимость")]
-    [Tooltip("Фургон и салон считают штуки/места, кузов/цистерна/баллон/холодильник считают литры, док считает слоты.")]
+    [Tooltip("Обычные грузовые отсеки считают килограммы грузоподъемности, салон считает места, док считает слоты.")]
     public float capacity = 0f;
 
     [InspectorName("Разрешенные грузы")]
@@ -103,5 +103,20 @@ public class CargoCompartmentDefinition
         }
 
         return clone;
+    }
+}
+
+public static class ShipConsumableTankMath
+{
+    public static float CalculateFuelTankCapacityKg(float usefulPayloadKg)
+    {
+        if (usefulPayloadKg <= 0f) return 0f;
+        return Mathf.Clamp(usefulPayloadKg * 0.12f, 50f, 2000f);
+    }
+
+    public static float CalculateClaudiumTankCapacityKg(float usefulPayloadKg)
+    {
+        if (usefulPayloadKg <= 0f) return 0f;
+        return Mathf.Clamp(usefulPayloadKg * 0.06f, 25f, 1000f);
     }
 }

@@ -24,6 +24,7 @@ public partial class WorldConfigDatabase
     private readonly Dictionary<string, IslandArchetypeStageConfig> islandArchetypeStagesById = new Dictionary<string, IslandArchetypeStageConfig>();
     private readonly Dictionary<string, IslandSocialNeedConfig> islandSocialNeedsById = new Dictionary<string, IslandSocialNeedConfig>();
     private readonly Dictionary<string, IslandBuildingConfig> islandBuildingsById = new Dictionary<string, IslandBuildingConfig>();
+    private readonly Dictionary<string, FlagshipExpeditionDefinition> flagshipExpeditionsById = new Dictionary<string, FlagshipExpeditionDefinition>();
 
     public List<ItemConfig> items = new List<ItemConfig>();
     public List<IslandConfig> islands = new List<IslandConfig>();
@@ -42,6 +43,7 @@ public partial class WorldConfigDatabase
     public List<IslandArchetypeStageConfig> islandArchetypeStages = new List<IslandArchetypeStageConfig>();
     public List<IslandSocialNeedConfig> islandSocialNeeds = new List<IslandSocialNeedConfig>();
     public List<IslandBuildingConfig> islandBuildings = new List<IslandBuildingConfig>();
+    public List<FlagshipExpeditionDefinition> flagshipExpeditions = new List<FlagshipExpeditionDefinition>();
 
     public bool isLoaded;
     public string lastError = "";
@@ -81,6 +83,7 @@ public partial class WorldConfigDatabase
             LoadIslandArchetypeStages(Path.Combine(folder, "Island_archetype_stage.csv"));
             LoadIslandSocialNeeds(Path.Combine(folder, "Island_social_need.csv"));
             LoadIslandBuildings(Path.Combine(folder, "Island_building.csv"));
+            LoadFlagshipExpeditions(Path.Combine(folder, "Expedition.csv"));
             isLoaded = true;
             lastError = "";
         }
@@ -118,6 +121,13 @@ public partial class WorldConfigDatabase
         if (string.IsNullOrWhiteSpace(technologyId)) return null;
         technologiesById.TryGetValue(technologyId, out TechnologyConfig technology);
         return technology;
+    }
+
+    public FlagshipExpeditionDefinition GetFlagshipExpedition(string expeditionId)
+    {
+        if (string.IsNullOrWhiteSpace(expeditionId)) return null;
+        flagshipExpeditionsById.TryGetValue(expeditionId, out FlagshipExpeditionDefinition expedition);
+        return expedition;
     }
 
     public GasCloudTypeConfig GetGasCloudType(string cloudTypeId)
@@ -240,7 +250,13 @@ public partial class WorldConfigDatabase
 
     public float GetItemStorageAmount(string itemId, int amount)
     {
-        return Mathf.Max(0, amount);
+        CargoStorageKind storageKind = GetItemStorageKind(itemId);
+        if (storageKind == CargoStorageKind.Cabin || storageKind == CargoStorageKind.ShipDock)
+        {
+            return Mathf.Max(0, amount);
+        }
+
+        return GetItemTransportMassKg(itemId, amount);
     }
 
     public float GetItemTransportMassKg(string itemId, int amount)
@@ -300,6 +316,7 @@ public partial class WorldConfigDatabase
         islandArchetypeStages.Clear();
         islandSocialNeeds.Clear();
         islandBuildings.Clear();
+        flagshipExpeditions.Clear();
         itemsById.Clear();
         islandsById.Clear();
         productionsById.Clear();
@@ -317,6 +334,7 @@ public partial class WorldConfigDatabase
         islandArchetypeStagesById.Clear();
         islandSocialNeedsById.Clear();
         islandBuildingsById.Clear();
+        flagshipExpeditionsById.Clear();
         isLoaded = false;
         lastError = "";
     }
@@ -326,14 +344,16 @@ public partial class WorldConfigDatabase
         foreach (Dictionary<string, string> row in ReadCsv(path))
         {
             string itemId = Get(row, "id_item");
+            CargoUnitKind parsedUnitKind = ParseCargoUnitKind(Get(row, "cargo_unit_kind"), itemId);
+            CargoStorageKind parsedStorageKind = ParseCargoStorageKind(Get(row, "cargo_storage_kind"), itemId);
             ItemConfig item = new ItemConfig
             {
                 id = itemId,
                 localNameRu = Get(row, "local_name_ru"),
                 localNameEn = Get(row, "local_name_en"),
                 energyKwhPerKg = Mathf.Max(0f, ParseFloat(Get(row, "energy_kwh_per_kg"))),
-                cargoUnitKind = ParseCargoUnitKind(Get(row, "cargo_unit_kind"), itemId),
-                cargoStorageKind = ParseCargoStorageKind(Get(row, "cargo_storage_kind"), itemId),
+                cargoUnitKind = NormalizeCargoUnitKind(itemId, parsedUnitKind, parsedStorageKind),
+                cargoStorageKind = NormalizeCargoStorageKind(itemId, parsedUnitKind, parsedStorageKind),
                 massKgPerUnit = Mathf.Max(0f, ParseFloat(Get(row, "mass_kg_per_unit"), IsPassengerCargoItemId(itemId) ? 100f : 1f)),
                 shipSizeClass = ParseShipSizeClass(Get(row, "ship_size_class")),
                 dockedTransportMassFactor = Mathf.Clamp(ParseFloat(Get(row, "docked_transport_mass_factor"), 0.1f), 0.01f, 1f)
@@ -693,6 +713,31 @@ public partial class WorldConfigDatabase
         }
     }
 
+    private void LoadFlagshipExpeditions(string path)
+    {
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            FlagshipExpeditionDefinition expedition = new FlagshipExpeditionDefinition
+            {
+                expeditionId = Get(row, "id_expedition"),
+                displayNameRu = Get(row, "local_name_ru"),
+                regionId = Get(row, "region_id"),
+                sceneName = Get(row, "scene_name"),
+                returnDockId = Get(row, "return_dock_id"),
+                returnDockKind = ParseDockingLocationKind(Get(row, "return_dock_kind"), DockingLocationKind.Island),
+                minimumFlagshipRank = Mathf.Max(0, ParseInt(Get(row, "minimum_flagship_rank"), FlagshipInteriorSimulator.MinimumFlagshipRank)),
+                moraleDrainMultiplier = Mathf.Max(0f, ParseFloat(Get(row, "morale_drain_multiplier"), 1f)),
+                summaryRu = Get(row, "summary_ru")
+            };
+
+            expedition.Normalize();
+            if (string.IsNullOrWhiteSpace(expedition.expeditionId)) continue;
+
+            flagshipExpeditions.Add(expedition);
+            flagshipExpeditionsById[expedition.expeditionId] = expedition;
+        }
+    }
+
     private static IEnumerable<Dictionary<string, string>> ReadCsv(string path)
     {
         if (!File.Exists(path))
@@ -820,6 +865,21 @@ public partial class WorldConfigDatabase
         return Enum.TryParse(value, true, out CargoUnitKind parsed) ? parsed : CargoUnitKind.Piece;
     }
 
+    private static CargoUnitKind NormalizeCargoUnitKind(string itemId, CargoUnitKind parsedUnitKind, CargoStorageKind parsedStorageKind)
+    {
+        if (IsPassengerCargoItemId(itemId) || parsedUnitKind == CargoUnitKind.Passenger || parsedStorageKind == CargoStorageKind.Cabin)
+        {
+            return CargoUnitKind.Passenger;
+        }
+
+        if (parsedUnitKind == CargoUnitKind.Ship || parsedStorageKind == CargoStorageKind.ShipDock)
+        {
+            return CargoUnitKind.Ship;
+        }
+
+        return CargoUnitKind.Piece;
+    }
+
     private static CargoStorageKind ParseCargoStorageKind(string value, string itemId)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -865,10 +925,31 @@ public partial class WorldConfigDatabase
         return Enum.TryParse(value, true, out CargoStorageKind parsed) ? parsed : CargoStorageKind.Van;
     }
 
+    private static CargoStorageKind NormalizeCargoStorageKind(string itemId, CargoUnitKind parsedUnitKind, CargoStorageKind parsedStorageKind)
+    {
+        if (IsPassengerCargoItemId(itemId) || parsedUnitKind == CargoUnitKind.Passenger || parsedStorageKind == CargoStorageKind.Cabin)
+        {
+            return CargoStorageKind.Cabin;
+        }
+
+        if (parsedUnitKind == CargoUnitKind.Ship || parsedStorageKind == CargoStorageKind.ShipDock)
+        {
+            return CargoStorageKind.ShipDock;
+        }
+
+        return CargoStorageKind.Van;
+    }
+
     private static ShipSizeClass ParseShipSizeClass(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return ShipSizeClass.None;
         return Enum.TryParse(value, true, out ShipSizeClass parsed) ? parsed : ShipSizeClass.None;
+    }
+
+    private static DockingLocationKind ParseDockingLocationKind(string value, DockingLocationKind fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return fallback;
+        return Enum.TryParse(value, true, out DockingLocationKind parsed) ? parsed : fallback;
     }
 
     private static bool ParseBool01(string value)

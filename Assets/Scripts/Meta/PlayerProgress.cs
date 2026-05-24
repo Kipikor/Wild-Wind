@@ -31,6 +31,102 @@ public enum TimedProcessKind
 }
 
 [Serializable]
+public class FlagshipExpeditionDefinition
+{
+    public string expeditionId = "";
+    public string displayNameRu = "";
+    public string regionId = "";
+    public string sceneName = "";
+    public string returnDockId = "capital";
+    public DockingLocationKind returnDockKind = DockingLocationKind.Island;
+    public int minimumFlagshipRank = FlagshipInteriorSimulator.MinimumFlagshipRank;
+    public float moraleDrainMultiplier = 1f;
+    public string summaryRu = "";
+
+    public void Normalize()
+    {
+        expeditionId ??= "";
+        displayNameRu ??= "";
+        regionId ??= "";
+        sceneName ??= "";
+        returnDockId = string.IsNullOrWhiteSpace(returnDockId) ? "capital" : returnDockId;
+        summaryRu ??= "";
+        minimumFlagshipRank = Mathf.Max(0, minimumFlagshipRank);
+        moraleDrainMultiplier = Mathf.Max(0f, moraleDrainMultiplier);
+    }
+}
+
+[Serializable]
+public class FlagshipExpeditionState
+{
+    public bool active;
+    public string expeditionId = "";
+    public string displayNameRu = "";
+    public string regionId = "";
+    public string sceneName = "";
+    public string returnDockId = "capital";
+    public DockingLocationKind returnDockKind = DockingLocationKind.Island;
+    public int minimumFlagshipRank = FlagshipInteriorSimulator.MinimumFlagshipRank;
+    public float moraleDrainMultiplier = 1f;
+    public string summaryRu = "";
+    public long startedUtcTicks;
+
+    public void Normalize()
+    {
+        expeditionId ??= "";
+        displayNameRu ??= "";
+        regionId ??= "";
+        sceneName ??= "";
+        returnDockId = string.IsNullOrWhiteSpace(returnDockId) ? "capital" : returnDockId;
+        summaryRu ??= "";
+        minimumFlagshipRank = Mathf.Max(0, minimumFlagshipRank);
+        moraleDrainMultiplier = Mathf.Max(0f, moraleDrainMultiplier);
+        if (!active)
+        {
+            startedUtcTicks = 0L;
+        }
+    }
+
+    public void Begin(FlagshipExpeditionDefinition definition, long utcTicks)
+    {
+        if (definition == null)
+        {
+            Clear();
+            return;
+        }
+
+        definition.Normalize();
+        active = true;
+        expeditionId = definition.expeditionId;
+        displayNameRu = definition.displayNameRu;
+        regionId = definition.regionId;
+        sceneName = definition.sceneName;
+        returnDockId = definition.returnDockId;
+        returnDockKind = definition.returnDockKind;
+        minimumFlagshipRank = definition.minimumFlagshipRank;
+        moraleDrainMultiplier = definition.moraleDrainMultiplier;
+        summaryRu = definition.summaryRu;
+        startedUtcTicks = Math.Max(0L, utcTicks);
+        Normalize();
+    }
+
+    public void Clear()
+    {
+        active = false;
+        expeditionId = "";
+        displayNameRu = "";
+        regionId = "";
+        sceneName = "";
+        returnDockId = "capital";
+        returnDockKind = DockingLocationKind.Island;
+        minimumFlagshipRank = FlagshipInteriorSimulator.MinimumFlagshipRank;
+        moraleDrainMultiplier = 1f;
+        summaryRu = "";
+        startedUtcTicks = 0L;
+    }
+}
+
+[Serializable]
 public class PlayerProgress
 {
     public int money;
@@ -45,6 +141,8 @@ public class PlayerProgress
     public List<GasHarvesterShipState> gasHarvesterShips = new List<GasHarvesterShipState>();
     public List<MiningShipState> miningShips = new List<MiningShipState>();
     public List<ScoutShipState> scoutShips = new List<ScoutShipState>();
+    public List<FlagshipInteriorState> flagshipInteriors = new List<FlagshipInteriorState>();
+    public FlagshipExpeditionState activeExpedition = new FlagshipExpeditionState();
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
     public DockingLocationKind currentDockKind = DockingLocationKind.Island;
@@ -62,6 +160,8 @@ public class PlayerProgress
     public bool receivedStartingInventory;
     public bool receivedStartingPaper;
     public float shipWeaponSpendBufferKg;
+    public ShipConsumableTankState shipEngineFuelTank = new ShipConsumableTankState { resourceId = "charcoal" };
+    public ShipConsumableTankState shipClaudiumTank = new ShipConsumableTankState { resourceId = "claudium" };
 
     public List<ResourceStack> inventory = new List<ResourceStack>();
     public List<ResourceStack> shipCargo = new List<ResourceStack>();
@@ -99,6 +199,10 @@ public class PlayerProgress
         gasHarvesterShips ??= new List<GasHarvesterShipState>();
         miningShips ??= new List<MiningShipState>();
         scoutShips ??= new List<ScoutShipState>();
+        flagshipInteriors ??= new List<FlagshipInteriorState>();
+        activeExpedition ??= new FlagshipExpeditionState();
+        shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
+        shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
         inventory ??= new List<ResourceStack>();
         shipCargo ??= new List<ResourceStack>();
         shipImpactCargo ??= new List<ResourceStack>();
@@ -111,7 +215,10 @@ public class PlayerProgress
         activeProcesses ??= new List<TimedProcessState>();
         acceptedMissionIds ??= new List<string>();
         completedMissionIds ??= new List<string>();
+        activeExpedition.Normalize();
         cargoTransfer.Normalize();
+        shipEngineFuelTank.Normalize();
+        shipClaudiumTank.Normalize();
 
         for (int i = shipCargo.Count - 1; i >= 0; i--)
         {
@@ -219,6 +326,18 @@ public class PlayerProgress
             }
 
             ship.Normalize();
+        }
+
+        for (int i = flagshipInteriors.Count - 1; i >= 0; i--)
+        {
+            FlagshipInteriorState interior = flagshipInteriors[i];
+            if (interior == null || string.IsNullOrWhiteSpace(interior.flagshipId))
+            {
+                flagshipInteriors.RemoveAt(i);
+                continue;
+            }
+
+            interior.Normalize();
         }
 
         for (int i = activeProcesses.Count - 1; i >= 0; i--)
@@ -505,6 +624,27 @@ public class PlayerProgress
         return newState;
     }
 
+    public FlagshipInteriorState GetFlagshipInteriorState(string flagshipId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(flagshipId)) return null;
+        flagshipInteriors ??= new List<FlagshipInteriorState>();
+
+        for (int i = 0; i < flagshipInteriors.Count; i++)
+        {
+            FlagshipInteriorState state = flagshipInteriors[i];
+            if (state != null && state.flagshipId == flagshipId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        FlagshipInteriorState newState = new FlagshipInteriorState { flagshipId = flagshipId };
+        flagshipInteriors.Add(newState);
+        return newState;
+    }
+
     public ScoutedObjectState GetScoutedObjectState(ScoutedObjectKind kind, string objectId, bool createIfMissing)
     {
         if (string.IsNullOrWhiteSpace(objectId)) return null;
@@ -686,6 +826,18 @@ public class PlayerProgress
         }
 
         return total;
+    }
+
+    public float GetShipConsumableTankMassKg()
+    {
+        shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
+        shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
+        return shipEngineFuelTank.amountKg + shipClaudiumTank.amountKg;
+    }
+
+    public float GetShipPayloadMassKg(WorldConfigDatabase config)
+    {
+        return GetShipInternalCargoMassKg(config) + GetShipConsumableTankMassKg();
     }
 
     public int GetShipImpactCargoAmount(string resourceId)
@@ -1304,6 +1456,8 @@ public class GasHarvesterShipState
     public long flightArrivesUtcTicks;
     public Vector3 lastKnownPosition;
     public List<ResourceStack> cargo = new List<ResourceStack>();
+    public ShipConsumableTankState engineFuelTank = new ShipConsumableTankState();
+    public ShipConsumableTankState claudiumTank = new ShipConsumableTankState { resourceId = "claudium" };
     public float harvestBufferKg;
     public float pendingFuelConsumptionKg;
     public float pendingClaudiumConsumptionKg;
@@ -1317,11 +1471,15 @@ public class GasHarvesterShipState
         homeIslandId ??= "";
         targetCloudId ??= "";
         cargo ??= new List<ResourceStack>();
+        engineFuelTank ??= new ShipConsumableTankState();
+        claudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
         harvestBufferKg = Mathf.Max(0f, harvestBufferKg);
         pendingFuelConsumptionKg = Mathf.Max(0f, pendingFuelConsumptionKg);
         pendingClaudiumConsumptionKg = Mathf.Max(0f, pendingClaudiumConsumptionKg);
         completedTrips = Mathf.Max(0, completedTrips);
         lastError ??= "";
+        engineFuelTank.Normalize();
+        claudiumTank.Normalize();
 
         for (int i = cargo.Count - 1; i >= 0; i--)
         {
@@ -1354,6 +1512,11 @@ public class GasHarvesterShipState
         }
 
         return total;
+    }
+
+    public float GetPayloadMassKg()
+    {
+        return GetCargoMassKg() + engineFuelTank.amountKg + claudiumTank.amountKg;
     }
 
     public void AddCargo(string itemId, int amount)
@@ -1477,6 +1640,8 @@ public class MiningShipState
     public Vector3 lastKnownPosition;
     public Vector3 miningPosition;
     public List<ResourceStack> cargo = new List<ResourceStack>();
+    public ShipConsumableTankState engineFuelTank = new ShipConsumableTankState();
+    public ShipConsumableTankState claudiumTank = new ShipConsumableTankState { resourceId = "claudium" };
     public float miningBufferKg;
     public float pendingFuelConsumptionKg;
     public float pendingClaudiumConsumptionKg;
@@ -1491,6 +1656,8 @@ public class MiningShipState
         targetRockId ??= "";
         targetOreTypeId ??= "";
         cargo ??= new List<ResourceStack>();
+        engineFuelTank ??= new ShipConsumableTankState();
+        claudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
         miningBufferKg = Mathf.Max(0f, miningBufferKg);
         pendingFuelConsumptionKg = Mathf.Max(0f, pendingFuelConsumptionKg);
         pendingClaudiumConsumptionKg = Mathf.Max(0f, pendingClaudiumConsumptionKg);
@@ -1498,6 +1665,8 @@ public class MiningShipState
         if (lastObservedShedUtcTicks < 0) lastObservedShedUtcTicks = 0;
         completedTrips = Mathf.Max(0, completedTrips);
         lastError ??= "";
+        engineFuelTank.Normalize();
+        claudiumTank.Normalize();
 
         for (int i = cargo.Count - 1; i >= 0; i--)
         {
@@ -1530,6 +1699,11 @@ public class MiningShipState
         }
 
         return total;
+    }
+
+    public float GetPayloadMassKg()
+    {
+        return GetCargoMassKg() + engineFuelTank.amountKg + claudiumTank.amountKg;
     }
 
     public void AddCargo(string itemId, int amount)
@@ -2189,6 +2363,55 @@ public class ResourceStack
 {
     public string resourceId = "";
     public int amount;
+}
+
+[Serializable]
+public class ShipConsumableTankState
+{
+    public string resourceId = "";
+    public float amountKg;
+
+    public void Normalize()
+    {
+        resourceId ??= "";
+        amountKg = Mathf.Max(0f, amountKg);
+    }
+
+    public float GetAmount(string requestedResourceId)
+    {
+        if (string.IsNullOrWhiteSpace(requestedResourceId)) return 0f;
+        return resourceId == requestedResourceId ? Mathf.Max(0f, amountKg) : 0f;
+    }
+
+    public void SetResource(string requestedResourceId)
+    {
+        requestedResourceId ??= "";
+        if (resourceId == requestedResourceId) return;
+
+        resourceId = requestedResourceId;
+        amountKg = 0f;
+    }
+
+    public float Add(string requestedResourceId, float amount, float capacityKg)
+    {
+        if (string.IsNullOrWhiteSpace(requestedResourceId) || amount <= 0f) return 0f;
+
+        SetResource(requestedResourceId);
+        float freeKg = Mathf.Max(0f, capacityKg - amountKg);
+        float added = Mathf.Min(freeKg, amount);
+        amountKg += added;
+        return added;
+    }
+
+    public bool TrySpend(string requestedResourceId, float amount)
+    {
+        if (amount <= 0f) return true;
+        if (string.IsNullOrWhiteSpace(requestedResourceId) || resourceId != requestedResourceId) return false;
+        if (amountKg + 0.0001f < amount) return false;
+
+        amountKg = Mathf.Max(0f, amountKg - amount);
+        return true;
+    }
 }
 
 [Serializable]

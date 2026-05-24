@@ -165,7 +165,7 @@ public class MiningFleetController : MonoBehaviour
     {
         if (state == null) return 0;
 
-        if (!TryBuildMetrics(definition, progress, catalog, techTree, config, state.GetCargoMassKg(), out MiningShipMetrics metrics, out string metricsError))
+        if (!TryBuildMetrics(definition, progress, catalog, techTree, config, state.GetPayloadMassKg(), out MiningShipMetrics metrics, out string metricsError))
         {
             SetError(state, metricsError);
             return 0;
@@ -175,7 +175,7 @@ public class MiningFleetController : MonoBehaviour
             && !string.IsNullOrWhiteSpace(state.lastError)
             && (state.lastError.IndexOf("overloaded", StringComparison.OrdinalIgnoreCase) >= 0
                 || state.lastError.IndexOf("перегруж", StringComparison.OrdinalIgnoreCase) >= 0)
-            && state.GetCargoMassKg() <= metrics.maxCargoKg + 0.001f)
+            && state.GetPayloadMassKg() <= metrics.maxCargoKg + 0.001f)
         {
             state.status = MiningShipStatus.Idle;
             state.lastError = "Overload cleared after mining setup update.";
@@ -328,7 +328,7 @@ public class MiningFleetController : MonoBehaviour
 
         float currentPayloadKg = GetMiningPayloadKg(state, metrics, definition);
         float freeImpactKg = Mathf.Max(0f, metrics.impactHoldCapacityKg - currentPayloadKg);
-        float freeMassKg = Mathf.Max(0f, metrics.maxCargoKg - state.GetCargoMassKg());
+        float freeMassKg = Mathf.Max(0f, metrics.maxCargoKg - state.GetPayloadMassKg());
         float plannedHarvestKg = Mathf.Min(Mathf.Max(1f, definition.targetOreKg), Mathf.Min(freeImpactKg, Mathf.Min(freeMassKg, targetRock.remainingOreKg)));
         if (plannedHarvestKg < 1f)
         {
@@ -336,8 +336,8 @@ public class MiningFleetController : MonoBehaviour
             return false;
         }
 
-        MiningLegEstimate outbound = EstimateLeg(metrics, home.position, miningPosition, state.GetCargoMassKg());
-        MiningLegEstimate ret = EstimateLeg(metrics, miningPosition, home.position, state.GetCargoMassKg() + plannedHarvestKg);
+        MiningLegEstimate outbound = EstimateLeg(metrics, home.position, miningPosition, state.GetPayloadMassKg());
+        MiningLegEstimate ret = EstimateLeg(metrics, miningPosition, home.position, state.GetPayloadMassKg() + plannedHarvestKg);
         if (!outbound.canFly)
         {
             error = outbound.reason;
@@ -350,7 +350,7 @@ public class MiningFleetController : MonoBehaviour
             return false;
         }
 
-        if (!TryEstimateMiningWorkBudget(metrics, Mathf.Max(miningCycleSeconds, maxMiningWatchSeconds), state.GetCargoMassKg() + plannedHarvestKg, out MiningWorkEstimate work, out string workError))
+        if (!TryEstimateMiningWorkBudget(metrics, Mathf.Max(miningCycleSeconds, maxMiningWatchSeconds), state.GetPayloadMassKg() + plannedHarvestKg, out MiningWorkEstimate work, out string workError))
         {
             error = workError;
             return false;
@@ -360,32 +360,35 @@ public class MiningFleetController : MonoBehaviour
         IslandProductionState storage = progress.GetIslandProductionState(home.id, true);
         int fuelNeed = outbound.requiredFuelKg + ret.requiredFuelKg + work.requiredFuelKg;
         int claudiumNeed = outbound.requiredClaudiumKg + ret.requiredClaudiumKg + work.requiredClaudiumKg;
-        int missingFuel = Mathf.Max(0, fuelNeed - state.GetCargoAmount(metrics.engineFuelId));
-        int missingClaudium = Mathf.Max(0, claudiumNeed - state.GetCargoAmount(claudiumResourceId));
-        int cargoAfterLoadAndOutbound = state.GetCargoMassKg() + missingFuel + missingClaudium - outbound.requiredFuelKg - outbound.requiredClaudiumKg;
-        if (cargoAfterLoadAndOutbound > metrics.maxCargoKg)
+        if (fuelNeed > metrics.fuelTankCapacityKg + 0.001f || claudiumNeed > metrics.claudiumTankCapacityKg + 0.001f)
         {
-            error = $"Not enough mass reserve for mining supplies: after launch {cargoAfterLoadAndOutbound} kg, limit {metrics.maxCargoKg:F0} kg.";
+            error = "Internal tanks are too small for this mining trip.";
             return false;
         }
 
-        if (!EnsureCargoAtLeastFromStorage(state, storage, metrics.engineFuelId, fuelNeed, out error))
+        if (!EnsureTankAtLeastFromStorage(state.engineFuelTank, storage, metrics.engineFuelId, fuelNeed, metrics.fuelTankCapacityKg, out error))
         {
             return false;
         }
 
-        if (!EnsureCargoAtLeastFromStorage(state, storage, claudiumResourceId, claudiumNeed, out error))
+        if (!EnsureTankAtLeastFromStorage(state.claudiumTank, storage, claudiumResourceId, claudiumNeed, metrics.claudiumTankCapacityKg, out error))
         {
             return false;
         }
 
-        if (!state.TrySpendCargo(metrics.engineFuelId, outbound.requiredFuelKg))
+        if (state.GetPayloadMassKg() > metrics.maxCargoKg + 0.001f)
+        {
+            error = $"Payload after tank refill is {state.GetPayloadMassKg():F0}/{metrics.maxCargoKg:F0} kg.";
+            return false;
+        }
+
+        if (!state.engineFuelTank.TrySpend(metrics.engineFuelId, outbound.requiredFuelKg))
         {
             error = "Not enough loaded fuel for outbound flight.";
             return false;
         }
 
-        if (!state.TrySpendCargo(claudiumResourceId, outbound.requiredClaudiumKg))
+        if (!state.claudiumTank.TrySpend(claudiumResourceId, outbound.requiredClaudiumKg))
         {
             error = "Not enough loaded claudium for outbound flight.";
             return false;
@@ -457,14 +460,14 @@ public class MiningFleetController : MonoBehaviour
         }
 
         int freeImpactKg = Mathf.FloorToInt(metrics.impactHoldCapacityKg - GetMiningPayloadKg(state, metrics, definition) + 0.0001f);
-        int freeMassKg = Mathf.FloorToInt(metrics.maxCargoKg - state.GetCargoMassKg() + 0.0001f);
+        int freeMassKg = Mathf.FloorToInt(metrics.maxCargoKg - state.GetPayloadMassKg() + 0.0001f);
         if (freeImpactKg <= 0 || freeMassKg <= 0)
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, "Impact hold full.");
         }
 
         float checkSeconds = Mathf.Max(0.1f, miningCycleSeconds);
-        if (!TryEstimateMiningCycle(metrics, state.GetCargoMassKg(), checkSeconds, out float fuelKg, out float claudiumKg, out string powerError))
+        if (!TryEstimateMiningCycle(metrics, state.GetPayloadMassKg(), checkSeconds, out float fuelKg, out float claudiumKg, out string powerError))
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, powerError);
         }
@@ -476,22 +479,22 @@ public class MiningFleetController : MonoBehaviour
             return false;
         }
 
-        MiningLegEstimate ret = EstimateLeg(metrics, state.miningPosition, home.position, state.GetCargoMassKg());
+        MiningLegEstimate ret = EstimateLeg(metrics, state.miningPosition, home.position, state.GetPayloadMassKg());
         if (!ret.canFly)
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, ret.reason);
         }
 
         string claudiumResourceId = ResolveClaudiumResourceId(definition);
-        float fuelAfterCycle = state.GetCargoAmount(metrics.engineFuelId) - state.pendingFuelConsumptionKg - fuelKg;
-        float claudiumAfterCycle = state.GetCargoAmount(claudiumResourceId) - state.pendingClaudiumConsumptionKg - claudiumKg;
+        float fuelAfterCycle = state.engineFuelTank.GetAmount(metrics.engineFuelId) - fuelKg;
+        float claudiumAfterCycle = state.claudiumTank.GetAmount(claudiumResourceId) - claudiumKg;
         if (fuelAfterCycle + 0.001f < ret.requiredFuelKg || claudiumAfterCycle + 0.001f < ret.requiredClaudiumKg)
         {
             return TryBeginReturn(definition, state, config, metrics, currentTicks, "Return reserve reached.");
         }
 
-        AccumulateConsumableSpend(state, metrics.engineFuelId, fuelKg, ref state.pendingFuelConsumptionKg);
-        AccumulateConsumableSpend(state, claudiumResourceId, claudiumKg, ref state.pendingClaudiumConsumptionKg);
+        SpendTankFuel(state.engineFuelTank, metrics.engineFuelId, fuelKg);
+        SpendTankFuel(state.claudiumTank, claudiumResourceId, claudiumKg);
 
         int caughtKg = 0;
         int shedKg = 0;
@@ -550,7 +553,7 @@ public class MiningFleetController : MonoBehaviour
             return false;
         }
 
-        MiningLegEstimate ret = EstimateLeg(metrics, state.lastKnownPosition, home.position, state.GetCargoMassKg());
+        MiningLegEstimate ret = EstimateLeg(metrics, state.lastKnownPosition, home.position, state.GetPayloadMassKg());
         if (!ret.canFly)
         {
             SetError(state, ret.reason);
@@ -558,13 +561,13 @@ public class MiningFleetController : MonoBehaviour
         }
 
         string claudiumResourceId = ResolveClaudiumResourceId(definition);
-        if (!state.TrySpendCargo(metrics.engineFuelId, ret.requiredFuelKg))
+        if (!state.engineFuelTank.TrySpend(metrics.engineFuelId, ret.requiredFuelKg))
         {
             SetError(state, "Not enough reserved fuel to return.");
             return false;
         }
 
-        if (!state.TrySpendCargo(claudiumResourceId, ret.requiredClaudiumKg))
+        if (!state.claudiumTank.TrySpend(claudiumResourceId, ret.requiredClaudiumKg))
         {
             SetError(state, "Not enough reserved claudium to return.");
             return false;
@@ -769,6 +772,8 @@ public class MiningFleetController : MonoBehaviour
         metrics.engineLiftKg = metrics.enginePowerKw * metrics.claudiumLiftEfficiency;
         metrics.allowedTakeoffMassKg = Mathf.Min(metrics.engineLiftKg, Mathf.Min(metrics.claudiumMaxLiftKg, metrics.hullLimitKg));
         metrics.maxCargoKg = Mathf.Max(0f, metrics.allowedTakeoffMassKg - metrics.emptyMassKg);
+        metrics.fuelTankCapacityKg = ShipConsumableTankMath.CalculateFuelTankCapacityKg(metrics.maxCargoKg);
+        metrics.claudiumTankCapacityKg = ShipConsumableTankMath.CalculateClaudiumTankCapacityKg(metrics.maxCargoKg);
         metrics.cruiseSpeedMS = Mathf.Max(0f, metrics.propellerMaxSpeedMS * Mathf.Clamp(cruiseSpeedFactor, 0.1f, 1f));
         metrics.cruisePowerKw = Mathf.Max(0f, metrics.enginePowerKw * Mathf.Clamp(cruisePowerLever, 0.05f, 1.2f));
 
@@ -927,6 +932,42 @@ public class MiningFleetController : MonoBehaviour
         storage.TrySpendResource(resourceId, missing);
         state.AddCargo(resourceId, missing);
         return true;
+    }
+
+    private static bool EnsureTankAtLeastFromStorage(ShipConsumableTankState tank, IslandProductionState storage, string resourceId, int targetAmount, float capacityKg, out string error)
+    {
+        error = "";
+        if (targetAmount <= 0) return true;
+        if (tank == null || storage == null || string.IsNullOrWhiteSpace(resourceId))
+        {
+            error = "Missing tank or storage for " + resourceId + ".";
+            return false;
+        }
+
+        if (targetAmount > capacityKg + 0.001f)
+        {
+            error = "Tank too small for " + resourceId + ": need " + targetAmount + " kg.";
+            return false;
+        }
+
+        if (tank.GetAmount(resourceId) >= targetAmount) return true;
+
+        int missing = Mathf.FloorToInt(Mathf.Max(0f, targetAmount - tank.GetAmount(resourceId)) + 0.0001f);
+        if (storage.GetResourceAmount(resourceId) < missing)
+        {
+            error = "Not enough " + resourceId + ": need " + missing + " kg.";
+            return false;
+        }
+
+        storage.TrySpendResource(resourceId, missing);
+        tank.Add(resourceId, missing, capacityKg);
+        return tank.GetAmount(resourceId) >= targetAmount;
+    }
+
+    private static void SpendTankFuel(ShipConsumableTankState tank, string resourceId, float amountKg)
+    {
+        if (tank == null || amountKg <= 0f) return;
+        tank.TrySpend(resourceId, amountKg);
     }
 
     private static void AccumulateConsumableSpend(MiningShipState state, string resourceId, float amountKg, ref float pendingKg)
@@ -1143,6 +1184,8 @@ public struct MiningShipMetrics
     public float engineLiftKg;
     public float allowedTakeoffMassKg;
     public float maxCargoKg;
+    public float fuelTankCapacityKg;
+    public float claudiumTankCapacityKg;
     public float cruiseSpeedMS;
     public float cruisePowerKw;
     public float impactHoldCapacityKg;
