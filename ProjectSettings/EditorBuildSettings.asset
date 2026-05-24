@@ -11,6 +11,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/WildWindWorldScene.unity
     guid: 71818f8ac51ca874e8d720aa2dc26afd
+  - enabled: 1
+    path: Assets/Scenes/PuzzleTestScene.unity
+    guid: 05751c4cebd84e5082675c4ae89685b4
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
   m_UseUCBPForAssetBundles: 0

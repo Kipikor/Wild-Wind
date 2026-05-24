@@ -9,6 +9,7 @@ public static class StartScreenSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/StartScreen.unity";
     private const string WorldScenePath = "Assets/Scenes/WildWindWorldScene.unity";
+    private const string PuzzleScenePath = "Assets/Scenes/PuzzleTestScene.unity";
     private const string RootName = "Wild Wind Start Screen";
 
     [MenuItem("Wild Wind/Start Screen/Build Scene")]
@@ -99,6 +100,7 @@ public static class StartScreenSceneBuilder
         List<EditorBuildSettingsScene> scenes = new List<EditorBuildSettingsScene>();
         AddSceneIfExists(scenes, ScenePath, true);
         AddSceneIfExists(scenes, WorldScenePath, true);
+        AddSceneIfExists(scenes, PuzzleScenePath, true);
         EditorBuildSettings.scenes = scenes.ToArray();
     }
 
@@ -133,6 +135,9 @@ public static class WildWindEditorStartSceneGuard
     private const string StartScenePath = StartScreenSceneBuilder.ScenePath;
     private const string WorldScenePath = "Assets/Scenes/WildWindWorldScene.unity";
     private const string SuppressNextPlayStartSceneKey = "WildWind.SuppressNextPlayStartScene";
+    private const string OneShotPlayScenePathKey = "WildWind.OneShotPlayScenePath";
+    private const string PlayStartsAtStartScreenEditorPrefKey = "WildWind.PlayStartsAtStartScreen";
+    private const string PlayStartsAtStartScreenMenuPath = "Wild Wind/Start Screen/Play Starts At Start Screen";
 
     static WildWindEditorStartSceneGuard()
     {
@@ -142,13 +147,51 @@ public static class WildWindEditorStartSceneGuard
         EditorApplication.delayCall += EnsureNormalPlayStartsAtStartScreen;
     }
 
+    public static bool PlayStartsAtStartScreen
+    {
+        get => EditorPrefs.GetBool(PlayStartsAtStartScreenEditorPrefKey, true);
+        private set
+        {
+            EditorPrefs.SetBool(PlayStartsAtStartScreenEditorPrefKey, value);
+            if (value)
+            {
+                EnsureNormalPlayStartsAtStartScreen();
+            }
+            else
+            {
+                EditorApplication.delayCall -= OpenStartScreenAfterPlay;
+                ClearStartScreenPlayOverrideIfOwned();
+            }
+        }
+    }
+
+    [MenuItem(PlayStartsAtStartScreenMenuPath)]
+    private static void TogglePlayStartsAtStartScreen()
+    {
+        PlayStartsAtStartScreen = !PlayStartsAtStartScreen;
+        Debug.Log("[WildWindEditorStartSceneGuard] Play starts at StartScreen: " + PlayStartsAtStartScreen);
+    }
+
+    [MenuItem(PlayStartsAtStartScreenMenuPath, true)]
+    private static bool ValidatePlayStartsAtStartScreen()
+    {
+        Menu.SetChecked(PlayStartsAtStartScreenMenuPath, PlayStartsAtStartScreen);
+        return true;
+    }
+
     public static void UseWorldSceneForNextPlay()
     {
+        UseSceneForNextPlay(WorldScenePath);
+    }
+
+    public static void UseSceneForNextPlay(string scenePath)
+    {
         SessionState.SetBool(SuppressNextPlayStartSceneKey, true);
-        SceneAsset worldScene = LoadSceneAsset(WorldScenePath);
-        if (worldScene != null)
+        SessionState.SetString(OneShotPlayScenePathKey, scenePath ?? "");
+        SceneAsset scene = LoadSceneAsset(scenePath);
+        if (scene != null)
         {
-            EditorSceneManager.playModeStartScene = worldScene;
+            EditorSceneManager.playModeStartScene = scene;
         }
     }
 
@@ -161,9 +204,15 @@ public static class WildWindEditorStartSceneGuard
 
         if (state == PlayModeStateChange.ExitingEditMode)
         {
-            if (SessionState.GetBool(SuppressNextPlayStartSceneKey, false))
+            bool suppressStartScene = ConsumeSuppressNextPlayStartScene();
+            if (!PlayStartsAtStartScreen)
             {
-                SessionState.SetBool(SuppressNextPlayStartSceneKey, false);
+                ClearStartScreenPlayOverrideIfOwned();
+                return;
+            }
+
+            if (suppressStartScene)
+            {
                 return;
             }
 
@@ -174,17 +223,41 @@ public static class WildWindEditorStartSceneGuard
 
         if (state == PlayModeStateChange.EnteredEditMode)
         {
+            ClearOneShotPlayOverrideIfOwned();
             WildWindBigTestRunner.ClearEditorBigTestLaunchPending();
+            if (!PlayStartsAtStartScreen)
+            {
+                ClearStartScreenPlayOverrideIfOwned();
+                return;
+            }
+
             EnsureNormalPlayStartsAtStartScreen();
             EditorApplication.delayCall -= OpenStartScreenAfterPlay;
             EditorApplication.delayCall += OpenStartScreenAfterPlay;
         }
     }
 
+    private static bool ConsumeSuppressNextPlayStartScene()
+    {
+        bool suppress = SessionState.GetBool(SuppressNextPlayStartSceneKey, false);
+        if (suppress)
+        {
+            SessionState.SetBool(SuppressNextPlayStartSceneKey, false);
+        }
+
+        return suppress;
+    }
+
     private static void EnsureNormalPlayStartsAtStartScreen()
     {
         if (Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
         {
+            return;
+        }
+
+        if (!PlayStartsAtStartScreen)
+        {
+            ClearStartScreenPlayOverrideIfOwned();
             return;
         }
 
@@ -198,6 +271,11 @@ public static class WildWindEditorStartSceneGuard
     private static void OpenStartScreenAfterPlay()
     {
         if (Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            return;
+        }
+
+        if (!PlayStartsAtStartScreen)
         {
             return;
         }
@@ -221,6 +299,39 @@ public static class WildWindEditorStartSceneGuard
         }
 
         EditorSceneManager.OpenScene(StartScenePath, OpenSceneMode.Single);
+    }
+
+    private static void ClearStartScreenPlayOverrideIfOwned()
+    {
+        SceneAsset current = EditorSceneManager.playModeStartScene;
+        if (current == null)
+        {
+            return;
+        }
+
+        string currentPath = AssetDatabase.GetAssetPath(current);
+        if (currentPath == StartScenePath)
+        {
+            EditorSceneManager.playModeStartScene = null;
+        }
+    }
+
+    private static void ClearOneShotPlayOverrideIfOwned()
+    {
+        string oneShotPath = SessionState.GetString(OneShotPlayScenePathKey, "");
+        if (string.IsNullOrWhiteSpace(oneShotPath))
+        {
+            return;
+        }
+
+        SceneAsset current = EditorSceneManager.playModeStartScene;
+        string currentPath = current != null ? AssetDatabase.GetAssetPath(current) : "";
+        if (currentPath == oneShotPath)
+        {
+            EditorSceneManager.playModeStartScene = null;
+        }
+
+        SessionState.SetString(OneShotPlayScenePathKey, "");
     }
 
     private static SceneAsset LoadSceneAsset(string path)
