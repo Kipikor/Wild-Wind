@@ -25,11 +25,6 @@ public class ShipPartDefinitionSO : ScriptableObject
     [Tooltip("Заполняется только у двигателя. Энергоемкость топлива берется из Item.csv.")]
     public string engineFuelId = "";
 
-    [Header("Грузовые ограничения")]
-    [InspectorName("Разрешенные грузы")]
-    [Tooltip("Если список заполнен, грузовые отсеки этой детали принимают только эти item id.")]
-    public List<string> allowedCargoItemIds = new List<string>();
-
     [Header("Слоты корпуса")]
     [InspectorName("Слоты")]
     [Tooltip("Слоты, которые дает корпус. Обязательность задается у каждого слота отдельно и не зависит от типа слота.")]
@@ -267,16 +262,16 @@ public enum ShipStatId
     NeedRepairRecoveryPerHour = 95,
     [InspectorName("Потребность: связь со столицей, восстановление/час")]
     NeedCapitalConnectionRecoveryPerHour = 96,
-    [InspectorName("Груз: фургон, смешиваемые единицы")]
-    CargoVanCapacityUnits = 100,
+    [InspectorName("Груз: общий лимит, кг")]
+    CargoVanCapacityKg = 100,
     [InspectorName("Груз: пассажирские места")]
     PassengerSeatCapacity = 101,
-    [InspectorName("Груз: кузов для сыпучки, л")]
-    BulkHoldCapacityLiters = 102,
-    [InspectorName("Груз: цистерна, л")]
-    LiquidTankCapacityLiters = 103,
-    [InspectorName("Груз: баллоны, л")]
-    GasCylinderCapacityLiters = 104,
+    [InspectorName("Груз: кузов, кг")]
+    BulkHoldCapacityKg = 102,
+    [InspectorName("Груз: цистерна, кг")]
+    LiquidTankCapacityKg = 103,
+    [InspectorName("Груз: баллоны, кг")]
+    GasCylinderCapacityKg = 104,
     [InspectorName("Груз: док, слоты")]
     ShipDockSlots = 105,
     [InspectorName("Груз: док, максимальный класс")]
@@ -285,8 +280,8 @@ public enum ShipStatId
     DockedShipMassFactor = 107,
     [InspectorName("Груз: клавдий дока, кг/т/ч")]
     DockSupportClaudiumPerTonHour = 108,
-    [InspectorName("Груз: холодильник, л")]
-    RefrigeratedHoldCapacityLiters = 109,
+    [InspectorName("Груз: холодильник, кг")]
+    RefrigeratedHoldCapacityKg = 109,
     [InspectorName("Груз: мощность холодильника, кВт")]
     RefrigeratedHoldPowerDrawKw = 110,
     [InspectorName("РџСЂРѕС‡РЅРѕСЃС‚СЊ РєРѕСЂРїСѓСЃР°")]

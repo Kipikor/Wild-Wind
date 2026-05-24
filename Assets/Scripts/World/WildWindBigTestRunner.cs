@@ -914,11 +914,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 module.needCreativityRecoveryPerHour >= 0f &&
                 module.needRepairRecoveryPerHour >= 0f &&
                 module.needCapitalConnectionRecoveryPerHour >= 0f &&
-                module.cargoVanCapacityUnits >= 0f &&
+                module.cargoVanCapacityKg >= 0f &&
                 module.passengerSeatCapacity >= 0f &&
-                module.bulkHoldCapacityLiters >= 0f &&
-                module.liquidTankCapacityLiters >= 0f &&
-                module.gasCylinderCapacityLiters >= 0f &&
+                module.bulkHoldCapacityKg >= 0f &&
+                module.liquidTankCapacityKg >= 0f &&
+                module.gasCylinderCapacityKg >= 0f &&
                 module.miningImpactDamageTakenMultiplier >= 0f &&
                 module.surveyPaperToInfoEfficiency >= 0f &&
                 module.leviathanAlarmGenerationMultiplier >= 0f &&
@@ -926,7 +926,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 module.harpoonMaxCarcassMassKg >= 0f &&
                 module.harpoonFlightDamage >= 0f &&
                 module.harpoonRangeMeters >= 0f &&
-                module.refrigeratedHoldCapacityLiters >= 0f &&
+                module.refrigeratedHoldCapacityKg >= 0f &&
                 module.refrigeratedHoldPowerDrawKw >= 0f &&
                 module.shipDockSlots >= 0f &&
                 module.dockedShipMassFactor > 0f &&
@@ -943,12 +943,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     module.needRepairRecoveryPerHour > 0f ||
                     module.needCapitalConnectionRecoveryPerHour > 0f;
 
-                hasCargoStorageModule |= module.cargoVanCapacityUnits > 0f ||
+                hasCargoStorageModule |= module.cargoVanCapacityKg > 0f ||
                     module.passengerSeatCapacity > 0f ||
-                    module.bulkHoldCapacityLiters > 0f ||
-                    module.liquidTankCapacityLiters > 0f ||
-                    module.gasCylinderCapacityLiters > 0f ||
-                    module.refrigeratedHoldCapacityLiters > 0f ||
+                    module.bulkHoldCapacityKg > 0f ||
+                    module.liquidTankCapacityKg > 0f ||
+                    module.gasCylinderCapacityKg > 0f ||
+                    module.refrigeratedHoldCapacityKg > 0f ||
                     module.shipDockSlots > 0f;
             }
         }
@@ -1154,23 +1154,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             !CargoStoragePlanner.TryValidateCargoStorage(config, cargoMetrics, dockOverflow, out _);
         report.Check(cargoLimitsWork, "Корабельные отсеки проверяют места салона, общий грузовой лимит по кг, док-слот, 10% массу докованного корабля и расход клавдия на поддержку дока.");
 
-        LogisticsShipMetrics fuelOnlyMetrics = new LogisticsShipMetrics
-        {
-            cargoCompartments = new List<CargoCompartmentDefinition>
-            {
-                new CargoCompartmentDefinition
-                {
-                    storageKind = CargoStorageKind.Van,
-                    capacity = 100f,
-                    allowedItemIds = new List<string> { "charcoal", "claudium" }
-                }
-            }
-        };
-        bool legacyWhitelistIgnoredForGeneralCargo =
-            CargoStoragePlanner.TryValidateCargoStorage(config, fuelOnlyMetrics, new Dictionary<string, int> { ["charcoal"] = 50, ["claudium"] = 40 }, out _) &&
-            CargoStoragePlanner.TryValidateCargoStorage(config, fuelOnlyMetrics, new Dictionary<string, int> { ["food"] = 1 }, out _);
-        report.Check(legacyWhitelistIgnoredForGeneralCargo, "Обычные грузовые отсеки больше не фильтруют item id: любой товар подходит, если хватает веса.");
-
         PlayerProgress tankProgress = new PlayerProgress();
         tankProgress.Normalize();
         tankProgress.AddShipCargo("charcoal", 10);
@@ -1221,13 +1204,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             waterStrider.gasHarvesterWaterOnly &&
             waterStrider.gasHarvesterVolumeM3PerSecond > 0f &&
             waterStrider.gasHarvesterPowerDrawKw > 0f &&
-            waterStrider.liquidTankCapacityLiters >= 1000f,
+            waterStrider.liquidTankCapacityKg >= 1000f,
             "Vodomerka module exists: water-only cloud harvester and 1000 l liquid tank.");
 
         report.Check(bulat != null &&
             bulat.miningImpactHoldCapacityKg >= 3000f &&
             Approximately(bulat.miningImpactDamageTakenMultiplier, 0.5f, 0.001f) &&
-            bulat.bulkHoldCapacityLiters >= 3000f,
+            bulat.bulkHoldCapacityKg >= 3000f,
             "Bulat module exists: 3 m3 bulk hold and 50% mining impact damage.");
 
         report.Check(hornet != null &&
@@ -1246,7 +1229,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(jaeger != null &&
             Approximately(jaeger.harpoonWeaponCostPerMinute, 2f, 0.001f) &&
             jaeger.harpoonMaxCarcassMassKg >= 100f &&
-            jaeger.refrigeratedHoldCapacityLiters >= 2500f &&
+            jaeger.refrigeratedHoldCapacityKg >= 2500f &&
             jaeger.refrigeratedHoldPowerDrawKw > 0f,
             "Eger base module exists: harpoon upkeep, 100 kg target limit and powered refrigerator.");
 
@@ -1260,18 +1243,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         report.Check(opora != null &&
             opora.needRepairRecoveryPerHour > 0f &&
-            opora.cargoVanCapacityUnits >= 6000f,
+            opora.cargoVanCapacityKg >= 6000f,
             "Opora module exists: repair recovery and large van deck.");
 
         report.Check(fuelTender != null &&
-            fuelTender.cargoVanCapacityUnits >= 6400f &&
-            ContainsId(fuelTender.allowedCargoItemIds, "charcoal") &&
-            ContainsId(fuelTender.allowedCargoItemIds, "claudium"),
-            "Fuel tender module exists: large generic cargo capacity with legacy fuel cargo tags.");
+            fuelTender.cargoVanCapacityKg >= 6400f,
+            "Fuel tender module exists: large generic cargo capacity.");
 
         report.Check(parovoz != null &&
             parovoz.passengerSeatCapacity >= 15f &&
-            parovoz.cargoVanCapacityUnits > 0f,
+            parovoz.cargoVanCapacityKg > 0f,
             "Parovoz module exists: 15 passenger seats and supplies van.");
 
         LogisticsShipMetrics fridgeMetrics = new LogisticsShipMetrics
@@ -1608,7 +1589,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                         maximum ? 4300f : 3500f) &&
                     stats.Get(ShipStatId.GasHarvesterWaterOnly, 0f) > 0.5f &&
                     Approximately(stats.Get(ShipStatId.GasHarvesterVolumeM3PerSecond, 0f), maximum ? 15f : 12f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.LiquidTankCapacityLiters, 0f), maximum ? 1500f : 1000f, 0.001f);
+                    Approximately(stats.Get(ShipStatId.LiquidTankCapacityKg, 0f), maximum ? 1500f : 1000f, 0.001f);
             case "bulat":
                 return R1CoreLoadoutStatsMatch(stats,
                         maximum ? 3320f : 3000f,
@@ -1621,7 +1602,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                         maximum ? 0.76f : 0.78f,
                         maximum ? 6500f : 6000f) &&
                     Approximately(stats.Get(ShipStatId.MiningImpactHoldCapacityKg, 0f), 3000f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.BulkHoldCapacityLiters, 0f), 3000f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.BulkHoldCapacityKg, 0f), 3000f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.MiningImpactDamageTakenMultiplier, 0f), maximum ? 0.45f : 0.5f, 0.001f);
             case "hornet":
                 return R1CoreLoadoutStatsMatch(stats,
@@ -1652,7 +1633,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     Approximately(stats.Get(ShipStatId.HarpoonMaxCarcassMassKg, 0f), maximum ? 200f : 100f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.HarpoonFlightDamage, 0f), maximum ? 55f : 40f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.HarpoonRangeMeters, 0f), maximum ? 60f : 45f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.RefrigeratedHoldCapacityLiters, 0f), 2500f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.RefrigeratedHoldCapacityKg, 0f), 2500f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.RefrigeratedHoldPowerDrawKw, 0f), maximum ? 55f : 70f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.NeedSafetyRecoveryPerHour, 0f), maximum ? 30f : 20f, 0.001f);
             case "opora":
@@ -1668,7 +1649,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                         maximum ? 11000f : 10000f,
                         maximum ? 50f : 45f) &&
                     Approximately(stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f), maximum ? 38f : 30f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), maximum ? 14000f : 6000f, 0.001f);
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityKg, 0f), maximum ? 14000f : 6000f, 0.001f);
             case "fuel_tender":
                 return R1CoreLoadoutStatsMatch(stats,
                         3600f,
@@ -1681,9 +1662,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                         1.15f,
                         10000f,
                         50f) &&
-                    Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 6400f, 0.001f) &&
-                    ContainsId(stats.AllowedCargoItemIds, "charcoal") &&
-                    ContainsId(stats.AllowedCargoItemIds, "claudium");
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityKg, 0f), 6400f, 0.001f);
             case "parovoz":
                 return R1CoreLoadoutStatsMatch(stats,
                         maximum ? 4820f : 4300f,
@@ -1752,21 +1731,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return true;
     }
 
-    private static bool ContainsId(IReadOnlyList<string> ids, string id)
-    {
-        if (ids == null || string.IsNullOrWhiteSpace(id)) return false;
-
-        for (int i = 0; i < ids.Count; i++)
-        {
-            if (ids[i] == id)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private static bool SlotAllowsAll(ShipPartDefinitionSO hull, string slotId, List<string> partIds)
     {
         if (hull == null || hull.slots == null || string.IsNullOrWhiteSpace(slotId) || partIds == null || partIds.Count == 0)
@@ -1828,7 +1792,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             waterMk2 != null &&
             waterMk2.gasHarvesterWaterOnly &&
             waterMk2.gasHarvesterVolumeM3PerSecond > waterBase.gasHarvesterVolumeM3PerSecond &&
-            waterMk2.liquidTankCapacityLiters >= 1500f &&
+            waterMk2.liquidTankCapacityKg >= 1500f &&
             waterMk2.baseMassKg > waterBase.baseMassKg,
             "Water Strider upgraded harvester keeps water-only mode and grows to a 1.5 t tank.");
 
@@ -1837,7 +1801,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(bulatBase != null &&
             bulatMk2 != null &&
             bulatMk2.miningImpactHoldCapacityKg >= 3000f &&
-            bulatMk2.bulkHoldCapacityLiters >= 3000f &&
+            bulatMk2.bulkHoldCapacityKg >= 3000f &&
             bulatMk2.miningImpactDamageTakenMultiplier <= bulatBase.miningImpactDamageTakenMultiplier &&
             bulatMk2.baseMassKg > bulatBase.baseMassKg,
             "Bulat upgraded impact hold preserves the 3 m3 ore role and improves impact damping.");
@@ -1857,7 +1821,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             jaegerMk2 != null &&
             jaegerMk2.harpoonMaxCarcassMassKg >= 200f &&
             Approximately(jaegerMk2.harpoonWeaponCostPerMinute, jaegerBase.harpoonWeaponCostPerMinute * 2f, 0.001f) &&
-            jaegerMk2.refrigeratedHoldCapacityLiters >= jaegerBase.refrigeratedHoldCapacityLiters,
+            jaegerMk2.refrigeratedHoldCapacityKg >= jaegerBase.refrigeratedHoldCapacityKg,
             "Eger upgraded harpoon catches 200 kg carcasses and doubles weapon drain while keeping cold storage.");
 
         SpecialModuleConfig oporaBase = config.GetSpecialModule("opora_crane_platform");
@@ -1865,7 +1829,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(oporaBase != null &&
             oporaMk2 != null &&
             oporaMk2.needRepairRecoveryPerHour > oporaBase.needRepairRecoveryPerHour &&
-            oporaMk2.cargoVanCapacityUnits >= 14000f &&
+            oporaMk2.cargoVanCapacityKg >= 14000f &&
             oporaMk2.baseMassKg > oporaBase.baseMassKg,
             "Opora upgraded crane improves repair throughput and expands van capacity.");
 
@@ -1971,31 +1935,23 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         switch (shipId)
         {
             case "liquid_tanker":
-                return Approximately(stats.Get(ShipStatId.LiquidTankCapacityLiters, 0f), 8000f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 0f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.BulkHoldCapacityLiters, 0f), 0f, 0.001f);
+                return Approximately(stats.Get(ShipStatId.LiquidTankCapacityKg, 0f), 8000f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityKg, 0f), 0f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.BulkHoldCapacityKg, 0f), 0f, 0.001f);
             case "gletcher":
-                return Approximately(stats.Get(ShipStatId.BulkHoldCapacityLiters, 0f), 3000f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.GasCylinderCapacityLiters, 0f), 4000f, 0.001f);
+                return Approximately(stats.Get(ShipStatId.BulkHoldCapacityKg, 0f), 3000f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.GasCylinderCapacityKg, 0f), 4000f, 0.001f);
             case "vakhta":
-                return Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 5000f, 0.001f) &&
+                return Approximately(stats.Get(ShipStatId.CargoVanCapacityKg, 0f), 5000f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.NeedWorkforceRecoveryPerHour, 0f), 55f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.NeedHealthRecoveryPerHour, 0f), 40f, 0.001f) &&
-                    ContainsId(stats.AllowedCargoItemIds, "food") &&
-                    ContainsId(stats.AllowedCargoItemIds, "medicines");
+                    Approximately(stats.Get(ShipStatId.NeedHealthRecoveryPerHour, 0f), 40f, 0.001f);
             case "boxvan_tender":
-                return Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 5700f, 0.001f) &&
-                    ContainsId(stats.AllowedCargoItemIds, "food") &&
-                    ContainsId(stats.AllowedCargoItemIds, "tools") &&
-                    !ContainsId(stats.AllowedCargoItemIds, "charcoal");
+                return Approximately(stats.Get(ShipStatId.CargoVanCapacityKg, 0f), 5700f, 0.001f);
             case "stapel":
                 return Approximately(stats.Get(ShipStatId.ShipDockSlots, 0f), 2f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.ShipDockMaxClass, 0f), (float)ShipSizeClass.Boat, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f), 40f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.CargoVanCapacityUnits, 0f), 1200f, 0.001f) &&
-                    ContainsId(stats.AllowedCargoItemIds, "charcoal") &&
-                    ContainsId(stats.AllowedCargoItemIds, "claudium") &&
-                    ContainsId(stats.AllowedCargoItemIds, "tools");
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityKg, 0f), 1200f, 0.001f);
             default:
                 return false;
         }
@@ -2051,11 +2007,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             case "water_strider":
                 return stats.Get(ShipStatId.GasHarvesterWaterOnly, 0f) > 0.5f &&
                     stats.Get(ShipStatId.GasHarvesterVolumeM3PerSecond, 0f) > 0f &&
-                    stats.Get(ShipStatId.LiquidTankCapacityLiters, 0f) >= 1000f;
+                    stats.Get(ShipStatId.LiquidTankCapacityKg, 0f) >= 1000f;
             case "bulat":
                 return stats.Get(ShipStatId.MiningImpactHoldCapacityKg, 0f) >= 3000f &&
                     Approximately(stats.Get(ShipStatId.MiningImpactDamageTakenMultiplier, 0f), 0.5f, 0.001f) &&
-                    stats.Get(ShipStatId.BulkHoldCapacityLiters, 0f) >= 3000f;
+                    stats.Get(ShipStatId.BulkHoldCapacityKg, 0f) >= 3000f;
             case "hornet":
                 return stats.Get(ShipStatId.ObservationRadiusMeters, 0f) >= 700f &&
                     Approximately(stats.Get(ShipStatId.SurveyPaperToInfoEfficiency, 0f), 0.2f, 0.001f) &&
@@ -2063,19 +2019,17 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             case "jaeger":
                 return Approximately(stats.Get(ShipStatId.HarpoonWeaponCostPerMinute, 0f), 2f, 0.001f) &&
                     stats.Get(ShipStatId.HarpoonMaxCarcassMassKg, 0f) >= 100f &&
-                    stats.Get(ShipStatId.RefrigeratedHoldCapacityLiters, 0f) >= 2500f &&
+                    stats.Get(ShipStatId.RefrigeratedHoldCapacityKg, 0f) >= 2500f &&
                     stats.Get(ShipStatId.RefrigeratedHoldPowerDrawKw, 0f) > 0f &&
                     stats.Get(ShipStatId.NeedSafetyRecoveryPerHour, 0f) > 0f;
             case "opora":
                 return stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f) > 0f &&
-                    stats.Get(ShipStatId.CargoVanCapacityUnits, 0f) >= 6000f;
+                    stats.Get(ShipStatId.CargoVanCapacityKg, 0f) >= 6000f;
             case "fuel_tender":
-                return stats.Get(ShipStatId.CargoVanCapacityUnits, 0f) >= 6400f &&
-                    ContainsId(stats.AllowedCargoItemIds, "charcoal") &&
-                    ContainsId(stats.AllowedCargoItemIds, "claudium");
+                return stats.Get(ShipStatId.CargoVanCapacityKg, 0f) >= 6400f;
             case "parovoz":
                 return stats.Get(ShipStatId.PassengerSeatCapacity, 0f) >= 15f &&
-                    stats.Get(ShipStatId.CargoVanCapacityUnits, 0f) >= 250f &&
+                    stats.Get(ShipStatId.CargoVanCapacityKg, 0f) >= 250f &&
                     stats.Get(ShipStatId.NeedHealthRecoveryPerHour, 0f) > 0f &&
                     stats.Get(ShipStatId.NeedComfortRecoveryPerHour, 0f) > 0f &&
                     stats.Get(ShipStatId.NeedCapitalConnectionRecoveryPerHour, 0f) > 0f;

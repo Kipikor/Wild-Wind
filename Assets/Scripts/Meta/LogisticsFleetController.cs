@@ -1087,13 +1087,12 @@ public static class CargoStoragePlanner
             }
         }
 
-        IReadOnlyList<string> allowedCargoItemIds = stats != null ? stats.AllowedCargoItemIds : null;
-        AddStatCompartment(compartments, stats, ShipStatId.CargoVanCapacityUnits, CargoStorageKind.Van, "Фургон", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.PassengerSeatCapacity, CargoStorageKind.Cabin, "Салон", null);
-        AddStatCompartment(compartments, stats, ShipStatId.BulkHoldCapacityLiters, CargoStorageKind.Van, "Грузовой кузов", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.LiquidTankCapacityLiters, CargoStorageKind.Van, "Грузовая цистерна", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.GasCylinderCapacityLiters, CargoStorageKind.Van, "Грузовые баллоны", allowedCargoItemIds);
-        AddStatCompartment(compartments, stats, ShipStatId.RefrigeratedHoldCapacityLiters, CargoStorageKind.Van, "Грузовой холодильник", allowedCargoItemIds);
+        AddStatCompartment(compartments, stats, ShipStatId.CargoVanCapacityKg, CargoStorageKind.Van, "Фургон");
+        AddStatCompartment(compartments, stats, ShipStatId.PassengerSeatCapacity, CargoStorageKind.Cabin, "Салон");
+        AddStatCompartment(compartments, stats, ShipStatId.BulkHoldCapacityKg, CargoStorageKind.Van, "Грузовой кузов");
+        AddStatCompartment(compartments, stats, ShipStatId.LiquidTankCapacityKg, CargoStorageKind.Van, "Грузовая цистерна");
+        AddStatCompartment(compartments, stats, ShipStatId.GasCylinderCapacityKg, CargoStorageKind.Van, "Грузовые баллоны");
+        AddStatCompartment(compartments, stats, ShipStatId.RefrigeratedHoldCapacityKg, CargoStorageKind.Van, "Грузовой холодильник");
 
         float dockSlots = stats != null ? stats.Get(ShipStatId.ShipDockSlots, 0f) : 0f;
         if (dockSlots > 0f)
@@ -1118,8 +1117,7 @@ public static class CargoStoragePlanner
         ShipStatBlock stats,
         ShipStatId stat,
         CargoStorageKind kind,
-        string displayName,
-        IReadOnlyList<string> allowedCargoItemIds = null)
+        string displayName)
     {
         float capacity = stats != null ? stats.Get(stat, 0f) : 0f;
         if (capacity <= 0f) return;
@@ -1131,7 +1129,6 @@ public static class CargoStoragePlanner
             capacity = capacity
         };
 
-        CopyAllowedItemIds(compartment.allowedItemIds, allowedCargoItemIds);
         compartments.Add(compartment);
     }
 
@@ -1265,20 +1262,6 @@ public static class CargoStoragePlanner
         if (!TryFitDockSlots(config, metrics, dockDemands, out error)) return false;
 
         return true;
-    }
-
-    private static void CopyAllowedItemIds(List<string> target, IReadOnlyList<string> source)
-    {
-        if (target == null || source == null) return;
-
-        for (int i = 0; i < source.Count; i++)
-        {
-            string itemId = source[i];
-            if (!string.IsNullOrWhiteSpace(itemId) && !target.Contains(itemId))
-            {
-                target.Add(itemId);
-            }
-        }
     }
 
     private static float GetMixedCapacity(LogisticsShipMetrics metrics, CargoStorageKind kind)

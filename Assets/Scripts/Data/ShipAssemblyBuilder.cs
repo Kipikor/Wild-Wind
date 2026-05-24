@@ -221,7 +221,6 @@ public static class ShipAssemblyBuilder
                 part.description = "CSV hull config.";
                 part.completedTechId = hullConfig.completedTechId ?? "";
                 part.engineFuelId = "";
-                part.allowedCargoItemIds = new List<string>();
                 part.compatibleSlotTypeIds = new List<string>();
                 part.grantedSlots = new List<ShipSlotDefinition>();
                 part.slots = BuildHullSlots(hullConfig, config);
@@ -242,7 +241,6 @@ public static class ShipAssemblyBuilder
                 part.description = "CSV engine config.";
                 part.completedTechId = engineConfig.completedTechId ?? "";
                 part.engineFuelId = engineConfig.fuelId ?? "";
-                part.allowedCargoItemIds = new List<string>();
                 part.slots = new List<ShipSlotDefinition>();
                 part.compatibleSlotTypeIds = new List<string> { "engine_main" };
                 part.grantedSlots = new List<ShipSlotDefinition>();
@@ -263,7 +261,6 @@ public static class ShipAssemblyBuilder
                 part.description = "CSV propeller config.";
                 part.completedTechId = propellerConfig.completedTechId ?? "";
                 part.engineFuelId = "";
-                part.allowedCargoItemIds = new List<string>();
                 part.slots = new List<ShipSlotDefinition>();
                 part.compatibleSlotTypeIds = new List<string> { "propeller_main" };
                 part.grantedSlots = new List<ShipSlotDefinition>();
@@ -284,7 +281,6 @@ public static class ShipAssemblyBuilder
                 part.description = "CSV claudium loop config.";
                 part.completedTechId = loopConfig.completedTechId ?? "";
                 part.engineFuelId = "";
-                part.allowedCargoItemIds = new List<string>();
                 part.slots = new List<ShipSlotDefinition>();
                 part.compatibleSlotTypeIds = new List<string> { "claudium_loop" };
                 part.grantedSlots = new List<ShipSlotDefinition>();
@@ -326,12 +322,6 @@ public static class ShipAssemblyBuilder
 
             part.completedTechId = moduleConfig.completedTechId ?? "";
             part.engineFuelId = "";
-            part.allowedCargoItemIds = new List<string>();
-            if (moduleConfig.allowedCargoItemIds != null)
-            {
-                part.allowedCargoItemIds.AddRange(moduleConfig.allowedCargoItemIds);
-            }
-
             part.slots = new List<ShipSlotDefinition>();
             part.compatibleSlotTypeIds = new List<string>();
             if (moduleConfig.compatibleSlotTypeIds != null)
@@ -608,12 +598,12 @@ public static class ShipAssemblyBuilder
         AddSpecialModuleStat(modifiers, ShipStatId.NeedCreativityRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needCreativityRecoveryPerHour);
         AddSpecialModuleStat(modifiers, ShipStatId.NeedRepairRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needRepairRecoveryPerHour);
         AddSpecialModuleStat(modifiers, ShipStatId.NeedCapitalConnectionRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needCapitalConnectionRecoveryPerHour);
-        AddSpecialModuleStat(modifiers, ShipStatId.CargoVanCapacityUnits, ShipStatOperation.Add, moduleConfig.cargoVanCapacityUnits);
+        AddSpecialModuleStat(modifiers, ShipStatId.CargoVanCapacityKg, ShipStatOperation.Add, moduleConfig.cargoVanCapacityKg);
         AddSpecialModuleStat(modifiers, ShipStatId.PassengerSeatCapacity, ShipStatOperation.Add, moduleConfig.passengerSeatCapacity);
-        AddSpecialModuleStat(modifiers, ShipStatId.BulkHoldCapacityLiters, ShipStatOperation.Add, moduleConfig.bulkHoldCapacityLiters);
-        AddSpecialModuleStat(modifiers, ShipStatId.LiquidTankCapacityLiters, ShipStatOperation.Add, moduleConfig.liquidTankCapacityLiters);
-        AddSpecialModuleStat(modifiers, ShipStatId.GasCylinderCapacityLiters, ShipStatOperation.Add, moduleConfig.gasCylinderCapacityLiters);
-        AddSpecialModuleStat(modifiers, ShipStatId.RefrigeratedHoldCapacityLiters, ShipStatOperation.Add, moduleConfig.refrigeratedHoldCapacityLiters);
+        AddSpecialModuleStat(modifiers, ShipStatId.BulkHoldCapacityKg, ShipStatOperation.Add, moduleConfig.bulkHoldCapacityKg);
+        AddSpecialModuleStat(modifiers, ShipStatId.LiquidTankCapacityKg, ShipStatOperation.Add, moduleConfig.liquidTankCapacityKg);
+        AddSpecialModuleStat(modifiers, ShipStatId.GasCylinderCapacityKg, ShipStatOperation.Add, moduleConfig.gasCylinderCapacityKg);
+        AddSpecialModuleStat(modifiers, ShipStatId.RefrigeratedHoldCapacityKg, ShipStatOperation.Add, moduleConfig.refrigeratedHoldCapacityKg);
         AddSpecialModuleStat(modifiers, ShipStatId.RefrigeratedHoldPowerDrawKw, ShipStatOperation.Set, moduleConfig.refrigeratedHoldPowerDrawKw);
         AddSpecialModuleStat(modifiers, ShipStatId.ShipDockSlots, ShipStatOperation.Add, moduleConfig.shipDockSlots);
         if (moduleConfig.shipDockSlots > 0f)
@@ -644,28 +634,14 @@ public class ShipStatBlock
     private readonly Dictionary<ShipStatId, float> addValues = new Dictionary<ShipStatId, float>();
     private readonly Dictionary<ShipStatId, float> multiplyValues = new Dictionary<ShipStatId, float>();
     private readonly HashSet<ShipStatId> setStats = new HashSet<ShipStatId>();
-    private readonly List<string> allowedCargoItemIds = new List<string>();
     private string engineFuelId = "";
 
     public string EngineFuelId => engineFuelId;
-    public IReadOnlyList<string> AllowedCargoItemIds => allowedCargoItemIds;
 
     public bool ApplyPart(ShipPartDefinitionSO part, out string error)
     {
         error = "";
         if (part == null) return true;
-
-        if (part.allowedCargoItemIds != null)
-        {
-            for (int i = 0; i < part.allowedCargoItemIds.Count; i++)
-            {
-                string itemId = part.allowedCargoItemIds[i];
-                if (!string.IsNullOrWhiteSpace(itemId) && !allowedCargoItemIds.Contains(itemId))
-                {
-                    allowedCargoItemIds.Add(itemId);
-                }
-            }
-        }
 
         if (!string.IsNullOrWhiteSpace(part.engineFuelId))
         {
@@ -786,7 +762,7 @@ public class ShipStatBlock
         ship.harpoonMaxCarcassMassKg = Mathf.Max(0f, Get(ShipStatId.HarpoonMaxCarcassMassKg, ship.harpoonMaxCarcassMassKg));
         ship.leviathanWeaponShotFlightDamage = Mathf.Max(0f, Get(ShipStatId.HarpoonFlightDamage, ship.leviathanWeaponShotFlightDamage));
         ship.harpoonRangeMeters = Mathf.Max(0f, Get(ShipStatId.HarpoonRangeMeters, ship.harpoonRangeMeters));
-        ship.refrigeratedHoldCapacityLiters = Mathf.Max(0f, Get(ShipStatId.RefrigeratedHoldCapacityLiters, ship.refrigeratedHoldCapacityLiters));
+        ship.refrigeratedHoldCapacityLiters = Mathf.Max(0f, Get(ShipStatId.RefrigeratedHoldCapacityKg, ship.refrigeratedHoldCapacityLiters));
         ship.refrigeratedHoldPowerDrawKw = Mathf.Max(0f, Get(ShipStatId.RefrigeratedHoldPowerDrawKw, ship.refrigeratedHoldPowerDrawKw));
 
         DamageableShip damageableShip = ship.GetComponentInParent<DamageableShip>();

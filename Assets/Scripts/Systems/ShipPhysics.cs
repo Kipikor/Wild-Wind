@@ -2578,7 +2578,7 @@ public class ShipPhysics : MonoBehaviour
 
         if (amountKg > refrigeratedHoldCapacityLiters + 0.001f)
         {
-            reason = $"Холодильник мал для туши: {amountKg}/{refrigeratedHoldCapacityLiters:0} л.";
+            reason = $"Холодильник мал для туши: {amountKg}/{refrigeratedHoldCapacityLiters:0} кг.";
             harpoonLastMessage = reason;
             return false;
         }

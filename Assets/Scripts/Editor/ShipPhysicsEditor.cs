@@ -693,7 +693,7 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Любой ресурс по ID", EditorStyles.boldLabel);
         customCheatResourceId = EditorGUILayout.TextField(new GUIContent("ID ресурса", "Можно вписать любой технический ID, даже если его еще нет в Item.csv."), customCheatResourceId);
-        customCheatAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent("Количество", "Точное количество в единицах предмета: места для пассажиров, литры для жидкостей/газа/сыпучки, штуки для товаров."), customCheatAmount));
+        customCheatAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent("Количество", "Точное количество в единицах предмета: места для пассажиров, штуки/кг для обычных грузов."), customCheatAmount));
 
         EditorGUILayout.BeginHorizontal();
         GUI.enabled = !string.IsNullOrWhiteSpace(customCheatResourceId);
@@ -720,7 +720,7 @@ public class ShipPhysicsEditor : Editor
     private void DrawResourceAmountField(string label, MetaGameState meta, ShipPhysics ship, IslandProductionState dockStorage, string resourceId, int currentAmount, ResourceCheatTarget target)
     {
         EditorGUI.BeginChangeCheck();
-        int newAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent(label, "Точное количество в единицах предмета: места для пассажиров, литры для жидкостей/газа/сыпучки, штуки для товаров. 0 удаляет ресурс из списка."), currentAmount));
+        int newAmount = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent(label, "Точное количество в единицах предмета: места для пассажиров, штуки/кг для обычных грузов. 0 удаляет ресурс из списка."), currentAmount));
         if (EditorGUI.EndChangeCheck())
         {
             SetResourceCheat(meta, ship, dockStorage, resourceId, newAmount, target);

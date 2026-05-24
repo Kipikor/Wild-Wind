@@ -691,12 +691,12 @@ public partial class WorldConfigDatabase
                 needCreativityRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_creativity_recovery_per_hour"))),
                 needRepairRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_repair_recovery_per_hour"))),
                 needCapitalConnectionRecoveryPerHour = Mathf.Max(0f, ParseFloat(Get(row, "need_capital_connection_recovery_per_hour"))),
-                cargoVanCapacityUnits = Mathf.Max(0f, ParseFloat(Get(row, "cargo_van_capacity_units"))),
+                cargoVanCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "cargo_van_capacity_kg"), ParseFloat(Get(row, "cargo_van_capacity_units")))),
                 passengerSeatCapacity = Mathf.Max(0f, ParseFloat(Get(row, "passenger_seat_capacity"))),
-                bulkHoldCapacityLiters = Mathf.Max(0f, ParseFloat(Get(row, "bulk_hold_capacity_l"))),
-                liquidTankCapacityLiters = Mathf.Max(0f, ParseFloat(Get(row, "liquid_tank_capacity_l"))),
-                gasCylinderCapacityLiters = Mathf.Max(0f, ParseFloat(Get(row, "gas_cylinder_capacity_l"))),
-                refrigeratedHoldCapacityLiters = Mathf.Max(0f, ParseFloat(Get(row, "refrigerated_hold_capacity_l"))),
+                bulkHoldCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "bulk_hold_capacity_kg"), ParseFloat(Get(row, "bulk_hold_capacity_l")))),
+                liquidTankCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "liquid_tank_capacity_kg"), ParseFloat(Get(row, "liquid_tank_capacity_l")))),
+                gasCylinderCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "gas_cylinder_capacity_kg"), ParseFloat(Get(row, "gas_cylinder_capacity_l")))),
+                refrigeratedHoldCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "refrigerated_hold_capacity_kg"), ParseFloat(Get(row, "refrigerated_hold_capacity_l")))),
                 refrigeratedHoldPowerDrawKw = Mathf.Max(0f, ParseFloat(Get(row, "refrigerated_hold_power_draw_kw"))),
                 shipDockSlots = Mathf.Max(0f, ParseFloat(Get(row, "ship_dock_slots"))),
                 shipDockMaxClass = ParseShipSizeClass(Get(row, "ship_dock_max_class")),
@@ -705,7 +705,6 @@ public partial class WorldConfigDatabase
             };
 
             module.compatibleSlotTypeIds.AddRange(SplitInlineList(Get(row, "compatible_slot_type")));
-            module.allowedCargoItemIds.AddRange(SplitInlineList(Get(row, "allowed_cargo_item_ids")));
 
             if (string.IsNullOrWhiteSpace(module.id)) continue;
             specialModules.Add(module);
@@ -851,15 +850,6 @@ public partial class WorldConfigDatabase
         if (string.IsNullOrWhiteSpace(value))
         {
             return IsPassengerCargoItemId(itemId) ? CargoUnitKind.Passenger : CargoUnitKind.Piece;
-        }
-
-        string normalized = value.Trim().Replace("-", "").Replace("_", "");
-        if (string.Equals(normalized, "liter", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "liters", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "volume", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "volumeliter", StringComparison.OrdinalIgnoreCase))
-        {
-            return CargoUnitKind.VolumeLiter;
         }
 
         return Enum.TryParse(value, true, out CargoUnitKind parsed) ? parsed : CargoUnitKind.Piece;
@@ -1190,18 +1180,17 @@ public class SpecialModuleConfig
     public float needCreativityRecoveryPerHour;
     public float needRepairRecoveryPerHour;
     public float needCapitalConnectionRecoveryPerHour;
-    public float cargoVanCapacityUnits;
+    public float cargoVanCapacityKg;
     public float passengerSeatCapacity;
-    public float bulkHoldCapacityLiters;
-    public float liquidTankCapacityLiters;
-    public float gasCylinderCapacityLiters;
-    public float refrigeratedHoldCapacityLiters;
+    public float bulkHoldCapacityKg;
+    public float liquidTankCapacityKg;
+    public float gasCylinderCapacityKg;
+    public float refrigeratedHoldCapacityKg;
     public float refrigeratedHoldPowerDrawKw;
     public float shipDockSlots;
     public ShipSizeClass shipDockMaxClass = ShipSizeClass.None;
     public float dockedShipMassFactor = 0.1f;
     public float dockSupportClaudiumPerTonHour = 0.02f;
-    public List<string> allowedCargoItemIds = new List<string>();
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }
