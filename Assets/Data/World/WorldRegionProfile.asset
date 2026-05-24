@@ -15,13 +15,13 @@ MonoBehaviour:
   seed: 170517
   worldSizeMeters: 100000
   chunkSizeMeters: 10000
-  activeBubbleRadiusMeters: 5000
-  detailedBubbleRadiusMeters: 1600
-  islandCount: 15
-  cloudFieldCount: 34
-  highCloudFieldCount: 8
-  resourceFieldCount: 11
-  highResourceFieldCount: 3
-  leviathanRegionCount: 5
-  highLeviathanRegionCount: 2
-  icebergFieldCount: 4
+  activeBubbleRadiusMeters: 8000
+  detailedBubbleRadiusMeters: 2200
+  islandCount: 6
+  cloudFieldCount: 3
+  highCloudFieldCount: 0
+  resourceFieldCount: 1
+  highResourceFieldCount: 0
+  leviathanRegionCount: 1
+  highLeviathanRegionCount: 0
+  icebergFieldCount: 0

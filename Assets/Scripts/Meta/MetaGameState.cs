@@ -60,7 +60,7 @@ public partial class MetaGameState : MonoBehaviour
     [InspectorName("Стартовый режим")]
     public GameSessionMode startingMode = GameSessionMode.Docked;
     [InspectorName("Стартовый док")]
-    public string startingDockId = "capital";
+    public string startingDockId = "Island1";
     [InspectorName("Тип стартового дока")]
     public DockingLocationKind startingDockKind = DockingLocationKind.Island;
     [InspectorName("Автосохранение при стыковке")]

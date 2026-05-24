@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class DockingPort : MonoBehaviour
@@ -32,11 +33,13 @@ public class DockingPort : MonoBehaviour
 
     [Header("Runtime Visual")]
     [SerializeField, InspectorName("Show Dock Area In Play")] private bool showDockAreaInPlay = true;
-    [SerializeField, InspectorName("Dock Area Segments")] private int dockAreaSegments = 96;
-    [SerializeField, InspectorName("Dock Area Line Width")] private float dockAreaLineWidth = 4f;
-    [SerializeField, InspectorName("Dock Area Height Offset")] private float dockAreaHeightOffset = 8f;
-    [SerializeField, InspectorName("Dock Area Color")] private Color dockAreaColor = new Color(0.22f, 0.88f, 1f, 0.82f);
-    [SerializeField, InspectorName("Dock Area In Range Color")] private Color dockAreaInRangeColor = new Color(0.34f, 1f, 0.48f, 0.92f);
+    [SerializeField, InspectorName("Dock Area Segments")] private int dockAreaSegments = 128;
+    [SerializeField, InspectorName("Dock Area Line Width")] private float dockAreaLineWidth = 12f;
+    [SerializeField, InspectorName("Dock Area Height Offset")] private float dockAreaHeightOffset = 22f;
+    [SerializeField, InspectorName("Dock Area Beacon Height")] private float dockAreaBeaconHeight = 130f;
+    [SerializeField, InspectorName("Dock Area Beacon Width")] private float dockAreaBeaconWidth = 12f;
+    [SerializeField, InspectorName("Dock Area Color")] private Color dockAreaColor = new Color(0.12f, 0.92f, 1f, 0.95f);
+    [SerializeField, InspectorName("Dock Area In Range Color")] private Color dockAreaInRangeColor = new Color(0.30f, 1f, 0.44f, 1f);
 
     public Vector3 DockPosition => snapPoint != null ? snapPoint.position : transform.position;
 
@@ -44,6 +47,8 @@ public class DockingPort : MonoBehaviour
     private GameSessionMode lastObservedMode;
     private LineRenderer dockAreaRenderer;
     private Material dockAreaMaterial;
+    private readonly List<Transform> dockAreaBeacons = new List<Transform>(4);
+    private Material dockAreaBeaconMaterial;
 
     private void Reset()
     {
@@ -119,19 +124,8 @@ public class DockingPort : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (dockAreaMaterial == null)
-        {
-            return;
-        }
-
-        if (Application.isPlaying)
-        {
-            Destroy(dockAreaMaterial);
-        }
-        else
-        {
-            DestroyImmediate(dockAreaMaterial);
-        }
+        DestroyRuntimeMaterial(dockAreaMaterial);
+        DestroyRuntimeMaterial(dockAreaBeaconMaterial);
     }
 
     private void UpdateDockAreaVisual()
@@ -151,6 +145,7 @@ public class DockingPort : MonoBehaviour
         dockAreaRenderer.enabled = visible;
         if (!visible)
         {
+            SetDockAreaBeaconsVisible(false);
             return;
         }
 
@@ -174,6 +169,7 @@ public class DockingPort : MonoBehaviour
         Color color = targetShip != null && Contains(targetShip.transform.position) ? dockAreaInRangeColor : dockAreaColor;
         dockAreaRenderer.startColor = color;
         dockAreaRenderer.endColor = color;
+        UpdateDockAreaBeacons(center, radius, color);
     }
 
     private void EnsureDockAreaVisual()
@@ -196,6 +192,7 @@ public class DockingPort : MonoBehaviour
         dockAreaRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         dockAreaRenderer.receiveShadows = false;
         dockAreaRenderer.sharedMaterial = GetDockAreaMaterial();
+        EnsureDockAreaBeacons(visual.transform);
     }
 
     private Material GetDockAreaMaterial()
@@ -221,6 +218,134 @@ public class DockingPort : MonoBehaviour
             hideFlags = HideFlags.DontSave
         };
         return dockAreaMaterial;
+    }
+
+    private void EnsureDockAreaBeacons(Transform parent)
+    {
+        while (dockAreaBeacons.Count < 4)
+        {
+            GameObject beacon = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            beacon.name = "Dock Area Beacon " + dockAreaBeacons.Count;
+            beacon.transform.SetParent(parent, false);
+
+            Collider collider = beacon.GetComponent<Collider>();
+            if (collider != null)
+            {
+                Destroy(collider);
+            }
+
+            MeshRenderer renderer = beacon.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+                renderer.sharedMaterial = GetDockAreaBeaconMaterial();
+            }
+
+            dockAreaBeacons.Add(beacon.transform);
+        }
+    }
+
+    private void UpdateDockAreaBeacons(Vector3 center, float radius, Color color)
+    {
+        EnsureDockAreaBeacons(dockAreaRenderer.transform);
+        Material material = GetDockAreaBeaconMaterial();
+        SetMaterialColor(material, color);
+
+        float height = Mathf.Max(12f, dockAreaBeaconHeight);
+        float width = Mathf.Max(1f, dockAreaBeaconWidth);
+        for (int i = 0; i < dockAreaBeacons.Count; i++)
+        {
+            float angle = i * Mathf.PI * 0.5f;
+            Transform beacon = dockAreaBeacons[i];
+            if (beacon == null)
+            {
+                continue;
+            }
+
+            Vector3 edge = center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+            beacon.gameObject.SetActive(dockAreaRenderer.enabled);
+            beacon.position = edge + Vector3.up * (height * 0.5f);
+            beacon.rotation = Quaternion.identity;
+            beacon.localScale = new Vector3(width, height * 0.5f, width);
+        }
+    }
+
+    private void SetDockAreaBeaconsVisible(bool visible)
+    {
+        for (int i = 0; i < dockAreaBeacons.Count; i++)
+        {
+            Transform beacon = dockAreaBeacons[i];
+            if (beacon != null)
+            {
+                beacon.gameObject.SetActive(visible);
+            }
+        }
+    }
+
+    private Material GetDockAreaBeaconMaterial()
+    {
+        if (dockAreaBeaconMaterial != null)
+        {
+            return dockAreaBeaconMaterial;
+        }
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+        {
+            shader = Shader.Find("Standard");
+        }
+
+        dockAreaBeaconMaterial = new Material(shader)
+        {
+            hideFlags = HideFlags.DontSave
+        };
+        SetMaterialTransparent(dockAreaBeaconMaterial);
+        return dockAreaBeaconMaterial;
+    }
+
+    private static void SetMaterialColor(Material material, Color color)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
+        if (material.HasProperty("_Color")) material.SetColor("_Color", color);
+    }
+
+    private static void SetMaterialTransparent(Material material)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
+        if (material.HasProperty("_Blend")) material.SetFloat("_Blend", 0f);
+        if (material.HasProperty("_SrcBlend")) material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        if (material.HasProperty("_DstBlend")) material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        if (material.HasProperty("_ZWrite")) material.SetFloat("_ZWrite", 0f);
+        material.SetOverrideTag("RenderType", "Transparent");
+        material.renderQueue = 3000;
+    }
+
+    private static void DestroyRuntimeMaterial(Material material)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(material);
+        }
+        else
+        {
+            DestroyImmediate(material);
+        }
     }
 
     private void OnDrawGizmosSelected()

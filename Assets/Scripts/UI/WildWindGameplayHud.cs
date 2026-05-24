@@ -679,9 +679,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         PlayerProgress progress = currentMeta.progress;
         bool docked = currentMeta.CurrentMode == GameSessionMode.Docked;
         bool completed = WildWindStarterDelivery.IsCompleted(progress);
-        int capitalFood = WildWindStarterDelivery.GetCapitalFood(progress);
-        int destinationFood = WildWindStarterDelivery.GetDestinationFood(progress);
-        int shipFood = WildWindStarterDelivery.GetShipFood(progress);
+        bool hasActiveDelivery = WildWindStarterDelivery.HasActiveDelivery(progress);
+        int sourceStock = WildWindStarterDelivery.GetSourceStock(progress);
+        int destinationStock = WildWindStarterDelivery.GetDestinationStock(progress);
+        int shipCargo = WildWindStarterDelivery.GetShipCargo(progress);
+        int deliveryAmount = WildWindStarterDelivery.GetActiveDeliveryAmount(progress);
         float distance = Vector3.Distance(GetPlayerPosition(currentSession), GetDestinationPosition(currentMeta));
 
         dockedPanel.gameObject.SetActive(docked);
@@ -691,11 +693,13 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         SetText(modeText, WildWindLocalization.Get(docked ? "game.hud.city" : "game.hud.flight"));
         SetText(missionText, completed
             ? WildWindLocalization.Get("game.hud.completed")
-            : WildWindLocalization.Get("game.hud.mission_title"));
-        SetText(routeText, WildWindLocalization.Get("game.hud.route"));
-        SetText(capitalStockText, WildWindLocalization.Get("game.hud.capital_stock") + ": " + capitalFood);
-        SetText(destinationStockText, WildWindLocalization.Get("game.hud.destination_stock") + ": " + destinationFood + " / " + WildWindStarterDelivery.DeliveryAmount);
-        SetText(shipCargoText, WildWindLocalization.Get("game.hud.ship_cargo") + ": " + shipFood);
+            : WildWindStarterDelivery.GetMissionTitle(progress));
+        SetText(routeText, WildWindStarterDelivery.GetRouteText(progress));
+        SetText(capitalStockText, WildWindStarterDelivery.GetSourceStockLabel(progress) + ": " + sourceStock);
+        SetText(destinationStockText, WildWindStarterDelivery.GetDestinationStockLabel(progress) + ": " + destinationStock + (deliveryAmount > 0 ? " / " + deliveryAmount : ""));
+        SetText(shipCargoText, WildWindStarterDelivery.GetShipCargoLabel(progress) + ": " + shipCargo);
+        SetText(loadFoodText, WildWindStarterDelivery.GetLoadButtonText(progress));
+        SetText(unloadFoodText, WildWindStarterDelivery.GetUnloadButtonText(progress));
         WildWindFlightControlBridge controls = ResolveFlightControls();
         float currentAltitude = GetPlayerPosition(currentSession).y;
         float targetAltitude = controls != null ? controls.TargetAltitude : currentAltitude;
@@ -718,12 +722,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             SyncTargetAltitudeField(controls);
         }
 
-        bool atCapital = docked && progress.currentDockId == WildWindStarterDelivery.SourceDockId;
-        bool atDestination = docked && progress.currentDockId == WildWindStarterDelivery.DestinationDockId;
-        SetInteractable(loadFoodButton, atCapital && !completed && shipFood < WildWindStarterDelivery.DeliveryAmount && capitalFood > 0);
+        string sourceDockId = WildWindStarterDelivery.GetActiveSourceDockId(progress);
+        string destinationDockId = WildWindStarterDelivery.GetActiveDestinationDockId(progress);
+        bool atSource = docked && progress.currentDockId == sourceDockId;
+        bool atDestination = docked && progress.currentDockId == destinationDockId;
+        SetInteractable(loadFoodButton, hasActiveDelivery && atSource && !completed && shipCargo < deliveryAmount && sourceStock > 0);
         SetInteractable(takeoffButton, docked);
         SetInteractable(dockButton, !docked);
-        SetInteractable(unloadFoodButton, atDestination && !completed && shipFood > 0);
+        SetInteractable(unloadFoodButton, hasActiveDelivery && atDestination && !completed && shipCargo > 0);
         SetInteractable(menuButton, true);
     }
 
@@ -1111,7 +1117,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return true;
         }
 
-        if (currentMeta != null)
+        if (currentMeta != null && currentMeta.progress != null && WildWindStarterDelivery.HasActiveDelivery(currentMeta.progress))
         {
             targetPosition = GetDestinationPosition(currentMeta);
             return true;
@@ -1163,20 +1169,27 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private Vector3 GetDestinationPosition(MetaGameState currentMeta)
     {
+        PlayerProgress progress = currentMeta != null ? currentMeta.progress : null;
+        string destinationDockId = WildWindStarterDelivery.GetActiveDestinationDockId(progress);
+        if (string.IsNullOrWhiteSpace(destinationDockId))
+        {
+            return GetPlayerPosition(ResolveSession());
+        }
+
         DockingPort[] docks = Object.FindObjectsByType<DockingPort>(FindObjectsSortMode.None);
         for (int i = 0; i < docks.Length; i++)
         {
             DockingPort dock = docks[i];
-            if (dock != null && dock.dockId == WildWindStarterDelivery.DestinationDockId)
+            if (dock != null && dock.dockId == destinationDockId)
             {
                 return dock.DockPosition;
             }
         }
 
         IslandConfig island = currentMeta != null && currentMeta.WorldConfig != null
-            ? currentMeta.WorldConfig.GetIsland(WildWindStarterDelivery.DestinationDockId)
+            ? currentMeta.WorldConfig.GetIsland(destinationDockId)
             : null;
-        return island != null ? island.position : new Vector3(WildWindStarterDelivery.ExpectedDestinationDistanceMeters, 2500f, 0f);
+        return island != null ? island.position : new Vector3(2300f, 2550f, 1200f);
     }
 
     private static Vector3 GetPlayerPosition(WildWindGameplaySession currentSession)

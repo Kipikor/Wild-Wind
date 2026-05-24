@@ -13,14 +13,14 @@ public sealed class WorldRegionProfile : ScriptableObject
     [SerializeField, InspectorName("Детальный радиус, м")] private float detailedBubbleRadiusMeters = 1600f;
 
     [Header("Плотность записей мира")]
-    [SerializeField, InspectorName("Острова, шт")] private int islandCount = 15;
-    [SerializeField, InspectorName("Облачные поля, шт")] private int cloudFieldCount = 34;
-    [SerializeField, InspectorName("Высотные облака, шт")] private int highCloudFieldCount = 8;
-    [SerializeField, InspectorName("Рудные поля, шт")] private int resourceFieldCount = 11;
-    [SerializeField, InspectorName("Высотные рудные поля, шт")] private int highResourceFieldCount = 3;
-    [SerializeField, InspectorName("Зоны левиафанов, шт")] private int leviathanRegionCount = 5;
-    [SerializeField, InspectorName("Высотные зоны левиафанов, шт")] private int highLeviathanRegionCount = 2;
-    [SerializeField, InspectorName("Поля айсбергов, шт")] private int icebergFieldCount = 4;
+    [SerializeField, InspectorName("Острова, шт")] private int islandCount = 6;
+    [SerializeField, InspectorName("Облачные поля, шт")] private int cloudFieldCount = 3;
+    [SerializeField, InspectorName("Высотные облака, шт")] private int highCloudFieldCount;
+    [SerializeField, InspectorName("Рудные поля, шт")] private int resourceFieldCount = 1;
+    [SerializeField, InspectorName("Высотные рудные поля, шт")] private int highResourceFieldCount;
+    [SerializeField, InspectorName("Зоны левиафанов, шт")] private int leviathanRegionCount = 1;
+    [SerializeField, InspectorName("Высотные зоны левиафанов, шт")] private int highLeviathanRegionCount;
+    [SerializeField, InspectorName("Поля айсбергов, шт")] private int icebergFieldCount;
 
     public int Seed => seed;
     public float WorldSizeMeters => worldSizeMeters;

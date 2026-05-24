@@ -349,17 +349,25 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
             return true;
         }
 
-        DockingPort dock = FindDock(WildWindStarterDelivery.DestinationDockId);
+        ResolveReferences();
+        PlayerProgress progress = meta != null ? meta.progress : null;
+        string destinationDockId = WildWindStarterDelivery.GetActiveDestinationDockId(progress);
+        if (string.IsNullOrWhiteSpace(destinationDockId))
+        {
+            statusMessage = "No active task target found.";
+            return false;
+        }
+
+        DockingPort dock = FindDock(destinationDockId);
         if (dock != null)
         {
             SetAutopilotTarget(dock.DockPosition, dock.dockId, dock.kind);
-            statusMessage = "Autopilot target copied from starter delivery.";
+            statusMessage = "Autopilot target copied from intro delivery.";
             return true;
         }
 
-        ResolveReferences();
         IslandConfig island = meta != null && meta.WorldConfig != null
-            ? meta.WorldConfig.GetIsland(WildWindStarterDelivery.DestinationDockId)
+            ? meta.WorldConfig.GetIsland(destinationDockId)
             : null;
         if (island == null)
         {
@@ -367,8 +375,8 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
             return false;
         }
 
-        SetAutopilotTarget(island.position, WildWindStarterDelivery.DestinationDockId, DockingLocationKind.Island);
-        statusMessage = "Autopilot target copied from starter delivery config.";
+        SetAutopilotTarget(island.position, destinationDockId, DockingLocationKind.Island);
+        statusMessage = "Autopilot target copied from intro delivery config.";
         return true;
     }
 

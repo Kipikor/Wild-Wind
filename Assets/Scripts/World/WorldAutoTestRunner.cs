@@ -147,11 +147,11 @@ public sealed class WorldAutoTestRunner : MonoBehaviour
 
     private void ValidateWorldRecords(WorldAutoTestReport report)
     {
-        report.Check(world.Islands.Count >= 10, "Островов достаточно для стартового региона: " + world.Islands.Count + ".");
-        report.Check(world.CloudFields.Count >= 20, "Облачных полей достаточно для стартового региона: " + world.CloudFields.Count + ".");
-        report.Check(world.ResourceFields.Count >= 8, "Ресурсных полей достаточно для стартового региона: " + world.ResourceFields.Count + ".");
-        report.Check(world.LeviathanRegions.Count >= 3, "Зон левиафанов достаточно для стартового региона: " + world.LeviathanRegions.Count + ".");
-        report.Check(world.IcebergFields.Count >= 2, "Полей айсбергов достаточно для стартового региона: " + world.IcebergFields.Count + ".");
+        report.Check(world.Islands.Count == 6, "Учебный регион содержит столицу и пять островов: " + world.Islands.Count + ".");
+        report.Check(world.CloudFields.Count == 3, "Учебный регион содержит только стартовые облака: " + world.CloudFields.Count + ".");
+        report.Check(world.ResourceFields.Count == 1, "Учебный регион содержит одну учебную глыбу: " + world.ResourceFields.Count + ".");
+        report.Check(world.LeviathanRegions.Count == 1, "Учебный регион содержит одну зону малых левиафанов: " + world.LeviathanRegions.Count + ".");
+        report.Check(world.IcebergFields.Count == 0, "Учебный регион пока не содержит айсбергов: " + world.IcebergFields.Count + ".");
 
         ValidateIslandRecords(report);
         ValidateCloudRecords(report);

@@ -64,14 +64,11 @@ public sealed class WorldRegionRuntime : MonoBehaviour
     public IReadOnlyList<WorldIcebergFieldRecord> IcebergFields => icebergFields;
 
     private int ChunkCountPerAxis => Mathf.Max(1, Mathf.RoundToInt(worldSizeMeters / Mathf.Max(1f, chunkSizeMeters)));
-    private int TargetIslandCount => profile != null ? profile.IslandCount : 15;
-    private int TargetCloudFieldCount => profile != null ? profile.CloudFieldCount : 34;
-    private int TargetHighCloudFieldCount => profile != null ? profile.HighCloudFieldCount : 8;
-    private int TargetResourceFieldCount => profile != null ? profile.ResourceFieldCount : 11;
-    private int TargetHighResourceFieldCount => profile != null ? profile.HighResourceFieldCount : 3;
-    private int TargetLeviathanRegionCount => profile != null ? profile.LeviathanRegionCount : 5;
-    private int TargetHighLeviathanRegionCount => profile != null ? profile.HighLeviathanRegionCount : 2;
-    private int TargetIcebergFieldCount => profile != null ? profile.IcebergFieldCount : 4;
+    private int TargetIslandCount => profile != null ? profile.IslandCount : 6;
+    private int TargetCloudFieldCount => profile != null ? profile.CloudFieldCount : 3;
+    private int TargetResourceFieldCount => profile != null ? profile.ResourceFieldCount : 1;
+    private int TargetLeviathanRegionCount => profile != null ? profile.LeviathanRegionCount : 1;
+    private int TargetIcebergFieldCount => profile != null ? profile.IcebergFieldCount : 0;
 
     private void Awake()
     {
@@ -325,125 +322,81 @@ public sealed class WorldRegionRuntime : MonoBehaviour
 
     private void GenerateIslands()
     {
-        CreateIsland("capital", "Гринхейвен", "Столица и торговый узел", new Vector3(0f, 2500f, 0f), 640f, true);
-
-        string[] names =
-        {
-            "Соляной причал", "Медная марь", "Тихий док", "Тканевая банка", "Пороховой пост",
-            "Восточная верфь", "Сухая гавань", "Башня аптекарей", "Янтарный рынок", "Серый маяк",
-            "Платформа угольщиков", "Грозовой склад", "Певчая пристань", "Северная мельница"
-        };
-
-        string[] roles =
-        {
-            "Еда и вода", "Руда и металл", "Доставка", "Ткань", "Порох",
-            "Корабельные работы", "Топливо", "Медицина", "Торговля", "Навигация",
-            "Уголь", "Опасные товары", "Пассажиры", "Механизмы"
-        };
-
-        System.Random random = new System.Random(regionSeed + 11);
-        int extraIslandCount = Mathf.Max(0, TargetIslandCount - 1);
-        for (int i = 0; i < extraIslandCount; i++)
-        {
-            int nameIndex = i % names.Length;
-            string displayName = names[nameIndex];
-            if (i >= names.Length)
-            {
-                displayName += " " + ((i / names.Length) + 1);
-            }
-
-            Vector3 position = PickSpacedHorizontalPosition(random, 8500f, 45500f, 4200f);
-            position.y = NextFloat(random, 2300f, 8800f);
-            CreateIsland("island_" + (i + 1).ToString("00"), displayName, roles[nameIndex], position, NextFloat(random, 260f, 760f), true);
-        }
+        int count = Mathf.Min(Mathf.Max(0, TargetIslandCount), 6);
+        if (count >= 1) CreateIsland("capital", "Столица", "Столица и торговый узел", new Vector3(0f, 2500f, 0f), 760f, true);
+        if (count >= 2) CreateIsland("Island1", "Ферма отца", "Еда и первый док", new Vector3(-2600f, 2500f, -1000f), 520f, true);
+        if (count >= 3) CreateIsland("Island2", "Аэролитовый остров", "Аэролит и знакомая механик", new Vector3(2300f, 2550f, 1200f), 540f, true);
+        if (count >= 4) CreateIsland("Island3", "Угольный причал", "Топливо", new Vector3(-1800f, 2500f, 3200f), 500f, true);
+        if (count >= 5) CreateIsland("Island4", "Туманный водосбор", "Вода и облака", new Vector3(4200f, 2650f, -1700f), 500f, true);
+        if (count >= 6) CreateIsland("Island5", "Клавдиевая гряда", "Клавдий", new Vector3(4400f, 3200f, 2700f), 560f, true);
     }
 
     private void GenerateCloudFields()
     {
-        string[] resources =
-        {
-            "water_vapor", "claudium_trace", "food_spores", "fulgur_trace", "cloth_fiber",
-            "cold_mist", "storm_charge", "crystal_dust"
-        };
-
-        System.Random random = new System.Random(regionSeed + 29);
-        int cloudCount = Mathf.Max(0, TargetCloudFieldCount);
-        int highCloudStart = Mathf.Max(0, cloudCount - Mathf.Clamp(TargetHighCloudFieldCount, 0, cloudCount));
-        for (int i = 0; i < cloudCount; i++)
-        {
-            bool highLayer = i >= highCloudStart;
-            Vector3 center = PickSpacedHorizontalPosition(random, 2500f, 48000f, 0f);
-            center.y = highLayer ? NextFloat(random, 11000f, 36000f) : NextFloat(random, 2200f, 9600f);
-            float radius = highLayer ? NextFloat(random, 650f, 2100f) : NextFloat(random, 1200f, 5200f);
-            float density = highLayer ? NextFloat(random, 0.12f, 0.38f) : NextFloat(random, 0.35f, 0.95f);
-            string resource = resources[i % resources.Length];
-
-            cloudFields.Add(new WorldCloudFieldRecord
-            {
-                id = "cloud_field_" + i.ToString("00"),
-                displayNameRu = highLayer ? "Редкое высотное облако " + (i - highCloudStart + 1) : "Облачное поле " + (i + 1),
-                centerMeters = center,
-                radiusMeters = radius,
-                thicknessMeters = highLayer ? NextFloat(random, 180f, 620f) : NextFloat(random, 420f, 1900f),
-                density01 = density,
-                resourceId = resource,
-                resourceKgEstimate = Mathf.RoundToInt(radius * density * (highLayer ? 18f : 46f)),
-                chunkId = GetChunkIdAt(center),
-                simulationOnlyWhenFar = true
-            });
-        }
+        int count = Mathf.Min(Mathf.Max(0, TargetCloudFieldCount), 3);
+        if (count >= 1) AddCloudField("cloud_capital_common_01", "Столичное учебное облако", new Vector3(800f, 2600f, -650f), 620f, 360f, 0.38f, "cloud_condensate", 12000);
+        if (count >= 2) AddCloudField("cloud_mist_training_01", "Туманный карман у водосбора", new Vector3(4550f, 2750f, -1300f), 760f, 440f, 0.52f, "wet_condensate", 18000);
+        if (count >= 3) AddCloudField("cloud_claudium_wisp_01", "Клавдиевый шлейф гряды", new Vector3(4750f, 3350f, 2500f), 540f, 320f, 0.30f, "claudic_condensate", 9000);
     }
 
     private void GenerateResourceFields()
     {
-        string[] ores = { "windshale", "dawnspar", "bluebrass", "stormbone", "claudreef", "mirrorbasalt", "crownstone" };
-        System.Random random = new System.Random(regionSeed + 43);
-        int resourceCount = Mathf.Max(0, TargetResourceFieldCount);
-        int highResourceStart = Mathf.Max(0, resourceCount - Mathf.Clamp(TargetHighResourceFieldCount, 0, resourceCount));
-        for (int i = 0; i < resourceCount; i++)
+        if (TargetResourceFieldCount <= 0)
         {
-            bool highValue = i >= highResourceStart;
-            Vector3 center = PickSpacedHorizontalPosition(random, 6000f, 47000f, 0f);
-            center.y = highValue ? NextFloat(random, 12000f, 32000f) : NextFloat(random, 2600f, 9200f);
-
-            resourceFields.Add(new WorldResourceFieldRecord
-            {
-                id = "ore_field_" + i.ToString("00"),
-                displayNameRu = highValue ? "Высотная рудная глыба " + (i - highResourceStart + 1) : "Рудное поле " + (i + 1),
-                centerMeters = center,
-                radiusMeters = highValue ? NextFloat(random, 800f, 1900f) : NextFloat(random, 1200f, 3200f),
-                altitudeBand = EvaluateAltitudeBand(center.y),
-                resourceId = ores[i % ores.Length],
-                resourceKgEstimate = Mathf.RoundToInt(NextFloat(random, highValue ? 180000f : 45000f, highValue ? 620000f : 180000f)),
-                chunkId = GetChunkIdAt(center),
-                materializesAsNodes = true
-            });
+            return;
         }
+
+        Vector3 center = new Vector3(2900f, 2550f, 1600f);
+        resourceFields.Add(new WorldResourceFieldRecord
+        {
+            id = "ore_field_tutorial_00",
+            displayNameRu = "Учебная рудная глыба",
+            centerMeters = center,
+            radiusMeters = 820f,
+            altitudeBand = EvaluateAltitudeBand(center.y),
+            resourceId = "windshale",
+            resourceKgEstimate = 8000,
+            chunkId = GetChunkIdAt(center),
+            materializesAsNodes = true
+        });
     }
 
     private void GenerateLeviathanRegions()
     {
-        System.Random random = new System.Random(regionSeed + 61);
-        int regionCount = Mathf.Max(0, TargetLeviathanRegionCount);
-        int highRegionStart = Mathf.Max(0, regionCount - Mathf.Clamp(TargetHighLeviathanRegionCount, 0, regionCount));
-        for (int i = 0; i < regionCount; i++)
+        if (TargetLeviathanRegionCount <= 0)
         {
-            bool high = i >= highRegionStart;
-            Vector3 center = PickSpacedHorizontalPosition(random, 12000f, 47000f, 0f);
-            center.y = high ? NextFloat(random, 13000f, 36000f) : NextFloat(random, 2800f, 9400f);
-
-            leviathanRegions.Add(new WorldLeviathanRegionRecord
-            {
-                id = "leviathan_region_" + i.ToString("00"),
-                displayNameRu = high ? "Высотный охотничий коридор" : "Пастбище левиафанов",
-                centerMeters = center,
-                radiusMeters = high ? NextFloat(random, 5000f, 9500f) : NextFloat(random, 6500f, 14000f),
-                altitudeMinMeters = high ? 10000f : 2000f,
-                altitudeMaxMeters = high ? 40000f : 10000f,
-                rarity01 = high ? NextFloat(random, 0.02f, 0.12f) : NextFloat(random, 0.18f, 0.42f),
-                chunkId = GetChunkIdAt(center)
-            });
+            return;
         }
+
+        Vector3 center = new Vector3(3600f, 2600f, 3900f);
+        leviathanRegions.Add(new WorldLeviathanRegionRecord
+        {
+            id = "leviathan_region_tutorial_00",
+            displayNameRu = "Учебные малые левиафаны",
+            centerMeters = center,
+            radiusMeters = 700f,
+            altitudeMinMeters = 2350f,
+            altitudeMaxMeters = 2900f,
+            rarity01 = 0.16f,
+            chunkId = GetChunkIdAt(center)
+        });
+    }
+
+    private void AddCloudField(string id, string displayNameRu, Vector3 center, float radius, float thickness, float density, string resourceId, int resourceKgEstimate)
+    {
+        cloudFields.Add(new WorldCloudFieldRecord
+        {
+            id = id,
+            displayNameRu = displayNameRu,
+            centerMeters = center,
+            radiusMeters = radius,
+            thicknessMeters = thickness,
+            density01 = density,
+            resourceId = resourceId,
+            resourceKgEstimate = resourceKgEstimate,
+            chunkId = GetChunkIdAt(center),
+            simulationOnlyWhenFar = true
+        });
     }
 
     private void GenerateIcebergFields()

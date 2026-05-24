@@ -1,3 +1,2 @@
 id_leviathan_zone,local_name_ru,local_name_en,position_x,position_y,position_z,radius_m,leviathan_type_id,initial_count,max_active,spawn_interval_seconds,min_y,max_y
-capital_leviathans,Пристоличные воды,Capital Leviathan Waters,90,95,60,260,"windcalf,mistwhale,sky_eel",3,5,780,55,165
-outer_stonebacks,Каменные пастбища,Stoneback Pastures,-850,130,680,720,"mistwhale,stoneback",2,5,960,70,210
+tutorial_windminnows,Учебные малые левиафаны,Tutorial Wind Minnows,3600,2600,3900,700,windminnow,2,3,900,2350,2900

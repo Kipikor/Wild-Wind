@@ -2701,11 +2701,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
     private void ValidateWorldEntityRecords(BigTestReport report)
     {
-        report.Check(world.Islands.Count >= 10, "В регионе достаточно островов для первого мира: " + world.Islands.Count + ".");
-        report.Check(world.CloudFields.Count >= 20, "В регионе достаточно облачных полей: " + world.CloudFields.Count + ".");
-        report.Check(world.ResourceFields.Count >= 8, "В регионе достаточно рудных/ресурсных полей: " + world.ResourceFields.Count + ".");
-        report.Check(world.LeviathanRegions.Count >= 3, "В регионе достаточно зон левиафанов: " + world.LeviathanRegions.Count + ".");
-        report.Check(world.IcebergFields.Count >= 2, "В регионе достаточно высотных айсберговых полей: " + world.IcebergFields.Count + ".");
+        report.Check(world.Islands.Count == 6, "Учебный регион содержит столицу и пять островов: " + world.Islands.Count + ".");
+        report.Check(world.CloudFields.Count == 3, "Учебный регион содержит только стартовые облака: " + world.CloudFields.Count + ".");
+        report.Check(world.ResourceFields.Count == 1, "Учебный регион содержит одну учебную глыбу: " + world.ResourceFields.Count + ".");
+        report.Check(world.LeviathanRegions.Count == 1, "Учебный регион содержит одну зону малых левиафанов: " + world.LeviathanRegions.Count + ".");
+        report.Check(world.IcebergFields.Count == 0, "Учебный регион пока не содержит айсбергов: " + world.IcebergFields.Count + ".");
 
         bool islandsValid = true;
         for (int i = 0; i < world.Islands.Count; i++)
@@ -3665,36 +3665,36 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         loadedMeta.EnsureProgressInitialized();
         PlayerProgress progress = loadedMeta.progress;
         WorldConfigDatabase config = loadedMeta.WorldConfig;
-        IslandConfig capital = config.GetIsland(WildWindStarterDelivery.SourceDockId);
+        IslandConfig source = config.GetIsland(WildWindStarterDelivery.SourceDockId);
         IslandConfig destination = config.GetIsland(WildWindStarterDelivery.DestinationDockId);
-        report.Check(capital != null, "Starter delivery source island exists in Island.csv.");
+        report.Check(source != null, "Starter delivery source island exists in Island.csv.");
         report.Check(destination != null, "Starter delivery destination island exists in Island.csv.");
-        if (capital == null || destination == null)
+        if (source == null || destination == null)
         {
             return;
         }
 
-        float distance = Vector3.Distance(capital.position, destination.position);
+        float distance = Vector3.Distance(source.position, destination.position);
         report.Check(Approximately(distance, WildWindStarterDelivery.ExpectedDestinationDistanceMeters, 1f),
-            "Starter delivery destination is 1 km from the capital: " + distance.ToString("0.#") + " m.");
+            "Starter delivery destination is about 5.6 km from the farm: " + distance.ToString("0.#") + " m.");
         report.Check(progress.currentMode == GameSessionMode.Docked && progress.currentDockId == WildWindStarterDelivery.SourceDockId,
-            "Starter delivery begins docked at the capital.");
+            "Starter delivery begins docked at the father's farm.");
         report.Check(WildWindStarterDelivery.GetCapitalFood(progress) >= WildWindStarterDelivery.DeliveryAmount,
-            "Capital starts with food for the first delivery: " + WildWindStarterDelivery.GetCapitalFood(progress) + ".");
+            "Farm starts with food for the first delivery: " + WildWindStarterDelivery.GetCapitalFood(progress) + ".");
         report.Check(WildWindStarterDelivery.GetDestinationFood(progress) == 0,
-            "Nearby island starts without delivered food.");
-        report.Check(loadedHud.IsDockedPanelVisible, "Starter delivery HUD shows docked/city controls at the capital.");
+            "Aerolite island starts without delivered food.");
+        report.Check(loadedHud.IsDockedPanelVisible, "Starter delivery HUD shows docked/city controls at the farm.");
 
-        int capitalBefore = WildWindStarterDelivery.GetCapitalFood(progress);
+        int sourceBefore = WildWindStarterDelivery.GetCapitalFood(progress);
         bool loaded = loadedHud.TryLoadStarterFood();
-        report.Check(loaded, "Starter delivery HUD loads food from capital into the ship.");
+        report.Check(loaded, "Starter delivery HUD loads food from the farm into the ship.");
         report.Check(WildWindStarterDelivery.GetShipFood(progress) == WildWindStarterDelivery.DeliveryAmount,
             "Ship cargo contains the delivery food.");
-        report.Check(WildWindStarterDelivery.GetCapitalFood(progress) == capitalBefore - WildWindStarterDelivery.DeliveryAmount,
-            "Capital stock decreases after loading food.");
+        report.Check(WildWindStarterDelivery.GetCapitalFood(progress) == sourceBefore - WildWindStarterDelivery.DeliveryAmount,
+            "Farm stock decreases after loading food.");
 
         bool tookOff = loadedHud.TryTakeOff();
-        report.Check(tookOff, "Starter delivery HUD starts flight from the capital.");
+        report.Check(tookOff, "Starter delivery HUD starts flight from the farm.");
         report.Check(progress.currentMode == GameSessionMode.Flight && loadedHud.IsFlightPanelVisible,
             "Starter delivery switches to flight mode and HUD flight controls.");
         report.Check(loadedHud.IsFlightControlsVisible, "Starter delivery flight HUD exposes direct movement controls.");
@@ -3741,18 +3741,47 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             DockingLocationKind.Island,
             destinationDock,
             out string dockReason);
-        report.Check(dockedAtDestination, "Starter delivery can dock at the nearby island: " + dockReason);
+        report.Check(dockedAtDestination, "Starter delivery can dock at the aerolite island: " + dockReason);
         report.Check(progress.currentMode == GameSessionMode.Docked && progress.currentDockId == WildWindStarterDelivery.DestinationDockId,
-            "Starter delivery arrives docked at the nearby island.");
+            "Starter delivery arrives docked at the aerolite island.");
 
         bool unloaded = loadedHud.TryUnloadStarterFood();
-        report.Check(unloaded, "Starter delivery HUD unloads food at the nearby island.");
+        report.Check(unloaded, "Starter delivery HUD unloads food at the aerolite island.");
         report.Check(WildWindStarterDelivery.GetShipFood(progress) == 0,
-            "Ship cargo is empty after starter delivery.");
-        report.Check(WildWindStarterDelivery.GetDestinationFood(progress) >= WildWindStarterDelivery.DeliveryAmount,
-            "Nearby island received the delivered food.");
+            "Ship cargo is empty after the first intro delivery.");
+        IslandProductionState aeroliteStorage = progress.GetIslandProductionState(WildWindStarterDelivery.DestinationDockId, false);
+        int deliveredFood = aeroliteStorage != null ? aeroliteStorage.GetResourceAmount(WildWindStarterDelivery.FoodItemId) : 0;
+        report.Check(deliveredFood >= WildWindStarterDelivery.DeliveryAmount,
+            "Aerolite island received the delivered food.");
+        report.Check(progress.IsMissionCompleted(WildWindStarterDelivery.FirstMissionId),
+            "First intro delivery mission is marked completed.");
+        report.Check(WildWindStarterDelivery.GetActiveSourceDockId(progress) == WildWindStarterDelivery.DestinationDockId &&
+            WildWindStarterDelivery.GetActiveDestinationDockId(progress) == "capital",
+            "Second intro delivery activates from aerolite island to the capital.");
+
+        int aeroliteBefore = WildWindStarterDelivery.GetSourceStock(progress);
+        bool loadedAerolite = loadedHud.TryLoadStarterFood();
+        report.Check(loadedAerolite, "Starter delivery HUD loads aerolite for the capital leg.");
+        report.Check(WildWindStarterDelivery.GetShipCargo(progress) == WildWindStarterDelivery.GetActiveDeliveryAmount(progress),
+            "Ship cargo contains the aerolite delivery.");
+        report.Check(WildWindStarterDelivery.GetSourceStock(progress) == aeroliteBefore - WildWindStarterDelivery.GetActiveDeliveryAmount(progress),
+            "Aerolite island stock decreases after loading aerolite.");
+
+        bool tookOffToCapital = loadedHud.TryTakeOff();
+        report.Check(tookOffToCapital, "Starter delivery HUD starts the second flight to the capital.");
+        IslandConfig capital = config.GetIsland("capital");
+        Vector3 capitalDock = capital != null ? FindDockPositionOrConfigPosition("capital", capital.position) : Vector3.zero;
+        string capitalDockReason = "capital island missing";
+        bool dockedAtCapital = capital != null && loadedSession.TryDockAt(
+            "capital",
+            DockingLocationKind.Island,
+            capitalDock,
+            out capitalDockReason);
+        report.Check(dockedAtCapital, "Second intro delivery can dock at the capital: " + (dockedAtCapital ? "ok" : capitalDockReason));
+        bool unloadedAerolite = loadedHud.TryUnloadStarterFood();
+        report.Check(unloadedAerolite, "Starter delivery HUD unloads aerolite at the capital.");
         report.Check(WildWindStarterDelivery.IsCompleted(progress),
-            "Starter delivery mission is marked completed.");
+            "Intro delivery chain is marked completed after the capital leg.");
     }
 
     private void ValidateStarterFlightControls(BigTestReport report, WildWindGameplaySession loadedSession, Vector3 destinationPosition)

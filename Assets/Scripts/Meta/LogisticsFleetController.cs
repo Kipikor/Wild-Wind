@@ -66,8 +66,8 @@ public class LogisticsFleetController : MonoBehaviour
         {
             routes.Add(new LogisticsRouteDefinition
             {
-                routeId = "starter_food_charcoal_tools",
-                displayName = "Еда, уголь, инструменты",
+                routeId = "starter_food_aerolite_capital",
+                displayName = "Еда, аэролит, столица",
                 loop = true,
                 stops = new List<LogisticsRouteStop>
                 {
@@ -80,21 +80,19 @@ public class LogisticsFleetController : MonoBehaviour
                     },
                     new LogisticsRouteStop
                     {
-                        islandId = "Island6",
-                        unload = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "food", amount = 10 } },
-                        load = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "charcoal", amount = 10 } },
+                        islandId = "Island2",
+                        unload = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "food", amount = 20 } },
+                        load = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "aerolite", amount = 12 } },
                         targetFuelKg = 30,
                         targetClaudiumKg = 15
                     },
                     new LogisticsRouteStop
                     {
-                        islandId = "Island5",
+                        islandId = "capital",
                         unload = new List<LogisticsCargoOrder>
                         {
-                            new LogisticsCargoOrder { itemId = "food", amount = 10 },
-                            new LogisticsCargoOrder { itemId = "charcoal", amount = 10 }
+                            new LogisticsCargoOrder { itemId = "aerolite", amount = 12 }
                         },
-                        load = new List<LogisticsCargoOrder> { new LogisticsCargoOrder { itemId = "tools", amount = 20 } },
                         targetFuelKg = 30,
                         targetClaudiumKg = 15
                     }

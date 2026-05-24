@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!29 &1
 OcclusionCullingSettings:
@@ -1290,8 +1290,8 @@ MonoBehaviour:
   profile: {fileID: 11400000, guid: 5aacbdda0148782419558f8e499b82ab, type: 2}
   manifest: {fileID: 11400000, guid: 23744fed2eb5d32438828a413ca91790, type: 2}
   focus: {fileID: 1922052142}
-  activeBubbleRadiusMeters: 5000
-  detailedBubbleRadiusMeters: 1600
+  activeBubbleRadiusMeters: 8000
+  detailedBubbleRadiusMeters: 2200
   generateOnAwake: 1
   drawWorldGizmos: 1
   drawAllChunks: 0
@@ -3399,692 +3399,104 @@ MonoBehaviour:
       \u0438\u0433\u0440\u043E\u043A\u043E\u043C."
   islands:
   - id: capital
-    displayNameRu: "\u0413\u0440\u0438\u043D\u0445\u0435\u0439\u0432\u0435\u043D"
-    roleRu: "\u0421\u0442\u043E\u043B\u0438\u0446\u0430 \u0438 \u0442\u043E\u0440\u0433\u043E\u0432\u044B\u0439
-      \u0443\u0437\u0435\u043B"
+    displayNameRu: Столица
+    roleRu: Столица и торговый узел
     positionMeters: {x: 0, y: 2500, z: 0}
-    radiusMeters: 640
+    radiusMeters: 760
     chunkId: chunk_05_05
     permanentEntity: 1
     materializesAsSceneObject: 1
-  - id: island_01
-    displayNameRu: "\u0421\u043E\u043B\u044F\u043D\u043E\u0439 \u043F\u0440\u0438\u0447\u0430\u043B"
-    roleRu: "\u0415\u0434\u0430 \u0438 \u0432\u043E\u0434\u0430"
-    positionMeters: {x: 28842.75, y: 7448.4087, z: -30628.934}
-    radiusMeters: 537.114
-    chunkId: chunk_07_01
+  - id: Island1
+    displayNameRu: Ферма отца
+    roleRu: Еда и первый док
+    positionMeters: {x: -2600, y: 2500, z: -1000}
+    radiusMeters: 520
+    chunkId: chunk_04_04
     permanentEntity: 1
     materializesAsSceneObject: 1
-  - id: island_02
-    displayNameRu: "\u041C\u0435\u0434\u043D\u0430\u044F \u043C\u0430\u0440\u044C"
-    roleRu: "\u0420\u0443\u0434\u0430 \u0438 \u043C\u0435\u0442\u0430\u043B\u043B"
-    positionMeters: {x: 15492.726, y: 3070.5974, z: 26678.037}
-    radiusMeters: 600.01056
-    chunkId: chunk_06_07
+  - id: Island2
+    displayNameRu: Аэролитовый остров
+    roleRu: Аэролит и знакомая механик
+    positionMeters: {x: 2300, y: 2550, z: 1200}
+    radiusMeters: 540
+    chunkId: chunk_05_05
     permanentEntity: 1
     materializesAsSceneObject: 1
-  - id: island_03
-    displayNameRu: "\u0422\u0438\u0445\u0438\u0439 \u0434\u043E\u043A"
-    roleRu: "\u0414\u043E\u0441\u0442\u0430\u0432\u043A\u0430"
-    positionMeters: {x: 21157.92, y: 5389.938, z: 25263.047}
-    radiusMeters: 330.11115
-    chunkId: chunk_07_07
+  - id: Island3
+    displayNameRu: Угольный причал
+    roleRu: Топливо
+    positionMeters: {x: -1800, y: 2500, z: 3200}
+    radiusMeters: 500
+    chunkId: chunk_04_05
     permanentEntity: 1
     materializesAsSceneObject: 1
-  - id: island_04
-    displayNameRu: "\u0422\u043A\u0430\u043D\u0435\u0432\u0430\u044F \u0431\u0430\u043D\u043A\u0430"
-    roleRu: "\u0422\u043A\u0430\u043D\u044C"
-    positionMeters: {x: -6700.965, y: 7399.0503, z: 28443.854}
-    radiusMeters: 424.88507
-    chunkId: chunk_04_07
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_05
-    displayNameRu: "\u041F\u043E\u0440\u043E\u0445\u043E\u0432\u043E\u0439 \u043F\u043E\u0441\u0442"
-    roleRu: "\u041F\u043E\u0440\u043E\u0445"
-    positionMeters: {x: 10569.009, y: 8384.157, z: -13824.652}
-    radiusMeters: 554.38916
-    chunkId: chunk_06_03
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_06
-    displayNameRu: "\u0412\u043E\u0441\u0442\u043E\u0447\u043D\u0430\u044F \u0432\u0435\u0440\u0444\u044C"
-    roleRu: "\u041A\u043E\u0440\u0430\u0431\u0435\u043B\u044C\u043D\u044B\u0435 \u0440\u0430\u0431\u043E\u0442\u044B"
-    positionMeters: {x: 30800.42, y: 2809.0027, z: -7078.033}
-    radiusMeters: 403.36746
-    chunkId: chunk_08_04
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_07
-    displayNameRu: "\u0421\u0443\u0445\u0430\u044F \u0433\u0430\u0432\u0430\u043D\u044C"
-    roleRu: "\u0422\u043E\u043F\u043B\u0438\u0432\u043E"
-    positionMeters: {x: -15095.064, y: 8369.464, z: 8516.117}
-    radiusMeters: 356.88574
-    chunkId: chunk_03_05
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_08
-    displayNameRu: "\u0411\u0430\u0448\u043D\u044F \u0430\u043F\u0442\u0435\u043A\u0430\u0440\u0435\u0439"
-    roleRu: "\u041C\u0435\u0434\u0438\u0446\u0438\u043D\u0430"
-    positionMeters: {x: -20396.6, y: 4438.827, z: -14162.854}
-    radiusMeters: 605.9444
-    chunkId: chunk_02_03
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_09
-    displayNameRu: "\u042F\u043D\u0442\u0430\u0440\u043D\u044B\u0439 \u0440\u044B\u043D\u043E\u043A"
-    roleRu: "\u0422\u043E\u0440\u0433\u043E\u0432\u043B\u044F"
-    positionMeters: {x: -5994.2246, y: 4737.615, z: -15991.132}
-    radiusMeters: 314.13147
-    chunkId: chunk_04_03
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_10
-    displayNameRu: "\u0421\u0435\u0440\u044B\u0439 \u043C\u0430\u044F\u043A"
-    roleRu: "\u041D\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u044F"
-    positionMeters: {x: 1720.2489, y: 6126.3696, z: -8755.595}
-    radiusMeters: 400.42093
+  - id: Island4
+    displayNameRu: Туманный водосбор
+    roleRu: Вода и облака
+    positionMeters: {x: 4200, y: 2650, z: -1700}
+    radiusMeters: 500
     chunkId: chunk_05_04
     permanentEntity: 1
     materializesAsSceneObject: 1
-  - id: island_11
-    displayNameRu: "\u041F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u0430 \u0443\u0433\u043E\u043B\u044C\u0449\u0438\u043A\u043E\u0432"
-    roleRu: "\u0423\u0433\u043E\u043B\u044C"
-    positionMeters: {x: 13750.999, y: 3282.6848, z: 21469.887}
-    radiusMeters: 712.0841
-    chunkId: chunk_06_07
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_12
-    displayNameRu: "\u0413\u0440\u043E\u0437\u043E\u0432\u043E\u0439 \u0441\u043A\u043B\u0430\u0434"
-    roleRu: "\u041E\u043F\u0430\u0441\u043D\u044B\u0435 \u0442\u043E\u0432\u0430\u0440\u044B"
-    positionMeters: {x: -24106.984, y: 6205.6816, z: 16631.023}
-    radiusMeters: 725.46265
-    chunkId: chunk_02_06
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_13
-    displayNameRu: "\u041F\u0435\u0432\u0447\u0430\u044F \u043F\u0440\u0438\u0441\u0442\u0430\u043D\u044C"
-    roleRu: "\u041F\u0430\u0441\u0441\u0430\u0436\u0438\u0440\u044B"
-    positionMeters: {x: -20477.408, y: 3893.2112, z: -32121.482}
-    radiusMeters: 642.8868
-    chunkId: chunk_02_01
-    permanentEntity: 1
-    materializesAsSceneObject: 1
-  - id: island_14
-    displayNameRu: "\u0421\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u043C\u0435\u043B\u044C\u043D\u0438\u0446\u0430"
-    roleRu: "\u041C\u0435\u0445\u0430\u043D\u0438\u0437\u043C\u044B"
-    positionMeters: {x: 17011.26, y: 7688.7446, z: -4494.377}
-    radiusMeters: 512.66394
-    chunkId: chunk_06_04
+  - id: Island5
+    displayNameRu: Клавдиевая гряда
+    roleRu: Клавдий
+    positionMeters: {x: 4400, y: 3200, z: 2700}
+    radiusMeters: 560
+    chunkId: chunk_05_05
     permanentEntity: 1
     materializesAsSceneObject: 1
   cloudFields:
-  - id: cloud_field_00
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      1"
-    centerMeters: {x: -1658.1351, y: 4966.4653, z: 10969.467}
-    radiusMeters: 2784.8032
-    thicknessMeters: 914.65045
-    density01: 0.5258043
-    resourceId: water_vapor
-    resourceKgEstimate: 67356
-    chunkId: chunk_04_06
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_01
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      2"
-    centerMeters: {x: 14114.651, y: 4907.9453, z: 31831.475}
-    radiusMeters: 2393.6118
-    thicknessMeters: 705.76184
-    density01: 0.79191476
-    resourceId: claudium_trace
-    resourceKgEstimate: 87195
-    chunkId: chunk_06_08
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_02
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      3"
-    centerMeters: {x: -23659.73, y: 5041.325, z: -37774.27}
-    radiusMeters: 3484.585
-    thicknessMeters: 1012.85675
-    density01: 0.602208
-    resourceId: food_spores
-    resourceKgEstimate: 96528
-    chunkId: chunk_02_01
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_03
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      4"
-    centerMeters: {x: -24730.713, y: 4832.3247, z: 12937.2295}
-    radiusMeters: 1361.8894
-    thicknessMeters: 1270.9419
-    density01: 0.42223898
-    resourceId: fulgur_trace
-    resourceKgEstimate: 26452
-    chunkId: chunk_02_06
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_04
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      5"
-    centerMeters: {x: 16340.759, y: 5230.544, z: 36101.39}
-    radiusMeters: 2586.859
-    thicknessMeters: 1808.0428
-    density01: 0.69105875
-    resourceId: cloth_fiber
-    resourceKgEstimate: 82233
-    chunkId: chunk_06_08
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_05
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      6"
-    centerMeters: {x: 21921.047, y: 9090.529, z: -3577.9692}
-    radiusMeters: 3932.4011
-    thicknessMeters: 1734.7539
-    density01: 0.74613976
-    resourceId: cold_mist
-    resourceKgEstimate: 134970
-    chunkId: chunk_07_04
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_06
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      7"
-    centerMeters: {x: -5480.3047, y: 7166.9287, z: -14143.025}
-    radiusMeters: 3205.1892
-    thicknessMeters: 1101.067
-    density01: 0.9367184
-    resourceId: storm_charge
-    resourceKgEstimate: 138109
-    chunkId: chunk_04_03
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_07
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      8"
-    centerMeters: {x: -43087.195, y: 8816.586, z: 14052.915}
-    radiusMeters: 2853.3357
-    thicknessMeters: 735.1089
-    density01: 0.7849149
-    resourceId: crystal_dust
-    resourceKgEstimate: 103023
-    chunkId: chunk_00_06
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_08
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      9"
-    centerMeters: {x: -9262.912, y: 4688.901, z: 5232.6436}
-    radiusMeters: 4713.527
-    thicknessMeters: 860.898
-    density01: 0.47558162
-    resourceId: water_vapor
-    resourceKgEstimate: 103117
-    chunkId: chunk_04_05
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_09
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      10"
-    centerMeters: {x: -12104.605, y: 2706.771, z: -5060.69}
-    radiusMeters: 4395.5435
-    thicknessMeters: 1125.9902
-    density01: 0.47830912
-    resourceId: claudium_trace
-    resourceKgEstimate: 96712
-    chunkId: chunk_03_04
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_10
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      11"
-    centerMeters: {x: 36118.547, y: 3250.1267, z: -18491.92}
-    radiusMeters: 2912.2869
-    thicknessMeters: 868.9032
-    density01: 0.54449195
-    resourceId: food_spores
-    resourceKgEstimate: 72943
-    chunkId: chunk_08_03
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_11
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      12"
-    centerMeters: {x: -3519.0422, y: 4156.782, z: 46859.86}
-    radiusMeters: 3182.4624
-    thicknessMeters: 630.0652
-    density01: 0.8779893
-    resourceId: fulgur_trace
-    resourceKgEstimate: 128532
-    chunkId: chunk_04_09
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_12
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      13"
-    centerMeters: {x: -5745.038, y: 6496.456, z: -44077.9}
-    radiusMeters: 4782.1562
-    thicknessMeters: 685.33154
-    density01: 0.7043897
-    resourceId: cloth_fiber
-    resourceKgEstimate: 154951
-    chunkId: chunk_04_00
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_13
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      14"
-    centerMeters: {x: -15786.007, y: 2874.3518, z: -34004.812}
-    radiusMeters: 1986.4863
-    thicknessMeters: 996.5468
-    density01: 0.9071325
-    resourceId: cold_mist
-    resourceKgEstimate: 82892
-    chunkId: chunk_03_01
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_14
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      15"
-    centerMeters: {x: -5512.4688, y: 3856.9258, z: -4086.5186}
-    radiusMeters: 3732.9941
-    thicknessMeters: 1051.7059
-    density01: 0.4220455
-    resourceId: storm_charge
-    resourceKgEstimate: 72473
-    chunkId: chunk_04_04
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_15
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      16"
-    centerMeters: {x: 18317.361, y: 2677.7607, z: -39012.414}
-    radiusMeters: 1976.7448
-    thicknessMeters: 628.687
-    density01: 0.69596416
-    resourceId: crystal_dust
-    resourceKgEstimate: 63284
-    chunkId: chunk_06_01
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_16
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      17"
-    centerMeters: {x: -1451.4502, y: 6765.5557, z: 3173.504}
-    radiusMeters: 3563.281
-    thicknessMeters: 1525.584
-    density01: 0.4408425
-    resourceId: water_vapor
-    resourceKgEstimate: 72259
-    chunkId: chunk_04_05
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_17
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      18"
-    centerMeters: {x: 42165.934, y: 4411.7896, z: -14146.738}
-    radiusMeters: 1977.6083
-    thicknessMeters: 845.217
-    density01: 0.43940565
-    resourceId: claudium_trace
-    resourceKgEstimate: 39973
-    chunkId: chunk_09_03
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_18
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      19"
-    centerMeters: {x: -6705.7925, y: 6956.388, z: -32179.3}
-    radiusMeters: 4756.818
-    thicknessMeters: 1078.3486
-    density01: 0.42083502
-    resourceId: food_spores
-    resourceKgEstimate: 92084
-    chunkId: chunk_04_01
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_19
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      20"
-    centerMeters: {x: -26855.904, y: 8921.457, z: 23410.52}
-    radiusMeters: 4209.4014
-    thicknessMeters: 757.8623
-    density01: 0.84592575
-    resourceId: fulgur_trace
-    resourceKgEstimate: 163799
-    chunkId: chunk_02_07
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_20
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      21"
-    centerMeters: {x: 27313.43, y: 8547.469, z: 14882.783}
-    radiusMeters: 4550.4067
-    thicknessMeters: 1881.802
-    density01: 0.7554505
-    resourceId: cloth_fiber
-    resourceKgEstimate: 158130
-    chunkId: chunk_07_06
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_21
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      22"
-    centerMeters: {x: 23739.926, y: 4755.8633, z: 12545.526}
-    radiusMeters: 2958.3896
-    thicknessMeters: 1261.9696
-    density01: 0.6963606
-    resourceId: cold_mist
-    resourceKgEstimate: 94765
-    chunkId: chunk_07_06
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_22
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      23"
-    centerMeters: {x: -6096.2827, y: 6770.3447, z: -2516.6921}
-    radiusMeters: 2576.4497
-    thicknessMeters: 428.89383
-    density01: 0.4988841
-    resourceId: storm_charge
-    resourceKgEstimate: 59126
-    chunkId: chunk_04_04
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_23
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      24"
-    centerMeters: {x: 17703.926, y: 9206.753, z: 11339.793}
-    radiusMeters: 4946.4004
-    thicknessMeters: 1089.834
-    density01: 0.89956796
-    resourceId: crystal_dust
-    resourceKgEstimate: 204683
-    chunkId: chunk_06_06
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_24
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      25"
-    centerMeters: {x: 9527.611, y: 7929.2266, z: -43821.254}
-    radiusMeters: 3678.9282
-    thicknessMeters: 1675.8367
-    density01: 0.8349766
-    resourceId: water_vapor
-    resourceKgEstimate: 141304
-    chunkId: chunk_05_00
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_25
-    displayNameRu: "\u041E\u0431\u043B\u0430\u0447\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      26"
-    centerMeters: {x: 3064.6804, y: 3644.5408, z: 28082.68}
-    radiusMeters: 2754.7266
-    thicknessMeters: 1193.6301
-    density01: 0.6568497
-    resourceId: claudium_trace
-    resourceKgEstimate: 83234
-    chunkId: chunk_05_07
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_26
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
-      \u043E\u0431\u043B\u0430\u043A\u043E 1"
-    centerMeters: {x: 5790.8174, y: 17169.852, z: -4836.7188}
-    radiusMeters: 1101.2203
-    thicknessMeters: 450.08228
-    density01: 0.15042739
-    resourceId: food_spores
-    resourceKgEstimate: 2982
+  - id: cloud_capital_common_01
+    displayNameRu: Столичное учебное облако
+    centerMeters: {x: 800, y: 2600, z: -650}
+    radiusMeters: 620
+    thicknessMeters: 360
+    density01: 0.38
+    resourceId: cloud_condensate
+    resourceKgEstimate: 12000
     chunkId: chunk_05_04
     simulationOnlyWhenFar: 1
-  - id: cloud_field_27
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
-      \u043E\u0431\u043B\u0430\u043A\u043E 2"
-    centerMeters: {x: 14138.936, y: 13255.44, z: -5401.433}
-    radiusMeters: 757.0923
-    thicknessMeters: 192.34247
-    density01: 0.20499228
-    resourceId: fulgur_trace
-    resourceKgEstimate: 2794
-    chunkId: chunk_06_04
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_28
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
-      \u043E\u0431\u043B\u0430\u043A\u043E 3"
-    centerMeters: {x: 2052.3997, y: 22998.213, z: -3893.0881}
-    radiusMeters: 1958.3287
-    thicknessMeters: 364.5431
-    density01: 0.29203737
-    resourceId: cloth_fiber
-    resourceKgEstimate: 10294
+  - id: cloud_mist_training_01
+    displayNameRu: Туманный карман у водосбора
+    centerMeters: {x: 4550, y: 2750, z: -1300}
+    radiusMeters: 760
+    thicknessMeters: 440
+    density01: 0.52
+    resourceId: wet_condensate
+    resourceKgEstimate: 18000
     chunkId: chunk_05_04
     simulationOnlyWhenFar: 1
-  - id: cloud_field_29
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
-      \u043E\u0431\u043B\u0430\u043A\u043E 4"
-    centerMeters: {x: -1765.1422, y: 28818.365, z: 8822.739}
-    radiusMeters: 1237.5046
-    thicknessMeters: 507.8399
-    density01: 0.1339174
-    resourceId: cold_mist
-    resourceKgEstimate: 2983
-    chunkId: chunk_04_05
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_30
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
-      \u043E\u0431\u043B\u0430\u043A\u043E 5"
-    centerMeters: {x: 5304.222, y: 29172.293, z: 22711.52}
-    radiusMeters: 1370.4305
-    thicknessMeters: 184.99252
-    density01: 0.17379339
-    resourceId: storm_charge
-    resourceKgEstimate: 4287
-    chunkId: chunk_05_07
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_31
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
-      \u043E\u0431\u043B\u0430\u043A\u043E 6"
-    centerMeters: {x: -7293.242, y: 25464.78, z: 7414.2837}
-    radiusMeters: 787.5921
-    thicknessMeters: 240.39464
-    density01: 0.2382642
-    resourceId: crystal_dust
-    resourceKgEstimate: 3378
-    chunkId: chunk_04_05
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_32
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
-      \u043E\u0431\u043B\u0430\u043A\u043E 7"
-    centerMeters: {x: 2197.0806, y: 18252.459, z: -37902.797}
-    radiusMeters: 1132.9011
-    thicknessMeters: 460.82654
-    density01: 0.37861636
-    resourceId: water_vapor
-    resourceKgEstimate: 7721
-    chunkId: chunk_05_01
-    simulationOnlyWhenFar: 1
-  - id: cloud_field_33
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u0432\u044B\u0441\u043E\u0442\u043D\u043E\u0435
-      \u043E\u0431\u043B\u0430\u043A\u043E 8"
-    centerMeters: {x: -22589.283, y: 26094.17, z: 26491.469}
-    radiusMeters: 1731.9447
-    thicknessMeters: 517.2666
-    density01: 0.32605416
-    resourceId: claudium_trace
-    resourceKgEstimate: 10165
-    chunkId: chunk_02_07
+  - id: cloud_claudium_wisp_01
+    displayNameRu: Клавдиевый шлейф гряды
+    centerMeters: {x: 4750, y: 3350, z: 2500}
+    radiusMeters: 540
+    thicknessMeters: 320
+    density01: 0.3
+    resourceId: claudic_condensate
+    resourceKgEstimate: 9000
+    chunkId: chunk_05_05
     simulationOnlyWhenFar: 1
   resourceFields:
-  - id: ore_field_00
-    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      1"
-    centerMeters: {x: -15469.607, y: 3653.8784, z: -9524.15}
-    radiusMeters: 1968.8037
+  - id: ore_field_tutorial_00
+    displayNameRu: Учебная рудная глыба
+    centerMeters: {x: 2900, y: 2550, z: 1600}
+    radiusMeters: 820
     altitudeBand: 3
     resourceId: windshale
-    resourceKgEstimate: 127864
-    chunkId: chunk_03_04
-    materializesAsNodes: 1
-  - id: ore_field_01
-    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      2"
-    centerMeters: {x: -22438.43, y: 7443.8853, z: -10351.536}
-    radiusMeters: 1395.9447
-    altitudeBand: 3
-    resourceId: dawnspar
-    resourceKgEstimate: 107224
-    chunkId: chunk_02_03
-    materializesAsNodes: 1
-  - id: ore_field_02
-    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      3"
-    centerMeters: {x: 10489.568, y: 4482.697, z: 3463.1462}
-    radiusMeters: 1616.4735
-    altitudeBand: 3
-    resourceId: bluebrass
-    resourceKgEstimate: 69782
-    chunkId: chunk_06_05
-    materializesAsNodes: 1
-  - id: ore_field_03
-    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      4"
-    centerMeters: {x: -7295.327, y: 3131.7583, z: 17022.941}
-    radiusMeters: 2804.5532
-    altitudeBand: 3
-    resourceId: stormbone
-    resourceKgEstimate: 177210
-    chunkId: chunk_04_06
-    materializesAsNodes: 1
-  - id: ore_field_04
-    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      5"
-    centerMeters: {x: 5417.0376, y: 5810.692, z: 24900.205}
-    radiusMeters: 2131.6062
-    altitudeBand: 3
-    resourceId: claudreef
-    resourceKgEstimate: 119848
-    chunkId: chunk_05_07
-    materializesAsNodes: 1
-  - id: ore_field_05
-    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      6"
-    centerMeters: {x: 10420.472, y: 2740.0928, z: -21947.814}
-    radiusMeters: 2070.8267
-    altitudeBand: 3
-    resourceId: mirrorbasalt
-    resourceKgEstimate: 73742
-    chunkId: chunk_06_02
-    materializesAsNodes: 1
-  - id: ore_field_06
-    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      7"
-    centerMeters: {x: 6838.1064, y: 6301.8613, z: 8561.5625}
-    radiusMeters: 1268.1781
-    altitudeBand: 3
-    resourceId: crownstone
-    resourceKgEstimate: 119079
+    resourceKgEstimate: 8000
     chunkId: chunk_05_05
     materializesAsNodes: 1
-  - id: ore_field_07
-    displayNameRu: "\u0420\u0443\u0434\u043D\u043E\u0435 \u043F\u043E\u043B\u0435
-      8"
-    centerMeters: {x: -17801.719, y: 8008.0024, z: 550.5398}
-    radiusMeters: 1337.4667
-    altitudeBand: 3
-    resourceId: windshale
-    resourceKgEstimate: 105823
-    chunkId: chunk_03_05
-    materializesAsNodes: 1
-  - id: ore_field_08
-    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u0430\u044F \u0440\u0443\u0434\u043D\u0430\u044F
-      \u0433\u043B\u044B\u0431\u0430 1"
-    centerMeters: {x: -3104.9375, y: 21197.533, z: -20099.875}
-    radiusMeters: 1377.9579
-    altitudeBand: 4
-    resourceId: dawnspar
-    resourceKgEstimate: 301192
-    chunkId: chunk_04_02
-    materializesAsNodes: 1
-  - id: ore_field_09
-    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u0430\u044F \u0440\u0443\u0434\u043D\u0430\u044F
-      \u0433\u043B\u044B\u0431\u0430 2"
-    centerMeters: {x: -1258.8396, y: 20644.678, z: -25975.744}
-    radiusMeters: 1664.4596
-    altitudeBand: 4
-    resourceId: bluebrass
-    resourceKgEstimate: 192867
-    chunkId: chunk_04_02
-    materializesAsNodes: 1
-  - id: ore_field_10
-    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u0430\u044F \u0440\u0443\u0434\u043D\u0430\u044F
-      \u0433\u043B\u044B\u0431\u0430 3"
-    centerMeters: {x: 13343.736, y: 19678.162, z: -3172.6}
-    radiusMeters: 965.0889
-    altitudeBand: 4
-    resourceId: stormbone
-    resourceKgEstimate: 341145
-    chunkId: chunk_06_04
-    materializesAsNodes: 1
   leviathanRegions:
-  - id: leviathan_region_00
-    displayNameRu: "\u041F\u0430\u0441\u0442\u0431\u0438\u0449\u0435 \u043B\u0435\u0432\u0438\u0430\u0444\u0430\u043D\u043E\u0432"
-    centerMeters: {x: 32193.574, y: 7693.6514, z: -1723.632}
-    radiusMeters: 8197.81
-    altitudeMinMeters: 2000
-    altitudeMaxMeters: 10000
-    rarity01: 0.3577322
-    chunkId: chunk_08_04
-  - id: leviathan_region_01
-    displayNameRu: "\u041F\u0430\u0441\u0442\u0431\u0438\u0449\u0435 \u043B\u0435\u0432\u0438\u0430\u0444\u0430\u043D\u043E\u0432"
-    centerMeters: {x: -9157.893, y: 7843.992, z: 28828.982}
-    radiusMeters: 8936.547
-    altitudeMinMeters: 2000
-    altitudeMaxMeters: 10000
-    rarity01: 0.20362514
-    chunkId: chunk_04_07
-  - id: leviathan_region_02
-    displayNameRu: "\u041F\u0430\u0441\u0442\u0431\u0438\u0449\u0435 \u043B\u0435\u0432\u0438\u0430\u0444\u0430\u043D\u043E\u0432"
-    centerMeters: {x: -6885.652, y: 7151.8823, z: 16801.871}
-    radiusMeters: 10796.236
-    altitudeMinMeters: 2000
-    altitudeMaxMeters: 10000
-    rarity01: 0.367935
-    chunkId: chunk_04_06
-  - id: leviathan_region_03
-    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u044B\u0439 \u043E\u0445\u043E\u0442\u043D\u0438\u0447\u0438\u0439
-      \u043A\u043E\u0440\u0438\u0434\u043E\u0440"
-    centerMeters: {x: -39926.617, y: 18532.818, z: -14605.839}
-    radiusMeters: 6302.9463
-    altitudeMinMeters: 10000
-    altitudeMaxMeters: 40000
-    rarity01: 0.114902236
-    chunkId: chunk_01_03
-  - id: leviathan_region_04
-    displayNameRu: "\u0412\u044B\u0441\u043E\u0442\u043D\u044B\u0439 \u043E\u0445\u043E\u0442\u043D\u0438\u0447\u0438\u0439
-      \u043A\u043E\u0440\u0438\u0434\u043E\u0440"
-    centerMeters: {x: -33696.598, y: 25156.848, z: -27022.754}
-    radiusMeters: 8393.13
-    altitudeMinMeters: 10000
-    altitudeMaxMeters: 40000
-    rarity01: 0.05185351
-    chunkId: chunk_01_02
-  icebergFields:
-  - id: iceberg_field_00
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u043F\u043E\u043B\u0435
-      \u0430\u0439\u0441\u0431\u0435\u0440\u0433\u043E\u0432 1"
-    centerMeters: {x: -34628.38, y: 58839.062, z: 26810.832}
-    radiusMeters: 3875.9104
-    altitudeMeters: 58839.062
-    icebergCountEstimate: 11
-    sublimateKgEstimate: 90
-    chunkId: chunk_01_07
-  - id: iceberg_field_01
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u043F\u043E\u043B\u0435
-      \u0430\u0439\u0441\u0431\u0435\u0440\u0433\u043E\u0432 2"
-    centerMeters: {x: -35820.777, y: 70036.91, z: -21614.604}
-    radiusMeters: 7547.768
-    altitudeMeters: 70036.91
-    icebergCountEstimate: 8
-    sublimateKgEstimate: 158
-    chunkId: chunk_01_02
-  - id: iceberg_field_02
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u043F\u043E\u043B\u0435
-      \u0430\u0439\u0441\u0431\u0435\u0440\u0433\u043E\u0432 3"
-    centerMeters: {x: 45105.125, y: 61745.25, z: 9635.343}
-    radiusMeters: 7884.551
-    altitudeMeters: 61745.25
-    icebergCountEstimate: 7
-    sublimateKgEstimate: 216
-    chunkId: chunk_09_05
-  - id: iceberg_field_03
-    displayNameRu: "\u0420\u0435\u0434\u043A\u043E\u0435 \u043F\u043E\u043B\u0435
-      \u0430\u0439\u0441\u0431\u0435\u0440\u0433\u043E\u0432 4"
-    centerMeters: {x: 7638.81, y: 91963.08, z: -44916.383}
-    radiusMeters: 5190.1895
-    altitudeMeters: 91963.08
-    icebergCountEstimate: 8
-    sublimateKgEstimate: 94
-    chunkId: chunk_05_00
+  - id: leviathan_region_tutorial_00
+    displayNameRu: Учебные малые левиафаны
+    centerMeters: {x: 3600, y: 2600, z: 3900}
+    radiusMeters: 700
+    altitudeMinMeters: 2350
+    altitudeMaxMeters: 2900
+    rarity01: 0.16
+    chunkId: chunk_05_05
+  icebergFields: []
 --- !u!4 &346987572
 Transform:
   m_ObjectHideFlags: 0
@@ -4471,7 +3883,7 @@ MonoBehaviour:
   shipHullId: starter_hull
   mode: 0
   dockKind: 0
-  dockId: capital
+  dockId: Island1
   initialized: 0
 --- !u!1 &404166606
 GameObject:
@@ -7357,753 +6769,115 @@ MonoBehaviour:
     initialAmount: 0
     remainingAmount: 0
     interactionCount: 0
-    firstDiscoveredUtcTicks: 639151529153960577
-    lastUpdatedUtcTicks: 639151529153960577
-  - kind: 1
-    id: island_01
-    chunkId: chunk_07_01
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
     firstDiscoveredUtcTicks: 0
     lastUpdatedUtcTicks: 0
   - kind: 1
-    id: island_02
-    chunkId: chunk_06_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_03
-    chunkId: chunk_07_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_04
-    chunkId: chunk_04_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_05
-    chunkId: chunk_06_03
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_06
-    chunkId: chunk_08_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_07
-    chunkId: chunk_03_05
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_08
-    chunkId: chunk_02_03
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_09
-    chunkId: chunk_04_03
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_10
-    chunkId: chunk_05_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_11
-    chunkId: chunk_06_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_12
-    chunkId: chunk_02_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_13
-    chunkId: chunk_02_01
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 1
-    id: island_14
-    chunkId: chunk_06_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_00
-    chunkId: chunk_04_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 67356
-    remainingAmount: 67356
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_01
-    chunkId: chunk_06_08
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 87195
-    remainingAmount: 87195
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_02
-    chunkId: chunk_02_01
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 96528
-    remainingAmount: 96528
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_03
-    chunkId: chunk_02_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 26452
-    remainingAmount: 26452
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_04
-    chunkId: chunk_06_08
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 82233
-    remainingAmount: 82233
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_05
-    chunkId: chunk_07_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 134970
-    remainingAmount: 134970
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_06
-    chunkId: chunk_04_03
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 138109
-    remainingAmount: 138109
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_07
-    chunkId: chunk_00_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 103023
-    remainingAmount: 103023
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_08
-    chunkId: chunk_04_05
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 103117
-    remainingAmount: 103117
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_09
-    chunkId: chunk_03_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 96712
-    remainingAmount: 96712
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_10
-    chunkId: chunk_08_03
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 72943
-    remainingAmount: 72943
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_11
-    chunkId: chunk_04_09
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 128532
-    remainingAmount: 128532
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_12
-    chunkId: chunk_04_00
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 154951
-    remainingAmount: 154951
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_13
-    chunkId: chunk_03_01
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 82892
-    remainingAmount: 82892
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_14
+    id: Island1
     chunkId: chunk_04_04
     discovered: 0
     activeInBubble: 0
     depleted: 0
-    initialAmount: 72473
-    remainingAmount: 72473
+    initialAmount: 0
+    remainingAmount: 0
     interactionCount: 0
     firstDiscoveredUtcTicks: 0
     lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_15
-    chunkId: chunk_06_01
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 63284
-    remainingAmount: 63284
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_16
-    chunkId: chunk_04_05
-    discovered: 1
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 72259
-    remainingAmount: 72259
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 639151529153960577
-    lastUpdatedUtcTicks: 639151529153960577
-  - kind: 2
-    id: cloud_field_17
-    chunkId: chunk_09_03
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 39973
-    remainingAmount: 39973
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_18
-    chunkId: chunk_04_01
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 92084
-    remainingAmount: 92084
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_19
-    chunkId: chunk_02_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 163799
-    remainingAmount: 163799
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_20
-    chunkId: chunk_07_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 158130
-    remainingAmount: 158130
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_21
-    chunkId: chunk_07_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 94765
-    remainingAmount: 94765
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_22
-    chunkId: chunk_04_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 59126
-    remainingAmount: 59126
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_23
-    chunkId: chunk_06_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 204683
-    remainingAmount: 204683
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_24
-    chunkId: chunk_05_00
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 141304
-    remainingAmount: 141304
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_25
-    chunkId: chunk_05_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 83234
-    remainingAmount: 83234
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_26
-    chunkId: chunk_05_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 2982
-    remainingAmount: 2982
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_27
-    chunkId: chunk_06_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 2794
-    remainingAmount: 2794
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_28
-    chunkId: chunk_05_04
-    discovered: 1
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 10294
-    remainingAmount: 10294
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 639151529153960577
-    lastUpdatedUtcTicks: 639151529153960577
-  - kind: 2
-    id: cloud_field_29
-    chunkId: chunk_04_05
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 2983
-    remainingAmount: 2983
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_30
-    chunkId: chunk_05_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 4287
-    remainingAmount: 4287
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_31
-    chunkId: chunk_04_05
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 3378
-    remainingAmount: 3378
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_32
-    chunkId: chunk_05_01
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 7721
-    remainingAmount: 7721
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 2
-    id: cloud_field_33
-    chunkId: chunk_02_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 10165
-    remainingAmount: 10165
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_00
-    chunkId: chunk_03_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 127864
-    remainingAmount: 127864
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_01
-    chunkId: chunk_02_03
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 107224
-    remainingAmount: 107224
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_02
-    chunkId: chunk_06_05
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 69782
-    remainingAmount: 69782
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_03
-    chunkId: chunk_04_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 177210
-    remainingAmount: 177210
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_04
-    chunkId: chunk_05_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 119848
-    remainingAmount: 119848
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_05
-    chunkId: chunk_06_02
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 73742
-    remainingAmount: 73742
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_06
+  - kind: 1
+    id: Island2
     chunkId: chunk_05_05
     discovered: 0
     activeInBubble: 0
     depleted: 0
-    initialAmount: 119079
-    remainingAmount: 119079
+    initialAmount: 0
+    remainingAmount: 0
+    interactionCount: 0
+    firstDiscoveredUtcTicks: 0
+    lastUpdatedUtcTicks: 0
+  - kind: 1
+    id: Island3
+    chunkId: chunk_04_05
+    discovered: 0
+    activeInBubble: 0
+    depleted: 0
+    initialAmount: 0
+    remainingAmount: 0
+    interactionCount: 0
+    firstDiscoveredUtcTicks: 0
+    lastUpdatedUtcTicks: 0
+  - kind: 1
+    id: Island4
+    chunkId: chunk_05_04
+    discovered: 0
+    activeInBubble: 0
+    depleted: 0
+    initialAmount: 0
+    remainingAmount: 0
+    interactionCount: 0
+    firstDiscoveredUtcTicks: 0
+    lastUpdatedUtcTicks: 0
+  - kind: 1
+    id: Island5
+    chunkId: chunk_05_05
+    discovered: 0
+    activeInBubble: 0
+    depleted: 0
+    initialAmount: 0
+    remainingAmount: 0
+    interactionCount: 0
+    firstDiscoveredUtcTicks: 0
+    lastUpdatedUtcTicks: 0
+  - kind: 2
+    id: cloud_capital_common_01
+    chunkId: chunk_05_04
+    discovered: 0
+    activeInBubble: 0
+    depleted: 0
+    initialAmount: 12000
+    remainingAmount: 12000
+    interactionCount: 0
+    firstDiscoveredUtcTicks: 0
+    lastUpdatedUtcTicks: 0
+  - kind: 2
+    id: cloud_mist_training_01
+    chunkId: chunk_05_04
+    discovered: 0
+    activeInBubble: 0
+    depleted: 0
+    initialAmount: 18000
+    remainingAmount: 18000
+    interactionCount: 0
+    firstDiscoveredUtcTicks: 0
+    lastUpdatedUtcTicks: 0
+  - kind: 2
+    id: cloud_claudium_wisp_01
+    chunkId: chunk_05_05
+    discovered: 0
+    activeInBubble: 0
+    depleted: 0
+    initialAmount: 9000
+    remainingAmount: 9000
     interactionCount: 0
     firstDiscoveredUtcTicks: 0
     lastUpdatedUtcTicks: 0
   - kind: 4
-    id: ore_field_07
-    chunkId: chunk_03_05
+    id: ore_field_tutorial_00
+    chunkId: chunk_05_05
     discovered: 0
     activeInBubble: 0
     depleted: 0
-    initialAmount: 105823
-    remainingAmount: 105823
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_08
-    chunkId: chunk_04_02
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 301192
-    remainingAmount: 301192
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_09
-    chunkId: chunk_04_02
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 192867
-    remainingAmount: 192867
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 4
-    id: ore_field_10
-    chunkId: chunk_06_04
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 341145
-    remainingAmount: 341145
+    initialAmount: 8000
+    remainingAmount: 8000
     interactionCount: 0
     firstDiscoveredUtcTicks: 0
     lastUpdatedUtcTicks: 0
   - kind: 8
-    id: leviathan_region_00
-    chunkId: chunk_08_04
+    id: leviathan_region_tutorial_00
+    chunkId: chunk_05_05
     discovered: 0
     activeInBubble: 0
     depleted: 0
     initialAmount: 0
     remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 8
-    id: leviathan_region_01
-    chunkId: chunk_04_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 8
-    id: leviathan_region_02
-    chunkId: chunk_04_06
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 8
-    id: leviathan_region_03
-    chunkId: chunk_01_03
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 8
-    id: leviathan_region_04
-    chunkId: chunk_01_02
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 0
-    remainingAmount: 0
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 16
-    id: iceberg_field_00
-    chunkId: chunk_01_07
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 90
-    remainingAmount: 90
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 16
-    id: iceberg_field_01
-    chunkId: chunk_01_02
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 158
-    remainingAmount: 158
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 16
-    id: iceberg_field_02
-    chunkId: chunk_09_05
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 216
-    remainingAmount: 216
-    interactionCount: 0
-    firstDiscoveredUtcTicks: 0
-    lastUpdatedUtcTicks: 0
-  - kind: 16
-    id: iceberg_field_03
-    chunkId: chunk_05_00
-    discovered: 0
-    activeInBubble: 0
-    depleted: 0
-    initialAmount: 94
-    remainingAmount: 94
     interactionCount: 0
     firstDiscoveredUtcTicks: 0
     lastUpdatedUtcTicks: 0
@@ -8985,7 +7759,7 @@ MonoBehaviour:
     acceptedMissionIds: []
     completedMissionIds: []
   startingMode: 0
-  startingDockId: capital
+  startingDockId: Island1
   startingDockKind: 0
   autoSaveOnDock: 1
   loadSavedGameOnAwake: 0

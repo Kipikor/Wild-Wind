@@ -222,7 +222,6 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
             if (proxy.transform.childCount == 0)
             {
                 BuildSphereProxy(proxy.transform, "Cloud Volume", cloudMaterial ??= CreateMaterial("Runtime Cloud Proxy", new Color(0.92f, 0.95f, 1f, 0.33f), true));
-                BuildLabel(proxy.transform, record.displayNameRu, new Color(0.92f, 0.95f, 1f, 0.88f), 180f);
             }
 
             proxy.transform.position = record.centerMeters;
@@ -243,7 +242,6 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
             if (proxy.transform.childCount == 0)
             {
                 BuildCubeProxy(proxy.transform, "Resource Marker", resourceMaterial ??= CreateMaterial("Runtime Resource Proxy", new Color(0.16f, 0.78f, 1f, 0.48f), true));
-                BuildLabel(proxy.transform, record.resourceId, new Color(0.35f, 0.9f, 1f, 0.9f), 130f);
             }
 
             float size = Mathf.Max(160f, record.radiusMeters * 0.45f);
@@ -265,7 +263,6 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
             if (proxy.transform.childCount == 0)
             {
                 BuildSphereProxy(proxy.transform, "Leviathan Territory", leviathanMaterial ??= CreateMaterial("Runtime Leviathan Proxy", new Color(0.72f, 0.18f, 1f, 0.26f), true));
-                BuildLabel(proxy.transform, record.displayNameRu, new Color(0.9f, 0.55f, 1f, 0.9f), 220f);
             }
 
             proxy.transform.position = record.centerMeters;
@@ -286,7 +283,6 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
             if (proxy.transform.childCount == 0)
             {
                 BuildCubeProxy(proxy.transform, "Iceberg Marker", icebergMaterial ??= CreateMaterial("Runtime Iceberg Proxy", new Color(0.65f, 0.9f, 1f, 0.42f), true));
-                BuildLabel(proxy.transform, record.displayNameRu, new Color(0.75f, 0.95f, 1f, 0.9f), 240f);
             }
 
             proxy.transform.position = record.centerMeters;
@@ -373,7 +369,6 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
         CreatePrimitive("Platform", PrimitiveType.Cube, root, new Vector3(0f, 0f, 0f), new Vector3(radius * 1.18f, radius * 0.04f, radius * 0.78f), islandMaterial);
         CreatePrimitive("Beacon", PrimitiveType.Cube, root, new Vector3(-radius * 0.18f, radius * 0.13f, radius * 0.02f), new Vector3(radius * 0.18f, radius * 0.22f, radius * 0.16f), islandMaterial);
         CreatePrimitive("Warm Light", PrimitiveType.Sphere, root, new Vector3(-radius * 0.18f, radius * 0.28f, -radius * 0.14f), Vector3.one * radius * 0.06f, warmMaterial);
-        BuildLabel(root, record.displayNameRu, new Color(1f, 0.78f, 0.35f, 0.95f), Mathf.Max(70f, radius * 0.14f));
     }
 
     private void BuildSphereProxy(Transform root, string name, Material material)
@@ -393,20 +388,6 @@ public sealed class WorldBubbleStreamer : MonoBehaviour
         {
             child.localScale = scale;
         }
-    }
-
-    private void BuildLabel(Transform root, string text, Color color, float characterSize)
-    {
-        GameObject labelObject = new GameObject("Label");
-        labelObject.transform.SetParent(root, false);
-        labelObject.transform.localPosition = new Vector3(0f, 1.1f, 0f);
-        TextMesh label = labelObject.AddComponent<TextMesh>();
-        label.text = text;
-        label.anchor = TextAnchor.MiddleCenter;
-        label.alignment = TextAlignment.Center;
-        label.characterSize = characterSize;
-        label.fontSize = 48;
-        label.color = color;
     }
 
     private GameObject CreatePrimitive(string name, PrimitiveType type, Transform parent, Vector3 localPosition, Vector3 localScale, Material material)

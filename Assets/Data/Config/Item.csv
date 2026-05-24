@@ -77,6 +77,7 @@ claudite,Клавдит,Claudite,0
 umbracite,Умбрацит,Umbracite,0
 nullsalt,Нульсоль,Nullsalt,0
 windcalf_carcass,Туша ветротеленка,Wind Calf Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1
+windminnow_carcass,Тушка ветропескаря,Wind Minnow Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1
 mistwhale_carcass,Туша дымного кита,Mist Whale Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1
 sky_eel_carcass,Туша небесного угря,Sky Eel Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1
 stoneback_carcass,Туша камнеспина,Stoneback Carcass,0,VolumeLiter,RefrigeratedHold,1,None,1

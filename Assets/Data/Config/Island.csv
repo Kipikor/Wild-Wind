@@ -1,31 +1,7 @@
 id_island,local_name_ru,local_name_en,position_x,position_y,position_z,archetype_id,Island_production,docking_radius,time_for_one_item_load
-capital,Столица,Capital,0,2500,0,,,80,1
-Island1,Фермерский остров 1,Farming Island 1,350,88,525,farming,Island_production_food,10,1.5
-Island2,Угольный остров 1,Coal Island 1,484,77,-510,coal,Island_production_charcoal,10,1.5
-Island3,Туманный остров 1,Mist Island 1,787,21,165,mist,Island_production_water,10,1.5
-Island4,Рудный остров 1,Ore Island 1,811,59,94,ore,Island_production_aerolite,10,1.5
-Island5,Рудный остров 2,Ore Island 2,156,11,-944,ore,Island_production_aerolite,10,1.5
-Island6,Фермерский остров 2,Farming Island 2,-686,25,-243,farming,Island_production_food,10,1.5
-Island7,Туманный остров 2,Mist Island 2,936,34,-620,mist,Island_production_water,10,1.5
-Island8,Фермерский остров 3,Farming Island 3,891,74,995,farming,Island_production_food,10,1.5
-Island9,Туманный остров 3,Mist Island 3,440,24,-11,mist,Island_production_water,10,1.5
-Island10,Рудный остров 3,Ore Island 3,203,5,-898,ore,Island_production_aerolite,10,1.5
-Island11,Фермерский остров 4,Farming Island 4,-354,50,633,farming,Island_production_food,10,1.5
-Island12,Туманный остров 4,Mist Island 4,512,42,-284,mist,Island_production_water,10,1.5
-Island13,Фермерский остров 5,Farming Island 5,481,9,711,farming,Island_production_food,10,1.5
-Island14,Фермерский остров 6,Farming Island 6,711,59,722,farming,Island_production_food,10,1.5
-Island15,Угольный остров 2,Coal Island 2,82,94,-936,coal,Island_production_charcoal,10,1.5
-Island16,Туманный остров 5,Mist Island 5,864,48,-618,mist,Island_production_water,10,1.5
-Island17,Рудный остров 4,Ore Island 4,769,70,597,ore,Island_production_aerolite,10,1.5
-Island18,Рудный остров 5,Ore Island 5,531,65,-746,ore,Island_production_aerolite,10,1.5
-Island19,Фермерский остров 7,Farming Island 7,817,75,825,farming,Island_production_food,10,1.5
-Island20,Туманный остров 6,Mist Island 6,676,69,91,mist,Island_production_water,10,1.5
-Island21,Фермерский остров 8,Farming Island 8,428,68,430,farming,Island_production_food,10,1.5
-Island22,Угольный остров 3,Coal Island 3,568,30,-373,coal,Island_production_charcoal,10,1.5
-Island23,Рудный остров 6,Ore Island 6,51,88,-815,ore,Island_production_aerolite,10,1.5
-Island24,Фермерский остров 9,Farming Island 9,542,75,925,farming,Island_production_food,10,1.5
-Island25,Туманный остров 7,Mist Island 7,-718,15,-176,mist,Island_production_water,10,1.5
-Island26,Фермерский остров 10,Farming Island 10,-242,8,-519,farming,Island_production_food,10,1.5
-Island27,Клавдиевый остров 1,Claudium Island 1,-420,3200,610,claudium,Island_production_claudium,18,1.5
-Island28,Клавдиевый остров 2,Claudium Island 2,690,3600,-340,claudium,Island_production_claudium,18,1.5
-starter_delivery_island,Ближний остров,Nearby Island,1000,2500,0,coal,Island_production_charcoal,120,0.5
+capital,Столица,Capital,0,2500,0,,,160,0.8
+Island1,Ферма отца,Father's Farm,-2600,2500,-1000,farming,Island_production_food,130,0.8
+Island2,Аэролитовый остров,Aerolite Island,2300,2550,1200,ore,Island_production_aerolite,130,0.8
+Island3,Угольный причал,Coal Wharf,-1800,2500,3200,coal,Island_production_charcoal,120,0.8
+Island4,Туманный водосбор,Mist Waterworks,4200,2650,-1700,mist,Island_production_water,120,0.8
+Island5,Клавдиевая гряда,Claudium Ridge,4400,3200,2700,claudium,Island_production_claudium,140,0.8
