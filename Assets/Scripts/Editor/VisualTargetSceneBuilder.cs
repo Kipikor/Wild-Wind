@@ -38,7 +38,6 @@ public static class VisualTargetSceneBuilder
         Debug.Log("[VisualTarget] Scene built with current visual setup: " + ScenePath);
     }
 
-    [MenuItem("Wild Wind/Visual/Build Visual Scene")]
     public static void BuildAltitudeCompositionTestScene()
     {
         EnsureFolders();

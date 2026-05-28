@@ -8,7 +8,6 @@ public static class DamageTestSceneBuilder
 {
     private const string GeneratedPrefix = "Damage Test ";
 
-    [MenuItem("Wild Wind/Damage/Build Shooting Test Scene")]
     public static void BuildShootingTestScene()
     {
         ClearGeneratedObjects();

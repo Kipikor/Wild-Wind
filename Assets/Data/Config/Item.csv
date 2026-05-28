@@ -52,7 +52,7 @@ needlechalk_ore,Игломел,Needle Chalk Ore,0,Piece,Van,1,None,1
 rainroot_ore,Дождекорень,Rainroot Ore,0,Piece,Van,1,None,1
 emberloam_ore,Жарозем,Emberloam Ore,0,Piece,Van,1,None,1
 glassmire_ore,Стеклотина,Glassmire Ore,0,Piece,Van,1,None,1
-stormbone_ore,Грозокость,Stormbone Ore,0,Piece,Van,1,None,1
+stormcrust_ore,Грозовая корка,Storm Crust Ore,0,Piece,Van,1,None,1
 ashpearl_ore,Пепложемчуг,Ash Pearl Ore,0,Piece,Van,1,None,1
 liftmarrow_ore,Подъемная жила,Lift Marrow Ore,0,Piece,Van,1,None,1
 duskclay_ore,Сумеречная глина,Dusk Clay Ore,0,Piece,Van,1,None,1
@@ -84,7 +84,7 @@ stoneback_carcass,Туша камнеспина,Stoneback Carcass,0,Piece,Van,1,
 leviathan_fat,Левиафанов жир,Leviathan Fat,10,Piece,Van,0.92,None,1
 leviathan_hide,Шкура левиафана,Leviathan Hide,0,Piece,Van,1,None,1
 claudium_gland,Клавдиевая железа,Claudium Gland,0,Piece,Van,1,None,1
-flexbone,Гибкокость,Flexbone,0,Piece,Van,1,None,1
+mineral_shell,Минеральный панцирь,Mineral Shell,0,Piece,Van,1,None,1
 airframe_kit,Набор корпуса,Airframe Kit,0,Piece,Van,1,None,1
 chemical_batch,Химическая партия,Chemical Batch,0,Piece,Van,1,None,1
 utility_boat_ship,Служебный катер,Utility Boat,0,Ship,ShipDock,15000,Boat,0.1

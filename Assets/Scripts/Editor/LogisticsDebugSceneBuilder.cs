@@ -10,7 +10,6 @@ public static class LogisticsDebugSceneBuilder
     private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
     private const string DebugSaveFileName = "wild_wind_logistics_debug_save.json";
 
-    [MenuItem("Wild Wind/Logistics/Build Debug Scene")]
     public static void BuildDebugScene()
     {
         ShipCatalogSO catalog = AssetDatabase.LoadAssetAtPath<ShipCatalogSO>(CatalogPath);
@@ -69,7 +68,6 @@ public static class LogisticsDebugSceneBuilder
         Debug.Log("[LogisticsDebug] Debug scene configured. Enter Play Mode or run Wild Wind/Logistics/Simulate 10 Minutes.");
     }
 
-    [MenuItem("Wild Wind/Logistics/Simulate 10 Minutes")]
     public static void SimulateTenMinutes()
     {
         MetaGameState meta = UnityEngine.Object.FindFirstObjectByType<MetaGameState>();
@@ -119,7 +117,6 @@ public static class LogisticsDebugSceneBuilder
         }
     }
 
-    [MenuItem("Wild Wind/Meta/Fast Forward 100 Hours")]
     public static void FastForwardHundredHours()
     {
         MetaGameState meta = UnityEngine.Object.FindFirstObjectByType<MetaGameState>();

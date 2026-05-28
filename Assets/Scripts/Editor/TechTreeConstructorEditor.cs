@@ -68,13 +68,11 @@ public class TechTreeConstructorEditor : Editor
         return SessionState.GetInt(GetSelectedNodeSessionKey(tree), -1);
     }
 
-    [MenuItem("Wild Wind/Древо техники/Открыть конструктор")]
     public static void OpenConstructor()
     {
         TechTreeGraphWindow.OpenWindow();
     }
 
-    [MenuItem("Wild Wind/Древо техники/Создать стартовое древо")]
     public static void CreateStarterTree()
     {
         ShipAssemblySetupEditor.BuildStarterAssemblySetup();

@@ -780,8 +780,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return 0f;
         }
 
-        return Mathf.Max(0f, ship.gasHarvesterPowerDrawActualKw) +
-            Mathf.Max(0f, ship.refrigeratedHoldPowerDrawActualKw);
+        return Mathf.Max(0f, ship.gasHarvesterPowerDrawActualKw);
     }
 
     private bool ToggleAfterburner()

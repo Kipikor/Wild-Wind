@@ -13,7 +13,6 @@ public static class WorldSceneBuilder
     private const string ShipCatalogPath = "Assets/Data/ShipCatalog.asset";
     private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
 
-    [MenuItem("Wild Wind/World/Build Final World Scene")]
     public static void BuildFinalWorldScene()
     {
         EnsureFolders();

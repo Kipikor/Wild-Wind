@@ -7,7 +7,6 @@ public static class LeviathanFlightTestSceneBuilder
 {
     private const string GeneratedPrefix = "Leviathan Flight Test ";
 
-    [MenuItem("Wild Wind/Leviathan/Собрать тест полета")]
     public static void BuildFlightTestScene()
     {
         ClearGeneratedObjects();

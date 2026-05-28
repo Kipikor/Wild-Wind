@@ -8,7 +8,6 @@ public static class MissionSetupEditor
     private const string StartPointName = "Старт миссии";
     private const string DestinationPointName = "Назначение миссии";
 
-    [MenuItem("Wild Wind/Миссии/Собрать тестовую миссию")]
     public static void SetupTestMission()
     {
         MissionDefinitionSO mission = AssetDatabase.LoadAssetAtPath<MissionDefinitionSO>(MissionPath);
@@ -71,7 +70,6 @@ public static class MissionSetupEditor
         Selection.activeGameObject = missionObject;
     }
 
-    [MenuItem("Wild Wind/Миссии/Собрать тестовую миссию", true)]
     public static bool ValidateSetupTestMission()
     {
         return !Application.isPlaying;

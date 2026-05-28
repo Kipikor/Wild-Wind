@@ -24,7 +24,6 @@ public class TechTreeGraphWindow : EditorWindow
     private GUIStyle premiumNodeStyle;
     private GUIStyle selectedNodeStyle;
 
-    [MenuItem("Wild Wind/Древо техники/Открыть визуальный редактор")]
     public static void OpenWindow()
     {
         TechTreeGraphWindow window = GetWindow<TechTreeGraphWindow>("Древо техники");

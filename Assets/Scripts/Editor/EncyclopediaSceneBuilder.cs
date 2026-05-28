@@ -13,7 +13,6 @@ public static class EncyclopediaSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/WildWindEncyclopediaScene.unity";
 
-    [MenuItem("Wild Wind/Энциклопедия/Собрать сцену энциклопедии")]
     public static void BuildEncyclopediaScene()
     {
         EnsureFolders();
@@ -31,7 +30,6 @@ public static class EncyclopediaSceneBuilder
         Debug.Log("[WildWindEncyclopedia] Сцена энциклопедии собрана: " + ScenePath + ". В Play Mode откроется черновая вики с поиском, категориями, CSV-записями, кораблями, технологиями и модулями.");
     }
 
-    [MenuItem("Wild Wind/Энциклопедия/Добавить энциклопедию в текущую сцену")]
     public static void AddEncyclopediaToCurrentScene()
     {
         CreateEventSystem();

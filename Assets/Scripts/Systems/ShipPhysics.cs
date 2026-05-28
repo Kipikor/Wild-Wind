@@ -1896,14 +1896,6 @@ public class ShipPhysics : MonoBehaviour
     public float harpoonMaxCarcassMassKg;
     private float harpoonWeaponSpendBufferKg;
 
-    [Header("Холодильник туш")]
-    [Tooltip("Вместимость холодильника для туш, л. 1000 л = 1 м3.")]
-    public float refrigeratedHoldCapacityLiters;
-    [Tooltip("Сколько мощности холодильник забирает при включении независимо от заполнения.")]
-    public float refrigeratedHoldPowerDrawKw;
-    [Tooltip("Холодильник активен. Если выключить, туши считаются нестабильным грузом.")]
-    public bool refrigeratedHoldEnabled = true;
-    [HideInInspector] public float refrigeratedHoldPowerDrawActualKw;
     [Header("Охотничий автопилот")]
     [Tooltip("Если включено, корабль сам подходит к ближайшему левиафану, стреляет гарпуном и забирает тушу после подтяжки.")]
     public bool leviathanHuntAutopilotEnabled;
@@ -2553,13 +2545,6 @@ public class ShipPhysics : MonoBehaviour
             return false;
         }
 
-        if (refrigeratedHoldCapacityLiters <= 0f)
-        {
-            reason = "На корабле нет холодильника для туш.";
-            harpoonLastMessage = reason;
-            return false;
-        }
-
         MetaGameState meta = ResolveMetaGameState();
         if (meta == null || meta.progress == null)
         {
@@ -2572,21 +2557,6 @@ public class ShipPhysics : MonoBehaviour
         if (harpoonMaxCarcassMassKg > 0f && amountKg > harpoonMaxCarcassMassKg)
         {
             reason = $"Гарпун не удержит такую тушу: {amountKg}/{harpoonMaxCarcassMassKg:0} кг.";
-            harpoonLastMessage = reason;
-            return false;
-        }
-
-        if (amountKg > refrigeratedHoldCapacityLiters + 0.001f)
-        {
-            reason = $"Холодильник мал для туши: {amountKg}/{refrigeratedHoldCapacityLiters:0} кг.";
-            harpoonLastMessage = reason;
-            return false;
-        }
-
-        if (refrigeratedHoldPowerDrawKw > 0f && enginePowerKwAt100 > 0f &&
-            claudiumPowerDrawKw + refrigeratedHoldPowerDrawKw > enginePowerKwAt100 + 0.001f)
-        {
-            reason = "Холодильнику туш не хватает мощности после клавдиевого контура.";
             harpoonLastMessage = reason;
             return false;
         }
@@ -3133,7 +3103,7 @@ public class ShipPhysics : MonoBehaviour
 
     private float CalculateCurrentSupportPowerDrawKw()
     {
-        float modulePowerKw = Mathf.Max(0f, refrigeratedHoldPowerDrawActualKw);
+        float modulePowerKw = 0f;
         if (gasHarvesterEnabled && gasHarvesterVolumeM3PerSecond > 0f && gasHarvesterPowerDrawKw > 0f)
         {
             modulePowerKw += Mathf.Max(gasHarvesterPowerDrawActualKw, gasHarvesterPowerDrawKw);
@@ -3560,15 +3530,6 @@ public class ShipPhysics : MonoBehaviour
     private float CalculatePoweredModulePowerRequestKw(float claudiumPowerKw)
     {
         float requestKw = 0f;
-        refrigeratedHoldPowerDrawActualKw = 0f;
-
-        float refrigeratorKw = GetRefrigeratedHoldPowerRequestKw();
-        if (refrigeratorKw > 0f && claudiumPowerKw + refrigeratorKw <= enginePowerKwAt100 + 0.001f)
-        {
-            refrigeratedHoldPowerDrawActualKw = refrigeratorKw;
-            requestKw += refrigeratorKw;
-        }
-
         if (gasHarvesterEnabled && gasHarvesterVolumeM3PerSecond > 0f && gasHarvesterPowerDrawKw > 0f &&
             claudiumPowerKw + requestKw + gasHarvesterPowerDrawKw <= enginePowerKwAt100 + 0.001f)
         {
@@ -3576,13 +3537,6 @@ public class ShipPhysics : MonoBehaviour
         }
 
         return requestKw;
-    }
-
-    private float GetRefrigeratedHoldPowerRequestKw()
-    {
-        return refrigeratedHoldEnabled && refrigeratedHoldCapacityLiters > 0f
-            ? Mathf.Max(0f, refrigeratedHoldPowerDrawKw)
-            : 0f;
     }
 
     private float CalculateClaudiumPowerKwForLift(float liftKg)
@@ -3775,15 +3729,14 @@ public class ShipPhysics : MonoBehaviour
             return;
         }
 
-        float refrigeratorKw = refrigeratedHoldPowerDrawActualKw;
-        if (claudiumPowerDrawKw + refrigeratorKw + gasHarvesterPowerDrawKw > enginePowerKwAt100 + 0.001f)
+        if (claudiumPowerDrawKw + gasHarvesterPowerDrawKw > enginePowerKwAt100 + 0.001f)
         {
             gasHarvesterLastMessage = "Харвестер выключен: после клавдиевого контура не хватает мощности до лимита 100%.";
             ResetGasHarvesterCycle();
             return;
         }
 
-        if (engineGeneratedPowerKw + 0.001f < claudiumPowerDrawKw + refrigeratorKw + gasHarvesterPowerDrawKw || !engineHasFuel)
+        if (engineGeneratedPowerKw + 0.001f < claudiumPowerDrawKw + gasHarvesterPowerDrawKw || !engineHasFuel)
         {
             gasHarvesterLastMessage = "Харвестер ждет мощность или топливо.";
             ResetGasHarvesterCycle();

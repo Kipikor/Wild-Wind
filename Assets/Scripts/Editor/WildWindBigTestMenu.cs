@@ -17,6 +17,7 @@ public static class WildWindBigTestMenu
         WorldSceneBuilder.BuildFinalWorldScene();
         RemoveSceneBigTestRunnersFromActiveScene();
         WildWindSaveSlots.ClearPendingGameplayLaunch();
+        WildWindUsageAudit.ArmForBigTest();
         WildWindBigTestRunner.MarkEditorBigTestLaunchPending();
 
         Scene scene = SceneManager.GetActiveScene();

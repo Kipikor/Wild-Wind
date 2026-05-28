@@ -10,7 +10,6 @@ public static class FlagshipConstructorPreviewBuilder
     public const string ConstructorPreviewScenePath = "Assets/Scenes/FlagshipConstructorPreview.unity";
     private const string RootName = "Wild Wind Flagship Constructor Screen";
 
-    [MenuItem("Wild Wind/Expeditions/Build Preview/2 Flagship Constructor")]
     public static void BuildConstructorPreview()
     {
         EnsureSceneFolder();
@@ -27,7 +26,6 @@ public static class FlagshipConstructorPreviewBuilder
         Debug.Log("[WildWindFlagshipConstructor] Constructor preview scene built: " + ConstructorPreviewScenePath);
     }
 
-    [MenuItem("Wild Wind/Expeditions/Open Preview/2 Flagship Constructor")]
     public static void OpenConstructorPreview()
     {
         if (!File.Exists(ConstructorPreviewScenePath))

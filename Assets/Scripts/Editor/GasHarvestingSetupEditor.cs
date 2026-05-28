@@ -8,7 +8,6 @@ public static class GasHarvestingSetupEditor
     private const string CatalogPath = "Assets/Data/ShipCatalog.asset";
     private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
 
-    [MenuItem("Wild Wind/Gas Harvesting/Prepare Starter Gas Ship")]
     public static void PrepareStarterGasShipMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();
@@ -16,7 +15,6 @@ public static class GasHarvestingSetupEditor
         Debug.Log("[Газовый харвестинг] Стартовый корабль подготовлен: установлен харвестер облаков, добавлены топливо и клавдий.");
     }
 
-    [MenuItem("Wild Wind/Gas Harvesting/Prepare Gas Test Scene")]
     public static void PrepareGasTestSceneMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();
@@ -27,7 +25,6 @@ public static class GasHarvestingSetupEditor
         Debug.Log("[Газовый харвестинг] Тестовая сцена подготовлена: связи сцены, стартовый корабль и пример автопилота готовы.");
     }
 
-    [MenuItem("Wild Wind/Gas Harvesting/Stock All Islands Test Fuel")]
     public static void StockAllIslandTestFuelMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();

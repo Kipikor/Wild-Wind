@@ -4,8 +4,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEngine.TestTools;
+#endif
 using Debug = UnityEngine.Debug;
 
 [DisallowMultipleComponent]
@@ -16,6 +22,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private const int BigTestContractVersion = 2;
     private const int MinimumExpectedCheckCount = 320;
     private const string BigTestSessionSavePrefix = "wild_wind_big_test_session_";
+#if UNITY_EDITOR
+    private const string UsageAuditAfterBigTestArmedSessionKey = "WildWind.UsageAudit.GenerateAfterBigTest.Armed";
+    private const string UsageAuditAfterBigTestRequestedSessionKey = "WildWind.UsageAudit.GenerateAfterBigTest.Requested";
+#endif
 
     public const string BigTestEditorLaunchPlayerPrefsKey = "WildWind.BigTestEditorLaunch";
     public const string DefaultStartSceneName = "StartScreen";
@@ -77,6 +87,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
     private bool hasRun;
     private bool becamePersistentForSceneLoop;
+#if UNITY_EDITOR
+    private bool usageCoverageCaptureActive;
+    private bool usageCoverageWasEnabled;
+#endif
 
     public WildWindBigTestResult LastResult { get; private set; }
 
@@ -211,6 +225,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
     private IEnumerator RunBigTestRoutine(Action<WildWindBigTestResult> completed, bool emitReportOutput)
     {
+#if UNITY_EDITOR
+        BeginUsageCoverageCaptureIfArmed();
+#endif
+
         BigTestSideEffectSnapshot sideEffects = BigTestSideEffectSnapshot.Capture();
         BigTestReport report = new BigTestReport(this);
         Stopwatch totalWatch = Stopwatch.StartNew();
@@ -272,6 +290,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
         }
 
+#if UNITY_EDITOR
+        WriteUsageCoverageSnapshotIfActive(report);
+        RequestUsageAuditAfterBigTestIfArmed();
+#endif
+
         ReleaseActiveRun();
 
         if (becamePersistentForSceneLoop)
@@ -286,6 +309,255 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         sessionLoopLaunchInProgress = false;
         ClearEditorBigTestLaunchPending();
     }
+
+#if UNITY_EDITOR
+    private void BeginUsageCoverageCaptureIfArmed()
+    {
+        usageCoverageCaptureActive = false;
+        if (!SessionState.GetBool(UsageAuditAfterBigTestArmedSessionKey, false))
+        {
+            return;
+        }
+
+        try
+        {
+            usageCoverageWasEnabled = Coverage.enabled;
+            if (!Coverage.enabled)
+            {
+                Coverage.enabled = true;
+            }
+
+            Coverage.ResetAll();
+            usageCoverageCaptureActive = true;
+            Debug.Log(LogPrefix + "Usage coverage capture started for this big test.", this);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning(LogPrefix + "Usage coverage capture could not be started: " + exception.Message, this);
+        }
+    }
+
+    private void WriteUsageCoverageSnapshotIfActive(BigTestReport report)
+    {
+        if (!usageCoverageCaptureActive)
+        {
+            return;
+        }
+
+        try
+        {
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string folder = Path.Combine(projectRoot, "TestReports", "UsageAudit");
+            Directory.CreateDirectory(folder);
+
+            string lcovPath = Path.Combine(folder, "WildWindBigTestCoverage.lcov");
+            string jsonPath = Path.Combine(folder, "WildWindBigTestCoverage.json");
+            CoverageSnapshot snapshot = CoverageSnapshot.Capture(projectRoot);
+            File.WriteAllText(lcovPath, snapshot.BuildLcov(), Encoding.UTF8);
+            File.WriteAllText(jsonPath, JsonUtility.ToJson(snapshot, true), Encoding.UTF8);
+            Debug.Log(LogPrefix + "Usage coverage snapshot saved: " + lcovPath, this);
+        }
+        catch (Exception exception)
+        {
+            report.Warn("Не удалось сохранить usage coverage snapshot: " + exception.Message);
+        }
+        finally
+        {
+            try
+            {
+                Coverage.enabled = usageCoverageWasEnabled;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(LogPrefix + "Usage coverage enabled state could not be restored: " + exception.Message, this);
+            }
+
+            usageCoverageCaptureActive = false;
+        }
+    }
+
+    private static void RequestUsageAuditAfterBigTestIfArmed()
+    {
+        if (!SessionState.GetBool(UsageAuditAfterBigTestArmedSessionKey, false))
+        {
+            return;
+        }
+
+        SessionState.SetBool(UsageAuditAfterBigTestRequestedSessionKey, true);
+    }
+
+    [Serializable]
+    private sealed class CoverageSnapshot
+    {
+        public string generatedAtUtc;
+        public string projectRoot;
+        public int coveredMethodCount;
+        public int coveredFileCount;
+        public List<CoverageFileSnapshot> files = new List<CoverageFileSnapshot>();
+
+        public static CoverageSnapshot Capture(string projectRoot)
+        {
+            CoverageSnapshot snapshot = new CoverageSnapshot
+            {
+                generatedAtUtc = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                projectRoot = projectRoot ?? ""
+            };
+
+            Dictionary<string, CoverageFileSnapshot> byPath = new Dictionary<string, CoverageFileSnapshot>(StringComparer.OrdinalIgnoreCase);
+            CoveredMethodStats[] stats = Coverage.GetStatsForAllCoveredMethods();
+            snapshot.coveredMethodCount = stats != null ? stats.Length : 0;
+
+            if (stats != null)
+            {
+                for (int i = 0; i < stats.Length; i++)
+                {
+                    System.Reflection.MethodBase method = stats[i].method;
+                    if (method == null)
+                    {
+                        continue;
+                    }
+
+                    CoveredSequencePoint[] points = Coverage.GetSequencePointsFor(method);
+                    if (points == null)
+                    {
+                        continue;
+                    }
+
+                    for (int p = 0; p < points.Length; p++)
+                    {
+                        CoveredSequencePoint point = points[p];
+                        string path = NormalizeCoverageSnapshotPath(point.filename, projectRoot);
+                        if (string.IsNullOrWhiteSpace(path))
+                        {
+                            continue;
+                        }
+
+                        if (!byPath.TryGetValue(path, out CoverageFileSnapshot file))
+                        {
+                            file = new CoverageFileSnapshot { path = path };
+                            byPath[path] = file;
+                        }
+
+                        file.totalSequencePoints++;
+                        if (point.hitCount > 0)
+                        {
+                            file.coveredSequencePoints++;
+                            file.AddLine(SafeUIntToInt(point.line), SafeUIntToInt(point.hitCount));
+                        }
+                    }
+                }
+            }
+
+            snapshot.files = new List<CoverageFileSnapshot>(byPath.Values);
+            snapshot.files.Sort((left, right) => string.Compare(left.path, right.path, StringComparison.OrdinalIgnoreCase));
+            for (int i = 0; i < snapshot.files.Count; i++)
+            {
+                if (snapshot.files[i].coveredSequencePoints > 0)
+                {
+                    snapshot.coveredFileCount++;
+                }
+            }
+
+            return snapshot;
+        }
+
+        public string BuildLcov()
+        {
+            StringBuilder builder = new StringBuilder(16384);
+            for (int i = 0; i < files.Count; i++)
+            {
+                CoverageFileSnapshot file = files[i];
+                if (file == null || file.lines.Count == 0)
+                {
+                    continue;
+                }
+
+                file.lines.Sort((left, right) => left.line.CompareTo(right.line));
+                builder.AppendLine("SF:" + file.path);
+                for (int lineIndex = 0; lineIndex < file.lines.Count; lineIndex++)
+                {
+                    CoverageLineSnapshot line = file.lines[lineIndex];
+                    builder.AppendLine("DA:" + line.line + "," + line.hitCount);
+                }
+
+                builder.AppendLine("end_of_record");
+            }
+
+            return builder.ToString();
+        }
+
+        private static string NormalizeCoverageSnapshotPath(string path, string projectRoot)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return "";
+            }
+
+            string normalized = path.Replace('\\', '/');
+            string root = (projectRoot ?? "").Replace('\\', '/').TrimEnd('/');
+            if (!string.IsNullOrWhiteSpace(root) &&
+                normalized.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(root.Length + 1);
+            }
+
+            int assetsIndex = normalized.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
+            if (assetsIndex >= 0)
+            {
+                normalized = normalized.Substring(assetsIndex + 1);
+            }
+
+            return normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase) &&
+                normalized.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+                ? normalized
+                : "";
+        }
+
+        private static int SafeUIntToInt(uint value)
+        {
+            return value > int.MaxValue ? int.MaxValue : (int)value;
+        }
+    }
+
+    [Serializable]
+    private sealed class CoverageFileSnapshot
+    {
+        public string path;
+        public int totalSequencePoints;
+        public int coveredSequencePoints;
+        public List<CoverageLineSnapshot> lines = new List<CoverageLineSnapshot>();
+
+        public void AddLine(int lineNumber, int hitCount)
+        {
+            if (lineNumber <= 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i].line == lineNumber)
+                {
+                    lines[i].hitCount += Mathf.Max(1, hitCount);
+                    return;
+                }
+            }
+
+            lines.Add(new CoverageLineSnapshot
+            {
+                line = lineNumber,
+                hitCount = Mathf.Max(1, hitCount)
+            });
+        }
+    }
+
+    [Serializable]
+    private sealed class CoverageLineSnapshot
+    {
+        public int line;
+        public int hitCount;
+    }
+#endif
 
     private void RunChecked(BigTestReport report, Action action)
     {
@@ -926,8 +1198,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 module.harpoonMaxCarcassMassKg >= 0f &&
                 module.harpoonFlightDamage >= 0f &&
                 module.harpoonRangeMeters >= 0f &&
-                module.refrigeratedHoldCapacityKg >= 0f &&
-                module.refrigeratedHoldPowerDrawKw >= 0f &&
                 module.shipDockSlots >= 0f &&
                 module.dockedShipMassFactor > 0f &&
                 module.dockSupportClaudiumPerTonHour >= 0f &&
@@ -948,7 +1218,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     module.bulkHoldCapacityKg > 0f ||
                     module.liquidTankCapacityKg > 0f ||
                     module.gasCylinderCapacityKg > 0f ||
-                    module.refrigeratedHoldCapacityKg > 0f ||
                     module.shipDockSlots > 0f;
             }
         }
@@ -1192,8 +1461,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         SpecialModuleConfig bulat = config.GetSpecialModule("bulat_impact_hold");
         SpecialModuleConfig hornet = config.GetSpecialModule("hornet_observation_suite");
         SpecialModuleConfig hornetMk2 = config.GetSpecialModule("hornet_observation_suite_mk2");
-        SpecialModuleConfig jaeger = config.GetSpecialModule("jaeger_harpoon_fridge");
-        SpecialModuleConfig jaegerMk2 = config.GetSpecialModule("jaeger_harpoon_fridge_mk2");
+        SpecialModuleConfig jaeger = config.GetSpecialModule("jaeger_harpoon_rig");
+        SpecialModuleConfig jaegerMk2 = config.GetSpecialModule("jaeger_harpoon_rig_mk2");
         SpecialModuleConfig opora = config.GetSpecialModule("opora_crane_platform");
         SpecialModuleConfig fuelTender = config.GetSpecialModule("fuel_tender_tanks");
         SpecialModuleConfig parovoz = config.GetSpecialModule("parovoz_passenger_cabin");
@@ -1229,17 +1498,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(jaeger != null &&
             Approximately(jaeger.harpoonWeaponCostPerMinute, 2f, 0.001f) &&
             jaeger.harpoonMaxCarcassMassKg >= 100f &&
-            jaeger.refrigeratedHoldCapacityKg >= 2500f &&
-            jaeger.refrigeratedHoldPowerDrawKw > 0f,
-            "Eger base module exists: harpoon upkeep, 100 kg target limit and powered refrigerator.");
+            jaeger.cargoVanCapacityKg >= jaeger.harpoonMaxCarcassMassKg,
+            "Eger base module exists: harpoon upkeep, 100 kg target limit and ordinary cargo room for trophies.");
 
         report.Check(jaeger != null &&
             jaegerMk2 != null &&
             Approximately(jaegerMk2.harpoonWeaponCostPerMinute, 4f, 0.001f) &&
             jaegerMk2.harpoonMaxCarcassMassKg >= 200f &&
             jaegerMk2.harpoonFlightDamage > jaeger.harpoonFlightDamage &&
-            jaegerMk2.refrigeratedHoldPowerDrawKw < jaeger.refrigeratedHoldPowerDrawKw,
-            "Eger upgraded harpoon exists: 200 kg limit, more damage, lower refrigerator draw.");
+            jaegerMk2.cargoVanCapacityKg >= jaegerMk2.harpoonMaxCarcassMassKg,
+            "Eger upgraded harpoon exists: 200 kg limit, more damage and ordinary cargo room for trophies.");
 
         report.Check(opora != null &&
             opora.needRepairRecoveryPerHour > 0f &&
@@ -1255,21 +1523,21 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             parovoz.cargoVanCapacityKg > 0f,
             "Parovoz module exists: 15 passenger seats and supplies van.");
 
-        LogisticsShipMetrics fridgeMetrics = new LogisticsShipMetrics
+        LogisticsShipMetrics trophyCargoMetrics = new LogisticsShipMetrics
         {
             cargoCompartments = new List<CargoCompartmentDefinition>
             {
-                new CargoCompartmentDefinition { storageKind = CargoStorageKind.RefrigeratedHold, capacity = 100f }
+                new CargoCompartmentDefinition { storageKind = CargoStorageKind.Van, capacity = 100f }
             }
         };
-        bool refrigeratorAcceptsCarcass = CargoStoragePlanner.TryValidateCargoStorage(
+        bool trophyCargoAcceptsCarcass = CargoStoragePlanner.TryValidateCargoStorage(
             config,
-            fridgeMetrics,
+            trophyCargoMetrics,
             new Dictionary<string, int> { ["windcalf_carcass"] = 80 },
             out _);
-        bool refrigeratorRejectsOverflow = !CargoStoragePlanner.TryValidateCargoStorage(
+        bool trophyCargoRejectsOverflow = !CargoStoragePlanner.TryValidateCargoStorage(
             config,
-            fridgeMetrics,
+            trophyCargoMetrics,
             new Dictionary<string, int> { ["windcalf_carcass"] = 120 },
             out _);
         bool genericHoldAcceptsCarcass = CargoStoragePlanner.TryValidateCargoStorage(
@@ -1283,8 +1551,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             },
             new Dictionary<string, int> { ["windcalf_carcass"] = 1 },
             out _);
-        report.Check(refrigeratorAcceptsCarcass && refrigeratorRejectsOverflow && genericHoldAcceptsCarcass,
-            "Leviathan carcasses are ordinary cargo by weight: old refrigerator capacity contributes generic kg capacity.");
+        report.Check(trophyCargoAcceptsCarcass && trophyCargoRejectsOverflow && genericHoldAcceptsCarcass,
+            "Leviathan carcasses are ordinary cargo by weight and do not need a special refrigerator compartment.");
 
         bool surveyEfficiencyWorks = false;
         if (config.gasClouds != null && config.gasClouds.Count > 0)
@@ -1404,7 +1672,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 "reinforced_harpoon",
                 "hunter_engine_tuning",
                 "armored_hunter_hull",
-                "cold_chamber",
                 "crane_tackles",
                 "short_circuit_claudium_loop",
                 "ribbed_deck_truss",
@@ -1633,8 +1900,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     Approximately(stats.Get(ShipStatId.HarpoonMaxCarcassMassKg, 0f), maximum ? 200f : 100f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.HarpoonFlightDamage, 0f), maximum ? 55f : 40f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.HarpoonRangeMeters, 0f), maximum ? 60f : 45f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.RefrigeratedHoldCapacityKg, 0f), 2500f, 0.001f) &&
-                    Approximately(stats.Get(ShipStatId.RefrigeratedHoldPowerDrawKw, 0f), maximum ? 55f : 70f, 0.001f) &&
+                    Approximately(stats.Get(ShipStatId.CargoVanCapacityKg, 0f), maximum ? 250f : 150f, 0.001f) &&
                     Approximately(stats.Get(ShipStatId.NeedSafetyRecoveryPerHour, 0f), maximum ? 30f : 20f, 0.001f);
             case "opora":
                 return R1CoreLoadoutStatsMatch(stats,
@@ -1815,14 +2081,14 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             hornetMk2.baseMassKg > hornetBase.baseMassKg,
             "Hornet upgraded instruments improve paper-to-info efficiency and reduce leviathan alarm.");
 
-        SpecialModuleConfig jaegerBase = config.GetSpecialModule("jaeger_harpoon_fridge");
-        SpecialModuleConfig jaegerMk2 = config.GetSpecialModule("jaeger_harpoon_fridge_mk2");
+        SpecialModuleConfig jaegerBase = config.GetSpecialModule("jaeger_harpoon_rig");
+        SpecialModuleConfig jaegerMk2 = config.GetSpecialModule("jaeger_harpoon_rig_mk2");
         report.Check(jaegerBase != null &&
             jaegerMk2 != null &&
             jaegerMk2.harpoonMaxCarcassMassKg >= 200f &&
             Approximately(jaegerMk2.harpoonWeaponCostPerMinute, jaegerBase.harpoonWeaponCostPerMinute * 2f, 0.001f) &&
-            jaegerMk2.refrigeratedHoldCapacityKg >= jaegerBase.refrigeratedHoldCapacityKg,
-            "Eger upgraded harpoon catches 200 kg carcasses and doubles weapon drain while keeping cold storage.");
+            jaegerMk2.cargoVanCapacityKg >= jaegerMk2.harpoonMaxCarcassMassKg,
+            "Eger upgraded harpoon catches 200 kg carcasses and doubles weapon drain without special cold storage.");
 
         SpecialModuleConfig oporaBase = config.GetSpecialModule("opora_crane_platform");
         SpecialModuleConfig oporaMk2 = config.GetSpecialModule("opora_crane_platform_mk2");
@@ -2019,8 +2285,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             case "jaeger":
                 return Approximately(stats.Get(ShipStatId.HarpoonWeaponCostPerMinute, 0f), 2f, 0.001f) &&
                     stats.Get(ShipStatId.HarpoonMaxCarcassMassKg, 0f) >= 100f &&
-                    stats.Get(ShipStatId.RefrigeratedHoldCapacityKg, 0f) >= 2500f &&
-                    stats.Get(ShipStatId.RefrigeratedHoldPowerDrawKw, 0f) > 0f &&
+                    stats.Get(ShipStatId.CargoVanCapacityKg, 0f) >= stats.Get(ShipStatId.HarpoonMaxCarcassMassKg, 0f) &&
                     stats.Get(ShipStatId.NeedSafetyRecoveryPerHour, 0f) > 0f;
             case "opora":
                 return stats.Get(ShipStatId.NeedRepairRecoveryPerHour, 0f) > 0f &&
@@ -4764,8 +5029,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ship.leviathanAlarmGenerationMultiplier = 1f;
         ship.harpoonWeaponCostPerMinute = 0f;
         ship.harpoonMaxCarcassMassKg = 0f;
-        ship.refrigeratedHoldCapacityLiters = 0f;
-        ship.refrigeratedHoldPowerDrawKw = 0f;
         ship.baseObservationRadiusMeters = 0f;
         ship.observationRadiusMeters = 0f;
         ship.observationFactsAtHalfRadiusPerSecond = 0f;
@@ -4843,7 +5106,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         float dragPerSpeedSquared = ship.CurrentAeroDrag;
         float staticThrustN = Mathf.Max(0f, ship.propellerMaxThrustKgf) * 9.81f;
-        float usefulPowerW = Mathf.Max(0f, ship.enginePowerKwAt100 * ship.enginePowerLever - ship.claudiumPowerDrawKw - ship.gasHarvesterPowerDrawActualKw - ship.refrigeratedHoldPowerDrawActualKw)
+        float usefulPowerW = Mathf.Max(0f, ship.enginePowerKwAt100 * ship.enginePowerLever - ship.claudiumPowerDrawKw - ship.gasHarvesterPowerDrawActualKw)
             * Mathf.Clamp01(ship.propellerEfficiency)
             * 1000f;
 

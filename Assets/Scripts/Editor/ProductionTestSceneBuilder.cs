@@ -10,13 +10,11 @@ public static class ProductionTestSceneBuilder
     private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
     private const string DebugSaveFileName = "wild_wind_production_debug_save.json";
 
-    [MenuItem("Wild Wind/Production/Prepare All Production Test Scene")]
     public static void PrepareAllProductionTestScene()
     {
         PrepareProductionTestScene(null);
     }
 
-    [MenuItem("Wild Wind/Production/Prepare Auto-Checking Production Test Scene")]
     public static void PrepareAutoCheckingProductionTestScene()
     {
         MetaGameState meta = PrepareProductionTestScene(null);
@@ -37,43 +35,36 @@ public static class ProductionTestSceneBuilder
         Debug.Log("[ProductionTest] Auto-check scene prepared. Enter Play Mode: ProductionAutoTestRunner will write OK/FAIL to the Console.");
     }
 
-    [MenuItem("Wild Wind/Production/Prepare Generation Test Scene")]
     public static void PrepareGenerationTestScene()
     {
         PrepareProductionTestScene(IslandIndustryKind.Generation);
     }
 
-    [MenuItem("Wild Wind/Production/Prepare Processing Test Scene")]
     public static void PrepareProcessingTestScene()
     {
         PrepareProductionTestScene(IslandIndustryKind.Processing);
     }
 
-    [MenuItem("Wild Wind/Production/Prepare Manufacturing Test Scene")]
     public static void PrepareManufacturingTestScene()
     {
         PrepareProductionTestScene(IslandIndustryKind.Manufacturing);
     }
 
-    [MenuItem("Wild Wind/Production/Prepare Reaction Test Scene")]
     public static void PrepareReactionTestScene()
     {
         PrepareProductionTestScene(IslandIndustryKind.Reaction);
     }
 
-    [MenuItem("Wild Wind/Production/Prepare Conversion Test Scene")]
     public static void PrepareConversionTestScene()
     {
         PrepareProductionTestScene(IslandIndustryKind.Conversion);
     }
 
-    [MenuItem("Wild Wind/Production/Prepare Assembly Test Scene")]
     public static void PrepareAssemblyTestScene()
     {
         PrepareProductionTestScene(IslandIndustryKind.Assembly);
     }
 
-    [MenuItem("Wild Wind/Production/Simulate 10 Minutes")]
     public static void SimulateTenMinutes()
     {
         MetaGameState meta = Object.FindFirstObjectByType<MetaGameState>();

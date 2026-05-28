@@ -603,8 +603,6 @@ public static class ShipAssemblyBuilder
         AddSpecialModuleStat(modifiers, ShipStatId.BulkHoldCapacityKg, ShipStatOperation.Add, moduleConfig.bulkHoldCapacityKg);
         AddSpecialModuleStat(modifiers, ShipStatId.LiquidTankCapacityKg, ShipStatOperation.Add, moduleConfig.liquidTankCapacityKg);
         AddSpecialModuleStat(modifiers, ShipStatId.GasCylinderCapacityKg, ShipStatOperation.Add, moduleConfig.gasCylinderCapacityKg);
-        AddSpecialModuleStat(modifiers, ShipStatId.RefrigeratedHoldCapacityKg, ShipStatOperation.Add, moduleConfig.refrigeratedHoldCapacityKg);
-        AddSpecialModuleStat(modifiers, ShipStatId.RefrigeratedHoldPowerDrawKw, ShipStatOperation.Set, moduleConfig.refrigeratedHoldPowerDrawKw);
         AddSpecialModuleStat(modifiers, ShipStatId.ShipDockSlots, ShipStatOperation.Add, moduleConfig.shipDockSlots);
         if (moduleConfig.shipDockSlots > 0f)
         {
@@ -762,9 +760,6 @@ public class ShipStatBlock
         ship.harpoonMaxCarcassMassKg = Mathf.Max(0f, Get(ShipStatId.HarpoonMaxCarcassMassKg, ship.harpoonMaxCarcassMassKg));
         ship.leviathanWeaponShotFlightDamage = Mathf.Max(0f, Get(ShipStatId.HarpoonFlightDamage, ship.leviathanWeaponShotFlightDamage));
         ship.harpoonRangeMeters = Mathf.Max(0f, Get(ShipStatId.HarpoonRangeMeters, ship.harpoonRangeMeters));
-        ship.refrigeratedHoldCapacityLiters = Mathf.Max(0f, Get(ShipStatId.RefrigeratedHoldCapacityKg, ship.refrigeratedHoldCapacityLiters));
-        ship.refrigeratedHoldPowerDrawKw = Mathf.Max(0f, Get(ShipStatId.RefrigeratedHoldPowerDrawKw, ship.refrigeratedHoldPowerDrawKw));
-
         DamageableShip damageableShip = ship.GetComponentInParent<DamageableShip>();
         if (damageableShip != null)
         {

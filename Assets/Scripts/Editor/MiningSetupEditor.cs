@@ -8,7 +8,6 @@ public static class MiningSetupEditor
     private const string CatalogPath = "Assets/Data/ShipCatalog.asset";
     private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
 
-    [MenuItem("Wild Wind/Mining/Prepare Starter Mining Ship")]
     public static void PrepareStarterMiningShipMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();
@@ -16,7 +15,6 @@ public static class MiningSetupEditor
         Debug.Log("[Майнинг] Стартовый корабль подготовлен: установлен противоударный кузов, добавлены топливо и клавдий.");
     }
 
-    [MenuItem("Wild Wind/Mining/Prepare Mining Test Scene")]
     public static void PrepareMiningTestSceneMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();
@@ -27,7 +25,6 @@ public static class MiningSetupEditor
         Debug.Log("[Майнинг] Тестовая сцена подготовлена: связи сцены, стартовый корабль и пример автопилота готовы.");
     }
 
-    [MenuItem("Wild Wind/Mining/Stock All Islands Test Fuel")]
     public static void StockAllIslandTestFuelMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();

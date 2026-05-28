@@ -812,7 +812,6 @@ public static class LeviathanHuntingSetupEditor
     private const string CatalogPath = "Assets/Data/ShipCatalog.asset";
     private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
 
-    [MenuItem("Wild Wind/Leviathans/Prepare Leviathan Test Scene")]
     public static void PrepareLeviathanTestSceneMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();
@@ -821,7 +820,6 @@ public static class LeviathanHuntingSetupEditor
         Debug.Log("[Левиафаны] Тестовая сцена подготовлена: MetaGameState, ShipLoader, менеджер левиафанов и стартовый охотничий корабль настроены.");
     }
 
-    [MenuItem("Wild Wind/Leviathans/Prepare Starter Hunter Ship")]
     public static void PrepareStarterHunterShipMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();
@@ -830,7 +828,6 @@ public static class LeviathanHuntingSetupEditor
         Debug.Log("[Левиафаны] Стартовый корабль подготовлен для охоты: гарпун настроен, добавлены немного топлива и клавдия.");
     }
 
-    [MenuItem("Wild Wind/Leviathans/Rebuild Leviathans From Configs")]
     public static void RebuildLeviathansFromConfigsMenu()
     {
         MetaGameState meta = FindOrCreateMetaGameState();

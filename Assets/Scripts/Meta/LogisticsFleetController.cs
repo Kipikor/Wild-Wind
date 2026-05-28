@@ -1092,7 +1092,6 @@ public static class CargoStoragePlanner
         AddStatCompartment(compartments, stats, ShipStatId.BulkHoldCapacityKg, CargoStorageKind.Van, "Грузовой кузов");
         AddStatCompartment(compartments, stats, ShipStatId.LiquidTankCapacityKg, CargoStorageKind.Van, "Грузовая цистерна");
         AddStatCompartment(compartments, stats, ShipStatId.GasCylinderCapacityKg, CargoStorageKind.Van, "Грузовые баллоны");
-        AddStatCompartment(compartments, stats, ShipStatId.RefrigeratedHoldCapacityKg, CargoStorageKind.Van, "Грузовой холодильник");
 
         float dockSlots = stats != null ? stats.Get(ShipStatId.ShipDockSlots, 0f) : 0f;
         if (dockSlots > 0f)

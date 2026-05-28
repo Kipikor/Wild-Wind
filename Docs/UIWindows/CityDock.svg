@@ -1,0 +1,225 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .bg0 { fill: #18212a; }
+      .cloud1 { fill: #d9c8aa; opacity: .24; }
+      .cloud2 { fill: #f4dfb5; opacity: .18; }
+      .island { fill: #30353a; }
+      .rock { fill: #20252b; }
+      .building { fill: #3d352b; stroke: #80613a; stroke-width: 2; }
+      .roof { fill: #161c22; }
+      .lamp { fill: #f2b45f; opacity: .88; }
+      .ship { fill: #2d3440; stroke: #b68446; stroke-width: 2; }
+      .ship2 { fill: #151a21; stroke: #775736; stroke-width: 2; }
+      .panel { fill: #12100d; stroke: #8a6334; stroke-width: 2; }
+      .panel2 { fill: #1b1711; stroke: #6e4d28; stroke-width: 1.5; }
+      .panel3 { fill: #242018; stroke: #9b713b; stroke-width: 1.5; }
+      .bar-bg { fill: #17140f; stroke: #5f4627; stroke-width: 1; }
+      .gold { fill: #e5c17a; }
+      .muted { fill: #a79369; }
+      .soft { fill: #c7b084; }
+      .green { fill: #7fbc48; }
+      .yellow { fill: #dca94a; }
+      .red { fill: #c85b42; }
+      .blue { fill: #5db4d8; }
+      .line { stroke: #8a6334; stroke-width: 2; }
+      .title { font: 700 30px Georgia, 'Times New Roman', serif; fill: #f0d28c; letter-spacing: .5px; }
+      .h1 { font: 700 24px Georgia, 'Times New Roman', serif; fill: #f0d28c; }
+      .h2 { font: 700 18px Georgia, 'Times New Roman', serif; fill: #e5c17a; }
+      .txt { font: 500 16px Inter, Arial, sans-serif; fill: #e2d3ad; }
+      .small { font: 500 13px Inter, Arial, sans-serif; fill: #a79369; }
+      .micro { font: 500 11px Inter, Arial, sans-serif; fill: #a79369; }
+      .num { font: 700 22px Inter, Arial, sans-serif; fill: #f0d28c; }
+      .btn { fill: #241b10; stroke: #b47a38; stroke-width: 2; }
+      .btn-primary { fill: #3a260f; stroke: #d79a43; stroke-width: 3; }
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#526b83"/>
+      <stop offset=".52" stop-color="#d7b782"/>
+      <stop offset="1" stop-color="#273747"/>
+    </linearGradient>
+    <linearGradient id="storm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b4054" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#091016" stop-opacity=".82"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <rect width="1920" height="1080" fill="url(#storm)"/>
+
+  <!-- Sky, city and dock backdrop -->
+  <g>
+    <ellipse class="cloud2" cx="370" cy="250" rx="330" ry="105"/>
+    <ellipse class="cloud1" cx="1120" cy="190" rx="420" ry="130"/>
+    <ellipse class="cloud1" cx="1390" cy="380" rx="420" ry="130"/>
+    <ellipse class="cloud2" cx="790" cy="470" rx="500" ry="135"/>
+    <ellipse class="cloud1" cx="320" cy="570" rx="460" ry="140"/>
+    <ellipse class="cloud1" cx="1570" cy="610" rx="430" ry="150"/>
+  </g>
+
+  <g opacity=".85">
+    <path class="rock" d="M680 570 C880 500 1280 500 1470 600 L1400 750 L780 750 Z"/>
+    <rect class="island" x="700" y="530" width="730" height="55" rx="18"/>
+    <rect class="building" x="815" y="388" width="92" height="148"/>
+    <rect class="roof" x="798" y="365" width="128" height="28"/>
+    <rect class="building" x="950" y="330" width="118" height="210"/>
+    <rect class="roof" x="932" y="300" width="154" height="34"/>
+    <rect class="building" x="1110" y="370" width="96" height="168"/>
+    <rect class="roof" x="1092" y="344" width="132" height="30"/>
+    <rect class="building" x="1240" y="410" width="120" height="126"/>
+    <rect class="roof" x="1224" y="385" width="154" height="28"/>
+    <line class="line" x1="770" y1="585" x2="1490" y2="720"/>
+    <line class="line" x1="720" y1="610" x2="1505" y2="610"/>
+    <circle class="lamp" cx="810" cy="575" r="8"/>
+    <circle class="lamp" cx="1030" cy="540" r="7"/>
+    <circle class="lamp" cx="1260" cy="570" r="8"/>
+  </g>
+
+  <g transform="translate(330 655)" opacity=".94">
+    <ellipse class="ship" cx="270" cy="55" rx="250" ry="58"/>
+    <rect class="ship2" x="78" y="78" width="335" height="60" rx="18"/>
+    <rect class="ship2" x="156" y="20" width="135" height="56" rx="18"/>
+    <line class="line" x1="20" y1="56" x2="520" y2="56"/>
+    <circle class="lamp" cx="435" cy="88" r="7"/>
+  </g>
+
+  <!-- Top bar -->
+  <g filter="url(#shadow)">
+    <rect class="panel" x="22" y="20" width="300" height="68" rx="8"/>
+    <text class="title" x="96" y="64">ГОРОД</text>
+    <rect class="panel2" x="1352" y="20" width="156" height="68" rx="8"/>
+    <text class="small" x="1380" y="45">07:42</text>
+    <text class="micro" x="1380" y="67">день 163</text>
+    <rect class="btn" x="1522" y="20" width="190" height="68" rx="8"/>
+    <text class="h2" x="1565" y="61">СОХРАНИТЬ</text>
+    <rect class="btn" x="1728" y="20" width="74" height="68" rx="8"/>
+    <text class="h2" x="1752" y="61">⚙</text>
+  </g>
+
+  <!-- Left navigation -->
+  <g filter="url(#shadow)">
+    <rect class="panel" x="24" y="112" width="270" height="704" rx="10"/>
+    <g transform="translate(44 136)">
+      <rect class="panel3" width="230" height="78" rx="6"/><text class="h2" x="76" y="48">АНГАР</text><text class="h1" x="24" y="50">♜</text>
+    </g>
+    <g transform="translate(44 228)">
+      <rect class="panel2" width="230" height="78" rx="6"/><text class="h2" x="76" y="48">РЫНОК</text><text class="h1" x="24" y="50">⚖</text>
+    </g>
+    <g transform="translate(44 320)">
+      <rect class="panel2" width="230" height="78" rx="6"/><text class="h2" x="76" y="48">МАСТЕРСКАЯ</text><text class="h1" x="24" y="50">⚒</text>
+    </g>
+    <g transform="translate(44 412)">
+      <rect class="panel2" width="230" height="78" rx="6"/><text class="h2" x="76" y="48">МАРШРУТЫ</text><text class="h1" x="24" y="50">⌁</text>
+    </g>
+    <g transform="translate(44 504)">
+      <rect class="panel2" width="230" height="78" rx="6"/><text class="h2" x="76" y="48">ИССЛЕДОВАНИЯ</text><text class="h1" x="24" y="50">▣</text>
+    </g>
+    <g transform="translate(44 596)">
+      <rect class="panel2" width="230" height="78" rx="6"/><text class="h2" x="76" y="48">РАЗВЕДКА</text><text class="h1" x="24" y="50">⌖</text>
+    </g>
+    <g transform="translate(44 688)">
+      <rect class="panel2" width="230" height="78" rx="6"/><text class="h2" x="76" y="48">ЭНЦИКЛОПЕДИЯ</text><text class="h1" x="24" y="50">☰</text>
+    </g>
+  </g>
+
+  <!-- Right panels -->
+  <g filter="url(#shadow)">
+    <rect class="panel" x="1508" y="118" width="384" height="400" rx="10"/>
+    <text class="h1" x="1576" y="160">ПОТРЕБНОСТИ ГОРОДА</text>
+
+    <g transform="translate(1542 198)">
+      <text class="txt" x="48" y="18">Рабочая сила</text><rect class="bar-bg" x="148" y="6" width="180" height="12"/><rect class="green" x="150" y="8" width="142" height="8"/><text class="small" x="340" y="18">91%</text><text class="h2" x="0" y="22">⚒</text>
+    </g>
+    <g transform="translate(1542 246)">
+      <text class="txt" x="48" y="18">Здоровье</text><rect class="bar-bg" x="148" y="6" width="180" height="12"/><rect class="green" x="150" y="8" width="126" height="8"/><text class="small" x="340" y="18">82%</text><text class="h2" x="0" y="22">✚</text>
+    </g>
+    <g transform="translate(1542 294)">
+      <text class="txt" x="48" y="18">Безопасность</text><rect class="bar-bg" x="148" y="6" width="180" height="12"/><rect class="yellow" x="150" y="8" width="104" height="8"/><text class="small" x="340" y="18">68%</text><text class="h2" x="0" y="22">◈</text>
+    </g>
+    <g transform="translate(1542 342)">
+      <text class="txt" x="48" y="18">Комфорт</text><rect class="bar-bg" x="148" y="6" width="180" height="12"/><rect class="yellow" x="150" y="8" width="96" height="8"/><text class="small" x="340" y="18">61%</text><text class="h2" x="0" y="22">◒</text>
+    </g>
+    <g transform="translate(1542 390)">
+      <text class="txt" x="48" y="18">Творчество</text><rect class="bar-bg" x="148" y="6" width="180" height="12"/><rect class="green" x="150" y="8" width="132" height="8"/><text class="small" x="340" y="18">86%</text><text class="h2" x="0" y="22">✦</text>
+    </g>
+    <g transform="translate(1542 438)">
+      <text class="txt" x="48" y="18">Ремонт</text><rect class="bar-bg" x="148" y="6" width="180" height="12"/><rect class="yellow" x="150" y="8" width="110" height="8"/><text class="small" x="340" y="18">72%</text><text class="h2" x="0" y="22">⚙</text>
+    </g>
+
+    <rect class="panel" x="1508" y="538" width="384" height="300" rx="10"/>
+    <text class="h1" x="1586" y="580">АКТИВНЫЕ ПРОЕКТЫ</text>
+    <g transform="translate(1542 616)">
+      <text class="txt" x="42" y="18">Корабельный док ур. II</text><rect class="bar-bg" x="42" y="34" width="250" height="13"/><rect class="yellow" x="44" y="36" width="115" height="9"/><text class="small" x="306" y="47">46%</text><text class="small" x="42" y="69">осталось 02:34:18</text><text class="h2" x="0" y="43">⚙</text>
+    </g>
+    <g transform="translate(1542 704)">
+      <text class="txt" x="42" y="18">Больница ур. II</text><rect class="bar-bg" x="42" y="34" width="250" height="13"/><rect class="green" x="44" y="36" width="180" height="9"/><text class="small" x="306" y="47">72%</text><text class="small" x="42" y="69">осталось 01:15:42</text><text class="h2" x="0" y="43">✚</text>
+    </g>
+    <g transform="translate(1542 792)">
+      <text class="txt" x="42" y="18">Лаборатория: математика</text><rect class="bar-bg" x="42" y="34" width="250" height="13"/><rect class="blue" x="44" y="36" width="82" height="9"/><text class="small" x="306" y="47">33%</text><text class="small" x="42" y="69">нужна бумага: 6</text><text class="h2" x="0" y="43">✦</text>
+    </g>
+  </g>
+
+  <!-- Focus plate -->
+  <g filter="url(#shadow)">
+    <rect class="panel" x="340" y="110" width="430" height="120" rx="10"/>
+    <text class="h1" x="372" y="150">Столица · Док-7</text>
+    <text class="txt" x="372" y="182">Главный хаб: снабжение, верфь, исследования, маршруты.</text>
+    <text class="small" x="372" y="208">Состояние: город стабилен, но комфорт и безопасность проседают.</text>
+  </g>
+
+  <!-- Bottom ship/resource bar -->
+  <g filter="url(#shadow)">
+    <rect class="panel" x="22" y="900" width="1876" height="148" rx="12"/>
+
+    <g transform="translate(48 922)">
+      <rect class="panel2" width="278" height="102" rx="8"/>
+      <text class="small" x="92" y="30">ТЕКУЩИЙ ДОК</text>
+      <text class="h1" x="92" y="66">СТОЛИЦА</text>
+      <text class="h1" x="24" y="70">♛</text>
+    </g>
+
+    <g transform="translate(340 922)">
+      <rect class="panel2" width="268" height="102" rx="8"/>
+      <text class="small" x="24" y="30">КОРАБЛЬ</text>
+      <text class="h1" x="24" y="66">Пионер</text>
+      <text class="small green" x="24" y="88">готов к полёту</text>
+    </g>
+
+    <g transform="translate(622 922)">
+      <rect class="panel2" width="196" height="102" rx="8"/>
+      <text class="small" x="24" y="30">КОРПУС</text>
+      <text class="num" x="24" y="66">92%</text>
+      <rect class="bar-bg" x="24" y="78" width="130" height="10"/><rect class="green" x="26" y="80" width="96" height="6"/>
+    </g>
+
+    <g transform="translate(832 922)">
+      <rect class="panel2" width="220" height="102" rx="8"/>
+      <text class="small" x="24" y="30">ГРУЗ</text>
+      <text class="num" x="24" y="66">312 / 420 кг</text>
+      <rect class="bar-bg" x="24" y="78" width="150" height="10"/><rect class="yellow" x="26" y="80" width="112" height="6"/>
+    </g>
+
+    <g transform="translate(1066 922)">
+      <rect class="panel2" width="220" height="102" rx="8"/>
+      <text class="small" x="24" y="30">ТОПЛИВО</text>
+      <text class="num" x="24" y="66">1240 / 1500 кг</text>
+      <rect class="bar-bg" x="24" y="78" width="150" height="10"/><rect class="green" x="26" y="80" width="124" height="6"/>
+    </g>
+
+    <g transform="translate(1300 922)">
+      <rect class="panel2" width="220" height="102" rx="8"/>
+      <text class="small" x="24" y="30">КЛАВДИЙ</text>
+      <text class="num" x="24" y="66">480 / 600 кг</text>
+      <rect class="bar-bg" x="24" y="78" width="150" height="10"/><rect class="blue" x="26" y="80" width="120" height="6"/>
+    </g>
+
+    <g transform="translate(1534 922)">
+      <rect class="btn-primary" width="328" height="102" rx="10"/>
+      <text class="title" x="112" y="65">ВЗЛЕТЕТЬ</text>
+      <text class="h1" x="44" y="67">➜</text>
+    </g>
+  </g>
+</svg>

@@ -13,8 +13,6 @@ public static class StartScreenSceneBuilder
     private const string PuzzleScenePath = "Assets/Scenes/PuzzleTestScene.unity";
     private const string RootName = "Wild Wind Start Screen";
 
-    [MenuItem("Wild Wind/Start Screen/Build Scene")]
-    [MenuItem("Wild Wind/UI/Build Start Screen")]
     public static void BuildStartScreen()
     {
         EnsureSceneFolder();
@@ -29,7 +27,6 @@ public static class StartScreenSceneBuilder
         Debug.Log("[WildWindStartScreen] Editable start screen scene built: " + ScenePath);
     }
 
-    [MenuItem("Wild Wind/Start Screen/Rebuild Open Scene UI")]
     public static void RebuildOpenStartScreen()
     {
         Scene scene = SceneManager.GetActiveScene();
@@ -64,7 +61,6 @@ public static class StartScreenSceneBuilder
         Debug.Log("[WildWindStartScreen] Open scene UI rebuilt.");
     }
 
-    [MenuItem("Wild Wind/Start Screen/Open Scene")]
     public static void OpenStartScreen()
     {
         if (!File.Exists(ScenePath))
@@ -174,14 +170,12 @@ public static class WildWindEditorStartSceneGuard
         }
     }
 
-    [MenuItem(PlayStartsAtStartScreenMenuPath)]
     private static void TogglePlayStartsAtStartScreen()
     {
         PlayStartsAtStartScreen = !PlayStartsAtStartScreen;
         Debug.Log("[WildWindEditorStartSceneGuard] Play starts at StartScreen: " + PlayStartsAtStartScreen);
     }
 
-    [MenuItem(PlayStartsAtStartScreenMenuPath, true)]
     private static bool ValidatePlayStartsAtStartScreen()
     {
         Menu.SetChecked(PlayStartsAtStartScreenMenuPath, PlayStartsAtStartScreen);

@@ -10,7 +10,6 @@ public static class ExpeditionScreenPreviewBuilder
     public const string SelectionPreviewScenePath = "Assets/Scenes/ExpeditionSelectionPreview.unity";
     private const string RootName = "Wild Wind Expedition Selection Screen";
 
-    [MenuItem("Wild Wind/Expeditions/Build Preview/1 Expedition Selection")]
     public static void BuildSelectionPreview()
     {
         EnsureSceneFolder();
@@ -27,7 +26,6 @@ public static class ExpeditionScreenPreviewBuilder
         Debug.Log("[WildWindExpeditions] Expedition selection preview scene built: " + SelectionPreviewScenePath);
     }
 
-    [MenuItem("Wild Wind/Expeditions/Open Preview/1 Expedition Selection")]
     public static void OpenSelectionPreview()
     {
         if (!File.Exists(SelectionPreviewScenePath))

@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .topBar,.panel{fill:#12100d;stroke:#8a6334;stroke-width:2}
+      .panelSoft,.row{fill:#1b1711;stroke:#5f4627;stroke-width:1.4}
+      .row{fill:#181d20}
+      .navItem{fill:#17140f;stroke:#5f4627;stroke-width:1.4}
+      .navActive{fill:#33230f;stroke:#d79a43;stroke-width:2.2}
+      .btn{fill:#241b10;stroke:#b47a38;stroke-width:2}
+      .btnPrimary{fill:#3a260f;stroke:#d79a43;stroke-width:3}
+      .chip{fill:#24302a;stroke:#789c63;stroke-width:1.3}
+      .chipBlue{fill:#1d2c35;stroke:#5db4d8;stroke-width:1.3}
+      .chipWarn{fill:#3a241d;stroke:#c85b42;stroke-width:1.3}
+      .barBg{fill:#17140f;stroke:#5f4627;stroke-width:1}
+      .green{fill:#7fbc48}.gold,.accent{fill:#e5c17a}.blue{fill:#5db4d8}.rust{fill:#c85b42}.yellow{fill:#dca94a}.red{fill:#c85b42}
+      .cloud{fill:#f4dfb5;opacity:.18}.cloud2{fill:#d9c8aa;opacity:.24}
+      .rock{fill:#20252b}.island{fill:#30353a;stroke:#80613a;stroke-width:2}
+      .ship{fill:#2d3440;stroke:#b68446;stroke-width:2}.shipDark{fill:#151a21;stroke:#775736;stroke-width:2}
+      .lamp{fill:#f2b45f;opacity:.88}
+      .line{stroke:#8a6334;stroke-width:2}.route{stroke:#d79a43;stroke-width:4;fill:none;stroke-dasharray:12 10}.routeDim{opacity:.4}
+      .grid{stroke:#6f7f82;stroke-width:1;opacity:.09}
+      .title{font:700 30px Georgia,'Times New Roman',serif;fill:#f0d28c}
+      .h1{font:700 24px Georgia,'Times New Roman',serif;fill:#f0d28c}
+      .h2{font:700 18px Inter,Arial,sans-serif;fill:#e5c17a}
+      .txt{font:500 16px Inter,Arial,sans-serif;fill:#e2d3ad}
+      .small{font:500 13px Inter,Arial,sans-serif;fill:#a79369}
+      .micro{font:500 11px Inter,Arial,sans-serif;fill:#a79369}
+      .num{font:700 22px Inter,Arial,sans-serif;fill:#f0d28c}
+      .buttonText{font:700 15px Inter,Arial,sans-serif;fill:#e5c17a}
+      .buttonTextBig{font:700 30px Georgia,'Times New Roman',serif;fill:#f0d28c}
+      .navText{font:700 15px Inter,Arial,sans-serif;fill:#e5c17a}
+      .chipText{font:700 13px Inter,Arial,sans-serif;fill:#d9e3cf}
+      .mapLabel{font:700 16px Inter,Arial,sans-serif;fill:#f0d28c}
+      .shadow{filter:url(#shadow)}
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#526b83"/><stop offset=".52" stop-color="#d7b782"/><stop offset="1" stop-color="#273747"/>
+    </linearGradient>
+    <linearGradient id="storm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b4054" stop-opacity=".05"/><stop offset="1" stop-color="#091016" stop-opacity=".82"/>
+    </linearGradient>
+    <linearGradient id="gridFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f4c56" stop-opacity=".35"/><stop offset="1" stop-color="#090b0e" stop-opacity=".8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="#121923"/>
+    <rect width="1920" height="1080" fill="url(#gridFade)"/>
+    <line x1="0" y1="120" x2="1920" y2="120" class="grid" /><line x1="0" y1="170" x2="1920" y2="170" class="grid" /><line x1="0" y1="220" x2="1920" y2="220" class="grid" /><line x1="0" y1="270" x2="1920" y2="270" class="grid" /><line x1="0" y1="320" x2="1920" y2="320" class="grid" /><line x1="0" y1="370" x2="1920" y2="370" class="grid" /><line x1="0" y1="420" x2="1920" y2="420" class="grid" /><line x1="0" y1="470" x2="1920" y2="470" class="grid" /><line x1="0" y1="520" x2="1920" y2="520" class="grid" /><line x1="0" y1="570" x2="1920" y2="570" class="grid" /><line x1="0" y1="620" x2="1920" y2="620" class="grid" /><line x1="0" y1="670" x2="1920" y2="670" class="grid" /><line x1="0" y1="720" x2="1920" y2="720" class="grid" /><line x1="0" y1="770" x2="1920" y2="770" class="grid" /><line x1="0" y1="820" x2="1920" y2="820" class="grid" /><line x1="0" y1="870" x2="1920" y2="870" class="grid" /><line x1="0" y1="920" x2="1920" y2="920" class="grid" /><line x1="0" y1="970" x2="1920" y2="970" class="grid" /><line x1="0" y1="1020" x2="1920" y2="1020" class="grid" />
+    <line x1="60" y1="0" x2="60" y2="1080" class="grid" /><line x1="156" y1="0" x2="156" y2="1080" class="grid" /><line x1="252" y1="0" x2="252" y2="1080" class="grid" /><line x1="348" y1="0" x2="348" y2="1080" class="grid" /><line x1="444" y1="0" x2="444" y2="1080" class="grid" /><line x1="540" y1="0" x2="540" y2="1080" class="grid" /><line x1="636" y1="0" x2="636" y2="1080" class="grid" /><line x1="732" y1="0" x2="732" y2="1080" class="grid" /><line x1="828" y1="0" x2="828" y2="1080" class="grid" /><line x1="924" y1="0" x2="924" y2="1080" class="grid" /><line x1="1020" y1="0" x2="1020" y2="1080" class="grid" /><line x1="1116" y1="0" x2="1116" y2="1080" class="grid" /><line x1="1212" y1="0" x2="1212" y2="1080" class="grid" /><line x1="1308" y1="0" x2="1308" y2="1080" class="grid" /><line x1="1404" y1="0" x2="1404" y2="1080" class="grid" /><line x1="1500" y1="0" x2="1500" y2="1080" class="grid" /><line x1="1596" y1="0" x2="1596" y2="1080" class="grid" /><line x1="1692" y1="0" x2="1692" y2="1080" class="grid" /><line x1="1788" y1="0" x2="1788" y2="1080" class="grid" /><line x1="1884" y1="0" x2="1884" y2="1080" class="grid" /><g class="shadow">
+    <rect x="24" y="20" width="1872" height="74" class="topBar" rx="10"/>
+    <text x="54" y="58" class="title" >ПРОИЗВОДСТВО</text>
+    <text x="54" y="82" class="small" >потоки, каскад, смета, bottleneck и запуск крупных целей</text>
+    <text x="1540" y="58" class="h2" text-anchor="end">07:42 · день 163</text>
+    <g><rect x="1574" y="31" width="156" height="52" class="btn" rx="8"/><text x="1652" y="65" class="buttonText" text-anchor="middle">СОХРАНИТЬ</text></g>
+    <g><rect x="1744" y="31" width="62" height="52" class="btn" rx="8"/><text x="1775" y="65" class="buttonText" text-anchor="middle">⚙</text></g>
+  </g><g class="shadow"><rect x="20" y="112" width="278" height="736" class="panel" rx="10"/><g><rect x="34" y="134" width="244" height="58" class="navItem" rx="8"/><text x="58" y="171" class="navText" >ГОРОД</text></g>
+<g><rect x="34" y="210" width="244" height="58" class="navItem" rx="8"/><text x="58" y="247" class="navText" >КАРТА</text></g>
+<g><rect x="34" y="286" width="244" height="58" class="navItem" rx="8"/><text x="58" y="323" class="navText" >АНГАР</text></g>
+<g><rect x="34" y="362" width="244" height="58" class="navItem" rx="8"/><text x="58" y="399" class="navText" >СБОРКА</text></g>
+<g><rect x="34" y="438" width="244" height="58" class="navActive" rx="8"/><text x="58" y="475" class="navText" >ПРОИЗВОДСТВО</text></g>
+<g><rect x="34" y="514" width="244" height="58" class="navItem" rx="8"/><text x="58" y="551" class="navText" >ИССЛЕДОВАНИЯ</text></g>
+<g><rect x="34" y="590" width="244" height="58" class="navItem" rx="8"/><text x="58" y="627" class="navText" >ФЛОТ</text></g>
+<g><rect x="34" y="666" width="244" height="58" class="navItem" rx="8"/><text x="58" y="703" class="navText" >РАЗВЕДКА</text></g>
+<g><rect x="34" y="742" width="244" height="58" class="navItem" rx="8"/><text x="58" y="779" class="navText" >ЭНЦИКЛОПЕДИЯ</text></g></g><g class="shadow"><rect x="338" y="116" width="1118" height="732" class="panel" rx="10"/><text x="362" y="158" class="h1" >Каскадное производство</text>
+    <text x="370" y="184" class="h1" >Цель: Кувалда · R3/T2 рудный корвет</text>
+    <g><rect x="370" y="238" width="620" height="58" class="row" rx="7"/><text x="386" y="262" class="txt" >Конструкционный цех 8.4 ч</text><text x="386" y="284" class="small" >главное узкое место</text><g><rect x="812" y="257" width="120" height="12" class="barBg" rx="6"/><rect x="814" y="259" width="116" height="8" class="rust" rx="4"/><text x="944" y="269" class="small" >100%</text></g></g><g><rect x="370" y="306" width="620" height="58" class="row" rx="7"/><text x="386" y="330" class="txt" >Узловой цех 1.4 ч</text><text x="386" y="352" class="small" >нагрузка 1x</text><g><rect x="812" y="325" width="120" height="12" class="barBg" rx="6"/><rect x="814" y="327" width="19.720000000000002" height="8" class="blue" rx="4"/><text x="944" y="337" class="small" >17%</text></g></g><g><rect x="370" y="374" width="620" height="58" class="row" rx="7"/><text x="386" y="398" class="txt" >Моторостроительный 0.4 ч</text><text x="386" y="420" class="small" >нагрузка 1x</text><g><rect x="812" y="393" width="120" height="12" class="barBg" rx="6"/><rect x="814" y="395" width="5.800000000000001" height="8" class="blue" rx="4"/><text x="944" y="405" class="small" >5%</text></g></g><g><rect x="370" y="442" width="620" height="58" class="row" rx="7"/><text x="386" y="466" class="txt" >Крупноузловой 0.7 ч</text><text x="386" y="488" class="small" >нагрузка 1x</text><g><rect x="812" y="461" width="120" height="12" class="barBg" rx="6"/><rect x="814" y="463" width="9.28" height="8" class="blue" rx="4"/><text x="944" y="473" class="small" >8%</text></g></g><g><rect x="370" y="510" width="620" height="58" class="row" rx="7"/><text x="386" y="534" class="txt" >Лёгкая промышленность 0.2 ч</text><text x="386" y="556" class="small" >нагрузка 1x</text><g><rect x="812" y="529" width="120" height="12" class="barBg" rx="6"/><rect x="814" y="531" width="3.48" height="8" class="blue" rx="4"/><text x="944" y="541" class="small" >3%</text></g></g><g><rect x="370" y="578" width="620" height="58" class="row" rx="7"/><text x="386" y="602" class="txt" >Корабельный док 1.5 ч</text><text x="386" y="624" class="small" >нагрузка 1x</text><g><rect x="812" y="597" width="120" height="12" class="barBg" rx="6"/><rect x="814" y="599" width="20.88" height="8" class="blue" rx="4"/><text x="944" y="609" class="small" >18%</text></g></g>
+    <g class="shadow"><rect x="1030" y="238" width="390" height="420" class="panel" rx="10"/><text x="1054" y="280" class="h1" >Смета</text>
+      <text x="1060" y="300" class="txt" >балка 765 · ферма 328</text>
+      <text x="1060" y="336" class="txt" >обшивка 238 · лист 170</text>
+      <text x="1060" y="372" class="txt" >шестерни 112 · трубки 78</text>
+      <text x="1060" y="408" class="txt" >кальцит 296 · сильвин 163</text>
+      <text x="1060" y="444" class="txt" >инструменты 12 · медикаменты 20</text>
+      <g><rect x="1060" y="514" width="150" height="74" class="panelSoft" rx="8"/><text x="1078" y="539" class="small" >ИТОГО</text><text x="1078" y="571" class="num accent" >9.9 ч</text></g>
+      <g><rect x="1230" y="514" width="150" height="74" class="panelSoft" rx="8"/><text x="1248" y="539" class="small" >СБОРКА</text><text x="1248" y="571" class="num accent" >1.5 ч</text></g>
+    </g>
+    <g><rect x="370" y="740" width="240" height="58" class="btn" rx="8"/><text x="490" y="777" class="buttonText" text-anchor="middle">УЛУЧШИТЬ ЦЕХ</text></g><g><rect x="630" y="740" width="240" height="58" class="btnPrimary" rx="8"/><text x="750" y="777" class="buttonText" text-anchor="middle">ЗАПУСТИТЬ</text></g>
+  </g><g class="shadow"><rect x="1508" y="116" width="384" height="732" class="panel" rx="10"/><text x="1532" y="158" class="h1" >Потоковые линии</text>
+    <g><rect x="1540" y="180" width="316" height="58" class="row" rx="7"/><text x="1556" y="204" class="txt" >Бумажная мастерская</text><text x="1556" y="226" class="small" >генерация</text><g><rect x="1678" y="199" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="201" width="104.4" height="8" class="green" rx="4"/><text x="1810" y="211" class="small" >90%</text></g></g>
+    <g><rect x="1540" y="250" width="316" height="58" class="row" rx="7"/><text x="1556" y="274" class="txt" >Дробилка руды</text><text x="1556" y="296" class="small" >переработка</text><g><rect x="1678" y="269" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="271" width="78.88000000000001" height="8" class="yellow" rx="4"/><text x="1810" y="281" class="small" >68%</text></g></g>
+    <g><rect x="1540" y="320" width="316" height="58" class="row" rx="7"/><text x="1556" y="344" class="txt" >Перегонка конденсата</text><text x="1556" y="366" class="small" >газ</text><g><rect x="1678" y="339" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="341" width="48.72" height="8" class="blue" rx="4"/><text x="1810" y="351" class="small" >42%</text></g></g>
+    <g><rect x="1540" y="390" width="316" height="58" class="row" rx="7"/><text x="1556" y="414" class="txt" >Пороховая реакция</text><text x="1556" y="436" class="small" >риск партии</text><g><rect x="1678" y="409" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="411" width="38.28" height="8" class="rust" rx="4"/><text x="1810" y="421" class="small" >33%</text></g></g>
+    <g><rect x="1540" y="460" width="316" height="58" class="row" rx="7"/><text x="1556" y="484" class="txt" >Клавдиевый маховик</text><text x="1556" y="506" class="small" >конверсия</text><g><rect x="1678" y="479" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="481" width="83.52" height="8" class="blue" rx="4"/><text x="1810" y="491" class="small" >72%</text></g></g>
+    <g><rect x="1540" y="530" width="316" height="58" class="row" rx="7"/><text x="1556" y="554" class="txt" >Сборка корпуса</text><text x="1556" y="576" class="small" >assembly</text><g><rect x="1678" y="549" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="551" width="63.800000000000004" height="8" class="yellow" rx="4"/><text x="1810" y="561" class="small" >55%</text></g></g>
+  </g><g class="shadow"><rect x="22" y="898" width="1876" height="130" class="panel" rx="10"/><g><rect x="50" y="924" width="210" height="74" class="panelSoft" rx="8"/><text x="68" y="949" class="small" >ДОК</text><text x="68" y="981" class="num accent" >Столица</text></g>
+<g><rect x="276" y="924" width="230" height="74" class="panelSoft" rx="8"/><text x="294" y="949" class="small" >КОРАБЛЬ</text><text x="294" y="981" class="num accent" >Пионер</text></g>
+<g><rect x="522" y="924" width="190" height="74" class="panelSoft" rx="8"/><text x="540" y="949" class="small" >КОРПУС</text><text x="540" y="981" class="num green" >92%</text></g>
+<g><rect x="728" y="924" width="220" height="74" class="panelSoft" rx="8"/><text x="746" y="949" class="small" >ГРУЗ</text><text x="746" y="981" class="num gold" >312/420 кг</text></g>
+<g><rect x="964" y="924" width="220" height="74" class="panelSoft" rx="8"/><text x="982" y="949" class="small" >ТОПЛИВО</text><text x="982" y="981" class="num green" >1240 кг</text></g>
+<g><rect x="1200" y="924" width="220" height="74" class="panelSoft" rx="8"/><text x="1218" y="949" class="small" >КЛАВДИЙ</text><text x="1218" y="981" class="num blue" >480 кг</text></g>
+<g><rect x="1534" y="922" width="328" height="86" class="btnPrimary" rx="8"/><text x="1698" y="973" class="buttonTextBig" text-anchor="middle">ВЗЛЕТЕТЬ</text></g></g>
+</svg>

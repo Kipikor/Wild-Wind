@@ -696,8 +696,6 @@ public partial class WorldConfigDatabase
                 bulkHoldCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "bulk_hold_capacity_kg"), ParseFloat(Get(row, "bulk_hold_capacity_l")))),
                 liquidTankCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "liquid_tank_capacity_kg"), ParseFloat(Get(row, "liquid_tank_capacity_l")))),
                 gasCylinderCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "gas_cylinder_capacity_kg"), ParseFloat(Get(row, "gas_cylinder_capacity_l")))),
-                refrigeratedHoldCapacityKg = Mathf.Max(0f, ParseFloat(Get(row, "refrigerated_hold_capacity_kg"), ParseFloat(Get(row, "refrigerated_hold_capacity_l")))),
-                refrigeratedHoldPowerDrawKw = Mathf.Max(0f, ParseFloat(Get(row, "refrigerated_hold_power_draw_kw"))),
                 shipDockSlots = Mathf.Max(0f, ParseFloat(Get(row, "ship_dock_slots"))),
                 shipDockMaxClass = ParseShipSizeClass(Get(row, "ship_dock_max_class")),
                 dockedShipMassFactor = Mathf.Clamp(ParseFloat(Get(row, "docked_ship_mass_factor"), 0.1f), 0.01f, 1f),
@@ -895,16 +893,6 @@ public partial class WorldConfigDatabase
             string.Equals(normalized, "bottle", StringComparison.OrdinalIgnoreCase))
         {
             return CargoStorageKind.GasCylinder;
-        }
-
-        if (string.Equals(normalized, "refrigerated", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "refrigerator", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "fridge", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "cold", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "coldhold", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "refrigeratedhold", StringComparison.OrdinalIgnoreCase))
-        {
-            return CargoStorageKind.RefrigeratedHold;
         }
 
         if (string.Equals(normalized, "dock", StringComparison.OrdinalIgnoreCase))
@@ -1185,8 +1173,6 @@ public class SpecialModuleConfig
     public float bulkHoldCapacityKg;
     public float liquidTankCapacityKg;
     public float gasCylinderCapacityKg;
-    public float refrigeratedHoldCapacityKg;
-    public float refrigeratedHoldPowerDrawKw;
     public float shipDockSlots;
     public ShipSizeClass shipDockMaxClass = ShipSizeClass.None;
     public float dockedShipMassFactor = 0.1f;

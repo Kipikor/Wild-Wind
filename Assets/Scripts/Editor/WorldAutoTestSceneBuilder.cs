@@ -5,7 +5,6 @@ using UnityEngine.SceneManagement;
 
 public static class WorldAutoTestSceneBuilder
 {
-    [MenuItem("Wild Wind/World/Prepare Auto-Checking World Test Scene")]
     public static void PrepareAutoCheckingWorldTestScene()
     {
         WorldSceneBuilder.BuildFinalWorldScene();

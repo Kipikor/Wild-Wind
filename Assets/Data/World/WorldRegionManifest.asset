@@ -16,7 +16,7 @@ MonoBehaviour:
   seed: 170517
   worldSizeMeters: 100000
   chunkSizeMeters: 10000
-  generatedAtUtc: 2026-05-24 12:53:19
+  generatedAtUtc: 2026-05-27 17:28:19
   chunks:
   - id: chunk_00_00
     chunkX: 0

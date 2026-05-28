@@ -5,7 +5,6 @@ public static class WorldSettingsPrefabBuilder
 {
     public const string SettingsPrefabPath = "Assets/Prefabs/Settings/WildWindSettings.prefab";
 
-    [MenuItem("Wild Wind/Settings/Create Or Update Settings Prefab")]
     public static void CreateOrUpdateSettingsPrefab()
     {
         GameObject prefab = EnsureSettingsPrefabAsset();

@@ -9,7 +9,6 @@ public static class WorldRegionDataBuilder
     public const string ProfilePath = FolderPath + "/WorldRegionProfile.asset";
     public const string ManifestPath = FolderPath + "/WorldRegionManifest.asset";
 
-    [MenuItem("Wild Wind/World/Rebuild World Data")]
     public static void RebuildWorldDataMenu()
     {
         EnsureAndRebuild(out WorldRegionProfile profile, out WorldRegionManifest manifest, true);

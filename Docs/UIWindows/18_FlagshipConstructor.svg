@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .topBar,.panel{fill:#12100d;stroke:#8a6334;stroke-width:2}
+      .panelSoft,.row{fill:#1b1711;stroke:#5f4627;stroke-width:1.4}
+      .row{fill:#181d20}
+      .navItem{fill:#17140f;stroke:#5f4627;stroke-width:1.4}
+      .navActive{fill:#33230f;stroke:#d79a43;stroke-width:2.2}
+      .btn{fill:#241b10;stroke:#b47a38;stroke-width:2}
+      .btnPrimary{fill:#3a260f;stroke:#d79a43;stroke-width:3}
+      .chip{fill:#24302a;stroke:#789c63;stroke-width:1.3}
+      .chipBlue{fill:#1d2c35;stroke:#5db4d8;stroke-width:1.3}
+      .chipWarn{fill:#3a241d;stroke:#c85b42;stroke-width:1.3}
+      .barBg{fill:#17140f;stroke:#5f4627;stroke-width:1}
+      .green{fill:#7fbc48}.gold,.accent{fill:#e5c17a}.blue{fill:#5db4d8}.rust{fill:#c85b42}.yellow{fill:#dca94a}.red{fill:#c85b42}
+      .cloud{fill:#f4dfb5;opacity:.18}.cloud2{fill:#d9c8aa;opacity:.24}
+      .rock{fill:#20252b}.island{fill:#30353a;stroke:#80613a;stroke-width:2}
+      .ship{fill:#2d3440;stroke:#b68446;stroke-width:2}.shipDark{fill:#151a21;stroke:#775736;stroke-width:2}
+      .lamp{fill:#f2b45f;opacity:.88}
+      .line{stroke:#8a6334;stroke-width:2}.route{stroke:#d79a43;stroke-width:4;fill:none;stroke-dasharray:12 10}.routeDim{opacity:.4}
+      .grid{stroke:#6f7f82;stroke-width:1;opacity:.09}
+      .title{font:700 30px Georgia,'Times New Roman',serif;fill:#f0d28c}
+      .h1{font:700 24px Georgia,'Times New Roman',serif;fill:#f0d28c}
+      .h2{font:700 18px Inter,Arial,sans-serif;fill:#e5c17a}
+      .txt{font:500 16px Inter,Arial,sans-serif;fill:#e2d3ad}
+      .small{font:500 13px Inter,Arial,sans-serif;fill:#a79369}
+      .micro{font:500 11px Inter,Arial,sans-serif;fill:#a79369}
+      .num{font:700 22px Inter,Arial,sans-serif;fill:#f0d28c}
+      .buttonText{font:700 15px Inter,Arial,sans-serif;fill:#e5c17a}
+      .buttonTextBig{font:700 30px Georgia,'Times New Roman',serif;fill:#f0d28c}
+      .navText{font:700 15px Inter,Arial,sans-serif;fill:#e5c17a}
+      .chipText{font:700 13px Inter,Arial,sans-serif;fill:#d9e3cf}
+      .mapLabel{font:700 16px Inter,Arial,sans-serif;fill:#f0d28c}
+      .shadow{filter:url(#shadow)}
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#526b83"/><stop offset=".52" stop-color="#d7b782"/><stop offset="1" stop-color="#273747"/>
+    </linearGradient>
+    <linearGradient id="storm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b4054" stop-opacity=".05"/><stop offset="1" stop-color="#091016" stop-opacity=".82"/>
+    </linearGradient>
+    <linearGradient id="gridFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f4c56" stop-opacity=".35"/><stop offset="1" stop-color="#090b0e" stop-opacity=".8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="#121923"/>
+    <rect width="1920" height="1080" fill="url(#gridFade)"/>
+    <line x1="0" y1="120" x2="1920" y2="120" class="grid" /><line x1="0" y1="170" x2="1920" y2="170" class="grid" /><line x1="0" y1="220" x2="1920" y2="220" class="grid" /><line x1="0" y1="270" x2="1920" y2="270" class="grid" /><line x1="0" y1="320" x2="1920" y2="320" class="grid" /><line x1="0" y1="370" x2="1920" y2="370" class="grid" /><line x1="0" y1="420" x2="1920" y2="420" class="grid" /><line x1="0" y1="470" x2="1920" y2="470" class="grid" /><line x1="0" y1="520" x2="1920" y2="520" class="grid" /><line x1="0" y1="570" x2="1920" y2="570" class="grid" /><line x1="0" y1="620" x2="1920" y2="620" class="grid" /><line x1="0" y1="670" x2="1920" y2="670" class="grid" /><line x1="0" y1="720" x2="1920" y2="720" class="grid" /><line x1="0" y1="770" x2="1920" y2="770" class="grid" /><line x1="0" y1="820" x2="1920" y2="820" class="grid" /><line x1="0" y1="870" x2="1920" y2="870" class="grid" /><line x1="0" y1="920" x2="1920" y2="920" class="grid" /><line x1="0" y1="970" x2="1920" y2="970" class="grid" /><line x1="0" y1="1020" x2="1920" y2="1020" class="grid" />
+    <line x1="60" y1="0" x2="60" y2="1080" class="grid" /><line x1="156" y1="0" x2="156" y2="1080" class="grid" /><line x1="252" y1="0" x2="252" y2="1080" class="grid" /><line x1="348" y1="0" x2="348" y2="1080" class="grid" /><line x1="444" y1="0" x2="444" y2="1080" class="grid" /><line x1="540" y1="0" x2="540" y2="1080" class="grid" /><line x1="636" y1="0" x2="636" y2="1080" class="grid" /><line x1="732" y1="0" x2="732" y2="1080" class="grid" /><line x1="828" y1="0" x2="828" y2="1080" class="grid" /><line x1="924" y1="0" x2="924" y2="1080" class="grid" /><line x1="1020" y1="0" x2="1020" y2="1080" class="grid" /><line x1="1116" y1="0" x2="1116" y2="1080" class="grid" /><line x1="1212" y1="0" x2="1212" y2="1080" class="grid" /><line x1="1308" y1="0" x2="1308" y2="1080" class="grid" /><line x1="1404" y1="0" x2="1404" y2="1080" class="grid" /><line x1="1500" y1="0" x2="1500" y2="1080" class="grid" /><line x1="1596" y1="0" x2="1596" y2="1080" class="grid" /><line x1="1692" y1="0" x2="1692" y2="1080" class="grid" /><line x1="1788" y1="0" x2="1788" y2="1080" class="grid" /><line x1="1884" y1="0" x2="1884" y2="1080" class="grid" /><g class="shadow">
+    <rect x="24" y="20" width="1872" height="74" class="topBar" rx="10"/>
+    <text x="54" y="58" class="title" >ФЛАГМАН / ОТСЕКИ</text>
+    <text x="54" y="82" class="small" >палубы, режимы комнат, поломки и автономность</text>
+    <text x="1540" y="58" class="h2" text-anchor="end">07:42 · день 163</text>
+    <g><rect x="1574" y="31" width="156" height="52" class="btn" rx="8"/><text x="1652" y="65" class="buttonText" text-anchor="middle">СОХРАНИТЬ</text></g>
+    <g><rect x="1744" y="31" width="62" height="52" class="btn" rx="8"/><text x="1775" y="65" class="buttonText" text-anchor="middle">⚙</text></g>
+  </g><g class="shadow"><rect x="20" y="112" width="278" height="736" class="panel" rx="10"/><g><rect x="34" y="134" width="244" height="58" class="navItem" rx="8"/><text x="58" y="171" class="navText" >ГОРОД</text></g>
+<g><rect x="34" y="210" width="244" height="58" class="navItem" rx="8"/><text x="58" y="247" class="navText" >КАРТА</text></g>
+<g><rect x="34" y="286" width="244" height="58" class="navItem" rx="8"/><text x="58" y="323" class="navText" >АНГАР</text></g>
+<g><rect x="34" y="362" width="244" height="58" class="navActive" rx="8"/><text x="58" y="399" class="navText" >СБОРКА</text></g>
+<g><rect x="34" y="438" width="244" height="58" class="navItem" rx="8"/><text x="58" y="475" class="navText" >ПРОИЗВОДСТВО</text></g>
+<g><rect x="34" y="514" width="244" height="58" class="navItem" rx="8"/><text x="58" y="551" class="navText" >ИССЛЕДОВАНИЯ</text></g>
+<g><rect x="34" y="590" width="244" height="58" class="navItem" rx="8"/><text x="58" y="627" class="navText" >ФЛОТ</text></g>
+<g><rect x="34" y="666" width="244" height="58" class="navItem" rx="8"/><text x="58" y="703" class="navText" >РАЗВЕДКА</text></g>
+<g><rect x="34" y="742" width="244" height="58" class="navItem" rx="8"/><text x="58" y="779" class="navText" >ЭНЦИКЛОПЕДИЯ</text></g></g><g class="shadow"><rect x="338" y="116" width="1118" height="732" class="panel" rx="10"/><text x="362" y="158" class="h1" >Конструктор отсеков флагмана</text>
+    <rect x="456" y="250" width="66" height="66" class="row" rx="6"/><rect x="530" y="250" width="66" height="66" class="panelSoft" rx="6"/><rect x="604" y="250" width="66" height="66" class="row" rx="6"/><rect x="678" y="250" width="66" height="66" class="panelSoft" rx="6"/><rect x="752" y="250" width="66" height="66" class="row" rx="6"/><rect x="826" y="250" width="66" height="66" class="panelSoft" rx="6"/><rect x="900" y="250" width="66" height="66" class="row" rx="6"/><rect x="974" y="250" width="66" height="66" class="panelSoft" rx="6"/><rect x="1048" y="250" width="66" height="66" class="row" rx="6"/><rect x="1122" y="250" width="66" height="66" class="panelSoft" rx="6"/><rect x="1196" y="250" width="66" height="66" class="row" rx="6"/><rect x="1270" y="250" width="66" height="66" class="panelSoft" rx="6"/><rect x="456" y="336" width="66" height="66" class="panelSoft" rx="6"/><rect x="530" y="336" width="66" height="66" class="row" rx="6"/><rect x="604" y="336" width="66" height="66" class="panelSoft" rx="6"/><rect x="678" y="336" width="66" height="66" class="row" rx="6"/><rect x="752" y="336" width="66" height="66" class="panelSoft" rx="6"/><rect x="826" y="336" width="66" height="66" class="row" rx="6"/><rect x="900" y="336" width="66" height="66" class="panelSoft" rx="6"/><rect x="974" y="336" width="66" height="66" class="row" rx="6"/><rect x="1048" y="336" width="66" height="66" class="panelSoft" rx="6"/><rect x="1122" y="336" width="66" height="66" class="row" rx="6"/><rect x="1196" y="336" width="66" height="66" class="panelSoft" rx="6"/><rect x="1270" y="336" width="66" height="66" class="row" rx="6"/><rect x="456" y="422" width="66" height="66" class="row" rx="6"/><rect x="530" y="422" width="66" height="66" class="panelSoft" rx="6"/><rect x="604" y="422" width="66" height="66" class="row" rx="6"/><rect x="678" y="422" width="66" height="66" class="panelSoft" rx="6"/><rect x="752" y="422" width="66" height="66" class="row" rx="6"/><rect x="826" y="422" width="66" height="66" class="panelSoft" rx="6"/><rect x="900" y="422" width="66" height="66" class="row" rx="6"/><rect x="974" y="422" width="66" height="66" class="panelSoft" rx="6"/><rect x="1048" y="422" width="66" height="66" class="row" rx="6"/><rect x="1122" y="422" width="66" height="66" class="panelSoft" rx="6"/><rect x="1196" y="422" width="66" height="66" class="row" rx="6"/><rect x="1270" y="422" width="66" height="66" class="panelSoft" rx="6"/><rect x="456" y="508" width="66" height="66" class="panelSoft" rx="6"/><rect x="530" y="508" width="66" height="66" class="row" rx="6"/><rect x="604" y="508" width="66" height="66" class="panelSoft" rx="6"/><rect x="678" y="508" width="66" height="66" class="row" rx="6"/><rect x="752" y="508" width="66" height="66" class="panelSoft" rx="6"/><rect x="826" y="508" width="66" height="66" class="row" rx="6"/><rect x="900" y="508" width="66" height="66" class="panelSoft" rx="6"/><rect x="974" y="508" width="66" height="66" class="row" rx="6"/><rect x="1048" y="508" width="66" height="66" class="panelSoft" rx="6"/><rect x="1122" y="508" width="66" height="66" class="row" rx="6"/><rect x="1196" y="508" width="66" height="66" class="panelSoft" rx="6"/><rect x="1270" y="508" width="66" height="66" class="row" rx="6"/><g><rect x="456" y="250" width="140" height="66" class="chipBlue" rx="8"/><text x="526" y="290" class="chipText" text-anchor="middle">Мостик</text></g><g><rect x="752" y="250" width="214" height="66" class="chip" rx="8"/><text x="859" y="290" class="chipText" text-anchor="middle">Столовая</text></g><g><rect x="1010" y="336" width="214" height="66" class="chip" rx="8"/><text x="1117" y="376" class="chipText" text-anchor="middle">Ремонтная</text></g><g><rect x="456" y="422" width="140" height="66" class="chip" rx="8"/><text x="526" y="462" class="chipText" text-anchor="middle">Склад</text></g><g><rect x="974" y="508" width="140" height="66" class="chipWarn" rx="8"/><text x="1044" y="548" class="chipText" text-anchor="middle">Двигатели</text></g>
+    <text x="456" y="210" class="h1" >Палубы универсальные · R3 Горизонт</text>
+    <g><rect x="456" y="720" width="220" height="58" class="btn" rx="8"/><text x="566" y="757" class="buttonText" text-anchor="middle">АВТОКОМПЛЕКТ</text></g><g><rect x="700" y="720" width="220" height="58" class="btnPrimary" rx="8"/><text x="810" y="757" class="buttonText" text-anchor="middle">СОХРАНИТЬ</text></g>
+  </g><g class="shadow"><rect x="1508" y="116" width="384" height="732" class="panel" rx="10"/><text x="1532" y="158" class="h1" >Каталог отсеков</text>
+    <g><rect x="1540" y="180" width="316" height="58" class="row" rx="7"/><text x="1556" y="204" class="txt" >Склад</text><text x="1556" y="226" class="small" >1 клетка</text><g><rect x="1678" y="199" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="201" width="69.6" height="8" class="green" rx="4"/><text x="1810" y="211" class="small" >60%</text></g></g>
+    <g><rect x="1540" y="250" width="316" height="58" class="row" rx="7"/><text x="1556" y="274" class="txt" >Медпункт</text><text x="1556" y="296" class="small" >1 клетка</text><g><rect x="1678" y="269" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="271" width="52.2" height="8" class="blue" rx="4"/><text x="1810" y="281" class="small" >45%</text></g></g>
+    <g><rect x="1540" y="320" width="316" height="58" class="row" rx="7"/><text x="1556" y="344" class="txt" >Столовая</text><text x="1556" y="366" class="small" >2 клетки</text><g><rect x="1678" y="339" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="341" width="81.19999999999999" height="8" class="yellow" rx="4"/><text x="1810" y="351" class="small" >70%</text></g></g>
+    <g><rect x="1540" y="390" width="316" height="58" class="row" rx="7"/><text x="1556" y="414" class="txt" >Каюты</text><text x="1556" y="436" class="small" >2 клетки</text><g><rect x="1678" y="409" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="411" width="76.56" height="8" class="blue" rx="4"/><text x="1810" y="421" class="small" >66%</text></g></g>
+    <g><rect x="1540" y="460" width="316" height="58" class="row" rx="7"/><text x="1556" y="484" class="txt" >Мастерская</text><text x="1556" y="506" class="small" >3 клетки</text><g><rect x="1678" y="479" width="120" height="12" class="barBg" rx="6"/><rect x="1680" y="481" width="46.400000000000006" height="8" class="rust" rx="4"/><text x="1810" y="491" class="small" >40%</text></g></g>
+    <text x="1540" y="570" class="txt" >Системные отсеки нельзя заменить.</text>
+<text x="1540" y="594" class="txt" >Обычные перетаскиваются по сетке и</text>
+<text x="1540" y="618" class="txt" >работают в режимах 25/50/100%.</text>
+  </g><g class="shadow"><rect x="22" y="898" width="1876" height="130" class="panel" rx="10"/><g><rect x="50" y="924" width="210" height="74" class="panelSoft" rx="8"/><text x="68" y="949" class="small" >ДОК</text><text x="68" y="981" class="num accent" >Столица</text></g>
+<g><rect x="276" y="924" width="230" height="74" class="panelSoft" rx="8"/><text x="294" y="949" class="small" >КОРАБЛЬ</text><text x="294" y="981" class="num accent" >Пионер</text></g>
+<g><rect x="522" y="924" width="190" height="74" class="panelSoft" rx="8"/><text x="540" y="949" class="small" >КОРПУС</text><text x="540" y="981" class="num green" >92%</text></g>
+<g><rect x="728" y="924" width="220" height="74" class="panelSoft" rx="8"/><text x="746" y="949" class="small" >ГРУЗ</text><text x="746" y="981" class="num gold" >312/420 кг</text></g>
+<g><rect x="964" y="924" width="220" height="74" class="panelSoft" rx="8"/><text x="982" y="949" class="small" >ТОПЛИВО</text><text x="982" y="981" class="num green" >1240 кг</text></g>
+<g><rect x="1200" y="924" width="220" height="74" class="panelSoft" rx="8"/><text x="1218" y="949" class="small" >КЛАВДИЙ</text><text x="1218" y="981" class="num blue" >480 кг</text></g>
+<g><rect x="1534" y="922" width="328" height="86" class="btnPrimary" rx="8"/><text x="1698" y="973" class="buttonTextBig" text-anchor="middle">ВЗЛЕТЕТЬ</text></g></g>
+</svg>

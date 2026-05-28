@@ -30,7 +30,6 @@ public static class ShipAssemblySetupEditor
     private const string StarterMiningHoldPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterMiningHold.prefab";
     private const string StarterObservationPostPrefabPath = "Assets/Data/ShipPrefabs/Modules/StarterObservationPost.prefab";
 
-    [MenuItem("Wild Wind/Корабли/Собрать базовый сетап сборки")]
     public static void BuildStarterAssemblySetup()
     {
         EnsureFolder(DataFolder);
@@ -80,13 +79,11 @@ public static class ShipAssemblySetupEditor
         EditorUtility.DisplayDialog("Базовая сборка корабля", "Базовый сетап корпуса, модулей, префабов, каталога и древа техники собран.", "OK");
     }
 
-    [MenuItem("Wild Wind/Корабли/Собрать базовый сетап сборки", true)]
     public static bool ValidateBuildStarterAssemblySetup()
     {
         return !Application.isPlaying;
     }
 
-    [MenuItem("Wild Wind/Корабли/Подготовить сцену под сборку")]
     public static void PrepareSceneForAssembly()
     {
         ShipLoader loader = Object.FindFirstObjectByType<ShipLoader>();
@@ -132,7 +129,6 @@ public static class ShipAssemblySetupEditor
         EditorUtility.DisplayDialog("Сцена подготовлена", "Загрузчик корабля и точка создания корпуса готовы. Старый сценовый корабль можно оставить как запасной: после создания корпуса-префаба он отключится.", "OK");
     }
 
-    [MenuItem("Wild Wind/Корабли/Подготовить сцену под сборку", true)]
     public static bool ValidatePrepareSceneForAssembly()
     {
         return !Application.isPlaying;

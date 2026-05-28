@@ -1,5 +1,11 @@
 # Wild Wind: полный черновой граф контента
 
+> Архивный черновик. Не использовать как источник истины для ресурсов, корабельных T-уровней, рецептов, газов, руд, левиафановых материалов, автоматонного лута и субликатов.
+>
+> Актуальный канон:
+> - `Docs/ResourceEntityDraft.md` - ресурсы, типы, веса, руды, газы, левиафаны, автоматоны, субликаты.
+> - `Docs/ShipRoleRankMatrix.md` - ранги кораблей, T-матрица, правила T0-T5, эталонные рецепты и T3-компоненты.
+
 Дата фиксации: 2026-05-17
 
 Статус: предварительный предконфиг. Это не финальный баланс и не канон названий. Документ нужен, чтобы увидеть полную связанную картину: ресурсы, технологии, острова, производства, рецепты, компоненты кораблей и сами корабли.
@@ -236,9 +242,9 @@ leviathan_materials:
     tendons_fibers:
       examples: [leviathan_tendon, power_sinew, nerve_fiber, armored_fiber]
       used_for: [cables, dampers, harpoons, sensitive_devices]
-    bones_shells:
-      examples: [leviathan_bone, porous_bone, horn_material, resonant_bone]
-      used_for: [light_composites, filters, handles, stabilizers]
+    mineral_residue:
+      examples: [shell_scrap, calcite_residue, sylvine_salt, monazite_trace]
+      used_for: [calcite_output, sylvine_output, monazite_trace_output, reaction_fillers]
     fats_oils:
       examples: [leviathan_fat, fine_bio_oil, heatproof_lubricant, black_leviathan_fat]
       used_for: [lubricants, fuel, sealants, precision_mechanics]
@@ -404,7 +410,7 @@ island_types:
     unlocks_by: tech_automaton_ruins
     needs_to_build: [weapons, tools, paper, mechanisms]
     possible_buildings: [salvage_yard, archive_lab, relay_workshop]
-    description: "Место, где новая цивилизация разбирает кости старой."
+    description: "Место, где новая цивилизация разбирает обломки старой."
 
   high_altitude_ice_outpost:
     name: "Высотный ледовый форпост"

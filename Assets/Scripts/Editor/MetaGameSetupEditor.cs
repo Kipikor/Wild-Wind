@@ -7,7 +7,6 @@ public static class MetaGameSetupEditor
     private const string TechTreePath = "Assets/Data/TechTrees/WildWindTechTree.asset";
     private const string MetaGameObjectName = "Мета-игра";
 
-    [MenuItem("Wild Wind/Мета/Собрать мета-игру")]
     public static void SetupMetaGame()
     {
         ShipPhysics ship = Object.FindFirstObjectByType<ShipPhysics>();
@@ -61,7 +60,6 @@ public static class MetaGameSetupEditor
         Selection.activeGameObject = metaGameObject;
     }
 
-    [MenuItem("Wild Wind/Мета/Собрать мета-игру", true)]
     public static bool ValidateSetupMetaGame()
     {
         return !Application.isPlaying;

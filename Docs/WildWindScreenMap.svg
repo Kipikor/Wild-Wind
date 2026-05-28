@@ -1,0 +1,203 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1600" viewBox="0 0 2560 1600">
+  <defs>
+    <style>
+      .bg { fill: #06080a; }
+      .section { fill: #11161c; stroke-width: 2; rx: 12; }
+      .card { fill: #1b2228; stroke-width: 2; rx: 8; }
+      .soft { fill: #2a2d2c; }
+      .title { fill: #eee0c2; font: 700 64px Inter, Arial, sans-serif; }
+      .subtitle { fill: #d8a556; font: 500 24px Inter, Arial, sans-serif; }
+      .note { fill: #9ca8ab; font: 400 17px Inter, Arial, sans-serif; }
+      .section-title { fill: #eee0c2; font: 700 24px Inter, Arial, sans-serif; }
+      .section-subtitle { fill: #9ca8ab; font: 400 13px Inter, Arial, sans-serif; }
+      .card-title { fill: #eee0c2; font: 600 15px Inter, Arial, sans-serif; }
+      .card-line { fill: #9ca8ab; font: 400 11px Inter, Arial, sans-serif; }
+      .pill-text { font: 500 10px Inter, Arial, sans-serif; text-anchor: middle; dominant-baseline: middle; }
+      .flow { fill: #d8a556; font: 500 15px Inter, Arial, sans-serif; }
+      .gold { stroke: #d8a556; }
+      .blue { stroke: #4d99e0; }
+      .green { stroke: #52b870; }
+      .red { stroke: #db5c4d; }
+      .violet { stroke: #9980e0; }
+      .cyan { stroke: #4dc7d1; }
+      .fill-gold { fill: #d8a556; }
+      .fill-blue { fill: #4d99e0; }
+      .fill-green { fill: #52b870; }
+      .fill-red { fill: #db5c4d; }
+      .fill-violet { fill: #9980e0; }
+      .fill-cyan { fill: #4dc7d1; }
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2560" height="1600"/>
+
+  <text class="title" x="80" y="112">Wild Wind</text>
+  <text class="subtitle" x="84" y="160">Полная карта интерфейсов по текущим механикам</text>
+  <text class="note" x="86" y="204">Рабочая опись экранов: что существует в коде, что видно в механиках, и что нужно спроектировать до сборки игры.</text>
+
+  <g filter="url(#shadow)">
+    <rect class="section gold" x="1810" y="58" width="650" height="126" rx="12"/>
+    <text class="section-title" x="1834" y="92">Статусы</text>
+    <rect class="soft green" x="1834" y="120" width="86" height="22" rx="11"/>
+    <text class="pill-text fill-green" x="1877" y="131">есть код</text>
+    <rect class="soft gold" x="1932" y="120" width="86" height="22" rx="11"/>
+    <text class="pill-text fill-gold" x="1975" y="131">концепт</text>
+    <rect class="soft blue" x="2030" y="120" width="92" height="22" rx="11"/>
+    <text class="pill-text fill-blue" x="2076" y="131">механика</text>
+    <rect class="soft red" x="2136" y="120" width="72" height="22" rx="11"/>
+    <text class="pill-text fill-red" x="2172" y="131">нужно</text>
+    <rect class="soft violet" x="2222" y="120" width="72" height="22" rx="11"/>
+    <text class="pill-text fill-violet" x="2258" y="131">позже</text>
+    <rect class="soft cyan" x="2308" y="120" width="82" height="22" rx="11"/>
+    <text class="pill-text fill-cyan" x="2349" y="131">dev only</text>
+  </g>
+
+  <!-- Section 1 -->
+  <g filter="url(#shadow)">
+    <rect class="section gold" x="72" y="270" width="1188" height="408" rx="12"/>
+    <text class="section-title" x="96" y="306">1. Вход и базовый игровой цикл</text>
+    <text class="section-subtitle" x="98" y="338">От запуска мира до ручного рейса и возвращения в док.</text>
+
+    <g transform="translate(96 362)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Главное меню</text><text class="card-line" x="16" y="54">Старт игры и вход в мир.</text><text class="card-line" x="16" y="80">Новая игра, продолжить, настройки.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(386 362)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Сохранения</text><text class="card-line" x="16" y="54">Выбор мира для продолжения.</text><text class="card-line" x="16" y="80">Слоты, дата, seed, пустое состояние.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(676 362)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Настройки</text><text class="card-line" x="16" y="54">Минимальные системные настройки.</text><text class="card-line" x="16" y="80">Язык RU/EN, позже звук и графика.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(966 362)">
+      <rect class="card gold" width="272" height="132" rx="8"/><rect class="fill-gold" width="5" height="132"/><text class="card-title" x="16" y="28">Город / док</text><text class="card-line" x="16" y="54">Главный хаб между рейсами.</text><text class="card-line" x="16" y="80">Корабль, ресурсы, проекты, взлёт.</text><rect class="soft gold" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-gold" x="59" y="112">концепт</text>
+    </g>
+    <g transform="translate(96 518)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Доковый HUD</text><text class="card-line" x="16" y="54">Короткие действия при стыковке.</text><text class="card-line" x="16" y="80">Склад, груз, загрузить, выгрузить.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(386 518)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Полётный HUD</text><text class="card-line" x="16" y="54">Ручной полёт и контроль рейса.</text><text class="card-line" x="16" y="80">Высота, скорость, курс, цель, тяга.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(676 518)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Пауза / меню</text><text class="card-line" x="16" y="54">Пауза, сохранение и выход.</text><text class="card-line" x="16" y="80">Продолжить, сохранить, выйти.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(966 518)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Диалог</text><text class="card-line" x="16" y="54">Сюжет и обучение.</text><text class="card-line" x="16" y="80">Портрет, имя, текст, далее.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+  </g>
+
+  <!-- Section 2 -->
+  <g filter="url(#shadow)">
+    <rect class="section blue" x="1300" y="270" width="1188" height="408" rx="12"/>
+    <text class="section-title" x="1324" y="306">2. Мир, острова и маршруты</text>
+    <text class="section-subtitle" x="1326" y="338">Пространство, снабжение и информация о регионе.</text>
+
+    <g transform="translate(1324 362)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Карта мира</text><text class="card-line" x="16" y="54">Главная навигация по региону.</text><text class="card-line" x="16" y="80">Острова, облака, руды, высоты.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(1614 362)">
+      <rect class="card red" width="272" height="132" rx="8"/><rect class="fill-red" width="5" height="132"/><text class="card-title" x="16" y="28">Планировщик маршрута</text><text class="card-line" x="16" y="54">Построить доставку или рейс.</text><text class="card-line" x="16" y="80">Откуда, куда, груз, топливо, риск.</text><rect class="soft red" x="16" y="101" width="72" height="22" rx="11"/><text class="pill-text fill-red" x="52" y="112">нужно</text>
+    </g>
+    <g transform="translate(1904 362)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Экран острова</text><text class="card-line" x="16" y="54">Состояние конкретного острова.</text><text class="card-line" x="16" y="80">Тип, стадия, склад, постройки.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(2194 362)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Потребности острова</text><text class="card-line" x="16" y="54">Понять, что тормозит развитие.</text><text class="card-line" x="16" y="80">Рабочая сила, здоровье, комфорт.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(1324 518)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Склад / груз</text><text class="card-line" x="16" y="54">Управлять товарными потоками.</text><text class="card-line" x="16" y="80">Магистраль, редкости, типы трюмов.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(1614 518)">
+      <rect class="card gold" width="272" height="132" rx="8"/><rect class="fill-gold" width="5" height="132"/><text class="card-title" x="16" y="28">События мира</text><text class="card-line" x="16" y="54">Лента результатов и угроз.</text><text class="card-line" x="16" y="80">Разведка, доставки, поломки.</text><rect class="soft gold" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-gold" x="59" y="112">концепт</text>
+    </g>
+    <g transform="translate(1904 518)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Разведка</text><text class="card-line" x="16" y="54">Открывать данные мира.</text><text class="card-line" x="16" y="80">Глыбы, облака, левиафаны.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(2194 518)">
+      <rect class="card red" width="272" height="132" rx="8"/><rect class="fill-red" width="5" height="132"/><text class="card-title" x="16" y="28">Idle-отчёт</text><text class="card-line" x="16" y="54">Понять, что случилось вне полёта.</text><text class="card-line" x="16" y="80">Рейсы, производство, расход.</text><rect class="soft red" x="16" y="101" width="72" height="22" rx="11"/><text class="pill-text fill-red" x="52" y="112">нужно</text>
+    </g>
+  </g>
+
+  <!-- Section 3 -->
+  <g filter="url(#shadow)">
+    <rect class="section green" x="72" y="720" width="1188" height="408" rx="12"/>
+    <text class="section-title" x="96" y="756">3. Экономика, производство и строительство</text>
+    <text class="section-subtitle" x="98" y="788">Оживление островов, постройки и крупные сборочные цели.</text>
+
+    <g transform="translate(96 812)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Производства острова</text><text class="card-line" x="16" y="54">Видеть рабочие здания.</text><text class="card-line" x="16" y="80">Generation, Processing, Reaction.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(386 812)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Строительство</text><text class="card-line" x="16" y="54">Запустить здание или улучшение.</text><text class="card-line" x="16" y="80">Очередь, этапы, ресурсы.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(676 812)">
+      <rect class="card gold" width="272" height="132" rx="8"/><rect class="fill-gold" width="5" height="132"/><text class="card-title" x="16" y="28">Каскадное производство</text><text class="card-line" x="16" y="54">Собрать крупную цель без микрокрафта.</text><text class="card-line" x="16" y="80">Смета, компоненты, bottleneck.</text><rect class="soft gold" x="16" y="101" width="64" height="22" rx="11"/><text class="pill-text fill-gold" x="48" y="112">доки</text>
+    </g>
+    <g transform="translate(966 812)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Рецепты</text><text class="card-line" x="16" y="54">Выбор качества производства.</text><text class="card-line" x="16" y="80">Входы, выходы, время, мощность.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(96 968)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Общественный слой</text><text class="card-line" x="16" y="54">Почему остров работает медленно.</text><text class="card-line" x="16" y="80">Потребности тают и восстанавливаются.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(386 968)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Сервисные здания</text><text class="card-line" x="16" y="54">Усилить доки и жизнь острова.</text><text class="card-line" x="16" y="80">Причал, больница, академия, ремонт.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(676 968)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Потоковая промышленность</text><text class="card-line" x="16" y="54">Накопление материалов в час.</text><text class="card-line" x="16" y="80">Руда, газы, реакции, разборка.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(966 968)">
+      <rect class="card gold" width="272" height="132" rx="8"/><rect class="fill-gold" width="5" height="132"/><text class="card-title" x="16" y="28">Проектная панель</text><text class="card-line" x="16" y="54">Следить за активными проектами.</text><text class="card-line" x="16" y="80">Проценты, остаток, узкое место.</text><rect class="soft gold" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-gold" x="59" y="112">концепт</text>
+    </g>
+  </g>
+
+  <!-- Section 4 -->
+  <g filter="url(#shadow)">
+    <rect class="section red" x="1300" y="720" width="1188" height="564" rx="12"/>
+    <text class="section-title" x="1324" y="756">4. Корабли, флот и прогрессия</text>
+    <text class="section-subtitle" x="1326" y="788">От Пионера до флагмана и экспедиций.</text>
+
+    <g transform="translate(1324 812)">
+      <rect class="card gold" width="272" height="132" rx="8"/><rect class="fill-gold" width="5" height="132"/><text class="card-title" x="16" y="28">Ангар / каталог</text><text class="card-line" x="16" y="54">Выбрать и сравнить корабли.</text><text class="card-line" x="16" y="80">Пионер, Водомерка, Опора, тендеры.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(1614 812)">
+      <rect class="card red" width="272" height="132" rx="8"/><rect class="fill-red" width="5" height="132"/><text class="card-title" x="16" y="28">Карточка корабля</text><text class="card-line" x="16" y="54">Понять роль и состояние.</text><text class="card-line" x="16" y="80">Ранг, трюмы, топливо, износ.</text><rect class="soft red" x="16" y="101" width="72" height="22" rx="11"/><text class="pill-text fill-red" x="52" y="112">нужно</text>
+    </g>
+    <g transform="translate(1904 812)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Верфь / сборка</text><text class="card-line" x="16" y="54">Построить новый корабль.</text><text class="card-line" x="16" y="80">Корпус, двигатель, винт, контур.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(2194 812)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Модернизация</text><text class="card-line" x="16" y="54">Улучшить узлы корабля.</text><text class="card-line" x="16" y="80">Mk2-узлы, технологии, ресурсы.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(1324 968)">
+      <rect class="card red" width="272" height="132" rx="8"/><rect class="fill-red" width="5" height="132"/><text class="card-title" x="16" y="28">Древо технологий</text><text class="card-line" x="16" y="54">Открывать роли и автоматизацию.</text><text class="card-line" x="16" y="80">Опыт, ресурсы, ветки, зависимости.</text><rect class="soft green" x="16" y="101" width="98" height="22" rx="11"/><text class="pill-text fill-green" x="65" y="112">есть editor</text>
+    </g>
+    <g transform="translate(1614 968)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Энциклопедия</text><text class="card-line" x="16" y="54">Объяснить граф контента.</text><text class="card-line" x="16" y="80">Корабли, ресурсы, острова, мир.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(1904 968)">
+      <rect class="card blue" width="272" height="132" rx="8"/><rect class="fill-blue" width="5" height="132"/><text class="card-title" x="16" y="28">Логистика флота</text><text class="card-line" x="16" y="54">Назначать автономные задачи.</text><text class="card-line" x="16" y="80">Газосбор, добыча, разведка.</text><rect class="soft blue" x="16" y="101" width="92" height="22" rx="11"/><text class="pill-text fill-blue" x="62" y="112">механика</text>
+    </g>
+    <g transform="translate(2194 968)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Конструктор флагмана</text><text class="card-line" x="16" y="54">Собрать внутренние отсеки.</text><text class="card-line" x="16" y="80">Палубы, комнаты, режимы.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(1324 1124)">
+      <rect class="card green" width="272" height="132" rx="8"/><rect class="fill-green" width="5" height="132"/><text class="card-title" x="16" y="28">Выбор экспедиции</text><text class="card-line" x="16" y="54">Отправить флагман в регион.</text><text class="card-line" x="16" y="80">Регионы, R-требование, мораль.</text><rect class="soft green" x="16" y="101" width="86" height="22" rx="11"/><text class="pill-text fill-green" x="59" y="112">есть код</text>
+    </g>
+    <g transform="translate(1614 1124)">
+      <rect class="card violet" width="272" height="132" rx="8"/><rect class="fill-violet" width="5" height="132"/><text class="card-title" x="16" y="28">Экспедиционный регион</text><text class="card-line" x="16" y="54">Играть вокруг флагмана.</text><text class="card-line" x="16" y="80">Мораль, цели, поломки, угрозы.</text><rect class="soft violet" x="16" y="101" width="72" height="22" rx="11"/><text class="pill-text fill-violet" x="52" y="112">позже</text>
+    </g>
+    <g transform="translate(1904 1124)">
+      <rect class="card violet" width="272" height="132" rx="8"/><rect class="fill-violet" width="5" height="132"/><text class="card-title" x="16" y="28">Опасные операции</text><text class="card-line" x="16" y="54">Отдельные режимы риска.</text><text class="card-line" x="16" y="80">Руда, облака, левиафаны, высота.</text><rect class="soft violet" x="16" y="101" width="72" height="22" rx="11"/><text class="pill-text fill-violet" x="52" y="112">позже</text>
+    </g>
+    <g transform="translate(2194 1124)">
+      <rect class="card cyan" width="272" height="132" rx="8"/><rect class="fill-cyan" width="5" height="132"/><text class="card-title" x="16" y="28">Тестовые панели</text><text class="card-line" x="16" y="54">Разработка и баланс.</text><text class="card-line" x="16" y="80">Пазлы, повреждения, visual test.</text><rect class="soft cyan" x="16" y="101" width="82" height="22" rx="11"/><text class="pill-text fill-cyan" x="57" y="112">dev only</text>
+    </g>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect class="section gold" x="72" y="1340" width="2416" height="110" rx="12"/>
+    <text class="section-title" x="96" y="1378">Главный цикл</text>
+    <text class="flow" x="98" y="1418">Меню -> Город/док -> Полёт -> Остров/док -> Карта/маршруты -> Производство / исследования / ангар -> новые корабли -> флагман -> экспедиции</text>
+  </g>
+</svg>

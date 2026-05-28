@@ -17,7 +17,6 @@ public enum CargoStorageKind
     BulkHold,
     LiquidTank,
     GasCylinder,
-    RefrigeratedHold,
     ShipDock
 }
 

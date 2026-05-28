@@ -280,10 +280,6 @@ public enum ShipStatId
     DockedShipMassFactor = 107,
     [InspectorName("Груз: клавдий дока, кг/т/ч")]
     DockSupportClaudiumPerTonHour = 108,
-    [InspectorName("Груз: холодильник, кг")]
-    RefrigeratedHoldCapacityKg = 109,
-    [InspectorName("Груз: мощность холодильника, кВт")]
-    RefrigeratedHoldPowerDrawKw = 110,
     [InspectorName("РџСЂРѕС‡РЅРѕСЃС‚СЊ РєРѕСЂРїСѓСЃР°")]
     StructureHp = 111
 }

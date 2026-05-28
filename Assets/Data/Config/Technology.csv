@@ -34,7 +34,6 @@ survey_autopilot,Автопилот разведки,Survey Autopilot,5,Шерш
 reinforced_harpoon,Усиленный гарпун,Reinforced Harpoon,4,Егерь,30,1,"hunter_hull","fundamental_experience,design_experience,weapon,tools,paper","7,4,6,4,2",Гарпун на 200 кг туши и повышенный расход оружия
 hunter_engine_tuning,Боевой форсаж,Hunter Engine Tuning,4,Егерь,25,1,"hunter_hull,air_pumps","fundamental_experience,design_experience,tools,cloth,paper","6,4,5,3,2",Улучшенный но всё ещё прожорливый двигатель Егеря
 armored_hunter_hull,Бронекорпус Егеря,Armored Hunter Hull,4,Егерь,30,1,"hunter_hull,bearing_skin","fundamental_experience,design_experience,tools,cloth,paper","6,4,5,5,2",Усиленный корпус и контур Егеря
-cold_chamber,Холодильная камера,Cold Chamber,4,Егерь,25,1,"hunter_hull","fundamental_experience,design_experience,tools,cloth,paper","5,3,4,4,3",Снижает энергозатраты холодильника
 crane_tackles,Крановые тали,Crane Tackles,4,Опора,25,1,"support_platform","fundamental_experience,design_experience,tools,cloth,paper","5,3,6,3,2",Улучшает скорость превращения инструментов в ремонт
 short_circuit_claudium_loop,Короткозамкнутый контур,Short Circuit Claudium Loop,4,Опора,30,1,"support_platform,steam_claudium_theory","fundamental_experience,design_experience,tools,cloth,paper","6,4,5,4,2",Повышает эффективность подъёма Опоры и снижает расход клавдия
 ribbed_deck_truss,Ребристая палубная ферма,Ribbed Deck Truss,4,Опора,30,1,"support_platform,basic_geometry","fundamental_experience,design_experience,tools,cloth,paper","6,4,6,4,2",Усиленный корпус Опоры и снятие жёсткого ограничения скорости

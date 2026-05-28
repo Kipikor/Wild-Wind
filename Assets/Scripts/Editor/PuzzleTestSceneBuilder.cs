@@ -9,7 +9,6 @@ public static class PuzzleTestSceneBuilder
 {
     public const string ScenePath = "Assets/Scenes/PuzzleTestScene.unity";
 
-    [MenuItem("Wild Wind/Puzzles/Build Puzzle Test Scene")]
     public static void BuildPuzzleTestScene()
     {
         EnsureSceneFolder();
@@ -28,7 +27,6 @@ public static class PuzzleTestSceneBuilder
         Debug.Log("[WildWindPuzzles] Puzzle test scene built: " + ScenePath);
     }
 
-    [MenuItem("Wild Wind/Puzzles/Open Puzzle Test Scene")]
     public static void OpenPuzzleTestScene()
     {
         if (!File.Exists(ScenePath))
@@ -42,7 +40,6 @@ public static class PuzzleTestSceneBuilder
         Debug.Log("[WildWindPuzzles] Puzzle test scene opened: " + scene.path);
     }
 
-    [MenuItem("Wild Wind/Puzzles/Use Puzzle Test Scene For Next Play")]
     public static void UsePuzzleTestSceneForNextPlay()
     {
         if (!File.Exists(ScenePath))
