@@ -11,6 +11,43 @@ public class MiningFragment : MonoBehaviour
     public float spinSpeedDeg = 90f;
 
     private ShipPhysics cachedShip;
+    private MetaGameState cachedMeta;
+
+    public static int ActiveCount => ActiveFragments.Count;
+
+    public static void GetActiveFragments(System.Collections.Generic.List<MiningFragment> results)
+    {
+        if (results == null) return;
+
+        results.Clear();
+        for (int i = ActiveFragments.Count - 1; i >= 0; i--)
+        {
+            MiningFragment fragment = ActiveFragments[i];
+            if (fragment == null || fragment.amountKg <= 0)
+            {
+                ActiveFragments.RemoveAt(i);
+                continue;
+            }
+
+            results.Add(fragment);
+        }
+    }
+
+    public static bool HasActiveItem(string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return false;
+
+        for (int i = 0; i < ActiveFragments.Count; i++)
+        {
+            MiningFragment fragment = ActiveFragments[i];
+            if (fragment != null && fragment.amountKg > 0 && fragment.oreItemId == itemId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public static MiningFragment FindNearestForLeviathan(Vector3 position, float radiusMeters)
     {
@@ -64,7 +101,9 @@ public class MiningFragment : MonoBehaviour
         }
 
         ShipPhysics ship = GetShip();
-        if (ship == null || ship.miningImpactHoldCapacityKg <= 0f) return;
+        MetaGameState meta = GetMeta();
+        bool starterSortieCatch = meta != null && meta.CanCatchStarterSortieFragmentsInCargo;
+        if (ship == null || (ship.miningImpactHoldCapacityKg <= 0f && !starterSortieCatch)) return;
 
         float radius = Mathf.Max(0.1f, ship.miningCatchRadiusMeters);
         if (Vector3.Distance(transform.position, ship.transform.position) > radius) return;
@@ -83,6 +122,16 @@ public class MiningFragment : MonoBehaviour
         }
 
         return cachedShip;
+    }
+
+    private MetaGameState GetMeta()
+    {
+        if (cachedMeta == null)
+        {
+            cachedMeta = FindFirstObjectByType<MetaGameState>();
+        }
+
+        return cachedMeta;
     }
 
     private void OnEnable()

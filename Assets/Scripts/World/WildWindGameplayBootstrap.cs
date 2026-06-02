@@ -43,6 +43,9 @@ public static class WildWindGameplayBootstrap
             !WildWindBigTestRunner.IsSessionLoopLaunchInProgress)
         {
             WildWindSaveSlots.ClearPendingGameplayLaunch();
+#if UNITY_EDITOR
+            WildWindBigTestRunner.TryStartPendingEditorBigTest();
+#endif
             return;
         }
 

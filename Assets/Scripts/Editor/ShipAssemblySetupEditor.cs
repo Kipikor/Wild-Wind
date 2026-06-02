@@ -157,7 +157,7 @@ public static class ShipAssemblySetupEditor
         hull.statModifiers = new List<ShipStatModifier>
         {
             Set(ShipStatId.BaseMass, 900f),
-            Set(ShipStatId.HullMaxTakeoffMassKg, 3000f),
+            Set(ShipStatId.HullMaxTakeoffMassKg, 3200f),
             Set(ShipStatId.AirDensity, 1.225f),
             Set(ShipStatId.DragCoefficient, 0.8f),
             Set(ShipStatId.FrontalArea, 8f),
@@ -167,8 +167,8 @@ public static class ShipAssemblySetupEditor
             Set(ShipStatId.GyroTurnDamping, 0.8f),
             Set(ShipStatId.MaxAutoTurnRateDeg, 5f),
             Set(ShipStatId.MaxStructuralTurnRateDeg, 15f),
-            Set(ShipStatId.MaxStructuralVerticalSpeed, 5f),
-            Set(ShipStatId.MaxAutoVerticalSpeed, 1f),
+            Set(ShipStatId.MaxStructuralVerticalSpeed, 10f),
+            Set(ShipStatId.MaxAutoVerticalSpeed, 10f),
             Set(ShipStatId.AltitudeStiffness, 0.2f),
             Set(ShipStatId.AltitudeDamping, 1.2f),
             Set(ShipStatId.AltitudeDriftTolerance, 0.15f),
@@ -220,8 +220,7 @@ public static class ShipAssemblySetupEditor
         {
             Add(ShipStatId.BaseMass, 90f),
             Set(ShipStatId.PropellerMaxSpeedMS, 30f),
-            Set(ShipStatId.PropellerEfficiency, 0.78f),
-            Set(ShipStatId.PropellerMaxThrustKgf, 220f)
+            Set(ShipStatId.PropellerEfficiency, 0.78f)
         };
 
         EditorUtility.SetDirty(propeller);
@@ -244,7 +243,7 @@ public static class ShipAssemblySetupEditor
             Add(ShipStatId.BaseMass, 160f),
             Set(ShipStatId.ClaudiumConsumptionPerTonSecond, 0.005f),
             Set(ShipStatId.ClaudiumLiftEfficiency, 10f),
-            Set(ShipStatId.ClaudiumMaxLiftKg, 2600f),
+            Set(ShipStatId.ClaudiumMaxLiftKg, 3200f),
             Set(ShipStatId.ClaudiumLiftSmoothing, 2.5f)
         };
 
@@ -509,14 +508,20 @@ public static class ShipAssemblySetupEditor
 
         ShipPhysics physics = root.AddComponent<ShipPhysics>();
         physics.baseMass = 900f;
-        physics.hullMaxTakeoffMassKg = 3000f;
+        physics.hullMaxTakeoffMassKg = 3200f;
         physics.targetTrimMass = 900f;
         physics.enginePowerKwAt100 = 190f;
         physics.engineFuelId = "charcoal";
         physics.engineFuelEfficiency = 0.18f;
         physics.engineFuelEnergyKwhPerKg = 8f;
         physics.engineFuelStockKg = 0f;
+        physics.engineResponseRate01PerSecond = 0.10f;
+        physics.neutralStopBrakeEnabled = false;
+        physics.neutralStopBrakeMaxDecelerationMS2 = 8f;
+        physics.neutralStopBrakeStopTimeSeconds = 0.75f;
+        physics.neutralStopBrakeDeadzoneMS = 0.05f;
         physics.enginePowerLever = 0.88f;
+        physics.claudiumLoopResponseRate01PerSecond = 0.10f;
         physics.gyroTurnTorque = 12000f;
         physics.gyroTurnDamping = 0.8f;
 

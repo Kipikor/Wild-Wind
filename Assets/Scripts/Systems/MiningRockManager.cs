@@ -30,6 +30,13 @@ public class MiningRockManager : MonoBehaviour
 
     private void Update()
     {
+        MetaGameState meta = Meta;
+        if (meta != null && meta.IsSessionExtractionCoreMode)
+        {
+            ClearConfiguredRocks();
+            return;
+        }
+
         if (!spawnRocksOnPlay || Time.unscaledTime < nextSyncTime) return;
         nextSyncTime = Time.unscaledTime + Mathf.Max(0.1f, syncIntervalSeconds);
         SpawnConfiguredRocks();
@@ -41,6 +48,11 @@ public class MiningRockManager : MonoBehaviour
 
         MetaGameState meta = Meta;
         if (meta == null || meta.progress == null || meta.WorldConfig == null || !meta.WorldConfig.isLoaded) return;
+        if (meta.IsSessionExtractionCoreMode)
+        {
+            ClearConfiguredRocks();
+            return;
+        }
 
         long nowTicks = meta.CurrentProcessUtcNow.Ticks;
         if (forceRebuild)
@@ -92,6 +104,15 @@ public class MiningRockManager : MonoBehaviour
 
             MiningRock rock = rockObject.AddComponent<MiningRock>();
             rock.Initialize(meta, state);
+        }
+    }
+
+    public void ClearConfiguredRocks()
+    {
+        if (rockRoot != null)
+        {
+            Destroy(rockRoot.gameObject);
+            rockRoot = null;
         }
     }
 }

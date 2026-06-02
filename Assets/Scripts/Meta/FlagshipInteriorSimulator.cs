@@ -394,6 +394,8 @@ public static class FlagshipInteriorSimulator
         if (progress == null) return null;
 
         progress.Normalize();
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return null;
+
         return EnsurePlayerFlagshipInteriorInternal(config, progress);
     }
 
@@ -402,6 +404,8 @@ public static class FlagshipInteriorSimulator
         if (progress == null || toUtcTicks <= fromUtcTicks) return 0;
 
         progress.Normalize();
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return 0;
+
         EnsurePlayerFlagshipInteriorInternal(config, progress);
 
         int changed = 0;
@@ -431,6 +435,12 @@ public static class FlagshipInteriorSimulator
             return false;
         }
 
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress))
+        {
+            message = "Flagship repairs are disabled in session extraction core.";
+            return false;
+        }
+
         FlagshipInteriorState interior = progress.GetFlagshipInteriorState(flagshipId, false);
         if (interior == null)
         {
@@ -455,6 +465,8 @@ public static class FlagshipInteriorSimulator
 
     public static bool SetRoomMode(PlayerProgress progress, string flagshipId, string roomId, FlagshipRoomMode mode)
     {
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return false;
+
         FlagshipInteriorState interior = progress != null ? progress.GetFlagshipInteriorState(flagshipId, false) : null;
         FlagshipRoomState room = interior != null ? interior.GetRoomState(roomId, false) : null;
         if (room == null || !Enum.IsDefined(typeof(FlagshipRoomMode), mode)) return false;
@@ -466,6 +478,12 @@ public static class FlagshipInteriorSimulator
     public static bool StartExpedition(PlayerProgress progress, string flagshipId, long utcTicks, out string message)
     {
         message = "";
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress))
+        {
+            message = "Flagship expeditions are disabled in session extraction core.";
+            return false;
+        }
+
         FlagshipInteriorState interior = progress != null ? progress.GetFlagshipInteriorState(flagshipId, false) : null;
         if (interior == null)
         {
@@ -484,6 +502,12 @@ public static class FlagshipInteriorSimulator
     public static bool CompleteExpeditionReturn(PlayerProgress progress, string flagshipId, out string message)
     {
         message = "";
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress))
+        {
+            message = "Flagship expeditions are disabled in session extraction core.";
+            return false;
+        }
+
         FlagshipInteriorState interior = progress != null ? progress.GetFlagshipInteriorState(flagshipId, false) : null;
         if (interior == null)
         {

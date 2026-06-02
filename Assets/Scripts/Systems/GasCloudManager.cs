@@ -17,6 +17,11 @@ public class GasCloudManager : MonoBehaviour
 
         MetaGameState meta = ResolveMeta();
         if (meta == null || meta.progress == null || meta.WorldConfig == null || !meta.WorldConfig.isLoaded) return;
+        if (meta.IsSessionExtractionCoreMode)
+        {
+            ClearConfiguredClouds();
+            return;
+        }
 
         if (cloudRoot != null && !forceRebuild)
         {
@@ -62,6 +67,15 @@ public class GasCloudManager : MonoBehaviour
 
             GasCloud cloud = cloudObject.AddComponent<GasCloud>();
             cloud.Initialize(cloudConfig, cloudType, state, this);
+        }
+    }
+
+    public void ClearConfiguredClouds()
+    {
+        if (cloudRoot != null)
+        {
+            Destroy(cloudRoot.gameObject);
+            cloudRoot = null;
         }
     }
 

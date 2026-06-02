@@ -27,12 +27,19 @@ public sealed class WildWindBigTestPlayModeTests
             yield return null;
 
             MonoBehaviour runner = UnityEngine.Object.FindFirstObjectByType(runnerType) as MonoBehaviour;
+            if (runner == null)
+            {
+                GameObject runnerObject = new GameObject("Wild Wind Big Test Runner (Automation)");
+                runner = runnerObject.AddComponent(runnerType) as MonoBehaviour;
+                yield return null;
+            }
+
             Assert.NotNull(runner, "WildWindBigTestRunner must exist in the world scene.");
 
             Invoke(runnerType, runner, "ResetRunStateForEditor");
             SetMember(runnerType, runner, "runOnStart", false);
             SetMember(runnerType, runner, "logFullReportToConsole", false);
-            SetMember(runnerType, runner, "writeReportFile", false);
+            SetMember(runnerType, runner, "writeReportFile", true);
 
             object callback = CreateResultCallback(resultType, value => result = value);
             IEnumerator routine = Invoke(runnerType, runner, "RunBigTestForAutomation", callback) as IEnumerator;
@@ -59,6 +66,19 @@ public sealed class WildWindBigTestPlayModeTests
     {
         Type runnerType = RequireType(RunnerTypeName);
         object result = Invoke(runnerType, null, "RunCanarySelfTest");
+
+        Assert.NotNull(result);
+        Assert.IsTrue(GetBool(result, "Completed"));
+        Assert.IsFalse(GetBool(result, "Succeeded"));
+        Assert.AreEqual(1, GetInt(result, "FailureCount"));
+        Assert.AreEqual(1, GetInt(result, "CheckCount"));
+    }
+
+    [Test]
+    public void BigTestRunner_ConsoleCanaryFailureTurnsResultRed()
+    {
+        Type runnerType = RequireType(RunnerTypeName);
+        object result = Invoke(runnerType, null, "RunConsoleCanarySelfTest");
 
         Assert.NotNull(result);
         Assert.IsTrue(GetBool(result, "Completed"));

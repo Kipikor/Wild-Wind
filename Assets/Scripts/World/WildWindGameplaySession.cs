@@ -8,7 +8,7 @@ public sealed class GameplaySessionSaveData
     public const int CurrentVersion = 1;
     public const string DefaultPlayerShipId = "player_ship";
     public const string DefaultStarterHullId = "starter_hull";
-    public const string DefaultDockId = "Island1";
+    public const string DefaultDockId = "capital";
 
     private static readonly Vector3 StarterDockOffset = new Vector3(-520f, 115f, -360f);
     private static readonly Quaternion StarterRotation = Quaternion.Euler(0f, 42f, 0f);

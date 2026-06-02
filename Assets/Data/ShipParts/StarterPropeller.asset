@@ -35,6 +35,3 @@ MonoBehaviour:
   - stat: 3
     operation: 0
     value: 0.78
-  - stat: 4
-    operation: 0
-    value: 220

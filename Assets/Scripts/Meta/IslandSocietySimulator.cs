@@ -9,6 +9,7 @@ public static class IslandSocietySimulator
     public static void EnsureIslandStates(WorldConfigDatabase config, PlayerProgress progress)
     {
         if (config == null || !config.isLoaded || progress == null) return;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return;
 
         for (int i = 0; i < config.islands.Count; i++)
         {
@@ -23,6 +24,7 @@ public static class IslandSocietySimulator
     public static int Advance(WorldConfigDatabase config, PlayerProgress progress, float deltaMinutes)
     {
         if (config == null || !config.isLoaded || progress == null || deltaMinutes <= 0f) return 0;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return 0;
 
         EnsureIslandStates(config, progress);
 
@@ -378,6 +380,7 @@ public static class PassengerTrafficSimulator
     public static int Advance(WorldConfigDatabase config, PlayerProgress progress, float deltaMinutes, string capitalIslandId = DefaultCapitalIslandId)
     {
         if (config == null || !config.isLoaded || progress == null || deltaMinutes <= 0f) return 0;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return 0;
 
         string capitalId = string.IsNullOrWhiteSpace(capitalIslandId) ? DefaultCapitalIslandId : capitalIslandId;
         IslandProductionState capitalStorage = progress.GetIslandProductionState(capitalId, true);

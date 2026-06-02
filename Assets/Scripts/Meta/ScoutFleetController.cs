@@ -58,6 +58,8 @@ public class ScoutFleetController : MonoBehaviour
     public void EnsureRuntimeShips(PlayerProgress progress)
     {
         if (progress == null) return;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return;
+
         ships ??= new List<ScoutShipDefinition>();
         if (ships.Count == 0)
         {
@@ -77,6 +79,7 @@ public class ScoutFleetController : MonoBehaviour
     public int Advance(WorldConfigDatabase config, PlayerProgress progress, long fromUtcTicks, long toUtcTicks)
     {
         if (config == null || !config.isLoaded || progress == null || toUtcTicks <= fromUtcTicks) return 0;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return 0;
 
         EnsureRuntimeShips(progress);
         int changed = AdvancePassiveFleetObservation(config, progress, fromUtcTicks, toUtcTicks);

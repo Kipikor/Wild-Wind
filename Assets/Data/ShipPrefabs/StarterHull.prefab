@@ -77,21 +77,26 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipPhysics
   baseMass: 900
-  hullMaxTakeoffMassKg: 3000
+  hullMaxTakeoffMassKg: 3200
   enginePowerKwAt100: 190
   engineFuelId: wood
   engineFuelEfficiency: 0.32
   engineFuelEnergyKwhPerKg: 4
   engineFuelStockKg: 0
+  engineResponseRate01PerSecond: 0.10
+  neutralStopBrakeEnabled: 0
+  neutralStopBrakeMaxDecelerationMS2: 8
+  neutralStopBrakeStopTimeSeconds: 0.75
+  neutralStopBrakeDeadzoneMS: 0.05
   propellerMaxSpeedMS: 30
   propellerEfficiency: 0.8
-  propellerMaxThrustKgf: 220
   claudiumResourceId: claudium
   claudiumStock: 0
   claudiumConsumptionPerTonSecond: 0.005
   claudiumLiftEfficiency: 10
-  claudiumMaxLiftKg: 2600
+  claudiumMaxLiftKg: 3200
   claudiumLiftSmoothing: 2
+  claudiumLoopResponseRate01PerSecond: 0.10
   claudiumCurrentLiftN: 0
   claudiumPowerDrawWatts: 0
   claudiumPowerDrawKw: 0
@@ -104,8 +109,8 @@ MonoBehaviour:
   frontalArea: 8
   sideResistance: 2
   verticalAreaFactor: 4
-  maxStructuralVerticalSpeed: 5
-  maxAutoVerticalSpeed: 1
+  maxStructuralVerticalSpeed: 10
+  maxAutoVerticalSpeed: 10
   windVelocity: {x: 0, y: 0, z: 0}
   autoStabilizeAtStart: 1
   altitudeHold: 0

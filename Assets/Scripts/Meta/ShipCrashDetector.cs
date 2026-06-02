@@ -64,7 +64,14 @@ public class ShipCrashDetector : MonoBehaviour
 
         if (metaGameState != null)
         {
-            metaGameState.LoseShipAndReturnToCity(reason);
+            if (metaGameState.HasActiveSortie)
+            {
+                metaGameState.LoseActiveSortieShipAndReturnToBase(reason);
+            }
+            else
+            {
+                metaGameState.LoseShipAndReturnToCity(reason);
+            }
         }
     }
 }

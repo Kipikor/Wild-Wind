@@ -686,22 +686,27 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ShipPhysics
   baseMass: 1585
-  hullMaxTakeoffMassKg: 3000
+  hullMaxTakeoffMassKg: 3200
   cargoMassKg: 150
   enginePowerKwAt100: 190
   engineFuelId: wood
   engineFuelEfficiency: 0.32
   engineFuelEnergyKwhPerKg: 4
   engineFuelStockKg: 100
-  propellerMaxSpeedMS: 30
+  engineResponseRate01PerSecond: 0.10
+  neutralStopBrakeEnabled: 0
+  neutralStopBrakeMaxDecelerationMS2: 8
+  neutralStopBrakeStopTimeSeconds: 0.75
+  neutralStopBrakeDeadzoneMS: 0.05
+  propellerMaxSpeedMS: 120
   propellerEfficiency: 0.78
-  propellerMaxThrustKgf: 220
   claudiumResourceId: claudium
   claudiumStock: 50
   claudiumConsumptionPerTonSecond: 0.005
   claudiumLiftEfficiency: 10
-  claudiumMaxLiftKg: 2600
+  claudiumMaxLiftKg: 3200
   claudiumLiftSmoothing: 2.5
+  claudiumLoopResponseRate01PerSecond: 0.10
   claudiumCurrentLiftN: 0
   claudiumPowerDrawWatts: 0
   claudiumPowerDrawKw: 0
@@ -763,8 +768,8 @@ MonoBehaviour:
   frontalArea: 8
   sideResistance: 2
   verticalAreaFactor: 4
-  maxStructuralVerticalSpeed: 5
-  maxAutoVerticalSpeed: 5
+  maxStructuralVerticalSpeed: 10
+  maxAutoVerticalSpeed: 10
   windVelocity: {x: 0, y: 0, z: 0}
   autoStabilizeAtStart: 1
   altitudeHold: 0
@@ -2113,8 +2118,8 @@ MonoBehaviour:
   saveFileName: wild_wind_production_debug_save.json
   startingOre: 4
   startingIron: 0
-  startingFuelKg: 50
-  startingClaudiumKg: 25
+  startingFuelKg: 150
+  startingClaudiumKg: 75
   startingPaperKg: 120
   processRealTimeWhilePlaying: 0
   idleMiningIntervalSeconds: 60

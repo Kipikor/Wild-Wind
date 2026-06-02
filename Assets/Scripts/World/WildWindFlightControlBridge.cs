@@ -17,9 +17,9 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     private const float DefaultTargetSpeedMS = 34f;
     private const float TargetMoveStepMeters = 100f;
     private const float DefaultArrivalRadiusMeters = 24f;
-    private const int MinManualThrustNotch = -1;
+    private const int MinManualThrustNotch = -3;
     private const int MaxManualThrustNotch = 5;
-    private const float ManualThrustNotchStep = 0.2f;
+    private const float ForwardManualThrustNotchStep = 0.2f;
     private const float ManualLeverStep = 0.25f;
     private const float ManualThrustHoldDelaySeconds = 0.5f;
     private const float ManualThrustRepeatSeconds = 0.3f;
@@ -49,7 +49,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     private int keyboardThrustDirection;
     private float keyboardThrustHeldSeconds;
     private float keyboardThrustNextRepeatSeconds;
-    private WildWindAxisControlMode altitudeMode = WildWindAxisControlMode.Assist;
+    private WildWindAxisControlMode altitudeMode = WildWindAxisControlMode.Manual;
     private WildWindAxisControlMode headingMode;
     private WildWindAxisControlMode speedMode;
     private bool hasAutopilotTarget;
@@ -58,6 +58,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     private DockingLocationKind autopilotTargetDockKind = DockingLocationKind.Island;
     private bool autoDockOnArrival;
     private bool autoDockAttempted;
+    private string syncedSortieEntryKey = "";
     private string statusMessage = "";
 
     public bool IsReady => ResolveShip() != null;
@@ -65,18 +66,21 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     public WildWindAxisControlMode AltitudeMode => altitudeMode;
     public WildWindAxisControlMode HeadingMode => headingMode;
     public WildWindAxisControlMode SpeedMode => speedMode;
-    public bool AltitudeAssistEnabled => altitudeMode == WildWindAxisControlMode.Assist;
-    public bool HeadingAssistEnabled => headingMode == WildWindAxisControlMode.Assist;
-    public bool SpeedAssistEnabled => speedMode == WildWindAxisControlMode.Assist;
-    public bool AutopilotAltitudeEnabled => altitudeMode == WildWindAxisControlMode.Autopilot;
-    public bool AutopilotHeadingEnabled => headingMode == WildWindAxisControlMode.Autopilot;
-    public bool AutopilotSpeedEnabled => speedMode == WildWindAxisControlMode.Autopilot;
-    public bool AutoDockOnArrival => autoDockOnArrival;
-    public bool HasAutopilotTarget => hasAutopilotTarget;
-    public bool IsFullAutopilot => AutopilotAltitudeEnabled && AutopilotHeadingEnabled && AutopilotSpeedEnabled;
+    public bool AltitudeAssistEnabled => false;
+    public bool HeadingAssistEnabled => false;
+    public bool SpeedAssistEnabled => false;
+    public bool AutopilotAltitudeEnabled => false;
+    public bool AutopilotHeadingEnabled => false;
+    public bool AutopilotSpeedEnabled => false;
+    public bool AutoDockOnArrival => false;
+    public bool HasAutopilotTarget => false;
+    public bool IsFullAutopilot => false;
     public bool IsConnectedToGameplayShip => IsConnectedToSessionShip();
     public bool AfterburnerEnabled => ResolveShip() != null && ship.engineAfterburnerEnabled;
-    public Vector3 AutopilotTarget => autopilotTarget;
+    public bool CheatAfterburnerEnabled => ResolveShip() != null && ship.engineCheatAfterburnerEnabled;
+    public bool ClaudiumSlipstreamEnabled => ResolveShip() != null && ship.claudiumSlipstreamEnabled;
+    public float ClaudiumSlipstreamCharge01 => ResolveShip() != null ? ship.ClaudiumSlipstreamCharge01 : 0f;
+    public Vector3 AutopilotTarget => Vector3.zero;
     public float ManualThrust => manualThrust;
     public int ManualThrustNotch => manualThrustNotch;
     public float ManualLateral => manualLateral;
@@ -107,13 +111,19 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
             return;
         }
 
-        if (Object.FindFirstObjectByType<WildWindFlightControlBridge>() != null)
+        EnsureInstance();
+    }
+
+    public static WildWindFlightControlBridge EnsureInstance()
+    {
+        WildWindFlightControlBridge existing = Object.FindFirstObjectByType<WildWindFlightControlBridge>();
+        if (existing != null)
         {
-            return;
+            return existing;
         }
 
         GameObject bridgeObject = new GameObject(ObjectName);
-        bridgeObject.AddComponent<WildWindFlightControlBridge>();
+        return bridgeObject.AddComponent<WildWindFlightControlBridge>();
     }
 
     private void Awake()
@@ -125,7 +135,6 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     {
         ResolveReferences();
         ApplyKeyboardFlightInput(Time.unscaledDeltaTime);
-        TryAutoDockOnArrival();
     }
 
     private void FixedUpdate()
@@ -134,6 +143,11 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     }
 
     public void ApplyForTests()
+    {
+        ApplyNow();
+    }
+
+    public void ApplyNow()
     {
         ResolveReferences();
         ApplyControlState();
@@ -148,13 +162,35 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     {
         SetManualThrustValue(thrust);
         manualLateral = Mathf.Clamp(lateral, -1f, 1f);
-        manualLift = 0f;
+        manualLift = Mathf.Clamp(lift, -1f, 1f);
         manualTurn = Mathf.Clamp(turn, -1f, 1f);
         StopKeyboardThrustRepeat();
         keyboardLateralActive = false;
         keyboardLiftActive = false;
         keyboardTurnActive = false;
         statusMessage = "Direct controls updated.";
+    }
+
+    public void SetMomentaryLiftInput(float lift)
+    {
+        manualLift = Mathf.Clamp(lift, -1f, 1f);
+        keyboardLiftActive = Mathf.Abs(manualLift) > 0.001f;
+        altitudeMode = WildWindAxisControlMode.Manual;
+        statusMessage = "Manual lift input.";
+    }
+
+    public void ClearMomentaryLiftInput()
+    {
+        manualLift = 0f;
+        keyboardLiftActive = false;
+    }
+
+    public void SetManualThrustNotchForHud(int notch)
+    {
+        speedMode = WildWindAxisControlMode.Manual;
+        SetManualThrustNotch(notch);
+        StopKeyboardThrustRepeat();
+        statusMessage = "Manual thrust notch selected.";
     }
 
     public void ClearDirectInput()
@@ -171,7 +207,9 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
 
     public void NudgeManualLift(float direction)
     {
-        NudgeTargetAltitude(Mathf.Sign(direction) * TargetAltitudeButtonStepMeters);
+        manualLift = Mathf.Clamp(Mathf.Sign(direction), -1f, 1f);
+        altitudeMode = WildWindAxisControlMode.Manual;
+        statusMessage = "Manual lift input changed.";
     }
 
     public void NudgeManualTurn(float direction)
@@ -183,25 +221,22 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
 
     public void SetAltitudeAssist(bool enabled)
     {
-        altitudeMode = WildWindAxisControlMode.Assist;
-        if (ResolveShip() != null)
-        {
-            EnsureTargetAltitudeInitialized();
-        }
+        altitudeMode = WildWindAxisControlMode.Manual;
+        if (ResolveShip() != null) ship.altitudeHold = false;
+        statusMessage = "Altitude autopilot disabled.";
     }
 
     public void SetHeadingAssist(bool enabled)
     {
-        headingMode = enabled ? WildWindAxisControlMode.Assist : WildWindAxisControlMode.Manual;
-        if (enabled && ResolveShip() != null)
-        {
-            ship.targetHeading = NormalizeHeading(ship.transform.eulerAngles.y);
-        }
+        headingMode = WildWindAxisControlMode.Manual;
+        if (ResolveShip() != null) ship.headingHold = false;
+        statusMessage = "Heading autopilot disabled.";
     }
 
     public void SetSpeedAssist(bool enabled)
     {
-        speedMode = enabled ? WildWindAxisControlMode.Autopilot : WildWindAxisControlMode.Manual;
+        speedMode = WildWindAxisControlMode.Manual;
+        statusMessage = "Speed autopilot disabled.";
     }
 
     public void ToggleAltitudeAssist()
@@ -221,21 +256,22 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
 
     public void SetAutopilotAltitude(bool enabled)
     {
-        altitudeMode = enabled ? WildWindAxisControlMode.Autopilot : WildWindAxisControlMode.Assist;
-        if (!enabled)
-        {
-            EnsureTargetAltitudeInitialized();
-        }
+        altitudeMode = WildWindAxisControlMode.Manual;
+        if (ResolveShip() != null) ship.altitudeHold = false;
+        statusMessage = "Autopilot disabled.";
     }
 
     public void SetAutopilotHeading(bool enabled)
     {
-        headingMode = enabled ? WildWindAxisControlMode.Autopilot : WildWindAxisControlMode.Manual;
+        headingMode = WildWindAxisControlMode.Manual;
+        if (ResolveShip() != null) ship.headingHold = false;
+        statusMessage = "Autopilot disabled.";
     }
 
     public void SetAutopilotSpeed(bool enabled)
     {
-        speedMode = enabled ? WildWindAxisControlMode.Autopilot : WildWindAxisControlMode.Manual;
+        speedMode = WildWindAxisControlMode.Manual;
+        statusMessage = "Autopilot disabled.";
     }
 
     public void ToggleAutopilotAltitude()
@@ -255,35 +291,24 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
 
     public void CycleAltitudeMode()
     {
-        altitudeMode = altitudeMode == WildWindAxisControlMode.Autopilot
-            ? WildWindAxisControlMode.Assist
-            : WildWindAxisControlMode.Autopilot;
-        if (altitudeMode == WildWindAxisControlMode.Assist)
-        {
-            EnsureTargetAltitudeInitialized();
-        }
+        SetAltitudeAssist(false);
     }
 
     public void CycleHeadingMode()
     {
-        headingMode = NextMode(headingMode);
-        if (headingMode == WildWindAxisControlMode.Assist && ResolveShip() != null)
-        {
-            ship.targetHeading = NormalizeHeading(ship.transform.eulerAngles.y);
-        }
+        SetHeadingAssist(false);
     }
 
     public void CycleSpeedMode()
     {
-        speedMode = speedMode == WildWindAxisControlMode.Autopilot
-            ? WildWindAxisControlMode.Manual
-            : WildWindAxisControlMode.Autopilot;
+        SetSpeedAssist(false);
     }
 
     public void ToggleAutoDockOnArrival()
     {
-        autoDockOnArrival = !autoDockOnArrival;
+        autoDockOnArrival = false;
         autoDockAttempted = false;
+        statusMessage = "Auto-dock disabled.";
     }
 
     public void ToggleAfterburner()
@@ -295,122 +320,97 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         }
 
         ship.engineAfterburnerEnabled = !ship.engineAfterburnerEnabled;
-        if (!ship.engineAfterburnerEnabled)
+        ClampEnginePowerLeverToLimit();
+
+        statusMessage = ship.engineAfterburnerEnabled
+            ? "Afterburner 120% enabled."
+            : "Afterburner disabled.";
+    }
+
+    public void ToggleCheatAfterburner()
+    {
+        if (ResolveShip() == null)
+        {
+            statusMessage = "Flight controls have no ship.";
+            return;
+        }
+
+        ship.engineCheatAfterburnerEnabled = !ship.engineCheatAfterburnerEnabled;
+        ClampEnginePowerLeverToLimit();
+
+        statusMessage = ship.engineCheatAfterburnerEnabled
+            ? "Cheat afterburner +500% enabled."
+            : "Cheat afterburner disabled.";
+    }
+
+    private void ClampEnginePowerLeverToLimit()
+    {
+        if (ship != null)
         {
             ship.enginePowerLever = Mathf.Min(ship.enginePowerLever, ship.EnginePowerLeverLimit);
         }
+    }
 
-        statusMessage = ship.engineAfterburnerEnabled
-            ? "Afterburner enabled."
-            : "Afterburner disabled.";
+    public void ToggleClaudiumSlipstream()
+    {
+        if (ResolveShip() == null)
+        {
+            statusMessage = "Flight controls have no ship.";
+            return;
+        }
+
+        if (ship.TrySetClaudiumSlipstreamEnabled(!ship.claudiumSlipstreamEnabled, out string reason))
+        {
+            statusMessage = reason;
+            return;
+        }
+
+        statusMessage = reason;
     }
 
     public void NudgeTargetAltitude(float deltaMeters)
     {
-        if (ResolveShip() == null) return;
-        EnsureTargetAltitudeInitialized();
-        SetTargetAltitude(ship.targetAltitude + deltaMeters);
+        statusMessage = "Target altitude controls disabled.";
     }
 
     public void SetTargetAltitude(float altitudeMeters)
     {
-        if (ResolveShip() == null) return;
-        ship.targetAltitude = Mathf.Max(0f, altitudeMeters);
-        altitudeMode = WildWindAxisControlMode.Assist;
-        statusMessage = "Target altitude assigned.";
+        statusMessage = "Target altitude controls disabled.";
     }
 
     public void NudgeTargetHeading(float deltaDegrees)
     {
-        if (ResolveShip() == null) return;
-        ship.targetHeading = NormalizeHeading(ship.targetHeading + deltaDegrees);
-        if (headingMode == WildWindAxisControlMode.Manual)
-        {
-            headingMode = WildWindAxisControlMode.Assist;
-        }
+        statusMessage = "Heading autopilot disabled.";
     }
 
     public void NudgeTargetSpeed(float deltaMS)
     {
-        targetSpeedMS = ClampTargetSpeed(targetSpeedMS + deltaMS);
-        if (speedMode != WildWindAxisControlMode.Autopilot)
-        {
-            speedMode = WildWindAxisControlMode.Autopilot;
-        }
+        statusMessage = "Speed autopilot disabled.";
     }
 
     public bool SetTargetFromActiveTask()
     {
-        MissionController activeMission = FindFirstObjectByType<MissionController>();
-        if (activeMission != null && activeMission.IsActive)
-        {
-            SetAutopilotTarget(activeMission.GetDestinationPosition(), "", DockingLocationKind.Island);
-            statusMessage = "Autopilot target copied from active mission.";
-            return true;
-        }
-
-        ResolveReferences();
-        PlayerProgress progress = meta != null ? meta.progress : null;
-        string destinationDockId = WildWindStarterDelivery.GetActiveDestinationDockId(progress);
-        if (string.IsNullOrWhiteSpace(destinationDockId))
-        {
-            statusMessage = "No active task target found.";
-            return false;
-        }
-
-        DockingPort dock = FindDock(destinationDockId);
-        if (dock != null)
-        {
-            SetAutopilotTarget(dock.DockPosition, dock.dockId, dock.kind);
-            statusMessage = "Autopilot target copied from intro delivery.";
-            return true;
-        }
-
-        IslandConfig island = meta != null && meta.WorldConfig != null
-            ? meta.WorldConfig.GetIsland(destinationDockId)
-            : null;
-        if (island == null)
-        {
-            statusMessage = "No active task target found.";
-            return false;
-        }
-
-        SetAutopilotTarget(island.position, destinationDockId, DockingLocationKind.Island);
-        statusMessage = "Autopilot target copied from intro delivery config.";
-        return true;
+        ClearAutopilotTarget();
+        statusMessage = "Autopilot disabled.";
+        return false;
     }
 
     public void SetTargetAtShipPosition()
     {
-        ShipPhysics currentShip = ResolveShip();
-        if (currentShip == null)
-        {
-            statusMessage = "No ship for target placement.";
-            return;
-        }
-
-        SetAutopilotTarget(currentShip.transform.position, "", DockingLocationKind.Island);
-        statusMessage = "Autopilot target moved to ship position.";
+        ClearAutopilotTarget();
+        statusMessage = "Autopilot disabled.";
     }
 
     public void SetManualTargetCoordinates(float x, float y, float z)
     {
-        SetAutopilotTarget(new Vector3(x, y, z), "", DockingLocationKind.Island);
-        statusMessage = "Manual autopilot target assigned.";
+        ClearAutopilotTarget();
+        statusMessage = "Autopilot disabled.";
     }
 
     public void MoveTarget(Vector3 delta)
     {
-        if (!hasAutopilotTarget)
-        {
-            SetTargetAtShipPosition();
-        }
-
-        autopilotTarget += delta;
-        targetDock = null;
-        autopilotTargetDockId = "";
-        autoDockAttempted = false;
-        statusMessage = "Autopilot target moved.";
+        ClearAutopilotTarget();
+        statusMessage = "Autopilot disabled.";
     }
 
     public void MoveTargetForward()
@@ -423,37 +423,73 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         hasAutopilotTarget = false;
         targetDock = null;
         autopilotTargetDockId = "";
+        autoDockOnArrival = false;
         autoDockAttempted = false;
         statusMessage = "Autopilot target cleared.";
     }
 
     public void ClearAllControlModes()
     {
-        altitudeMode = WildWindAxisControlMode.Assist;
+        altitudeMode = WildWindAxisControlMode.Manual;
         headingMode = WildWindAxisControlMode.Manual;
         speedMode = WildWindAxisControlMode.Manual;
         autoDockOnArrival = false;
         ClearDirectInput();
         ClearKeyboardInputFlags();
-        EnsureTargetAltitudeInitialized();
+        ClearAutopilotTarget();
+    }
+
+    public void PrimeSortieEntryCruise(Vector3 targetPosition, float speedMS)
+    {
+        ResolveReferences();
+        ShipPhysics currentShip = ResolveShip();
+        if (currentShip == null)
+        {
+            statusMessage = "No ship for sortie entry cruise.";
+            return;
+        }
+
+        ClearKeyboardInputFlags();
+        manualLateral = 0f;
+        manualLift = 0f;
+        manualTurn = 0f;
+        SetManualThrustNotch(MaxManualThrustNotch);
+
+        altitudeMode = WildWindAxisControlMode.Manual;
+        headingMode = WildWindAxisControlMode.Manual;
+        speedMode = WildWindAxisControlMode.Manual;
+        targetSpeedMS = ClampTargetSpeed(Mathf.Max(0f, speedMS));
+
+        hasAutopilotTarget = false;
+        targetDock = null;
+        autopilotTargetDockId = "";
+        autoDockOnArrival = false;
+        autoDockAttempted = false;
+
+        currentShip.targetAltitude = Mathf.Max(0f, currentShip.transform.position.y);
+        Vector3 toTarget = Flatten(targetPosition - currentShip.transform.position);
+        currentShip.targetHeading = toTarget.sqrMagnitude > 0.0001f
+            ? HeadingFromVector(toTarget)
+            : NormalizeHeading(currentShip.transform.eulerAngles.y);
+        currentShip.altitudeHold = false;
+        currentShip.headingHold = false;
+        currentShip.cruiseControl = false;
+        syncedSortieEntryKey = GetActiveSortieEntryKey();
+        statusMessage = "Sortie entry cruise primed.";
     }
 
     public string GetControlSummary()
     {
-        string targetText = hasAutopilotTarget
-            ? autopilotTarget.x.ToString("0") + ", " + autopilotTarget.y.ToString("0") + ", " + autopilotTarget.z.ToString("0")
-            : "no target";
-        string autopilot = IsFullAutopilot ? "full" : HasAnySemiAutopilot() ? "semi" : "off";
         string connection = IsConnectedToGameplayShip ? "ship ok" : "ship ?";
-        return "T " + manualThrust.ToString("0.0") +
-            " (" + manualThrustNotch + ")" +
+        string thrustLabel = manualThrustNotch == 0
+            ? "Stop"
+            : manualThrust.ToString("0.0") + " (" + manualThrustNotch + ")";
+        return "T " + thrustLabel +
             " / S " + manualLateral.ToString("0.0") +
+            " / L " + manualLift.ToString("0.0") +
             " / R " + manualTurn.ToString("0.0") +
-            " | Alt " + TargetAltitude.ToString("0") +
-            " | " + altitudeMode + "/" + headingMode + "/" + speedMode +
-            " | AP " + autopilot +
-            " | " + connection +
-            " | " + targetText;
+            " | AP off"
+            + " | " + connection;
     }
 
     public void ApplyFlightInputForTests(WildWindFlightInputState input, float deltaSeconds)
@@ -510,11 +546,6 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     private void ApplyLateralAxisInput(float axis)
     {
         axis = Mathf.Clamp(axis, -1f, 1f);
-        if (IsFullAutopilot)
-        {
-            ClearKeyboardManualAxis(ref keyboardLateralActive, ref manualLateral);
-            return;
-        }
 
         ApplyManualKeyboardAxis(axis, ref keyboardLateralActive, ref manualLateral);
     }
@@ -522,49 +553,18 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     private void ApplyAltitudeAxisInput(float axis, float deltaSeconds)
     {
         axis = Mathf.Clamp(axis, -1f, 1f);
-        if (altitudeMode == WildWindAxisControlMode.Autopilot)
+        altitudeMode = WildWindAxisControlMode.Manual;
+        ApplyManualKeyboardAxis(axis, ref keyboardLiftActive, ref manualLift);
+        if (Mathf.Abs(axis) > 0.001f)
         {
-            ClearKeyboardManualAxis(ref keyboardLiftActive, ref manualLift);
-            return;
-        }
-
-        ClearKeyboardManualAxis(ref keyboardLiftActive, ref manualLift);
-        if (Mathf.Abs(axis) > 0.001f && ResolveShip() != null)
-        {
-            altitudeMode = WildWindAxisControlMode.Assist;
-            EnsureTargetAltitudeInitialized();
-            float rate = ResolveControlSettings() != null
-                ? controlSettings.FlightTargetAltitudeChangeMetersPerSecond
-                : 70f;
-            ship.targetAltitude = Mathf.Max(0f, ship.targetAltitude + axis * rate * deltaSeconds);
-            statusMessage = "Target altitude changed.";
+            statusMessage = "Manual lift input.";
         }
     }
 
     private void ApplyHeadingAxisInput(float axis, float deltaSeconds)
     {
         axis = Mathf.Clamp(axis, -1f, 1f);
-        if (headingMode == WildWindAxisControlMode.Autopilot)
-        {
-            ClearKeyboardManualAxis(ref keyboardTurnActive, ref manualTurn);
-            return;
-        }
-
-        if (headingMode == WildWindAxisControlMode.Assist)
-        {
-            ClearKeyboardManualAxis(ref keyboardTurnActive, ref manualTurn);
-            if (Mathf.Abs(axis) > 0.001f && ResolveShip() != null)
-            {
-                float rate = ResolveControlSettings() != null
-                    ? controlSettings.FlightTargetHeadingChangeDegreesPerSecond
-                    : 45f;
-                ship.targetHeading = NormalizeHeading(ship.targetHeading + axis * rate * deltaSeconds);
-                statusMessage = "Target heading changed.";
-            }
-
-            return;
-        }
-
+        headingMode = WildWindAxisControlMode.Manual;
         ApplyManualKeyboardAxis(axis, ref keyboardTurnActive, ref manualTurn);
     }
 
@@ -614,6 +614,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
                 ship.sideInput = 0f;
                 ship.liftInput = 0f;
                 ship.turnInput = 0f;
+                ship.neutralStopBrakeEnabled = false;
             }
 
             return;
@@ -622,63 +623,32 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         ship.routeEnabled = false;
         ship.positionHold = false;
 
-        Vector3 target = autopilotTarget;
-        bool targetReady = hasAutopilotTarget;
-        Vector3 toTarget = targetReady ? target - ship.transform.position : Vector3.zero;
-        Vector3 flatToTarget = Flatten(toTarget);
-        float distance = flatToTarget.magnitude;
-        float desiredHeading = targetReady && distance > 0.1f
-            ? HeadingFromVector(flatToTarget)
-            : NormalizeHeading(ship.transform.eulerAngles.y);
+        bool useHeadingHold = false;
+        bool useSpeedHold = false;
+        bool useStopGear = !useSpeedHold && Mathf.Approximately(manualThrust, 0f);
 
-        bool useAltitudeHold = true;
-        bool useHeadingHold = HeadingAssistEnabled || (AutopilotHeadingEnabled && targetReady);
-        bool useSpeedHold = SpeedAssistEnabled || (AutopilotSpeedEnabled && targetReady);
-
-        if (altitudeMode == WildWindAxisControlMode.Manual)
-        {
-            altitudeMode = WildWindAxisControlMode.Assist;
-        }
-
-        EnsureTargetAltitudeInitialized();
-        ship.altitudeHold = useAltitudeHold;
+        ship.altitudeHold = false;
         ship.headingHold = useHeadingHold;
         ship.cruiseControl = useSpeedHold;
+        ship.neutralStopBrakeEnabled = useStopGear;
 
-        if (AutopilotAltitudeEnabled && targetReady)
+        if (useStopGear)
         {
-            ship.targetAltitude = Mathf.Max(0f, target.y);
+            ship.targetSpeedMS = 0f;
+            ship.thrustInput = 0f;
         }
 
-        if (AutopilotHeadingEnabled && targetReady)
-        {
-            ship.targetHeading = desiredHeading;
-        }
-
-        if (AutopilotSpeedEnabled && targetReady)
-        {
-            float headingError = Mathf.Abs(Mathf.DeltaAngle(ship.transform.eulerAngles.y, desiredHeading));
-            float facingFactor = Mathf.Clamp01(1f - Mathf.InverseLerp(10f, 75f, headingError));
-            float brakingSpeed = CalculateArrivalSpeed(distance);
-            ship.targetSpeedMS = Mathf.Min(Mathf.Max(0f, targetSpeedMS), brakingSpeed) * facingFactor;
-        }
-        else if (SpeedAssistEnabled)
-        {
-            ship.targetSpeedMS = ClampTargetSpeed(targetSpeedMS);
-        }
-
-        ship.sideInput = IsFullAutopilot ? 0f : manualLateral;
-        ship.liftInput = 0f;
+        ship.sideInput = manualLateral;
+        ship.liftInput = manualLift;
 
         if (!useHeadingHold)
         {
             ship.turnInput = manualTurn;
         }
 
-        if (!useSpeedHold)
+        if (!useSpeedHold && !useStopGear)
         {
             ship.thrustInput = manualThrust;
-            ship.enginePowerLever = ship.CalculateEnginePowerLeverForPropellerEngagement(Mathf.Abs(manualThrust));
         }
     }
 
@@ -713,7 +683,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
 
     private void SetManualThrustValue(float value)
     {
-        SetManualThrustNotch(Mathf.RoundToInt(Mathf.Clamp(value, -1f, 1f) / ManualThrustNotchStep));
+        SetManualThrustNotch(GetNearestManualThrustNotch(value));
     }
 
     private void StepManualThrust(int direction)
@@ -729,7 +699,38 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     private void SetManualThrustNotch(int notch)
     {
         manualThrustNotch = Mathf.Clamp(notch, MinManualThrustNotch, MaxManualThrustNotch);
-        manualThrust = manualThrustNotch * ManualThrustNotchStep;
+        manualThrust = GetManualThrustForNotch(manualThrustNotch);
+    }
+
+    private static float GetManualThrustForNotch(int notch)
+    {
+        if (notch > 0)
+        {
+            return Mathf.Clamp01(notch * ForwardManualThrustNotchStep);
+        }
+
+        return notch switch
+        {
+            -1 => -0.25f,
+            -2 => -0.5f,
+            -3 => -1f,
+            _ => 0f
+        };
+    }
+
+    private static int GetNearestManualThrustNotch(float value)
+    {
+        float clamped = Mathf.Clamp(value, -1f, 1f);
+        if (clamped > 0f)
+        {
+            return Mathf.Clamp(Mathf.RoundToInt(clamped / ForwardManualThrustNotchStep), 0, MaxManualThrustNotch);
+        }
+
+        float reverseMagnitude = Mathf.Abs(clamped);
+        if (reverseMagnitude < 0.125f) return 0;
+        if (reverseMagnitude < 0.375f) return -1;
+        if (reverseMagnitude < 0.75f) return -2;
+        return -3;
     }
 
     private void StopKeyboardThrustRepeat()
@@ -750,6 +751,9 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
 
     private void TryAutoDockOnArrival()
     {
+        autoDockOnArrival = false;
+        autoDockAttempted = false;
+        hasAutopilotTarget = false;
         if (!autoDockOnArrival || autoDockAttempted || !hasAutopilotTarget)
         {
             return;
@@ -785,12 +789,14 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
 
     private void SetAutopilotTarget(Vector3 target, string dockId, DockingLocationKind dockKind)
     {
-        autopilotTarget = target;
-        autopilotTargetDockId = dockId ?? "";
-        autopilotTargetDockKind = dockKind;
-        targetDock = !string.IsNullOrWhiteSpace(autopilotTargetDockId) ? FindDock(autopilotTargetDockId) : null;
-        hasAutopilotTarget = true;
+        autopilotTarget = Vector3.zero;
+        autopilotTargetDockId = "";
+        autopilotTargetDockKind = DockingLocationKind.Island;
+        targetDock = null;
+        hasAutopilotTarget = false;
+        autoDockOnArrival = false;
         autoDockAttempted = false;
+        statusMessage = "Autopilot disabled.";
     }
 
     private float GetArrivalRadius()
@@ -805,7 +811,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
 
     private bool HasAnySemiAutopilot()
     {
-        return AutopilotAltitudeEnabled || AutopilotHeadingEnabled || AutopilotSpeedEnabled;
+        return false;
     }
 
     private void EnsureTargetAltitudeInitialized()
@@ -905,6 +911,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
             ship != meta.shipLoader.targetShip)
         {
             ship = meta.shipLoader.targetShip;
+            SyncManualThrustWithActiveSortieEntry();
             return;
         }
 
@@ -931,6 +938,45 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         {
             ship = FindFirstObjectByType<ShipPhysics>();
         }
+
+        SyncManualThrustWithActiveSortieEntry();
+    }
+
+    private void SyncManualThrustWithActiveSortieEntry()
+    {
+        string key = GetActiveSortieEntryKey();
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            syncedSortieEntryKey = "";
+            return;
+        }
+
+        if (key == syncedSortieEntryKey || ship == null)
+        {
+            return;
+        }
+
+        syncedSortieEntryKey = key;
+        if (ship.thrustInput < 0.9f && ship.propellerPitch < 0.9f)
+        {
+            return;
+        }
+
+        SetManualThrustNotch(MaxManualThrustNotch);
+        speedMode = WildWindAxisControlMode.Manual;
+        statusMessage = "Sortie entry full thrust synced.";
+    }
+
+    private string GetActiveSortieEntryKey()
+    {
+        SortieSessionState sortie = meta != null ? meta.ActiveSortie : null;
+        if (sortie == null || !sortie.active)
+        {
+            return "";
+        }
+
+        string sortieId = sortie.zone != null ? sortie.zone.sortieId : "";
+        return sortie.startedUtcTicks.ToString() + ":" + sortieId;
     }
 
     private static DockingPort FindDock(string dockId)

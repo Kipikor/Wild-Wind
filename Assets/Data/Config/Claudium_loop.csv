@@ -1,22 +1,2 @@
 id_claudium_loop,local_name_ru,local_name_en,complited_tech,base_mass_kg,claudium_consumption_per_ton_second,lift_kg_per_kw,max_lift_kg,lift_smoothing
-starter_claudium_loop,Клавдиевый контур Пионера,Pioneer Claudium Loop,,160,0.005,28,2500,2.5
-light_claudium_loop,Лёгкий контур,Light Claudium Loop,claudium_control,110,0.0045,9,1800,3
-efficient_claudium_loop,Экономичный контур,Efficient Claudium Loop,claudium_control,210,0.0035,12,3000,2
-heavy_claudium_loop,Грузовой контур,Heavy Claudium Loop,heavy_lift,320,0.006,11,4200,1.8
-water_strider_claudium_loop,Контур Водомерки,Water Strider Claudium Loop,bearing_skin,375,0.005,28,3500,2.5
-bulat_claudium_loop,Контур Булата,Bulat Claudium Loop,ore_collector,410,0.005,28,6000,2.2
-hornet_claudium_loop,Контур Шершня,Hornet Claudium Loop,continuous_observations,420,0.005,28,3800,2.6
-jaeger_claudium_loop,Контур Егеря,Jaeger Claudium Loop,hunter_hull,520,0.005,28,5200,2
-opora_claudium_loop,Контур Опоры,Opora Claudium Loop,support_platform,480,0.0035,45,10000,1.8
-fuel_tender_claudium_loop,Экономичный контур Топливщика,Fuel Tender Efficient Loop,support_platform,500,0.003,50,10000,2
-parovoz_claudium_loop,Контур Паровоза,Parovoz Claudium Loop,passenger_routes,520,0.005,28,5900,2
-liquid_tanker_claudium_loop,Контур Жидковоза,Liquid Tanker Claudium Loop,liquid_tender_tanks,500,0.0035,45,12000,2
-gletcher_claudium_loop,Контур Глетчера,Gletcher Claudium Loop,bulk_gas_tender,500,0.0035,45,9000,2
-vakhta_claudium_loop,Контур Вахты,Vakhta Claudium Loop,workforce_health_tender,560,0.0035,45,11000,2
-boxvan_tender_claudium_loop,Контур Фургонщика,Boxvan Tender Claudium Loop,boxed_goods_tender,500,0.0035,45,10000,2
-stapel_claudium_loop,Контур Стапеля,Stapel Claudium Loop,field_flying_dock,750,0.0032,55,16000,1.8
-water_strider_claudium_loop_mk2,Настроенный контур Водомерки,Water Strider Tuned Loop,water_strider_loop_tuning,430,0.0052,28,4300,2.6
-bulat_claudium_loop_mk2,Настроенный контур Булата,Bulat Tuned Loop,bulat_loop_tuning,470,0.0052,28,6500,2.3
-jaeger_claudium_loop_mk2,Усиленный контур Егеря,Jaeger Reinforced Loop,armored_hunter_hull,560,0.0054,28,5400,2
-opora_claudium_loop_mk2,Короткозамкнутый контур Опоры,Opora Short-Circuit Loop,short_circuit_claudium_loop,560,0.003,50,11000,2
-parovoz_claudium_loop_mk2,Маршрутный контур Паровоза,Parovoz Route Loop,route_tables,580,0.0052,28,6600,2.1
+starter_claudium_loop,Pioneer Claudium Loop,Pioneer Claudium Loop,,160,0.005,28,3200,2.5

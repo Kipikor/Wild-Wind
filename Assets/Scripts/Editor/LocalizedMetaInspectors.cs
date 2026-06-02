@@ -309,9 +309,8 @@ public static class LocalizedInspector
         if (!BeginFoldout(flight, label, "Настройки физики и автопилотов корабля.")) return;
         Property(flight, "baseMass", "Базовая масса", "Сухая масса корабля.");
         Property(flight, "targetTrimMass", "Масса триммирования", "Масса, под которую система подъема старается сбалансировать корабль.");
-        Property(flight, "propellerMaxSpeedMS", "Макс. скорость винта", "Скорость, после которой винт больше не разгоняет корабль.");
+        Property(flight, "propellerMaxSpeedMS", "Расчетная скорость винта", "Справочная скорость винта для баланса и отчетов; физическая тяга больше не отсекается по этой скорости.");
         Property(flight, "propellerEfficiency", "КПД винта", "Эффективность передачи мощности в тягу.");
-        Property(flight, "propellerMaxThrustKgf", "Макс. тяга винта", "Максимальная статическая тяга винта в кгс.");
         Property(flight, "maxStructuralVerticalSpeed", "Конструкционный лимит вертикальной скорости", "Вертикальная скорость, выше которой корабль считается перегруженным.");
         Property(flight, "maxAutoVerticalSpeed", "Лимит вертикальной скорости автопилота", "Максимальная вертикальная скорость, которую просит автопилот.");
         Property(flight, "airDensity", "Плотность воздуха", "Плотность воздуха для расчета сопротивления.");
@@ -333,6 +332,7 @@ public static class LocalizedInspector
         Property(flight, "headingStiffness", "Жесткость курса", "P-настройка автопилота курса.");
         Property(flight, "headingDamping", "Демпфирование курса", "D-настройка автопилота курса.");
         Property(flight, "waypointRadius", "Радиус точки маршрута", "На каком расстоянии точка маршрута считается достигнутой.");
+        Property(flight, "routeMaxSpeedMS", "Макс. скорость маршрута", "Предел целевой скорости путевой машины. Это не ограничение винта.");
         Property(flight, "speedStiffness", "Жесткость скорости", "P-настройка круиз-контроля.");
         Property(flight, "speedDamping", "Демпфирование скорости", "D-настройка круиз-контроля.");
         EndFoldout();

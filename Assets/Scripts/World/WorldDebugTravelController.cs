@@ -41,6 +41,7 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     [SerializeField, Range(0.04f, 2f), InspectorName("Flight Camera Height Smooth, s")] private float flightCameraHeightSmoothSeconds = 0.48f;
     [SerializeField, Range(0.02f, 1f), InspectorName("Flight Camera Rotation Smooth, s")] private float flightCameraRotationSmoothSeconds = 0.14f;
     [SerializeField, Range(0.02f, 1.5f), InspectorName("Flight Orbit Heading Smooth, s")] private float flightCameraOrbitHeadingSmoothSeconds = 0.38f;
+    [SerializeField, InspectorName("Rigid Flight Camera")] private bool rigidFlightCamera = true;
     [SerializeField, Range(0f, 45f), InspectorName("Tail Auto Align Window, deg")] private float tailAutoAlignWindowDegrees = 15f;
     [SerializeField, Range(0f, 1f), InspectorName("Tail Auto Align Delay, s")] private float tailAutoAlignDelaySeconds = 0.12f;
     [SerializeField, Range(0.02f, 1.5f), InspectorName("Tail Auto Align Smooth, s")] private float tailAutoAlignSmoothSeconds = 0.24f;
@@ -626,6 +627,15 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     private Vector3 GetSmoothedCameraOrbitPivot(Transform target, Vector3 rawPivot, bool snap)
     {
         bool smoothFlightPivot = IsPlayerShipFlightTarget(target);
+        if (UseRigidFlightCamera(target))
+        {
+            smoothedCameraOrbitPivot = rawPivot;
+            smoothedCameraOrbitPivotYVelocity = 0f;
+            cameraHeightVelocity = 0f;
+            hasSmoothedCameraOrbitPivot = true;
+            return rawPivot;
+        }
+
         float resetDistance = Mathf.Max(80f, cameraOrbitDistanceMeters * 0.4f);
         if (!smoothFlightPivot || snap || !hasSmoothedCameraOrbitPivot ||
             (rawPivot - smoothedCameraOrbitPivot).sqrMagnitude > resetDistance * resetDistance)
@@ -654,6 +664,12 @@ public sealed class WorldDebugTravelController : MonoBehaviour
 
     private Vector3 GetSmoothedCameraPosition(Transform target, Vector3 targetPosition, float effectiveFollowSharpness)
     {
+        if (UseRigidFlightCamera(target))
+        {
+            cameraHeightVelocity = 0f;
+            return targetPosition;
+        }
+
         Vector3 currentPosition = worldCamera.transform.position;
         Vector3 nextPosition = Vector3.Lerp(currentPosition, targetPosition, effectiveFollowSharpness);
         if (!IsPlayerShipFlightTarget(target))
@@ -674,6 +690,11 @@ public sealed class WorldDebugTravelController : MonoBehaviour
 
     private Quaternion GetSmoothedCameraRotation(Transform target, Quaternion targetRotation)
     {
+        if (UseRigidFlightCamera(target))
+        {
+            return targetRotation;
+        }
+
         if (!IsPlayerShipFlightTarget(target))
         {
             return targetRotation;
@@ -748,7 +769,13 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         }
 
         float rawHeading = NormalizeDegrees(Mathf.Atan2(flatForward.x, flatForward.z) * Mathf.Rad2Deg);
-        if (snap || !hasSmoothedCameraOrbitHeading)
+        if (UseRigidFlightCamera(target))
+        {
+            smoothedCameraOrbitHeadingDegrees = rawHeading;
+            smoothedCameraOrbitHeadingVelocity = 0f;
+            hasSmoothedCameraOrbitHeading = true;
+        }
+        else if (snap || !hasSmoothedCameraOrbitHeading)
         {
             smoothedCameraOrbitHeadingDegrees = rawHeading;
             smoothedCameraOrbitHeadingVelocity = 0f;
@@ -766,6 +793,11 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         }
 
         return Quaternion.Euler(0f, smoothedCameraOrbitHeadingDegrees, 0f);
+    }
+
+    private bool UseRigidFlightCamera(Transform target)
+    {
+        return rigidFlightCamera && IsPlayerShipFlightTarget(target);
     }
 
     private void HandleCameraTargetTransition(Transform movementTarget)

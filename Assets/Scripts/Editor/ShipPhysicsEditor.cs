@@ -66,15 +66,17 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(hullMaxTakeoffMassKgProp, new GUIContent("Макс. взлетная масса корпуса (кг)", "Предельная полная масса корабля вместе с грузом, которую разрешает корпус."));
         EditorGUILayout.LabelField("Текущая масса с грузом", ship.GetTotalMassKg().ToString("F0") + " кг");
         DrawResourceCheats(ship);
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerMaxSpeedMS"), new GUIContent("Макс. скорость винта (м/с)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerMaxSpeedMS"), new GUIContent("Расчетная скорость винта (м/с)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerEfficiency"), new GUIContent("КПД мощности винта"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("propellerMaxThrustKgf"), new GUIContent("Макс. тяга винта (кгс)"));
-
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Двигатель", EditorStyles.boldLabel);
         EditorGUILayout.PropertyField(serializedObject.FindProperty("enginePowerKwAt100"), new GUIContent("Мощность на 100%, кВт"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("engineFuelId"), new GUIContent("Топливо"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("engineFuelEfficiency"), new GUIContent("КПД топлива"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("engineResponseRate01PerSecond"), new GUIContent("Engine response 01/s", "Fraction of maximum engine output change per second."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("neutralStopBrakeMaxDecelerationMS2"), new GUIContent("Stop brake accel, m/s2"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("neutralStopBrakeStopTimeSeconds"), new GUIContent("Stop brake time, s"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("neutralStopBrakeDeadzoneMS"), new GUIContent("Stop brake deadzone, m/s"));
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Клавдиевый контур", EditorStyles.boldLabel);
@@ -83,6 +85,7 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumLiftEfficiency"), new GUIContent("КПД подъема", "Сколько килограммов подъема дает один киловатт мощности двигателя."));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumMaxLiftKg"), new GUIContent("Макс. подъем, кг", "Максимальная масса, которую контур может поддерживать."));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumLiftSmoothing"), new GUIContent("Сглаживание подъема", "Как быстро контур выходит на запрошенную подъемную силу."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("claudiumLoopResponseRate01PerSecond"), new GUIContent("Loop response 01/s", "Fraction of maximum loop lift change per second."));
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("Аэродинамика", EditorStyles.boldLabel);
@@ -118,14 +121,10 @@ public class ShipPhysicsEditor : Editor
 
         float maxSpeedMS = 0f;
         
-        if (totalDrag > 0 && ship.propellerMaxThrustKgf > 0f)
+        if (totalDrag > 0 && ship.enginePowerKwAt100 > 0f && ship.propellerEfficiency > 0f)
         {
-            float thrustN = ship.propellerMaxThrustKgf * 9.81f;
-            maxSpeedMS = Mathf.Sqrt(Mathf.Max(0f, thrustN) / Mathf.Max(0.001f, totalDrag));
-            if (ship.propellerMaxSpeedMS > 0f)
-            {
-                maxSpeedMS = Mathf.Min(maxSpeedMS, ship.propellerMaxSpeedMS);
-            }
+            float usefulPowerW = ship.EnginePowerCapacityKw * Mathf.Clamp01(ship.propellerEfficiency) * 1000f;
+            maxSpeedMS = Mathf.Pow(Mathf.Max(0f, usefulPowerW) / Mathf.Max(0.001f, totalDrag), 1f / 3f);
         }
 
         EditorGUILayout.HelpBox(
@@ -252,6 +251,7 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("waypointRadius"), new GUIContent("Радиус точки (м)"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("routeArrivalSpeedMS"), new GUIContent("Скорость прибытия (м/с)", "Точка засчитывается только если корабль находится рядом и горизонтальная скорость ниже этого значения."));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("routeBrakeAccelerationMS2"), new GUIContent("Расчетное торможение (м/с²)", "Путевая машина заранее снижает скорость так, будто сможет тормозить с этим ускорением."));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("routeMaxSpeedMS"), new GUIContent("Макс. скорость маршрута (м/с)", "Предел целевой скорости путевой машины. Это не ограничение винта."));
         
         ShipPhysics sp = (ShipPhysics)target;
         if (GUILayout.Button("Сгенерировать тестовый маршрут", GUILayout.Height(25)))
@@ -388,7 +388,7 @@ public class ShipPhysicsEditor : Editor
             EditorGUILayout.LabelField($"Мощность двигателя: {ship.engineGeneratedPowerKw:F1} кВт", EditorStyles.boldLabel);
             EditorGUILayout.LabelField($"Контур забрал: {ship.claudiumPowerDrawKw:F1} кВт", EditorStyles.label);
             EditorGUILayout.LabelField($"Винт получил: {ship.propellerInputPowerKw:F1} кВт, полезно {ship.propellerUsefulPowerKw:F1} кВт", EditorStyles.label);
-            EditorGUILayout.LabelField($"КПД винта: {ship.propellerCalculatedEfficiency:P0}, лимит скорости: {ship.propellerMaxSpeedMS:F1} м/с", EditorStyles.label);
+            EditorGUILayout.LabelField($"КПД винта: {ship.propellerCalculatedEfficiency:P0}, расчетная скорость: {ship.propellerMaxSpeedMS:F1} м/с", EditorStyles.label);
             EditorGUILayout.LabelField($"Текущая тяга винта: {ship.propellerThrustKgf:F1} кгс", EditorStyles.boldLabel);
             EditorGUILayout.LabelField($"Ручка мощности: {(ship.enginePowerLever * 100):F0}%, минимум контура: {(ship.engineMinimumPowerLever * 100):F0}%", EditorStyles.miniLabel);
         }

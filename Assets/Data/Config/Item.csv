@@ -1,4 +1,6 @@
 id_item,local_name_ru,local_name_en,energy_kwh_per_kg,cargo_unit_kind,cargo_storage_kind,mass_kg_per_unit,ship_size_class,docked_transport_mass_factor
+broken_automaton,Broken Automaton,Broken Automaton,0,Piece,Van,1,None,1
+automaton_core,Automaton Core,Automaton Core,0,Piece,Van,1,None,1
 food,Еда,Food,0,Piece,Van,1,None,1
 charcoal,Уголь,Charcoal,8,Piece,Van,1,None,1
 metal,Металл,Metal,0,Piece,Van,1,None,1
@@ -86,5 +88,6 @@ leviathan_hide,Шкура левиафана,Leviathan Hide,0,Piece,Van,1,None,1
 claudium_gland,Клавдиевая железа,Claudium Gland,0,Piece,Van,1,None,1
 mineral_shell,Минеральный панцирь,Mineral Shell,0,Piece,Van,1,None,1
 airframe_kit,Набор корпуса,Airframe Kit,0,Piece,Van,1,None,1
+module_kit,Module Kit,Module Kit,0,Piece,Van,1,None,1
+munition_bundle,Munition Bundle,Munition Bundle,0,Piece,Van,1,None,1
 chemical_batch,Химическая партия,Chemical Batch,0,Piece,Van,1,None,1
-utility_boat_ship,Служебный катер,Utility Boat,0,Ship,ShipDock,15000,Boat,0.1

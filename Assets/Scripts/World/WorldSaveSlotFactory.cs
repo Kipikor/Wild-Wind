@@ -63,7 +63,7 @@ public static class WorldSaveSlotFactory
             GameplaySessionSaveData.DefaultDockId,
             DockingLocationKind.Island,
             GameplaySessionSaveData.ResolveStarterDockPosition(manifest, GameplaySessionSaveData.DefaultDockId));
-        WildWindStarterDelivery.SeedNewGame(progress);
+        progress.sessionExtractionCoreMode = true;
 
         return new MetaGameSaveData
         {

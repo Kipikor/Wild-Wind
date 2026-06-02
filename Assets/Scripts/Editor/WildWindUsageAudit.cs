@@ -92,6 +92,12 @@ public static class WildWindUsageAudit
         SessionState.SetBool(GenerateAfterBigTestRequestedSessionKey, false);
     }
 
+    public static void DisarmForBigTest()
+    {
+        SessionState.SetBool(GenerateAfterBigTestArmedSessionKey, false);
+        SessionState.SetBool(GenerateAfterBigTestRequestedSessionKey, false);
+    }
+
     public static void GenerateReadOnlyReport()
     {
         string projectRoot = GetProjectRoot();

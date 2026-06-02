@@ -1189,6 +1189,7 @@ public static class IslandProductionSimulator
     public static int Advance(WorldConfigDatabase config, PlayerProgress progress, long fromUtcTicks, long toUtcTicks)
     {
         if (config == null || !config.isLoaded || progress == null || toUtcTicks <= fromUtcTicks) return 0;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return 0;
 
         IslandDevelopmentSimulator.EnsureIslandStates(config, progress);
 
@@ -1211,6 +1212,7 @@ public static class IslandProductionSimulator
     public static void EnsureIslandStates(WorldConfigDatabase config, PlayerProgress progress)
     {
         if (config == null || !config.isLoaded || progress == null) return;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return;
 
         IslandDevelopmentSimulator.EnsureIslandStates(config, progress);
 

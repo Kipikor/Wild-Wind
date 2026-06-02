@@ -117,6 +117,8 @@ public class LogisticsFleetController : MonoBehaviour
     public void EnsureRuntimeShips(PlayerProgress progress)
     {
         if (progress == null) return;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return;
+
         progress.Normalize();
 
         if (ships == null) return;
@@ -148,6 +150,11 @@ public class LogisticsFleetController : MonoBehaviour
         long toUtcTicks)
     {
         if (!simulationEnabled || config == null || !config.isLoaded || progress == null || toUtcTicks <= fromUtcTicks)
+        {
+            return 0;
+        }
+
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress))
         {
             return 0;
         }

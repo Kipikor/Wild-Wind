@@ -990,8 +990,8 @@ MonoBehaviour:
   saveFileName: wild_wind_production_debug_save.json
   startingOre: 4
   startingIron: 0
-  startingFuelKg: 50
-  startingClaudiumKg: 25
+  startingFuelKg: 150
+  startingClaudiumKg: 75
   startingPaperKg: 120
   processRealTimeWhilePlaying: 0
   skipInitialProcessCatchUp: 1

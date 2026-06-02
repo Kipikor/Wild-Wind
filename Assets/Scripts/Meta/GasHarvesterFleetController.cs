@@ -78,6 +78,8 @@ public class GasHarvesterFleetController : MonoBehaviour
     public void EnsureRuntimeShips(PlayerProgress progress)
     {
         if (progress == null) return;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return;
+
         progress.Normalize();
         if (ships == null) return;
 
@@ -113,6 +115,11 @@ public class GasHarvesterFleetController : MonoBehaviour
             return 0;
         }
 
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress))
+        {
+            return 0;
+        }
+
         EnsureRuntimeShips(progress);
 
         int changed = 0;
@@ -138,6 +145,7 @@ public class GasHarvesterFleetController : MonoBehaviour
     public int DebugStockAllIslandFuelAndClaudium(WorldConfigDatabase config, PlayerProgress progress)
     {
         if (config == null || !config.isLoaded || progress == null) return 0;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return 0;
 
         int changed = 0;
         for (int i = 0; i < config.islands.Count; i++)

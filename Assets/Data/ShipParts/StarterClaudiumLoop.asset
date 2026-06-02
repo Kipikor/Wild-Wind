@@ -38,7 +38,7 @@ MonoBehaviour:
     value: 10
   - stat: 39
     operation: 0
-    value: 2600
+    value: 3200
   - stat: 40
     operation: 0
     value: 2.5

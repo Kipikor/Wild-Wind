@@ -122,6 +122,7 @@ public class MissionController : MonoBehaviour
     private void ResumeMissionIfActiveInSave()
     {
         if (mission == null || targetShip == null || metaGameState == null || metaGameState.progress == null) return;
+        if (metaGameState.IsSessionExtractionCoreMode) return;
         if (metaGameState.progress.activeFlightMissionId != mission.missionId) return;
 
         IsCompleted = false;

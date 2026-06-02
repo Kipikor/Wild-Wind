@@ -143,6 +143,10 @@ public class PlayerProgress
     public List<ScoutShipState> scoutShips = new List<ScoutShipState>();
     public List<FlagshipInteriorState> flagshipInteriors = new List<FlagshipInteriorState>();
     public FlagshipExpeditionState activeExpedition = new FlagshipExpeditionState();
+    public SortieSessionState activeSortie = new SortieSessionState();
+    public BaseExtractionIndustryState baseIndustry = new BaseExtractionIndustryState();
+    public bool sessionExtractionCoreMode;
+    public string selectedSortieId = SessionExtractionConstants.DefaultSafeOreSortieId;
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
     public DockingLocationKind currentDockKind = DockingLocationKind.Island;
@@ -182,6 +186,9 @@ public class PlayerProgress
         activeResearchTechnologyId ??= "";
         currentDockId ??= "";
         activeFlightMissionId ??= "";
+        selectedSortieId = string.IsNullOrWhiteSpace(selectedSortieId)
+            ? SessionExtractionConstants.DefaultSafeOreSortieId
+            : selectedSortieId.Trim();
         if (currentFlightRotation.x == 0f
             && currentFlightRotation.y == 0f
             && currentFlightRotation.z == 0f
@@ -201,6 +208,8 @@ public class PlayerProgress
         scoutShips ??= new List<ScoutShipState>();
         flagshipInteriors ??= new List<FlagshipInteriorState>();
         activeExpedition ??= new FlagshipExpeditionState();
+        activeSortie ??= new SortieSessionState();
+        baseIndustry ??= new BaseExtractionIndustryState();
         shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
         shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
         inventory ??= new List<ResourceStack>();
@@ -216,6 +225,8 @@ public class PlayerProgress
         acceptedMissionIds ??= new List<string>();
         completedMissionIds ??= new List<string>();
         activeExpedition.Normalize();
+        activeSortie.Normalize();
+        baseIndustry.Normalize();
         cargoTransfer.Normalize();
         shipEngineFuelTank.Normalize();
         shipClaudiumTank.Normalize();
@@ -479,6 +490,14 @@ public class PlayerProgress
         shipCargo ??= new List<ResourceStack>();
         shipCargo.Clear();
         ClearShipImpactCargo();
+    }
+
+    public void ClearShipConsumableTanks()
+    {
+        shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
+        shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
+        shipEngineFuelTank.amountKg = 0f;
+        shipClaudiumTank.amountKg = 0f;
     }
 
     public void StopCargoTransfer()
@@ -1063,6 +1082,7 @@ public class PlayerProgress
         currentDockKind = dockKind;
         activeFlightMissionId = "";
         hasCurrentFlightPose = false;
+        activeSortie?.Clear();
     }
 
     public void SetDocked(string dockId, DockingLocationKind dockKind, Vector3 dockPosition)
@@ -1083,6 +1103,28 @@ public class PlayerProgress
         currentFlightPosition = position;
         currentFlightRotation = rotation;
         hasCurrentFlightPose = true;
+        RememberSortiePosition(position);
+    }
+
+    public bool HasActiveSortie => activeSortie != null && activeSortie.active;
+
+    public void BeginSortie(SortieZoneDefinition definition, long utcTicks, string dockId, DockingLocationKind dockKind, Vector3 dockPosition)
+    {
+        activeSortie ??= new SortieSessionState();
+        activeSortie.Begin(definition, utcTicks, dockId, dockKind, dockPosition);
+    }
+
+    public void ClearActiveSortie()
+    {
+        activeSortie ??= new SortieSessionState();
+        activeSortie.Clear();
+    }
+
+    public void RememberSortiePosition(Vector3 position)
+    {
+        if (activeSortie == null || !activeSortie.active) return;
+
+        activeSortie.RememberPosition(position);
     }
 
     public PlayerProgress Clone()

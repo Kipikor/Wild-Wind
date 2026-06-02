@@ -29,6 +29,7 @@ public static class ShipAssemblyBuilder
         }
 
         progress.Normalize();
+        bool sessionExtractionCoreMode = SessionExtractionCoreRuntime.IsCoreMode(progress);
         ShipPartDefinitionSO hull = catalog.GetPartById(progress.selectedHullId);
         if (hull == null || !hull.IsHull)
         {
@@ -48,7 +49,7 @@ public static class ShipAssemblyBuilder
         }
 
         result.hull = hull;
-        AddSlots(result.slots, hull.slots, "");
+        AddSlots(result.slots, hull.slots, "", sessionExtractionCoreMode);
         if (!ValidateSlotIds(result.slots, out result.message))
         {
             return false;
@@ -94,7 +95,7 @@ public static class ShipAssemblyBuilder
                 return false;
             }
 
-            AddSlots(result.slots, module.grantedSlots, slot.slotId + ":" + module.partId + ":");
+            AddSlots(result.slots, module.grantedSlots, slot.slotId + ":" + module.partId + ":", sessionExtractionCoreMode);
             if (!ValidateSlotIds(result.slots, out result.message))
             {
                 return false;
@@ -116,6 +117,7 @@ public static class ShipAssemblyBuilder
         }
 
         progress.Normalize();
+        bool sessionExtractionCoreMode = SessionExtractionCoreRuntime.IsCoreMode(progress);
         ShipPartDefinitionSO hull = catalog.GetPartById(progress.selectedHullId);
         if (hull == null || !hull.IsHull)
         {
@@ -129,7 +131,7 @@ public static class ShipAssemblyBuilder
         }
 
         List<ShipSlotDefinition> slots = new List<ShipSlotDefinition>();
-        AddSlots(slots, hull.slots, "");
+        AddSlots(slots, hull.slots, "", sessionExtractionCoreMode);
 
         bool changed = false;
         for (int i = 0; i < slots.Count; i++)
@@ -166,12 +168,25 @@ public static class ShipAssemblyBuilder
 
             if (installedModule != null && installedModule.IsModule && installedModule.CanFitSlot(slot))
             {
-                AddSlots(slots, installedModule.grantedSlots, slot.slotId + ":" + installedModule.partId + ":");
+                AddSlots(slots, installedModule.grantedSlots, slot.slotId + ":" + installedModule.partId + ":", sessionExtractionCoreMode);
             }
         }
 
         message = changed ? "Обязательные слоты заполнены." : "Обязательные слоты уже заполнены.";
         return true;
+    }
+
+    public static bool ShouldIncludeSlotForProgress(ShipSlotDefinition slot, PlayerProgress progress)
+    {
+        if (slot == null) return false;
+        return !SessionExtractionCoreRuntime.IsCoreMode(progress) || !IsLegacyUtilitySlot(slot);
+    }
+
+    private static bool IsLegacyUtilitySlot(ShipSlotDefinition slot)
+    {
+        if (slot == null) return false;
+        return slot.slotTypeId == SessionExtractionConstants.LegacyUtilitySlotTypeId
+            || slot.slotId == SessionExtractionConstants.LegacyUtilitySlotId;
     }
 
     public static bool IsPartUsable(ShipPartDefinitionSO part, TechTreeDefinitionSO techTree, PlayerProgress progress)
@@ -326,9 +341,14 @@ public static class ShipAssemblyBuilder
             part.compatibleSlotTypeIds = new List<string>();
             if (moduleConfig.compatibleSlotTypeIds != null)
             {
-                part.compatibleSlotTypeIds.AddRange(moduleConfig.compatibleSlotTypeIds);
+                for (int slotIndex = 0; slotIndex < moduleConfig.compatibleSlotTypeIds.Count; slotIndex++)
+                {
+                    AddCompatibleSlotType(part.compatibleSlotTypeIds, moduleConfig.compatibleSlotTypeIds[slotIndex]);
+                }
             }
 
+            ShipFittingSlotBand fittingBand = SessionExtractionFitting.ClassifySpecialModule(moduleConfig);
+            AddCompatibleSlotType(part.compatibleSlotTypeIds, SessionExtractionFitting.GetSlotTypeId(fittingBand));
             part.grantedSlots = new List<ShipSlotDefinition>();
             part.statModifiers = BuildSpecialModuleStatModifiers(moduleConfig);
             applied++;
@@ -378,6 +398,7 @@ public static class ShipAssemblyBuilder
             slots.Add(CreateRequiredSlot("engine_main", "Маршевый двигатель", "engine_main", "starter_engine"));
             slots.Add(CreateRequiredSlot("propeller_main", "Винт", "propeller_main", "starter_propeller"));
             slots.Add(CreateRequiredSlot("claudium_loop", "Клавдиевый контур", "claudium_loop", "starter_claudium_loop"));
+            AddSessionExtractionSlots(slots);
             slots.Add(new ShipSlotDefinition
             {
                 slotId = "utility_01",
@@ -392,6 +413,7 @@ public static class ShipAssemblyBuilder
         slots.Add(CreateRequiredSlot("engine_main", "Маршевый двигатель", "engine_main"));
         slots.Add(CreateRequiredSlot("propeller_main", "Винт", "propeller_main"));
         slots.Add(CreateRequiredSlot("claudium_loop", "Клавдиевый контур", "claudium_loop"));
+        AddSessionExtractionSlots(slots);
         slots.Add(new ShipSlotDefinition
         {
             slotId = "utility_01",
@@ -411,6 +433,21 @@ public static class ShipAssemblyBuilder
         slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.PropellerSlotId, "Винт", "propeller_main", design.GetAllowedPropellerIds()));
         slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.ClaudiumLoopSlotId, "Клавдиевый контур", "claudium_loop", design.GetAllowedClaudiumLoopIds()));
         slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.RoleModuleSlotId, "Ролевой модуль", "utility", design.GetAllowedSpecialModuleIds()));
+        AddSessionExtractionSlots(slots);
+    }
+
+    private static void AddSessionExtractionSlots(List<ShipSlotDefinition> slots)
+    {
+        if (slots == null) return;
+
+        slots.Add(CreateOptionalSlot("high_01", "High 1", SessionExtractionConstants.HighSlotTypeId));
+        slots.Add(CreateOptionalSlot("high_02", "High 2", SessionExtractionConstants.HighSlotTypeId));
+        slots.Add(CreateOptionalSlot("high_03", "High 3", SessionExtractionConstants.HighSlotTypeId));
+        slots.Add(CreateOptionalSlot("mid_01", "Mid 1", SessionExtractionConstants.MidSlotTypeId));
+        slots.Add(CreateOptionalSlot("mid_02", "Mid 2", SessionExtractionConstants.MidSlotTypeId));
+        slots.Add(CreateOptionalSlot("low_01", "Low 1", SessionExtractionConstants.LowSlotTypeId));
+        slots.Add(CreateOptionalSlot("low_02", "Low 2", SessionExtractionConstants.LowSlotTypeId));
+        slots.Add(CreateOptionalSlot("rig_01", "Rig 1", SessionExtractionConstants.RigSlotTypeId));
     }
 
     private static ShipSlotDefinition CreateRequiredSlot(string slotId, string displayName, string slotTypeId, string allowedPartId = "")
@@ -447,6 +484,29 @@ public static class ShipAssemblyBuilder
         }
 
         return slot;
+    }
+
+    private static ShipSlotDefinition CreateOptionalSlot(string slotId, string displayName, string slotTypeId)
+    {
+        return new ShipSlotDefinition
+        {
+            slotId = slotId,
+            displayName = displayName,
+            slotTypeId = slotTypeId,
+            required = false,
+            allowedPartIds = new List<string>()
+        };
+    }
+
+    private static void AddCompatibleSlotType(List<string> target, string slotTypeId)
+    {
+        if (target == null || string.IsNullOrWhiteSpace(slotTypeId)) return;
+
+        string cleanSlotTypeId = slotTypeId.Trim();
+        if (!target.Contains(cleanSlotTypeId))
+        {
+            target.Add(cleanSlotTypeId);
+        }
     }
 
     private static List<ShipStatModifier> BuildHullStatModifiers(HullConfig hullConfig)
@@ -498,7 +558,6 @@ public static class ShipAssemblyBuilder
         AddStat(modifiers, ShipStatId.BaseMass, ShipStatOperation.Add, propellerConfig.baseMassKg);
         AddStat(modifiers, ShipStatId.PropellerMaxSpeedMS, ShipStatOperation.Set, propellerConfig.maxSpeedMS);
         AddStat(modifiers, ShipStatId.PropellerEfficiency, ShipStatOperation.Set, propellerConfig.efficiency);
-        AddStat(modifiers, ShipStatId.PropellerMaxThrustKgf, ShipStatOperation.Set, propellerConfig.maxThrustKgf);
         return modifiers;
     }
 
@@ -527,7 +586,7 @@ public static class ShipAssemblyBuilder
         });
     }
 
-    private static void AddSlots(List<ShipSlotDefinition> target, List<ShipSlotDefinition> source, string prefix)
+    private static void AddSlots(List<ShipSlotDefinition> target, List<ShipSlotDefinition> source, string prefix, bool sessionExtractionCoreMode = false)
     {
         if (target == null || source == null) return;
 
@@ -535,6 +594,7 @@ public static class ShipAssemblyBuilder
         {
             ShipSlotDefinition slot = source[i];
             if (slot == null) continue;
+            if (sessionExtractionCoreMode && IsLegacyUtilitySlot(slot)) continue;
 
             string slotId = string.IsNullOrWhiteSpace(slot.slotId) ? "slot_" + i : slot.slotId;
             target.Add(slot.CloneWithId(prefix + slotId));
@@ -710,7 +770,6 @@ public class ShipStatBlock
         ship.targetTrimMass = Mathf.Max(1f, Get(ShipStatId.TargetTrimMass, ship.baseMass));
         ship.propellerMaxSpeedMS = Mathf.Max(0f, Get(ShipStatId.PropellerMaxSpeedMS, ship.propellerMaxSpeedMS));
         ship.propellerEfficiency = Mathf.Max(0f, Get(ShipStatId.PropellerEfficiency, 0f));
-        ship.propellerMaxThrustKgf = Mathf.Max(0f, Get(ShipStatId.PropellerMaxThrustKgf, ship.propellerMaxThrustKgf));
         ship.airDensity = Mathf.Max(0.01f, Get(ShipStatId.AirDensity, 1.225f));
         ship.dragCoefficient = Mathf.Max(0f, Get(ShipStatId.DragCoefficient, 0f));
         ship.frontalArea = Mathf.Max(0f, Get(ShipStatId.FrontalArea, 0f));

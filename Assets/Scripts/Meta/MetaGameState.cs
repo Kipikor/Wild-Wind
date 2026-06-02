@@ -22,6 +22,10 @@ public class MetaGameSaveData
 
 public partial class MetaGameState : MonoBehaviour
 {
+    private const float ExtractionRunupOutwardDotThreshold = 0.9659258f;
+    private const float SortieEntryApproachSeconds = 20f;
+    private const float SortieEntryDefaultMaxSpeedMS = 120f;
+
     [Header("Связи")]
     [InspectorName("Каталог кораблей")]
     public ShipCatalogSO catalog;
@@ -60,7 +64,7 @@ public partial class MetaGameState : MonoBehaviour
     [InspectorName("Стартовый режим")]
     public GameSessionMode startingMode = GameSessionMode.Docked;
     [InspectorName("Стартовый док")]
-    public string startingDockId = "Island1";
+    public string startingDockId = "capital";
     [InspectorName("Тип стартового дока")]
     public DockingLocationKind startingDockKind = DockingLocationKind.Island;
     [InspectorName("Автосохранение при стыковке")]
@@ -78,9 +82,9 @@ public partial class MetaGameState : MonoBehaviour
     [InspectorName("Стартовое железо")]
     public int startingIron = 0;
     [InspectorName("Стартовое топливо на борту, кг")]
-    public int startingFuelKg = 50;
+    public int startingFuelKg = 150;
     [InspectorName("Стартовый клавдий на борту, кг")]
-    public int startingClaudiumKg = 25;
+    public int startingClaudiumKg = 75;
     [InspectorName("Стартовая бумага в столице, кг")]
     [Tooltip("Нужна разведчикам: 1 кг бумаги превращается в 1 кг научной информации.")]
     public int startingPaperKg = 120;
@@ -124,6 +128,11 @@ public partial class MetaGameState : MonoBehaviour
     [Tooltip("Размер простой временной модели острова. Радиус стыковки берется отдельно из Island.csv.")]
     public float configIslandVisualRadius = 80f;
 
+    [Header("Session Extraction Core")]
+    [InspectorName("Use session extraction core")]
+    [Tooltip("When enabled, runtime uses base/sortie/resource turnover and does not tick legacy island social needs, passengers, or island supply chains.")]
+    public bool sessionExtractionCoreMode = true;
+
     [Header("Отладочный интерфейс стыковки")]
     [InspectorName("Показывать интерфейс")]
     public bool showDockingDebugUI = true;
@@ -141,6 +150,17 @@ public partial class MetaGameState : MonoBehaviour
 
     public GameSessionMode CurrentMode => progress != null ? progress.currentMode : startingMode;
     public bool IsDocked => CurrentMode == GameSessionMode.Docked;
+    public bool HasActiveSortie => progress != null && progress.HasActiveSortie;
+    public SortieSessionState ActiveSortie => progress != null ? progress.activeSortie : null;
+    public string ActiveSortieExtractionRunupStatus => activeSortieExtractionRunupStatus;
+    public bool IsSafeOreSortieActive => HasActiveSortie
+        && ActiveSortie != null
+        && ActiveSortie.zone != null
+        && ActiveSortie.zone.sortieId == SessionExtractionConstants.DefaultSafeOreSortieId;
+    public bool CanCatchStarterSortieFragmentsInCargo => HasActiveSortie
+        && ActiveSortie != null
+        && ActiveSortie.zone != null
+        && IsDefaultSessionSortieId(ActiveSortie.zone.sortieId);
     public string EffectiveSaveFileName
     {
         get
@@ -170,10 +190,47 @@ public partial class MetaGameState : MonoBehaviour
     private string syncedClaudiumResourceId = "";
     private float pendingFuelConsumedKg;
     private float pendingClaudiumConsumedKg;
+    private string activeSortieExtractionRunupStatus = "";
 
     private ShipCatalogSO ActiveCatalog => catalog != null ? catalog : shipLoader != null ? shipLoader.catalog : null;
     public WorldConfigDatabase WorldConfig => worldConfig;
     public ShipCatalogSO CurrentCatalog => ActiveCatalog;
+    public bool IsSessionExtractionCoreMode => sessionExtractionCoreMode;
+    public bool UsesLegacyDockAssemblyUi => !sessionExtractionCoreMode;
+    public int SpawnedConfiguredIslandCount => spawnedConfigIslandRoot != null ? spawnedConfigIslandRoot.childCount : 0;
+
+    private void SyncSessionExtractionCoreMode()
+    {
+        if (progress == null) return;
+
+        progress.sessionExtractionCoreMode = sessionExtractionCoreMode;
+    }
+
+    private void EnsureEconomyRuntimeStates()
+    {
+        if (progress == null || worldConfig == null || !worldConfig.isLoaded) return;
+
+        if (sessionExtractionCoreMode)
+        {
+            progress.GetIslandProductionState(GetCapitalIslandId(), true)?.Normalize();
+            progress.baseIndustry ??= new BaseExtractionIndustryState();
+            progress.baseIndustry.Normalize();
+            return;
+        }
+
+        IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+        IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
+    }
+
+    private void EnsureLegacyAutonomousFleetRuntime()
+    {
+        if (sessionExtractionCoreMode || progress == null) return;
+
+        logisticsFleet?.EnsureRuntimeShips(progress);
+        gasHarvesterFleet?.EnsureRuntimeShips(progress);
+        miningFleet?.EnsureRuntimeShips(progress);
+        scoutFleet?.EnsureRuntimeShips(progress);
+    }
 
     private class CargoPlanEntry
     {
@@ -226,17 +283,14 @@ public partial class MetaGameState : MonoBehaviour
         if (progress != null)
         {
             progress.Normalize();
-            IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
+            SyncSessionExtractionCoreMode();
+            EnsureEconomyRuntimeStates();
             EnsureLogisticsFleet();
             EnsureGasSystems();
             EnsureMiningSystems();
             EnsureLeviathanSystems();
             EnsureScoutSystems();
-            logisticsFleet?.EnsureRuntimeShips(progress);
-            gasHarvesterFleet?.EnsureRuntimeShips(progress);
-            miningFleet?.EnsureRuntimeShips(progress);
-            scoutFleet?.EnsureRuntimeShips(progress);
-            IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
+            EnsureLegacyAutonomousFleetRuntime();
         }
     }
 
@@ -435,6 +489,7 @@ public partial class MetaGameState : MonoBehaviour
         {
             IslandConfig island = worldConfig.islands[i];
             if (island == null || string.IsNullOrWhiteSpace(island.id)) continue;
+            if (sessionExtractionCoreMode && !IsCapitalIsland(island.id)) continue;
 
             GameObject islandObject = new GameObject(GetIslandDisplayName(island));
             islandObject.transform.SetParent(spawnedConfigIslandRoot, false);
@@ -479,6 +534,32 @@ public partial class MetaGameState : MonoBehaviour
                 station.displayName = GetIslandDisplayName(island);
             }
         }
+    }
+
+    public void RefreshSessionExtractionRuntimeActors()
+    {
+        SpawnConfiguredWorldActors(true);
+    }
+
+    private void SpawnConfiguredWorldActors(bool forceRebuild = false)
+    {
+        SpawnConfiguredIslands(forceRebuild);
+        if (sessionExtractionCoreMode)
+        {
+            ClearLegacyWorldActors();
+            return;
+        }
+
+        gasCloudManager?.SpawnConfiguredClouds(forceRebuild);
+        miningRockManager?.SpawnConfiguredRocks(forceRebuild);
+        leviathanManager?.SpawnConfiguredLeviathans(forceRebuild);
+    }
+
+    private void ClearLegacyWorldActors()
+    {
+        gasCloudManager?.ClearConfiguredClouds();
+        miningRockManager?.ClearConfiguredRocks();
+        leviathanManager?.ClearConfiguredLeviathans();
     }
 
     public bool IsCapitalIsland(string islandId)
@@ -535,10 +616,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         EnsureProgressInitialized();
-        SpawnConfiguredIslands();
-        gasCloudManager?.SpawnConfiguredClouds();
-        miningRockManager?.SpawnConfiguredRocks();
-        leviathanManager?.SpawnConfiguredLeviathans();
+        SpawnConfiguredWorldActors();
         if (!skipInitialProcessCatchUp && (!loadedGame || !TryAdvanceOfflineProgressFromLastSave(DateTime.UtcNow, out _)))
         {
             AdvanceRealTimeProcessesSliced(DateTime.UtcNow);
@@ -556,10 +634,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureMiningSystems();
         EnsureLeviathanSystems();
         EnsureScoutSystems();
-        SpawnConfiguredIslands();
-        gasCloudManager?.SpawnConfiguredClouds();
-        miningRockManager?.SpawnConfiguredRocks();
-        leviathanManager?.SpawnConfiguredLeviathans();
+        SpawnConfiguredWorldActors();
         ApplySelectedShip();
         ApplySessionModeToShip();
     }
@@ -579,6 +654,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         SyncShipConsumablesWithCargo(false);
+        UpdateActiveSortieExtractionRunupFromActiveShip();
     }
 
     private void OnApplicationQuit()
@@ -597,15 +673,19 @@ public partial class MetaGameState : MonoBehaviour
         progress ??= new PlayerProgress();
         progress.Normalize();
         EnsureWorldConfigLoaded();
-        IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
-        IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
+        SyncSessionExtractionCoreMode();
+        EnsureEconomyRuntimeStates();
         EnsureLogisticsFleet();
         EnsureGasSystems();
         EnsureMiningSystems();
         EnsureLeviathanSystems();
-        logisticsFleet?.EnsureRuntimeShips(progress);
-        gasHarvesterFleet?.EnsureRuntimeShips(progress);
-        miningFleet?.EnsureRuntimeShips(progress);
+        EnsureScoutSystems();
+        EnsureLegacyAutonomousFleetRuntime();
+        if (sessionExtractionCoreMode)
+        {
+            MigrateLegacyPersonalInventoryToCapitalStorage();
+            DisableLegacyShopForSessionCore();
+        }
 
         if (initialized) return;
 
@@ -615,12 +695,14 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         progress.Normalize();
-        IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
-        IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
-        logisticsFleet?.EnsureRuntimeShips(progress);
-        gasHarvesterFleet?.EnsureRuntimeShips(progress);
-        miningFleet?.EnsureRuntimeShips(progress);
-        scoutFleet?.EnsureRuntimeShips(progress);
+        SyncSessionExtractionCoreMode();
+        EnsureEconomyRuntimeStates();
+        EnsureLegacyAutonomousFleetRuntime();
+        if (sessionExtractionCoreMode)
+        {
+            MigrateLegacyPersonalInventoryToCapitalStorage();
+            DisableLegacyShopForSessionCore();
+        }
 
         if (progress.lastSavedUtcTicks == 0 && string.IsNullOrWhiteSpace(progress.currentDockId))
         {
@@ -644,21 +726,32 @@ public partial class MetaGameState : MonoBehaviour
 
         if (progress.money < startingMoney)
         {
-            progress.money = startingMoney;
+            if (!sessionExtractionCoreMode)
+            {
+                progress.money = startingMoney;
+            }
         }
 
         if (!progress.receivedStartingInventory)
         {
-            progress.AddResource("ore", startingOre);
-            progress.AddResource("iron", startingIron);
+            if (!sessionExtractionCoreMode)
+            {
+                progress.AddResource("ore", startingOre);
+                progress.AddResource("iron", startingIron);
+            }
+
             AddStartingShipConsumables();
             progress.receivedStartingInventory = true;
         }
 
         if (!progress.receivedStartingPaper)
         {
-            AddStartingIslandSupplies();
-            WildWindStarterDelivery.SeedNewGame(progress);
+            if (!sessionExtractionCoreMode)
+            {
+                AddStartingIslandSupplies();
+                WildWindStarterDelivery.SeedNewGame(progress);
+            }
+
             progress.receivedStartingPaper = true;
         }
 
@@ -668,7 +761,11 @@ public partial class MetaGameState : MonoBehaviour
             progress.lastProcessUtcTicks = nowTicks;
         }
 
-        if (progress.nextShopRefreshUtcTicks == 0)
+        if (sessionExtractionCoreMode)
+        {
+            DisableLegacyShopForSessionCore();
+        }
+        else if (progress.nextShopRefreshUtcTicks == 0)
         {
             progress.nextShopRefreshUtcTicks = nowTicks + TimeSpan.FromSeconds(Mathf.Max(1, shopRefreshIntervalSeconds)).Ticks;
             progress.shopSeed = UnityEngine.Random.Range(1, int.MaxValue);
@@ -678,6 +775,40 @@ public partial class MetaGameState : MonoBehaviour
         ApplyStartingTechnologies();
         ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out _);
         initialized = true;
+    }
+
+    private int MigrateLegacyPersonalInventoryToCapitalStorage()
+    {
+        if (!sessionExtractionCoreMode || progress == null || progress.inventory == null || progress.inventory.Count == 0)
+        {
+            return 0;
+        }
+
+        IslandProductionState capitalStorage = progress.GetIslandProductionState(GetCapitalIslandId(), true);
+        if (capitalStorage == null)
+        {
+            return 0;
+        }
+
+        int moved = 0;
+        for (int i = 0; i < progress.inventory.Count; i++)
+        {
+            ResourceStack stack = progress.inventory[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0) continue;
+
+            moved += capitalStorage.AddResource(stack.resourceId, stack.amount);
+        }
+
+        progress.inventory.Clear();
+        return moved;
+    }
+
+    private void DisableLegacyShopForSessionCore()
+    {
+        if (progress == null) return;
+
+        progress.nextShopRefreshUtcTicks = 0L;
+        progress.shopSeed = 0;
     }
 
     public PlayerProgress CreateProgressSnapshot()
@@ -717,7 +848,9 @@ public partial class MetaGameState : MonoBehaviour
             {
                 RefreshSceneShipReferences(shipLoader.targetShip);
                 ApplyFuelConfigToShip(shipLoader.targetShip);
-                ApplyCargoMassToShip(shipLoader.targetShip);
+                RefreshShipConsumablesFromTanks(shipLoader.targetShip, true);
+                shipLoader.targetShip.cargoMassKg = Mathf.Max(0f, progress.GetShipPayloadMassKg(worldConfig));
+                shipLoader.targetShip.RefreshRuntimeShipSettings();
             }
 
             return true;
@@ -753,6 +886,11 @@ public partial class MetaGameState : MonoBehaviour
         ShipCatalogSO activeCatalog = ActiveCatalog;
         ShipPartDefinitionSO hull = activeCatalog != null ? activeCatalog.GetPartById(hullId) : null;
         if (hull == null || !hull.IsHull || !ShipAssemblyBuilder.IsPartUsable(hull, techTree, progress)) return false;
+        if (sessionExtractionCoreMode && progress.selectedHullId != hullId)
+        {
+            lastSaveMessage = "Legacy hull selector is disabled in session extraction core; ship replacement must use base assembly.";
+            return false;
+        }
 
         if (!progress.SelectHull(hullId)) return false;
 
@@ -765,6 +903,11 @@ public partial class MetaGameState : MonoBehaviour
     {
         EnsureProgressInitialized();
         if (!IsDocked) return false;
+        if (sessionExtractionCoreMode && !CanInstallSessionCoreFittingModule(slotId, moduleId, out string reason))
+        {
+            lastSaveMessage = reason;
+            return false;
+        }
 
         progress.InstallModule(slotId, moduleId);
         ApplySelectedShip();
@@ -772,15 +915,106 @@ public partial class MetaGameState : MonoBehaviour
         return true;
     }
 
+    private bool CanInstallSessionCoreFittingModule(string slotId, string moduleId, out string reason)
+    {
+        reason = "";
+        if (string.IsNullOrWhiteSpace(slotId))
+        {
+            reason = "No fitting slot selected.";
+            return false;
+        }
+
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog == null)
+        {
+            reason = "Ship catalog is missing.";
+            return false;
+        }
+
+        ShipSlotDefinition slot = FindCurrentAssemblySlotForCoreFitting(activeCatalog, slotId);
+        if (slot == null)
+        {
+            reason = "Slot is not available in session extraction fitting: " + slotId + ".";
+            return false;
+        }
+
+        if (!IsSessionCoreFittingSlotType(slot.slotTypeId))
+        {
+            reason = "Session extraction fitting accepts only High, Mid, Low, and Rig module slots.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(moduleId))
+        {
+            return true;
+        }
+
+        ShipPartDefinitionSO module = activeCatalog.GetPartById(moduleId);
+        if (module == null || !module.IsModule)
+        {
+            reason = "Module is missing: " + moduleId + ".";
+            return false;
+        }
+
+        if (!ShipAssemblyBuilder.IsPartUsable(module, techTree, progress))
+        {
+            reason = "Module is not researched: " + GetPartName(module) + ".";
+            return false;
+        }
+
+        if (!module.CanFitSlot(slot))
+        {
+            reason = GetPartName(module) + " cannot fit " + GetSlotTypeDisplayName(slot.slotTypeId) + ".";
+            return false;
+        }
+
+        return true;
+    }
+
+    private ShipSlotDefinition FindCurrentAssemblySlotForCoreFitting(ShipCatalogSO activeCatalog, string slotId)
+    {
+        List<ShipSlotDefinition> slots = GetAssemblySlotsForUi(activeCatalog);
+        for (int i = 0; i < slots.Count; i++)
+        {
+            ShipSlotDefinition slot = slots[i];
+            if (slot != null && slot.slotId == slotId)
+            {
+                return slot;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsSessionCoreFittingSlotType(string slotTypeId)
+    {
+        return slotTypeId == SessionExtractionConstants.HighSlotTypeId
+            || slotTypeId == SessionExtractionConstants.MidSlotTypeId
+            || slotTypeId == SessionExtractionConstants.LowSlotTypeId
+            || slotTypeId == SessionExtractionConstants.RigSlotTypeId;
+    }
+
     public void AddMoney(int amount)
     {
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy money rewards are disabled in session extraction core.";
+            return;
+        }
+
         progress.money += Mathf.Max(0, amount);
     }
 
     public void AddResource(string resourceId, int amount)
     {
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy direct resource rewards are disabled in session extraction core.";
+            return;
+        }
+
         progress.AddResource(resourceId, amount);
     }
 
@@ -793,14 +1027,25 @@ public partial class MetaGameState : MonoBehaviour
     public void AddExperienceToShip(string shipId, int amount)
     {
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy ship XP rewards are disabled in session extraction core.";
+            return;
+        }
+
         progress.AddShipExperience(shipId, amount);
     }
 
     public bool TryResearchNode(string nodeId)
     {
-        if (techTree == null) return false;
-
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy XP tech-tree research is disabled in session extraction core. Use base resource technology cycles and cascade production.";
+            return false;
+        }
+
+        if (techTree == null) return false;
 
         TechTreeNode node = techTree.GetNode(nodeId);
         if (!TechTreeRules.CanResearch(node, progress, out string experienceShipId, out _)) return false;
@@ -819,9 +1064,14 @@ public partial class MetaGameState : MonoBehaviour
 
     public bool TryPurchaseNode(string nodeId)
     {
-        if (techTree == null) return false;
-
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy money tech-tree purchases are disabled in session extraction core. Use base resource technology cycles and cascade production.";
+            return false;
+        }
+
+        if (techTree == null) return false;
 
         TechTreeNode node = techTree.GetNode(nodeId);
         if (!TechTreeRules.CanPurchase(node, progress, out _)) return false;
@@ -1000,13 +1250,20 @@ public partial class MetaGameState : MonoBehaviour
 
     public bool TryBeginFlightSession(MissionDefinitionSO mission)
     {
-        return TryBeginFlightSession(mission, null);
+        return TryBeginFlightSession(mission, null, false);
     }
 
-    private bool TryBeginFlightSession(MissionDefinitionSO mission, FlagshipExpeditionDefinition expedition)
+    private bool TryBeginFlightSession(MissionDefinitionSO mission, FlagshipExpeditionDefinition expedition, bool allowSessionExtractionCoreSortie)
     {
         EnsureProgressInitialized();
         expedition?.Normalize();
+
+        if (sessionExtractionCoreMode && !allowSessionExtractionCoreSortie)
+        {
+            progress.activeExpedition?.Clear();
+            lastSaveMessage = "Legacy flight missions are disabled in session extraction core. Start a sortie from the base.";
+            return false;
+        }
 
         if (CurrentMode == GameSessionMode.Flight)
         {
@@ -1051,13 +1308,19 @@ public partial class MetaGameState : MonoBehaviour
             TrySaveGame();
         }
 
-        if (expedition != null)
+        if (!sessionExtractionCoreMode && expedition != null)
         {
             progress.activeExpedition.Begin(expedition, GetProcessUtcNow().Ticks);
         }
+        else if (sessionExtractionCoreMode)
+        {
+            progress.activeExpedition?.Clear();
+        }
 
         progress.SetFlight(missionId);
-        bool flagshipExpeditionStarted = TryStartPlayerFlagshipExpedition(out string flagshipExpeditionMessage);
+        string flagshipExpeditionMessage = "";
+        bool flagshipExpeditionStarted = !sessionExtractionCoreMode
+            && TryStartPlayerFlagshipExpedition(out flagshipExpeditionMessage);
         ApplySelectedShip();
         ApplySessionModeToShip();
         lastSaveMessage = "Вылет начат. Ручное сохранение доступно у дока, выход из игры сохранит текущий полет.";
@@ -1074,7 +1337,2324 @@ public partial class MetaGameState : MonoBehaviour
 
     public bool BeginFreeFlight()
     {
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Free flight is disabled in session extraction core. Start a sortie from the base.";
+            return false;
+        }
+
         return TryBeginFlightSession(null);
+    }
+
+    public SortieZoneDefinition CreateDefaultSafeOreSortieDefinition()
+    {
+        return new SortieZoneDefinition
+        {
+            sortieId = SessionExtractionConstants.DefaultSafeOreSortieId,
+            displayName = SessionExtractionConstants.DefaultSafeOreSortieName,
+            primaryBranch = BaseProcessingBranch.Ore,
+            recommendedSlotBand = ShipFittingSlotBand.High,
+            requiredFittingSummary = "No required High module",
+            starterResourceItemId = "windshale_ore",
+            starterResourceChunkMin = 2,
+            starterResourceChunkMax = 5,
+            starterResourceShedIntervalSeconds = 1.75f,
+            starterResourceColor = new Color(0.55f, 0.50f, 0.45f, 1f),
+            centerPosition = Vector3.zero,
+            entryPosition = new Vector3(0f, 350f, 0f),
+            radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
+            stormFloorY = 0f,
+            extractionBoundaryToleranceMeters = 150f,
+            distanceToBaseKm = 220f,
+            returnCruiseSpeedMS = 35f,
+            returnPowerLever = 0.7f,
+            returnReserveMultiplier = 1.15f
+        };
+    }
+
+    public List<SortieZoneDefinition> CreateDefaultSessionSortieDefinitions()
+    {
+        List<SortieZoneDefinition> sorties = new List<SortieZoneDefinition>
+        {
+            CreateDefaultSafeOreSortieDefinition(),
+            CreateDefaultSafeGasSortieDefinition(),
+            CreateDefaultSafeAutomatonSortieDefinition(),
+            CreateDefaultSafeLeviathanSortieDefinition(),
+            CreateDefaultSafeSurveySortieDefinition()
+        };
+
+        for (int i = 0; i < sorties.Count; i++)
+        {
+            sorties[i]?.Normalize();
+        }
+
+        return sorties;
+    }
+
+    public SortieZoneDefinition CreateDefaultSafeGasSortieDefinition()
+    {
+        return new SortieZoneDefinition
+        {
+            sortieId = SessionExtractionConstants.DefaultSafeGasSortieId,
+            displayName = SessionExtractionConstants.DefaultSafeGasSortieName,
+            primaryBranch = BaseProcessingBranch.Gas,
+            recommendedSlotBand = ShipFittingSlotBand.High,
+            requiredFittingSummary = "High gas harvester",
+            requiredModuleIds = new List<string> { SessionExtractionConstants.StarterGasHarvesterModuleId },
+            starterResourceItemId = "cloud_condensate",
+            starterResourceChunkMin = 2,
+            starterResourceChunkMax = 4,
+            starterResourceShedIntervalSeconds = 2.1f,
+            starterResourceColor = new Color(0.65f, 0.82f, 1f, 1f),
+            centerPosition = new Vector3(900f, 0f, 0f),
+            entryPosition = new Vector3(900f, 360f, 0f),
+            radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
+            stormFloorY = 0f,
+            extractionBoundaryToleranceMeters = 150f,
+            distanceToBaseKm = 220f,
+            returnCruiseSpeedMS = 35f,
+            returnPowerLever = 0.7f,
+            returnReserveMultiplier = 1.15f
+        };
+    }
+
+    public SortieZoneDefinition CreateDefaultSafeAutomatonSortieDefinition()
+    {
+        return new SortieZoneDefinition
+        {
+            sortieId = SessionExtractionConstants.DefaultSafeAutomatonSortieId,
+            displayName = SessionExtractionConstants.DefaultSafeAutomatonSortieName,
+            primaryBranch = BaseProcessingBranch.AutomatonDismantling,
+            recommendedSlotBand = ShipFittingSlotBand.High,
+            requiredFittingSummary = "High impact or salvage module",
+            requiredModuleIds = new List<string> { SessionExtractionConstants.StarterMiningHoldModuleId },
+            starterResourceItemId = SessionExtractionConstants.BrokenAutomatonItemId,
+            starterResourceChunkMin = 1,
+            starterResourceChunkMax = 2,
+            starterResourceShedIntervalSeconds = 3.0f,
+            starterResourceColor = new Color(0.78f, 0.76f, 0.68f, 1f),
+            centerPosition = new Vector3(-900f, 0f, 650f),
+            entryPosition = new Vector3(-900f, 340f, 650f),
+            radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
+            stormFloorY = 0f,
+            extractionBoundaryToleranceMeters = 150f,
+            distanceToBaseKm = 220f,
+            returnCruiseSpeedMS = 35f,
+            returnPowerLever = 0.7f,
+            returnReserveMultiplier = 1.15f
+        };
+    }
+
+    public SortieZoneDefinition CreateDefaultSafeLeviathanSortieDefinition()
+    {
+        return new SortieZoneDefinition
+        {
+            sortieId = SessionExtractionConstants.DefaultSafeLeviathanSortieId,
+            displayName = SessionExtractionConstants.DefaultSafeLeviathanSortieName,
+            primaryBranch = BaseProcessingBranch.LeviathanProcessing,
+            recommendedSlotBand = ShipFittingSlotBand.High,
+            requiredFittingSummary = "High harpoon module",
+            requiredModuleIds = new List<string> { SessionExtractionConstants.StarterHarpoonModuleId },
+            starterResourceItemId = "windcalf_carcass",
+            starterResourceChunkMin = 2,
+            starterResourceChunkMax = 5,
+            starterResourceShedIntervalSeconds = 3.4f,
+            starterResourceColor = new Color(0.56f, 0.78f, 0.74f, 1f),
+            centerPosition = new Vector3(0f, 0f, -1200f),
+            entryPosition = new Vector3(0f, 380f, -1200f),
+            radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
+            stormFloorY = 0f,
+            extractionBoundaryToleranceMeters = 160f,
+            distanceToBaseKm = 220f,
+            returnCruiseSpeedMS = 35f,
+            returnPowerLever = 0.7f,
+            returnReserveMultiplier = 1.15f
+        };
+    }
+
+    public SortieZoneDefinition CreateDefaultSafeSurveySortieDefinition()
+    {
+        return new SortieZoneDefinition
+        {
+            sortieId = SessionExtractionConstants.DefaultSafeSurveySortieId,
+            displayName = SessionExtractionConstants.DefaultSafeSurveySortieName,
+            primaryBranch = BaseProcessingBranch.CyberneticDeciphering,
+            recommendedSlotBand = ShipFittingSlotBand.Mid,
+            requiredFittingSummary = "Mid observation module",
+            requiredModuleIds = new List<string> { SessionExtractionConstants.StarterObservationPostModuleId },
+            starterResourceItemId = SessionExtractionConstants.RockInfoItemId,
+            starterResourceChunkMin = 1,
+            starterResourceChunkMax = 3,
+            starterResourceShedIntervalSeconds = 2.8f,
+            starterResourceColor = new Color(0.72f, 0.88f, 0.92f, 1f),
+            centerPosition = new Vector3(1250f, 0f, 850f),
+            entryPosition = new Vector3(1250f, 370f, 850f),
+            radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
+            stormFloorY = 0f,
+            extractionBoundaryToleranceMeters = 140f,
+            distanceToBaseKm = 220f,
+            returnCruiseSpeedMS = 35f,
+            returnPowerLever = 0.7f,
+            returnReserveMultiplier = 1.15f
+        };
+    }
+
+    public SortieZoneDefinition GetSelectedSessionSortieDefinition()
+    {
+        EnsureProgressInitialized();
+
+        string selectedId = progress != null && !string.IsNullOrWhiteSpace(progress.selectedSortieId)
+            ? progress.selectedSortieId
+            : SessionExtractionConstants.DefaultSafeOreSortieId;
+        SortieZoneDefinition selected = FindDefaultSessionSortieDefinition(selectedId);
+        if (selected != null) return selected;
+
+        progress.selectedSortieId = SessionExtractionConstants.DefaultSafeOreSortieId;
+        return CreateDefaultSafeOreSortieDefinition();
+    }
+
+    public string GetSelectedSessionSortieDisplayName()
+    {
+        SortieZoneDefinition selected = GetSelectedSessionSortieDefinition();
+        return selected != null ? selected.displayName : SessionExtractionConstants.DefaultSafeOreSortieName;
+    }
+
+    public string GetSelectedSessionSortieRequirementText()
+    {
+        return GetSortieRequirementText(GetSelectedSessionSortieDefinition());
+    }
+
+    public bool CanBeginSelectedSessionSortie(out string reason)
+    {
+        return CanBeginSessionExtractionSortie(GetSelectedSessionSortieDefinition(), out reason);
+    }
+
+    public bool CanBeginSessionExtractionSortie(SortieZoneDefinition zone, out string reason)
+    {
+        reason = "";
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        if (zone == null)
+        {
+            reason = "Sortie is missing.";
+            return false;
+        }
+
+        zone.Normalize();
+        if (!IsDockedAtCapital())
+        {
+            reason = "Session sortie can start only from the base.";
+            return false;
+        }
+
+        if (!HasRequiredSortieModule(zone, out string moduleReason))
+        {
+            reason = moduleReason;
+            return false;
+        }
+
+        reason = "Sortie ready: " + zone.displayName + ".";
+        return true;
+    }
+
+    public bool SelectSessionSortie(string sortieId, out string message)
+    {
+        EnsureProgressInitialized();
+        message = "";
+
+        SortieZoneDefinition sortie = FindDefaultSessionSortieDefinition(sortieId);
+        if (sortie == null)
+        {
+            message = "Unknown sortie: " + sortieId + ".";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        progress.selectedSortieId = sortie.sortieId;
+        message = "Selected sortie: " + sortie.displayName + ".";
+        lastSaveMessage = message;
+        AutoSaveIfDocked();
+        return true;
+    }
+
+    public bool SelectNextSessionSortie(out string message)
+    {
+        EnsureProgressInitialized();
+        List<SortieZoneDefinition> sorties = CreateDefaultSessionSortieDefinitions();
+        if (sorties.Count == 0)
+        {
+            message = "No sorties are configured.";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        string current = progress.selectedSortieId ?? "";
+        int index = 0;
+        for (int i = 0; i < sorties.Count; i++)
+        {
+            if (sorties[i] != null && sorties[i].sortieId == current)
+            {
+                index = (i + 1) % sorties.Count;
+                break;
+            }
+        }
+
+        return SelectSessionSortie(sorties[index].sortieId, out message);
+    }
+
+    public bool BeginSelectedSessionSortie()
+    {
+        return BeginSessionExtractionSortie(GetSelectedSessionSortieDefinition());
+    }
+
+    public bool BeginSafeOreSortie()
+    {
+        return BeginSessionExtractionSortie(CreateDefaultSafeOreSortieDefinition());
+    }
+
+    private SortieZoneDefinition FindDefaultSessionSortieDefinition(string sortieId)
+    {
+        if (string.IsNullOrWhiteSpace(sortieId)) return null;
+
+        List<SortieZoneDefinition> sorties = CreateDefaultSessionSortieDefinitions();
+        for (int i = 0; i < sorties.Count; i++)
+        {
+            SortieZoneDefinition sortie = sorties[i];
+            if (sortie != null && sortie.sortieId == sortieId)
+            {
+                return sortie;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsDefaultSessionSortieId(string sortieId)
+    {
+        return sortieId == SessionExtractionConstants.DefaultSafeOreSortieId
+            || sortieId == SessionExtractionConstants.DefaultSafeGasSortieId
+            || sortieId == SessionExtractionConstants.DefaultSafeAutomatonSortieId
+            || sortieId == SessionExtractionConstants.DefaultSafeLeviathanSortieId
+            || sortieId == SessionExtractionConstants.DefaultSafeSurveySortieId;
+    }
+
+    private bool HasRequiredSortieModule(SortieZoneDefinition zone, out string reason)
+    {
+        reason = "";
+        if (zone == null) return true;
+
+        zone.Normalize();
+        if (zone.requiredModuleIds == null || zone.requiredModuleIds.Count == 0)
+        {
+            return true;
+        }
+
+        if (!ShipAssemblyBuilder.TryBuild(ActiveCatalog, techTree, progress, out ShipAssemblyResult assembly))
+        {
+            reason = "Sortie blocked: ship assembly is invalid. " + (assembly != null ? assembly.message : "");
+            return false;
+        }
+
+        string requiredSlotTypeId = SessionExtractionFitting.GetSlotTypeId(zone.recommendedSlotBand);
+        for (int installedIndex = 0; installedIndex < assembly.installedModules.Count; installedIndex++)
+        {
+            InstalledModuleState installed = assembly.installedModules[installedIndex];
+            if (installed == null || string.IsNullOrWhiteSpace(installed.moduleId)) continue;
+            if (!AssemblySlotMatchesType(assembly, installed.slotId, requiredSlotTypeId)) continue;
+
+            for (int requiredIndex = 0; requiredIndex < zone.requiredModuleIds.Count; requiredIndex++)
+            {
+                if (installed.moduleId == zone.requiredModuleIds[requiredIndex])
+                {
+                    return true;
+                }
+            }
+        }
+
+        reason = "Sortie blocked: " + zone.displayName + " requires " + GetSortieRequirementText(zone) + ".";
+        return false;
+    }
+
+    private static bool AssemblySlotMatchesType(ShipAssemblyResult assembly, string slotId, string slotTypeId)
+    {
+        if (assembly == null || string.IsNullOrWhiteSpace(slotId) || string.IsNullOrWhiteSpace(slotTypeId))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < assembly.slots.Count; i++)
+        {
+            ShipSlotDefinition slot = assembly.slots[i];
+            if (slot != null && slot.slotId == slotId)
+            {
+                return slot.slotTypeId == slotTypeId;
+            }
+        }
+
+        return false;
+    }
+
+    private static string GetSortieRequirementText(SortieZoneDefinition zone)
+    {
+        if (zone == null) return "";
+
+        zone.Normalize();
+        if (!string.IsNullOrWhiteSpace(zone.requiredFittingSummary))
+        {
+            return zone.requiredFittingSummary;
+        }
+
+        if (zone.requiredModuleIds == null || zone.requiredModuleIds.Count == 0)
+        {
+            return "no required module";
+        }
+
+        return string.Join("/", zone.requiredModuleIds);
+    }
+
+    public bool BeginSessionExtractionSortie(SortieZoneDefinition zone)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        SortieZoneDefinition sortieZone = zone != null ? zone.Clone() : CreateDefaultSafeOreSortieDefinition();
+        sortieZone.Normalize();
+        if (!CanBeginSessionExtractionSortie(sortieZone, out string beginReason))
+        {
+            lastSaveMessage = beginReason;
+            return false;
+        }
+
+        string launchDockId = progress.currentDockId;
+        DockingLocationKind launchDockKind = progress.currentDockKind;
+        Vector3 launchDockPosition = progress.hasCurrentDockPosition
+            ? progress.currentDockPosition
+            : GetCurrentShipPosition();
+
+        if (!TryBeginFlightSession(null, null, true))
+        {
+            return false;
+        }
+
+        SortieEntryState entryState = BuildSortieEntryState(sortieZone, launchDockPosition, GetActiveShip());
+        sortieZone.entryPosition = entryState.position;
+        progress.BeginSortie(sortieZone, GetProcessUtcNow().Ticks, launchDockId, launchDockKind, launchDockPosition);
+        PlaceShipAtSortieEntry(sortieZone, entryState);
+
+        string saveFailure = "";
+        if (!TrySaveGame(true))
+        {
+            saveFailure = " Save failed: " + lastSaveMessage;
+        }
+
+        lastSaveMessage = "Session sortie started: " + sortieZone.displayName + "." + saveFailure;
+        return true;
+    }
+
+    public SortieReturnEstimate GetActiveSortieReturnEstimate()
+    {
+        EnsureProgressInitialized();
+
+        if (!progress.HasActiveSortie)
+        {
+            return SortieExtractionCalculator.Calculate(null, Vector3.zero, default);
+        }
+
+        ShipPhysics ship = GetActiveShip();
+        Vector3 position = ship != null ? ship.transform.position : progress.activeSortie.lastKnownPosition;
+        progress.RememberSortiePosition(position);
+        return SortieExtractionCalculator.Calculate(progress.activeSortie, position, BuildCurrentSortieReturnProfile());
+    }
+
+    public void RememberActiveSortiePosition(Vector3 position)
+    {
+        EnsureProgressInitialized();
+        progress.RememberSortiePosition(position);
+    }
+
+    private void UpdateActiveSortieExtractionRunupFromActiveShip()
+    {
+        if (!sessionExtractionCoreMode || CurrentMode != GameSessionMode.Flight || !HasActiveSortie)
+        {
+            activeSortieExtractionRunupStatus = "";
+            return;
+        }
+
+        ShipPhysics ship = GetActiveShip();
+        if (ship == null || !ship.gameObject.activeInHierarchy)
+        {
+            progress.activeSortie?.ResetExtractionRunup();
+            activeSortieExtractionRunupStatus = "Slip blocked: active ship missing.";
+            return;
+        }
+
+        Rigidbody body = ship.GetComponent<Rigidbody>();
+        float deltaSeconds = Time.deltaTime > 0f ? Time.deltaTime : Time.fixedDeltaTime;
+        RecordActiveSortieExtractionRunup(
+            ship.transform.position,
+            body != null ? body.linearVelocity : Vector3.zero,
+            ship.transform.forward,
+            deltaSeconds,
+            ship.ClaudiumSlipstreamActive);
+    }
+
+    public bool RecordActiveSortieExtractionRunup(
+        Vector3 position,
+        Vector3 velocity,
+        Vector3 forward,
+        float deltaSeconds,
+        bool claudiumSlipstreamActive)
+    {
+        EnsureProgressInitialized();
+        if (!progress.HasActiveSortie)
+        {
+            activeSortieExtractionRunupStatus = "";
+            return false;
+        }
+
+        SortieSessionState sortie = progress.activeSortie;
+        sortie.Normalize();
+        SortieZoneDefinition zone = sortie.zone;
+        if (zone == null)
+        {
+            sortie.ResetExtractionRunup();
+            activeSortieExtractionRunupStatus = "Slip blocked: sortie zone missing.";
+            return false;
+        }
+
+        SortieReturnEstimate estimate = SortieExtractionCalculator.Calculate(
+            sortie,
+            position,
+            BuildCurrentSortieReturnProfile());
+        Vector3 outward = GetSortieOutwardDirection(zone, position);
+        Vector3 horizontalVelocity = new Vector3(velocity.x, 0f, velocity.z);
+        Vector3 horizontalForward = new Vector3(forward.x, 0f, forward.z);
+        float speed = horizontalVelocity.magnitude;
+        float velocityDot = speed > 0.001f ? Vector3.Dot(horizontalVelocity / speed, outward) : -1f;
+        float facingDot = horizontalForward.sqrMagnitude > 0.001f ? Vector3.Dot(horizontalForward.normalized, outward) : -1f;
+        bool velocityToBase = speed > 0.001f
+            && velocityDot >= ExtractionRunupOutwardDotThreshold;
+        bool facingToBase = horizontalForward.sqrMagnitude > 0.001f
+            && facingDot >= ExtractionRunupOutwardDotThreshold;
+        bool movingToBase = velocityToBase || facingToBase;
+        bool canBuildRunup = !estimate.isInsideCylinder
+            && estimate.isAboveStorm
+            && estimate.hasEnoughCoal
+            && estimate.hasEnoughClaudium
+            && claudiumSlipstreamActive
+            && movingToBase;
+
+        if (canBuildRunup)
+        {
+            sortie.AddExtractionRunup(deltaSeconds);
+        }
+        else
+        {
+            sortie.ResetExtractionRunup();
+        }
+
+        progress.RememberSortiePosition(position);
+        activeSortieExtractionRunupStatus = BuildExtractionRunupStatus(
+            sortie,
+            zone,
+            estimate,
+            claudiumSlipstreamActive,
+            movingToBase,
+            velocityDot,
+            facingDot);
+        return sortie.extractionRunupSeconds + 0.001f >= Mathf.Max(0f, zone.extractionRunupRequiredSeconds);
+    }
+
+    private static string BuildExtractionRunupStatus(
+        SortieSessionState sortie,
+        SortieZoneDefinition zone,
+        SortieReturnEstimate estimate,
+        bool claudiumSlipstreamActive,
+        bool movingToBase,
+        float velocityDot,
+        float facingDot)
+    {
+        if (sortie == null || zone == null)
+        {
+            return "";
+        }
+
+        if (!estimate.isAboveStorm)
+        {
+            return "Slip blocked: storm layer.";
+        }
+
+        if (estimate.isInsideCylinder)
+        {
+            return "Slip blocked: leave cylinder.";
+        }
+
+        if (!estimate.hasEnoughCoal || !estimate.hasEnoughClaudium)
+        {
+            return "Slip blocked: reserves coal "
+                + estimate.currentCoalKg.ToString("0.#")
+                + "/"
+                + estimate.requiredCoalKg.ToString("0.#")
+                + ", claudium "
+                + estimate.currentClaudiumKg.ToString("0.#")
+                + "/"
+                + estimate.requiredClaudiumKg.ToString("0.#")
+                + ".";
+        }
+
+        if (!claudiumSlipstreamActive)
+        {
+            return "Slip blocked: slipstream off.";
+        }
+
+        if (!movingToBase)
+        {
+            return "Slip blocked: aim at BASE SLIP. V "
+                + velocityDot.ToString("0.00")
+                + ", F "
+                + facingDot.ToString("0.00")
+                + ".";
+        }
+
+        float requiredSeconds = Mathf.Max(0f, zone.extractionRunupRequiredSeconds);
+        return sortie.extractionRunupSeconds + 0.001f >= requiredSeconds
+            ? "Slip ready: press Extract home."
+            : "Slip charging: "
+                + sortie.extractionRunupSeconds.ToString("0.0")
+                + "/"
+                + requiredSeconds.ToString("0.0")
+                + "s.";
+    }
+
+    public bool TryExtractActiveSortie(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!progress.HasActiveSortie)
+        {
+            message = "No active sortie.";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        SortieReturnProfile profile = BuildCurrentSortieReturnProfile();
+        ShipPhysics ship = GetActiveShip();
+        Vector3 position = ship != null ? ship.transform.position : progress.activeSortie.lastKnownPosition;
+        SortieReturnEstimate estimate = SortieExtractionCalculator.Calculate(progress.activeSortie, position, profile);
+        if (!estimate.canExtract)
+        {
+            if (estimate.isInsideCylinder
+                || !estimate.isNearBoundary
+                || !estimate.isAboveStorm
+                || !estimate.hasEnoughCoal
+                || !estimate.hasEnoughClaudium)
+            {
+                progress.activeSortie.ResetExtractionRunup();
+            }
+
+            message = estimate.status;
+            lastSaveMessage = message;
+            return false;
+        }
+
+        string fuelId = string.IsNullOrWhiteSpace(profile.coalResourceId) ? GetStartingEngineFuelId() : profile.coalResourceId;
+        string claudiumId = string.IsNullOrWhiteSpace(profile.claudiumResourceId) ? "claudium" : profile.claudiumResourceId;
+        if (progress.shipEngineFuelTank.GetAmount(fuelId) + 0.001f < estimate.requiredCoalKg
+            || progress.shipClaudiumTank.GetAmount(claudiumId) + 0.001f < estimate.requiredClaudiumKg)
+        {
+            message = estimate.status;
+            lastSaveMessage = message;
+            return false;
+        }
+
+        progress.shipEngineFuelTank.TrySpend(fuelId, estimate.requiredCoalKg);
+        progress.shipClaudiumTank.TrySpend(claudiumId, estimate.requiredClaudiumKg);
+        int transferred = TransferShipCargoToCapital();
+        progress.ClearShipCargo();
+        progress.StopCargoTransfer();
+
+        string baseDockId = GetCapitalIslandId();
+        progress.SetDocked(baseDockId, DockingLocationKind.Island, GetDockPositionOrFallback(baseDockId, DockingLocationKind.Island));
+        SyncShipConsumablesWithCargo(true);
+        ApplySessionModeToShip();
+
+        if (autoSaveOnDock)
+        {
+            TrySaveGame();
+        }
+
+        message = "Extraction complete: transferred " + transferred
+            + " cargo units to base. Return cost: "
+            + estimate.requiredCoalKg.ToString("F0") + " kg coal, "
+            + estimate.requiredClaudiumKg.ToString("F0") + " kg claudium.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    public bool LoseActiveSortieShipAndReturnToBase(string reason = "")
+    {
+        EnsureProgressInitialized();
+        progress.ClearActiveSortie();
+        return LoseShipAndReturnToCity(reason);
+    }
+
+    public string GetBaseRefuelStatusText()
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        IslandProductionState storage = IsDockedAtCapital() ? GetCapitalStorageState() : null;
+        ResolveCurrentTankResourceIds(out string fuelId, out string claudiumId);
+
+        int fuelStored = storage != null ? storage.GetResourceAmount(fuelId) : 0;
+        int claudiumStored = storage != null ? storage.GetResourceAmount(claudiumId) : 0;
+        return fuelId + " " + progress.shipEngineFuelTank.GetAmount(fuelId).ToString("F0")
+            + "/" + capacity.fuelTankCapacityKg.ToString("F0")
+            + " base " + fuelStored
+            + ", " + claudiumId + " " + progress.shipClaudiumTank.GetAmount(claudiumId).ToString("F0")
+            + "/" + capacity.claudiumTankCapacityKg.ToString("F0")
+            + " base " + claudiumStored;
+    }
+
+    public string GetCoreFittingCompactText()
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog == null)
+        {
+            return "Fit: no catalog";
+        }
+
+        List<ShipSlotDefinition> slots = GetAssemblySlotsForUi(activeCatalog);
+        return "Fit H " + CountFittingBandText(slots, activeCatalog, SessionExtractionConstants.HighSlotTypeId)
+            + " M " + CountFittingBandText(slots, activeCatalog, SessionExtractionConstants.MidSlotTypeId)
+            + " L " + CountFittingBandText(slots, activeCatalog, SessionExtractionConstants.LowSlotTypeId)
+            + " R " + CountFittingBandText(slots, activeCatalog, SessionExtractionConstants.RigSlotTypeId);
+    }
+
+    public string GetCoreFittingSummaryText()
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog == null)
+        {
+            return "Fitting: no catalog";
+        }
+
+        List<ShipSlotDefinition> slots = GetAssemblySlotsForUi(activeCatalog);
+        return "High: " + BuildFittingBandSummary(slots, activeCatalog, SessionExtractionConstants.HighSlotTypeId)
+            + " | Mid: " + BuildFittingBandSummary(slots, activeCatalog, SessionExtractionConstants.MidSlotTypeId)
+            + " | Low: " + BuildFittingBandSummary(slots, activeCatalog, SessionExtractionConstants.LowSlotTypeId)
+            + " | Rig: " + BuildFittingBandSummary(slots, activeCatalog, SessionExtractionConstants.RigSlotTypeId);
+    }
+
+    public string GetBaseProcessingOverviewText()
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        if (!sessionExtractionCoreMode)
+        {
+            return "";
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        IslandProductionState storage = GetCapitalStorageState();
+        List<string> parts = new List<string>();
+        for (int i = 0; i < SessionExtractionIndustry.ProcessingBranches.Length; i++)
+        {
+            BaseProcessingBranch branch = SessionExtractionIndustry.ProcessingBranches[i];
+            BaseProcessingLineState line = progress.baseIndustry.GetProcessing(branch);
+            TryGetAvailableBaseProcessingInput(branch, storage, out _, out int availableInput);
+            parts.Add(SessionExtractionIndustry.GetProcessingDisplayName(branch)
+                + " L" + line.level
+                + " " + line.capacityUnitsPerMinute.ToString("F0") + "/m"
+                + " in " + availableInput
+                + " done " + line.totalProcessedUnits.ToString("F0"));
+        }
+
+        return "Processing " + SessionExtractionIndustry.ProcessingBranches.Length + ": " + string.Join(" | ", parts);
+    }
+
+    public string GetBaseCascadeProductionOverviewText()
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        if (!sessionExtractionCoreMode)
+        {
+            return "";
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        List<string> parts = new List<string>();
+        for (int i = 0; i < SessionExtractionIndustry.CascadeProductionTypes.Length; i++)
+        {
+            CascadeProductionType type = SessionExtractionIndustry.CascadeProductionTypes[i];
+            CascadeProductionLineState line = progress.baseIndustry.GetProduction(type);
+            parts.Add(SessionExtractionIndustry.GetProductionDisplayName(type)
+                + " L" + line.level
+                + " " + line.capacityUnitsPerMinute.ToString("F0") + "/m"
+                + " load " + line.totalLoadApplied.ToString("F0"));
+        }
+
+        return "Cascade " + SessionExtractionIndustry.CascadeProductionTypes.Length + ": " + string.Join(" | ", parts);
+    }
+
+    public string GetNextBaseCascadeOrderOverviewText()
+    {
+        CascadeProductionEstimate estimate = EstimateNextBaseCascadeOrder(out CascadeProductionOrderDefinition order);
+        if (order == null)
+        {
+            return "Next cascade: none.";
+        }
+
+        if (estimate != null && estimate.canRun)
+        {
+            return "Next cascade: " + order.displayName
+                + ", bottleneck " + SessionExtractionIndustry.GetProductionDisplayName(estimate.bottleneck)
+                + " ~" + estimate.bottleneckMinutes.ToString("F1") + "m.";
+        }
+
+        string blocked = estimate != null && !string.IsNullOrWhiteSpace(estimate.blockedReason)
+            ? estimate.blockedReason
+            : "blocked.";
+        return "Next cascade: " + order.displayName + " - " + blocked;
+    }
+
+    public string GetNextBaseIndustryUpgradeOverviewText()
+    {
+        if (!TryResolveNextBaseIndustryUpgrade(
+                out bool processing,
+                out BaseProcessingBranch branch,
+                out CascadeProductionType type,
+                out List<CascadeItemAmount> cost,
+                out int level,
+                out bool canAfford,
+                out string blockedReason))
+        {
+            return "Base upgrade: no base lines.";
+        }
+
+        string lineName = processing
+            ? SessionExtractionIndustry.GetProcessingDisplayName(branch)
+            : SessionExtractionIndustry.GetProductionDisplayName(type);
+        return "Base upgrade: " + lineName
+            + " L" + level + " -> L" + (level + 1)
+            + " cost " + BuildItemCostText(cost)
+            + (canAfford ? "." : " - " + blockedReason);
+    }
+
+    public bool CanUpgradeNextBaseIndustryLine(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        if (!TryResolveNextBaseIndustryUpgrade(
+                out _,
+                out _,
+                out _,
+                out _,
+                out _,
+                out bool canAfford,
+                out message))
+        {
+            message = "No base industry lines are available.";
+            return false;
+        }
+
+        return canAfford;
+    }
+
+    public bool TryUpgradeNextBaseIndustryLine(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!TryResolveNextBaseIndustryUpgrade(
+                out bool processing,
+                out BaseProcessingBranch branch,
+                out CascadeProductionType type,
+                out _,
+                out _,
+                out bool canAfford,
+                out message)
+            || !canAfford)
+        {
+            lastSaveMessage = message;
+            return false;
+        }
+
+        return processing
+            ? TryUpgradeBaseProcessingBranch(branch, out message)
+            : TryUpgradeCascadeProductionType(type, out message);
+    }
+
+    public bool CanUpgradeBaseProcessingBranch(BaseProcessingBranch branch, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return CanUpgradeBaseProcessingBranchInternal(branch, out _, out _, out message);
+    }
+
+    public bool TryUpgradeBaseProcessingBranch(BaseProcessingBranch branch, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!CanUpgradeBaseProcessingBranchInternal(branch, out BaseProcessingLineState line, out List<CascadeItemAmount> cost, out message))
+        {
+            lastSaveMessage = message;
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (!SpendBaseIndustryUpgradeCost(storage, cost, out message))
+        {
+            lastSaveMessage = message;
+            return false;
+        }
+
+        int oldLevel = line.level;
+        float oldCapacity = line.capacityUnitsPerMinute;
+        line.level = oldLevel + 1;
+        line.capacityUnitsPerMinute = GetUpgradedProcessingCapacity(branch, line.level, oldCapacity);
+        AutoSaveIfDocked();
+
+        message = "Upgraded processing " + SessionExtractionIndustry.GetProcessingDisplayName(branch)
+            + " to L" + line.level
+            + ": " + oldCapacity.ToString("F0") + " -> " + line.capacityUnitsPerMinute.ToString("F0") + "/m.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    public bool CanUpgradeCascadeProductionType(CascadeProductionType type, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return CanUpgradeCascadeProductionTypeInternal(type, out _, out _, out message);
+    }
+
+    public bool TryUpgradeCascadeProductionType(CascadeProductionType type, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!CanUpgradeCascadeProductionTypeInternal(type, out CascadeProductionLineState line, out List<CascadeItemAmount> cost, out message))
+        {
+            lastSaveMessage = message;
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (!SpendBaseIndustryUpgradeCost(storage, cost, out message))
+        {
+            lastSaveMessage = message;
+            return false;
+        }
+
+        int oldLevel = line.level;
+        float oldCapacity = line.capacityUnitsPerMinute;
+        line.level = oldLevel + 1;
+        line.capacityUnitsPerMinute = GetUpgradedCascadeCapacity(type, line.level, oldCapacity);
+        AutoSaveIfDocked();
+
+        message = "Upgraded cascade " + SessionExtractionIndustry.GetProductionDisplayName(type)
+            + " to L" + line.level
+            + ": " + oldCapacity.ToString("F0") + " -> " + line.capacityUnitsPerMinute.ToString("F0") + "/m.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    public bool CanRefuelBaseShip(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!IsDockedAtCapital())
+        {
+            message = "Refuel is available only at the base.";
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            message = "Base storage is missing.";
+            return false;
+        }
+
+        if (EnsurePioneerFallbackHullSelectedForCore())
+        {
+            ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out _);
+            ApplySelectedShip();
+        }
+
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        if (!capacity.assemblyValid)
+        {
+            message = "Refuel blocked: " + capacity.reason;
+            return false;
+        }
+
+        ResolveCurrentTankResourceIds(out string fuelId, out string claudiumId);
+        bool canFuel = storage.GetResourceAmount(fuelId) > 0
+            && progress.shipEngineFuelTank.GetAmount(fuelId) < capacity.fuelTankCapacityKg - 0.001f;
+        bool canClaudium = storage.GetResourceAmount(claudiumId) > 0
+            && progress.shipClaudiumTank.GetAmount(claudiumId) < capacity.claudiumTankCapacityKg - 0.001f;
+        bool canFreePioneerRefuel = CanFreeRefuelPioneerFallback(fuelId, claudiumId, capacity);
+
+        if (!canFuel && !canClaudium && !canFreePioneerRefuel)
+        {
+            message = "Refuel blocked: tanks are full or base has no matching coal/claudium.";
+            return false;
+        }
+
+        message = canFreePioneerRefuel && !canFuel && !canClaudium
+            ? "Pioneer free refuel ready: " + GetBaseRefuelStatusText() + "."
+            : "Refuel ready: " + GetBaseRefuelStatusText() + ".";
+        return true;
+    }
+
+    public bool TryRefuelBaseShip(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!CanRefuelBaseShip(out message))
+        {
+            lastSaveMessage = message;
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        ResolveCurrentTankResourceIds(out string fuelId, out string claudiumId);
+
+        int fuelMoved = RefillTankFromStorage(progress.shipEngineFuelTank, fuelId, capacity.fuelTankCapacityKg, storage);
+        int claudiumMoved = RefillTankFromStorage(progress.shipClaudiumTank, claudiumId, capacity.claudiumTankCapacityKg, storage);
+        FreeRefuelPioneerFallback(fuelId, claudiumId, capacity, out float freeFuelKg, out float freeClaudiumKg);
+        if (fuelMoved <= 0 && claudiumMoved <= 0 && freeFuelKg <= 0f && freeClaudiumKg <= 0f)
+        {
+            message = "Refuel blocked: no resources moved.";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        SyncShipConsumablesWithCargo(true);
+        AutoSaveIfDocked();
+
+        message = "Refueled: " + fuelMoved + " kg " + fuelId
+            + ", " + claudiumMoved + " kg " + claudiumId
+            + (freeFuelKg > 0f || freeClaudiumKg > 0f
+                ? " Pioneer free reserve: " + freeFuelKg.ToString("F0") + " kg " + fuelId
+                    + ", " + freeClaudiumKg.ToString("F0") + " kg " + claudiumId + "."
+                : ".");
+        lastSaveMessage = message;
+        return true;
+    }
+
+    private bool CanFreeRefuelPioneerFallback(string fuelId, string claudiumId, CargoCapacityInfo capacity)
+    {
+        if (!sessionExtractionCoreMode || progress == null || !IsDockedAtCapital() || !IsPioneerFallbackHullSelected())
+        {
+            return false;
+        }
+
+        float fuelTargetKg = Mathf.Max(0f, startingFuelKg);
+        float claudiumTargetKg = Mathf.Max(0f, startingClaudiumKg);
+        bool needsFuel = fuelTargetKg > 0f
+            && progress.shipEngineFuelTank.GetAmount(fuelId) < fuelTargetKg - 0.001f;
+        bool needsClaudium = claudiumTargetKg > 0f
+            && progress.shipClaudiumTank.GetAmount(claudiumId) < claudiumTargetKg - 0.001f;
+        return capacity.assemblyValid && (needsFuel || needsClaudium);
+    }
+
+    private void FreeRefuelPioneerFallback(string fuelId, string claudiumId, CargoCapacityInfo capacity, out float fuelAddedKg, out float claudiumAddedKg)
+    {
+        fuelAddedKg = 0f;
+        claudiumAddedKg = 0f;
+        if (!CanFreeRefuelPioneerFallback(fuelId, claudiumId, capacity))
+        {
+            return;
+        }
+
+        EnsurePioneerFallbackHullSelectedForCore();
+
+        float fuelTargetKg = Mathf.Max(0f, startingFuelKg);
+        if (fuelTargetKg > 0f)
+        {
+            float currentFuelKg = progress.shipEngineFuelTank.GetAmount(fuelId);
+            fuelAddedKg = progress.shipEngineFuelTank.Add(
+                fuelId,
+                Mathf.Max(0f, fuelTargetKg - currentFuelKg),
+                Mathf.Max(fuelTargetKg, capacity.fuelTankCapacityKg));
+        }
+
+        float claudiumTargetKg = Mathf.Max(0f, startingClaudiumKg);
+        if (claudiumTargetKg > 0f)
+        {
+            float currentClaudiumKg = progress.shipClaudiumTank.GetAmount(claudiumId);
+            claudiumAddedKg = progress.shipClaudiumTank.Add(
+                claudiumId,
+                Mathf.Max(0f, claudiumTargetKg - currentClaudiumKg),
+                Mathf.Max(claudiumTargetKg, capacity.claudiumTankCapacityKg));
+        }
+    }
+
+    private bool IsPioneerFallbackHullSelected()
+    {
+        if (progress == null) return false;
+
+        string selectedHullId = progress.selectedHullId ?? "";
+        ShipPartDefinitionSO starterHull = ActiveCatalog != null ? ActiveCatalog.GetStarterHull() : null;
+        string starterHullId = starterHull != null ? starterHull.partId : GameplaySessionSaveData.DefaultStarterHullId;
+        if (string.IsNullOrWhiteSpace(selectedHullId)
+            || selectedHullId == GameplaySessionSaveData.DefaultStarterHullId
+            || selectedHullId == starterHullId)
+        {
+            return true;
+        }
+
+        if (ActiveCatalog == null || starterHull == null)
+        {
+            return false;
+        }
+
+        ShipPartDefinitionSO selectedHull = ActiveCatalog.GetPartById(selectedHullId);
+        return selectedHull == null || !selectedHull.IsHull;
+    }
+
+    private bool EnsurePioneerFallbackHullSelectedForCore()
+    {
+        if (!sessionExtractionCoreMode || progress == null || ActiveCatalog == null)
+        {
+            return false;
+        }
+
+        if (!IsPioneerFallbackHullSelected())
+        {
+            return false;
+        }
+
+        ShipPartDefinitionSO starterHull = ActiveCatalog.GetStarterHull();
+        if (starterHull == null)
+        {
+            return false;
+        }
+
+        string selectedHullId = progress.selectedHullId ?? "";
+        ShipPartDefinitionSO selectedHull = string.IsNullOrWhiteSpace(selectedHullId)
+            ? null
+            : ActiveCatalog.GetPartById(selectedHullId);
+        if (string.IsNullOrWhiteSpace(selectedHullId) || selectedHull == null || !selectedHull.IsHull)
+        {
+            progress.ReplaceShipAssembly(starterHull.partId);
+            return true;
+        }
+
+        return false;
+    }
+
+    public bool TryProcessBaseBatch(BaseProcessingBranch branch, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!IsDockedAtCapital())
+        {
+            message = SessionExtractionIndustry.GetProcessingDisplayName(branch) + " processing is available only at the base.";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            message = "Base storage is missing.";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+
+        return branch switch
+        {
+            BaseProcessingBranch.Ore => TryProcessOreBaseBatch(storage, out message),
+            BaseProcessingBranch.Gas => TryProcessGasBaseBatch(storage, out message),
+            BaseProcessingBranch.AutomatonDismantling => TryProcessAutomatonBaseBatch(storage, out message),
+            BaseProcessingBranch.LeviathanProcessing => TryProcessLeviathanBaseBatch(storage, out message),
+            BaseProcessingBranch.CyberneticDeciphering => TryProcessCyberInfoBaseBatch(storage, out message),
+            _ => FailBaseProcessing("Unknown processing branch: " + branch + ".", out message)
+        };
+    }
+
+    public bool TryProcessBaseOreBatch(out string message)
+    {
+        return TryProcessBaseBatch(BaseProcessingBranch.Ore, out message);
+    }
+
+    public bool TryProcessNextBaseBatch(out string message)
+    {
+        if (!TryGetNextProcessableBaseBranch(out BaseProcessingBranch branch))
+        {
+            message = IsDockedAtCapital()
+                ? "No processable sortie resources in base storage."
+                : "Processing is available only at the base.";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        return TryProcessBaseBatch(branch, out message);
+    }
+
+    public bool HasProcessableBaseBatch()
+    {
+        return TryGetNextProcessableBaseBranch(out _);
+    }
+
+    public bool TryGetNextProcessableBaseBranch(out BaseProcessingBranch branch)
+    {
+        branch = BaseProcessingBranch.Ore;
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        if (!IsDockedAtCapital())
+        {
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < SessionExtractionIndustry.ProcessingBranches.Length; i++)
+        {
+            BaseProcessingBranch candidate = SessionExtractionIndustry.ProcessingBranches[i];
+            if (TryGetAvailableBaseProcessingInput(candidate, storage, out _, out int available) && available > 0)
+            {
+                branch = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryProcessOreBaseBatch(IslandProductionState storage, out string message)
+    {
+        OreTypeConfig oreType = FindFirstStoredOreType(storage, out int availableOre);
+        if (oreType == null || availableOre <= 0)
+        {
+            return FailBaseProcessing("No ore in base storage.", out message);
+        }
+
+        BaseProcessingLineState line = progress.baseIndustry.GetProcessing(BaseProcessingBranch.Ore);
+        int batchKg = GetProcessingBatchSize(line, availableOre);
+        if (!storage.TrySpendResource(oreType.oreItemId, batchKg))
+        {
+            return FailBaseProcessing("Could not spend ore from base storage.", out message);
+        }
+
+        int outputTotal = AddOreProcessingOutputs(storage, oreType, batchKg);
+        line.totalProcessedUnits += batchKg;
+        AutoSaveIfDocked();
+
+        message = "Processed " + batchKg + " kg " + oreType.oreItemId + " into " + outputTotal + " kg minerals.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    private bool TryProcessGasBaseBatch(IslandProductionState storage, out string message)
+    {
+        GasCloudTypeConfig gasType = FindFirstStoredGasCloudType(storage, out int availableCondensate);
+        if (gasType == null || availableCondensate <= 0)
+        {
+            return FailBaseProcessing("No gas condensate in base storage.", out message);
+        }
+
+        BaseProcessingLineState line = progress.baseIndustry.GetProcessing(BaseProcessingBranch.Gas);
+        int batch = GetProcessingBatchSize(line, availableCondensate);
+        if (!storage.TrySpendResource(gasType.condensateItemId, batch))
+        {
+            return FailBaseProcessing("Could not spend gas condensate from base storage.", out message);
+        }
+
+        int outputTotal = AddGasProcessingOutputs(storage, gasType, batch);
+        line.totalProcessedUnits += batch;
+        AutoSaveIfDocked();
+
+        message = "Processed " + batch + " units " + gasType.condensateItemId + " into " + outputTotal + " gas materials.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    private bool TryProcessAutomatonBaseBatch(IslandProductionState storage, out string message)
+    {
+        string inputItemId = FindFirstStoredAutomatonInput(storage, out int availableSalvage);
+        if (string.IsNullOrWhiteSpace(inputItemId) || availableSalvage <= 0)
+        {
+            return FailBaseProcessing("No automaton salvage in base storage.", out message);
+        }
+
+        BaseProcessingLineState line = progress.baseIndustry.GetProcessing(BaseProcessingBranch.AutomatonDismantling);
+        int batch = GetProcessingBatchSize(line, availableSalvage);
+        if (!storage.TrySpendResource(inputItemId, batch))
+        {
+            return FailBaseProcessing("Could not spend automaton salvage from base storage.", out message);
+        }
+
+        int outputTotal = 0;
+        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.MechanismsItemId, batch, 0.40f);
+        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.ToolsItemId, batch, 0.20f);
+        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.AutomatonCoreItemId, batch, 0.20f);
+        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.DesignExperienceItemId, batch, 0.10f);
+
+        line.totalProcessedUnits += batch;
+        AutoSaveIfDocked();
+
+        message = "Dismantled " + batch + " units " + inputItemId + " into " + outputTotal + " automaton outputs.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    private bool TryProcessLeviathanBaseBatch(IslandProductionState storage, out string message)
+    {
+        LeviathanTypeConfig leviathanType = FindFirstStoredLeviathanType(storage, out int availableCarcass);
+        if (leviathanType == null || availableCarcass <= 0)
+        {
+            return FailBaseProcessing("No leviathan carcass in base storage.", out message);
+        }
+
+        BaseProcessingLineState line = progress.baseIndustry.GetProcessing(BaseProcessingBranch.LeviathanProcessing);
+        int batch = GetProcessingBatchSize(line, availableCarcass);
+        if (!storage.TrySpendResource(leviathanType.carcassItemId, batch))
+        {
+            return FailBaseProcessing("Could not spend leviathan carcass from base storage.", out message);
+        }
+
+        int outputTotal = 0;
+        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanFatItemId, batch, 0.30f);
+        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanHideItemId, batch, 0.25f);
+        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.MineralShellItemId, batch, 0.25f);
+        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.ClaudiumGlandItemId, batch, 0.08f);
+
+        line.totalProcessedUnits += batch;
+        AutoSaveIfDocked();
+
+        message = "Processed " + batch + " kg " + leviathanType.carcassItemId + " into " + outputTotal + " leviathan materials.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    private bool TryProcessCyberInfoBaseBatch(IslandProductionState storage, out string message)
+    {
+        string infoItemId = FindFirstStoredCyberInfoInput(storage, out int availableInfo);
+        if (string.IsNullOrWhiteSpace(infoItemId) || availableInfo <= 0)
+        {
+            return FailBaseProcessing("No cybernetic survey information in base storage.", out message);
+        }
+
+        BaseProcessingLineState line = progress.baseIndustry.GetProcessing(BaseProcessingBranch.CyberneticDeciphering);
+        int batch = GetProcessingBatchSize(line, availableInfo);
+        if (!storage.TrySpendResource(infoItemId, batch))
+        {
+            return FailBaseProcessing("Could not spend survey information from base storage.", out message);
+        }
+
+        int outputTotal = 0;
+        if (infoItemId == SessionExtractionConstants.LeviathanInfoItemId)
+        {
+            outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.DesignExperienceItemId, batch, 0.85f);
+            outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.FundamentalExperienceItemId, batch, 0.15f);
+        }
+        else if (infoItemId == SessionExtractionConstants.CloudInfoItemId)
+        {
+            outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.FundamentalExperienceItemId, batch, 0.70f);
+            outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.DesignExperienceItemId, batch, 0.30f);
+        }
+        else
+        {
+            outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.FundamentalExperienceItemId, batch, 0.85f);
+            outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.DesignExperienceItemId, batch, 0.15f);
+        }
+
+        line.totalProcessedUnits += batch;
+        AutoSaveIfDocked();
+
+        message = "Deciphered " + batch + " units " + infoItemId + " into " + outputTotal + " research outputs.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    private bool FailBaseProcessing(string message, out string outputMessage)
+    {
+        outputMessage = message;
+        lastSaveMessage = outputMessage;
+        return false;
+    }
+
+    public bool TryRunStarterAirframeCascade(out string message)
+    {
+        return TryRunBaseCascadeOrder(CreateStarterAirframeCascadeOrder(), out message);
+    }
+
+    public CascadeProductionOrderDefinition CreateStarterAirframeCascadeOrder()
+    {
+        return SessionExtractionIndustry.CreateStarterAirframeOrder();
+    }
+
+    public CascadeProductionEstimate EstimateStarterAirframeCascade()
+    {
+        return EstimateBaseCascadeOrder(CreateStarterAirframeCascadeOrder());
+    }
+
+    public List<CascadeProductionOrderDefinition> CreateStarterCascadeOrders()
+    {
+        return SessionExtractionIndustry.CreateStarterCascadeOrders();
+    }
+
+    public CascadeProductionEstimate EstimateNextBaseCascadeOrder(out CascadeProductionOrderDefinition selectedOrder)
+    {
+        selectedOrder = null;
+        List<CascadeProductionOrderDefinition> orders = CreateStarterCascadeOrders();
+        CascadeProductionEstimate firstEstimate = null;
+        CascadeProductionOrderDefinition firstOrder = null;
+        CascadeProductionEstimate firstRunnableEstimate = null;
+        CascadeProductionOrderDefinition firstRunnableOrder = null;
+        IslandProductionState storage = IsDockedAtCapital() ? GetCapitalStorageState() : null;
+
+        for (int i = 0; i < orders.Count; i++)
+        {
+            CascadeProductionOrderDefinition order = orders[i];
+            if (order == null) continue;
+
+            CascadeProductionEstimate estimate = EstimateBaseCascadeOrder(order);
+            if (firstEstimate == null)
+            {
+                firstEstimate = estimate;
+                firstOrder = order;
+            }
+
+            if (estimate != null && estimate.canRun)
+            {
+                firstRunnableEstimate ??= estimate;
+                firstRunnableOrder ??= order;
+
+                if (StarterCascadeOrderNeedsOutput(order, storage))
+                {
+                    selectedOrder = order;
+                    return estimate;
+                }
+            }
+        }
+
+        if (firstRunnableEstimate != null)
+        {
+            selectedOrder = firstRunnableOrder;
+            return firstRunnableEstimate;
+        }
+
+        selectedOrder = firstOrder;
+        if (firstEstimate != null)
+        {
+            return firstEstimate;
+        }
+
+        return new CascadeProductionEstimate
+        {
+            canRun = false,
+            bottleneck = CascadeProductionType.Assembly,
+            blockedReason = "No starter cascade orders are configured."
+        };
+    }
+
+    private static bool StarterCascadeOrderNeedsOutput(CascadeProductionOrderDefinition order, IslandProductionState storage)
+    {
+        if (order == null || storage == null)
+        {
+            return false;
+        }
+
+        order.Normalize();
+        int targetStock = GetStarterCascadeTargetStock(order.orderId);
+        if (targetStock <= 0)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < order.outputs.Count; i++)
+        {
+            CascadeItemAmount output = order.outputs[i];
+            if (output == null || string.IsNullOrWhiteSpace(output.itemId) || output.amount <= 0) continue;
+            if (storage.GetResourceAmount(output.itemId) < targetStock)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int GetStarterCascadeTargetStock(string orderId)
+    {
+        return orderId switch
+        {
+            SessionExtractionConstants.StarterAirframeOrderId => 1,
+            SessionExtractionConstants.StarterModuleKitOrderId => 1,
+            SessionExtractionConstants.StarterMunitionBundleOrderId => 4,
+            _ => 0
+        };
+    }
+
+    public bool TryRunNextBaseCascadeOrder(out string message)
+    {
+        CascadeProductionEstimate estimate = EstimateNextBaseCascadeOrder(out CascadeProductionOrderDefinition order);
+        if (order == null || estimate == null || !estimate.canRun)
+        {
+            message = estimate != null && !string.IsNullOrWhiteSpace(estimate.blockedReason)
+                ? estimate.blockedReason
+                : "No runnable cascade order.";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        return TryRunBaseCascadeOrder(order, out message);
+    }
+
+    public CascadeProductionEstimate EstimateBaseCascadeOrder(CascadeProductionOrderDefinition order)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        CascadeProductionEstimate estimate = new CascadeProductionEstimate
+        {
+            canRun = false,
+            bottleneck = CascadeProductionType.Assembly,
+            blockedReason = "Cascade order is missing."
+        };
+
+        if (order == null)
+        {
+            return estimate;
+        }
+
+        order.Normalize();
+        if (sessionExtractionCoreMode && !IsKnownSessionCoreCascadeOrder(order))
+        {
+            estimate.blockedReason = "Cascade order is not part of the session extraction base catalog.";
+            return estimate;
+        }
+
+        if (!IsDockedAtCapital())
+        {
+            estimate.blockedReason = "Cascade production is available only at the base.";
+            return estimate;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            estimate.blockedReason = "Base storage is missing.";
+            return estimate;
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+
+        if (order.outputs.Count == 0)
+        {
+            estimate.blockedReason = "Cascade order has no output.";
+            return estimate;
+        }
+
+        if (order.loads.Count == 0)
+        {
+            estimate.blockedReason = "Cascade order has no production load.";
+            return estimate;
+        }
+
+        for (int i = 0; i < order.inputs.Count; i++)
+        {
+            CascadeItemAmount input = order.inputs[i];
+            if (input == null || string.IsNullOrWhiteSpace(input.itemId) || input.amount <= 0) continue;
+
+            int available = storage.GetResourceAmount(input.itemId);
+            if (available >= input.amount) continue;
+
+            estimate.missingInputs.Add(new CascadeResourceGap
+            {
+                itemId = input.itemId,
+                required = input.amount,
+                available = available,
+                missing = Mathf.Max(0, input.amount - available)
+            });
+        }
+
+        for (int i = 0; i < order.loads.Count; i++)
+        {
+            CascadeProductionLoad load = order.loads[i];
+            if (load == null || load.loadUnits <= 0f) continue;
+
+            CascadeProductionLineState line = progress.baseIndustry.GetProduction(load.type);
+            float minutes = load.loadUnits / Mathf.Max(0.1f, line.capacityUnitsPerMinute);
+            estimate.totalLoadUnits += load.loadUnits;
+            if (minutes > estimate.bottleneckMinutes)
+            {
+                estimate.bottleneck = load.type;
+                estimate.bottleneckMinutes = minutes;
+            }
+        }
+
+        if (estimate.missingInputs.Count > 0)
+        {
+            CascadeResourceGap gap = estimate.missingInputs[0];
+            estimate.blockedReason = "Cascade blocked: need " + gap.required + " " + gap.itemId
+                + ", have " + gap.available + ".";
+            return estimate;
+        }
+
+        estimate.canRun = true;
+        estimate.blockedReason = "";
+        return estimate;
+    }
+
+    public bool TryRunBaseCascadeOrder(CascadeProductionOrderDefinition order, out string message)
+    {
+        message = "";
+        CascadeProductionEstimate estimate = EstimateBaseCascadeOrder(order);
+        if (order == null || !estimate.canRun)
+        {
+            message = string.IsNullOrWhiteSpace(estimate.blockedReason)
+                ? "Cascade order is blocked."
+                : estimate.blockedReason;
+            lastSaveMessage = message;
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            message = "Base storage is missing.";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        order.Normalize();
+        for (int i = 0; i < order.inputs.Count; i++)
+        {
+            CascadeItemAmount input = order.inputs[i];
+            if (input == null || string.IsNullOrWhiteSpace(input.itemId) || input.amount <= 0) continue;
+
+            if (!storage.TrySpendResource(input.itemId, input.amount))
+            {
+                message = "Cascade blocked: could not spend " + input.amount + " " + input.itemId + ".";
+                lastSaveMessage = message;
+                return false;
+            }
+        }
+
+        for (int i = 0; i < order.outputs.Count; i++)
+        {
+            CascadeItemAmount output = order.outputs[i];
+            if (output == null || string.IsNullOrWhiteSpace(output.itemId) || output.amount <= 0) continue;
+            storage.AddResource(output.itemId, output.amount);
+        }
+
+        ApplyCascadeOrderLoad(order);
+        AutoSaveIfDocked();
+
+        message = "Cascade complete: " + BuildCascadeOutputsText(order)
+            + ". Bottleneck: " + SessionExtractionIndustry.GetProductionDisplayName(estimate.bottleneck)
+            + " ~" + estimate.bottleneckMinutes.ToString("F1") + " min.";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    public bool CanLoadStarterMunitionsAtBase(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!sessionExtractionCoreMode)
+        {
+            message = "Starter munitions are part of session extraction core.";
+            return false;
+        }
+
+        if (!IsDockedAtCapital())
+        {
+            message = "Starter munitions can be loaded only at the base.";
+            return false;
+        }
+
+        if (progress.HasActiveSortie)
+        {
+            message = "Finish the active sortie before loading munitions.";
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            message = "Base storage is missing.";
+            return false;
+        }
+
+        if (storage.GetResourceAmount(SessionExtractionConstants.StarterMunitionBundleItemId) <= 0)
+        {
+            message = "Loadout blocked: build a munition bundle first.";
+            return false;
+        }
+
+        int currentWeapon = progress.GetShipCargoAmount(SessionExtractionConstants.StarterWeaponCargoItemId);
+        int targetWeapon = Mathf.Max(1, SessionExtractionConstants.StarterWeaponLoadoutTargetUnits);
+        if (currentWeapon >= targetWeapon)
+        {
+            message = "Weapon loadout is already stocked: " + currentWeapon + "/" + targetWeapon + ".";
+            return false;
+        }
+
+        int loadUnits = GetStarterMunitionLoadUnits(currentWeapon);
+        if (loadUnits <= 0)
+        {
+            message = "No weapon units can be loaded.";
+            return false;
+        }
+
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        if (!capacity.assemblyValid || !capacity.canFly)
+        {
+            message = "Loadout blocked: " + capacity.reason;
+            return false;
+        }
+
+        float addedMassKg = worldConfig != null
+            ? worldConfig.GetItemTransportMassKg(SessionExtractionConstants.StarterWeaponCargoItemId, loadUnits)
+            : loadUnits;
+        float freeKg = Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg - capacity.currentTankKg);
+        if (freeKg + 0.001f < addedMassKg)
+        {
+            message = "Loadout blocked: need " + addedMassKg.ToString("F1")
+                + " kg cargo room, free " + freeKg.ToString("F1") + " kg.";
+            return false;
+        }
+
+        Dictionary<string, int> cargoAfterLoad = CargoStoragePlanner.ToCargoMap(progress.shipCargo);
+        cargoAfterLoad[SessionExtractionConstants.StarterWeaponCargoItemId] =
+            cargoAfterLoad.TryGetValue(SessionExtractionConstants.StarterWeaponCargoItemId, out int existingWeapon)
+                ? existingWeapon + loadUnits
+                : loadUnits;
+        if (!CargoStoragePlanner.TryValidateCargoStorage(worldConfig, capacity.cargoCompartments, cargoAfterLoad, out string storageError))
+        {
+            message = storageError;
+            return false;
+        }
+
+        message = "Starter munitions ready: load "
+            + loadUnits + " kg "
+            + SessionExtractionConstants.StarterWeaponCargoItemId
+            + " from one "
+            + SessionExtractionConstants.StarterMunitionBundleItemId
+            + ".";
+        return true;
+    }
+
+    public bool TryLoadStarterMunitionsAtBase(out string message)
+    {
+        if (!CanLoadStarterMunitionsAtBase(out message))
+        {
+            lastSaveMessage = message;
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        int loadUnits = GetStarterMunitionLoadUnits(progress.GetShipCargoAmount(SessionExtractionConstants.StarterWeaponCargoItemId));
+        if (storage == null || loadUnits <= 0 || !storage.TrySpendResource(SessionExtractionConstants.StarterMunitionBundleItemId, 1))
+        {
+            message = "Loadout blocked: could not spend "
+                + SessionExtractionConstants.StarterMunitionBundleItemId + ".";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        progress.AddShipCargo(SessionExtractionConstants.StarterWeaponCargoItemId, loadUnits);
+        ApplyCargoMassToShip(GetActiveShip());
+        ResetCargoPlan();
+        AutoSaveIfDocked();
+
+        message = "Loaded starter munitions: +" + loadUnits
+            + " kg " + SessionExtractionConstants.StarterWeaponCargoItemId + ".";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    private static int GetStarterMunitionLoadUnits(int currentWeaponUnits)
+    {
+        int targetWeapon = Mathf.Max(1, SessionExtractionConstants.StarterWeaponLoadoutTargetUnits);
+        int perBundle = Mathf.Max(1, SessionExtractionConstants.StarterWeaponUnitsPerMunitionBundle);
+        return Mathf.Min(perBundle, Mathf.Max(0, targetWeapon - Mathf.Max(0, currentWeaponUnits)));
+    }
+
+    private bool IsKnownSessionCoreCascadeOrder(CascadeProductionOrderDefinition order)
+    {
+        if (order == null) return false;
+
+        List<CascadeProductionOrderDefinition> catalogOrders = CreateStarterCascadeOrders();
+        for (int i = 0; i < catalogOrders.Count; i++)
+        {
+            CascadeProductionOrderDefinition catalogOrder = catalogOrders[i];
+            if (CascadeOrdersMatch(order, catalogOrder))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool CascadeOrdersMatch(CascadeProductionOrderDefinition left, CascadeProductionOrderDefinition right)
+    {
+        if (left == null || right == null) return false;
+
+        left.Normalize();
+        right.Normalize();
+        return left.orderId == right.orderId
+            && CascadeItemsMatch(left.inputs, right.inputs)
+            && CascadeItemsMatch(left.outputs, right.outputs)
+            && CascadeLoadsMatch(left.loads, right.loads);
+    }
+
+    private static bool CascadeItemsMatch(List<CascadeItemAmount> left, List<CascadeItemAmount> right)
+    {
+        if (left == null || right == null) return left == right;
+        if (left.Count != right.Count) return false;
+
+        for (int i = 0; i < left.Count; i++)
+        {
+            CascadeItemAmount leftItem = left[i];
+            CascadeItemAmount rightItem = right[i];
+            if (leftItem == null || rightItem == null) return false;
+            if (leftItem.itemId != rightItem.itemId || leftItem.amount != rightItem.amount)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool CascadeLoadsMatch(List<CascadeProductionLoad> left, List<CascadeProductionLoad> right)
+    {
+        if (left == null || right == null) return left == right;
+        if (left.Count != right.Count) return false;
+
+        for (int i = 0; i < left.Count; i++)
+        {
+            CascadeProductionLoad leftLoad = left[i];
+            CascadeProductionLoad rightLoad = right[i];
+            if (leftLoad == null || rightLoad == null) return false;
+            if (leftLoad.type != rightLoad.type || !Mathf.Approximately(leftLoad.loadUnits, rightLoad.loadUnits))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool CanUpgradeBaseProcessingBranchInternal(
+        BaseProcessingBranch branch,
+        out BaseProcessingLineState line,
+        out List<CascadeItemAmount> cost,
+        out string message)
+    {
+        line = null;
+        cost = null;
+        message = "";
+
+        if (!IsDockedAtCapital())
+        {
+            message = "Base processing upgrades are available only at the base.";
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            message = "Base storage is missing.";
+            return false;
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        line = progress.baseIndustry.GetProcessing(branch);
+        cost = CreateProcessingUpgradeCost(line.level);
+        if (!CanSpendBaseIndustryUpgradeCost(storage, cost, out string blockedReason))
+        {
+            message = "Processing upgrade blocked: " + blockedReason + ".";
+            return false;
+        }
+
+        message = "Processing upgrade ready: " + SessionExtractionIndustry.GetProcessingDisplayName(branch)
+            + " L" + line.level + " -> L" + (line.level + 1)
+            + ", cost " + BuildItemCostText(cost) + ".";
+        return true;
+    }
+
+    private bool CanUpgradeCascadeProductionTypeInternal(
+        CascadeProductionType type,
+        out CascadeProductionLineState line,
+        out List<CascadeItemAmount> cost,
+        out string message)
+    {
+        line = null;
+        cost = null;
+        message = "";
+
+        if (!IsDockedAtCapital())
+        {
+            message = "Cascade upgrades are available only at the base.";
+            return false;
+        }
+
+        IslandProductionState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            message = "Base storage is missing.";
+            return false;
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        line = progress.baseIndustry.GetProduction(type);
+        cost = CreateCascadeUpgradeCost(line.level);
+        if (!CanSpendBaseIndustryUpgradeCost(storage, cost, out string blockedReason))
+        {
+            message = "Cascade upgrade blocked: " + blockedReason + ".";
+            return false;
+        }
+
+        message = "Cascade upgrade ready: " + SessionExtractionIndustry.GetProductionDisplayName(type)
+            + " L" + line.level + " -> L" + (line.level + 1)
+            + ", cost " + BuildItemCostText(cost) + ".";
+        return true;
+    }
+
+    private bool TryResolveNextBaseIndustryUpgrade(
+        out bool processing,
+        out BaseProcessingBranch branch,
+        out CascadeProductionType type,
+        out List<CascadeItemAmount> cost,
+        out int level,
+        out bool canAfford,
+        out string blockedReason)
+    {
+        processing = true;
+        branch = BaseProcessingBranch.Ore;
+        type = CascadeProductionType.Assembly;
+        cost = null;
+        level = 0;
+        canAfford = false;
+        blockedReason = "";
+
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        if (progress == null)
+        {
+            blockedReason = "Progress is missing.";
+            return false;
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        IslandProductionState storage = IsDockedAtCapital() ? GetCapitalStorageState() : null;
+
+        bool foundAny = false;
+        bool foundAffordable = false;
+        bool bestProcessing = true;
+        BaseProcessingBranch bestBranch = BaseProcessingBranch.Ore;
+        CascadeProductionType bestType = CascadeProductionType.Assembly;
+        List<CascadeItemAmount> bestCost = null;
+        int bestLevel = int.MaxValue;
+        string bestBlockedReason = "";
+
+        bool foundFallback = false;
+        bool fallbackProcessing = true;
+        BaseProcessingBranch fallbackBranch = BaseProcessingBranch.Ore;
+        CascadeProductionType fallbackType = CascadeProductionType.Assembly;
+        List<CascadeItemAmount> fallbackCost = null;
+        int fallbackLevel = int.MaxValue;
+        string fallbackBlockedReason = "";
+
+        for (int i = 0; i < SessionExtractionIndustry.ProcessingBranches.Length; i++)
+        {
+            BaseProcessingBranch candidateBranch = SessionExtractionIndustry.ProcessingBranches[i];
+            BaseProcessingLineState candidateLine = progress.baseIndustry.GetProcessing(candidateBranch);
+            List<CascadeItemAmount> candidateCost = CreateProcessingUpgradeCost(candidateLine.level);
+            string candidateBlocked = "";
+            bool candidateAffordable = storage != null && CanSpendBaseIndustryUpgradeCost(storage, candidateCost, out candidateBlocked);
+            if (storage == null)
+            {
+                candidateBlocked = IsDockedAtCapital() ? "base storage is missing" : "upgrades are available only at the base";
+            }
+
+            foundAny = true;
+            if (!foundFallback || candidateLine.level < fallbackLevel)
+            {
+                foundFallback = true;
+                fallbackProcessing = true;
+                fallbackBranch = candidateBranch;
+                fallbackCost = candidateCost;
+                fallbackLevel = candidateLine.level;
+                fallbackBlockedReason = candidateBlocked;
+            }
+
+            if (candidateAffordable && (!foundAffordable || candidateLine.level < bestLevel))
+            {
+                foundAffordable = true;
+                bestProcessing = true;
+                bestBranch = candidateBranch;
+                bestCost = candidateCost;
+                bestLevel = candidateLine.level;
+                bestBlockedReason = "";
+            }
+        }
+
+        for (int i = 0; i < SessionExtractionIndustry.CascadeProductionTypes.Length; i++)
+        {
+            CascadeProductionType candidateType = SessionExtractionIndustry.CascadeProductionTypes[i];
+            CascadeProductionLineState candidateLine = progress.baseIndustry.GetProduction(candidateType);
+            List<CascadeItemAmount> candidateCost = CreateCascadeUpgradeCost(candidateLine.level);
+            string candidateBlocked = "";
+            bool candidateAffordable = storage != null && CanSpendBaseIndustryUpgradeCost(storage, candidateCost, out candidateBlocked);
+            if (storage == null)
+            {
+                candidateBlocked = IsDockedAtCapital() ? "base storage is missing" : "upgrades are available only at the base";
+            }
+
+            foundAny = true;
+            if (!foundFallback || candidateLine.level < fallbackLevel)
+            {
+                foundFallback = true;
+                fallbackProcessing = false;
+                fallbackType = candidateType;
+                fallbackCost = candidateCost;
+                fallbackLevel = candidateLine.level;
+                fallbackBlockedReason = candidateBlocked;
+            }
+
+            if (candidateAffordable && (!foundAffordable || candidateLine.level < bestLevel))
+            {
+                foundAffordable = true;
+                bestProcessing = false;
+                bestType = candidateType;
+                bestCost = candidateCost;
+                bestLevel = candidateLine.level;
+                bestBlockedReason = "";
+            }
+        }
+
+        if (!foundAny)
+        {
+            blockedReason = "No base industry lines are available.";
+            return false;
+        }
+
+        processing = foundAffordable ? bestProcessing : fallbackProcessing;
+        branch = foundAffordable ? bestBranch : fallbackBranch;
+        type = foundAffordable ? bestType : fallbackType;
+        cost = foundAffordable ? bestCost : fallbackCost;
+        level = foundAffordable ? bestLevel : fallbackLevel;
+        canAfford = foundAffordable;
+        blockedReason = foundAffordable ? bestBlockedReason : fallbackBlockedReason;
+        return true;
+    }
+
+    private static List<CascadeItemAmount> CreateProcessingUpgradeCost(int currentLevel)
+    {
+        int level = Mathf.Max(1, currentLevel);
+        return new List<CascadeItemAmount>
+        {
+            new CascadeItemAmount { itemId = "ferron", amount = 4 * level },
+            new CascadeItemAmount { itemId = "silvate", amount = 1 * level },
+            new CascadeItemAmount { itemId = "charcoal", amount = 1 * level }
+        };
+    }
+
+    private static List<CascadeItemAmount> CreateCascadeUpgradeCost(int currentLevel)
+    {
+        int level = Mathf.Max(1, currentLevel);
+        return new List<CascadeItemAmount>
+        {
+            new CascadeItemAmount { itemId = "ferron", amount = 6 * level },
+            new CascadeItemAmount { itemId = "silvate", amount = 2 * level },
+            new CascadeItemAmount { itemId = "charcoal", amount = 2 * level }
+        };
+    }
+
+    private static bool CanSpendBaseIndustryUpgradeCost(IslandProductionState storage, List<CascadeItemAmount> cost, out string blockedReason)
+    {
+        blockedReason = "";
+        if (storage == null)
+        {
+            blockedReason = "base storage is missing";
+            return false;
+        }
+
+        if (cost == null || cost.Count == 0)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < cost.Count; i++)
+        {
+            CascadeItemAmount item = cost[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.itemId) || item.amount <= 0) continue;
+
+            int available = storage.GetResourceAmount(item.itemId);
+            if (available >= item.amount) continue;
+
+            blockedReason = "need " + item.amount + " " + item.itemId + ", have " + available;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool SpendBaseIndustryUpgradeCost(IslandProductionState storage, List<CascadeItemAmount> cost, out string message)
+    {
+        message = "";
+        if (!CanSpendBaseIndustryUpgradeCost(storage, cost, out string blockedReason))
+        {
+            message = "Upgrade blocked: " + blockedReason + ".";
+            return false;
+        }
+
+        if (cost == null) return true;
+        for (int i = 0; i < cost.Count; i++)
+        {
+            CascadeItemAmount item = cost[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.itemId) || item.amount <= 0) continue;
+
+            if (!storage.TrySpendResource(item.itemId, item.amount))
+            {
+                message = "Upgrade blocked: could not spend " + item.amount + " " + item.itemId + ".";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static float GetUpgradedProcessingCapacity(BaseProcessingBranch branch, int level, float currentCapacity)
+    {
+        float baseCapacity = SessionExtractionIndustry.GetDefaultProcessingCapacity(branch);
+        float targetCapacity = baseCapacity * (1f + 0.25f * Mathf.Max(0, level - 1));
+        return Mathf.Max(currentCapacity, targetCapacity);
+    }
+
+    private static float GetUpgradedCascadeCapacity(CascadeProductionType type, int level, float currentCapacity)
+    {
+        float baseCapacity = SessionExtractionIndustry.GetDefaultProductionCapacity(type);
+        float targetCapacity = baseCapacity * (1f + 0.25f * Mathf.Max(0, level - 1));
+        return Mathf.Max(currentCapacity, targetCapacity);
+    }
+
+    private static string BuildItemCostText(List<CascadeItemAmount> cost)
+    {
+        if (cost == null || cost.Count == 0)
+        {
+            return "nothing";
+        }
+
+        List<string> parts = new List<string>();
+        for (int i = 0; i < cost.Count; i++)
+        {
+            CascadeItemAmount item = cost[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.itemId) || item.amount <= 0) continue;
+            parts.Add(item.itemId + " x" + item.amount);
+        }
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "nothing";
+    }
+
+    public bool CanInstallStarterCargoRackUpgrade(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return ResolveStarterFittingUpgrade(
+            SessionExtractionConstants.StarterAirframeKitItemId,
+            SessionExtractionConstants.StarterCargoRackModuleId,
+            SessionExtractionConstants.StarterLowSlotId,
+            SessionExtractionConstants.LowSlotTypeId,
+            "Starter cargo rack is already installed.",
+            out _, out _, out _, out message);
+    }
+
+    public bool TryInstallStarterCargoRackUpgrade(out string message)
+    {
+        return TryInstallStarterFittingUpgrade(
+            SessionExtractionConstants.StarterAirframeKitItemId,
+            SessionExtractionConstants.StarterCargoRackModuleId,
+            SessionExtractionConstants.StarterLowSlotId,
+            SessionExtractionConstants.LowSlotTypeId,
+            "Starter cargo rack is already installed.",
+            "Installed first Low upgrade",
+            out message);
+    }
+
+    public bool CanInstallStarterGasHarvesterUpgrade(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return ResolveStarterFittingUpgrade(
+            SessionExtractionConstants.StarterModuleKitItemId,
+            SessionExtractionConstants.StarterGasHarvesterModuleId,
+            SessionExtractionConstants.StarterHighSlotId,
+            SessionExtractionConstants.HighSlotTypeId,
+            "Starter gas harvester is already installed.",
+            out _, out _, out _, out message);
+    }
+
+    public bool TryInstallStarterGasHarvesterUpgrade(out string message)
+    {
+        return TryInstallStarterFittingUpgrade(
+            SessionExtractionConstants.StarterModuleKitItemId,
+            SessionExtractionConstants.StarterGasHarvesterModuleId,
+            SessionExtractionConstants.StarterHighSlotId,
+            SessionExtractionConstants.HighSlotTypeId,
+            "Starter gas harvester is already installed.",
+            "Installed High gas harvester",
+            out message);
+    }
+
+    public bool CanInstallStarterMiningHoldUpgrade(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return ResolveStarterFittingUpgrade(
+            SessionExtractionConstants.StarterModuleKitItemId,
+            SessionExtractionConstants.StarterMiningHoldModuleId,
+            SessionExtractionConstants.StarterSecondHighSlotId,
+            SessionExtractionConstants.HighSlotTypeId,
+            "Starter mining hold is already installed.",
+            out _, out _, out _, out message);
+    }
+
+    public bool TryInstallStarterMiningHoldUpgrade(out string message)
+    {
+        return TryInstallStarterFittingUpgrade(
+            SessionExtractionConstants.StarterModuleKitItemId,
+            SessionExtractionConstants.StarterMiningHoldModuleId,
+            SessionExtractionConstants.StarterSecondHighSlotId,
+            SessionExtractionConstants.HighSlotTypeId,
+            "Starter mining hold is already installed.",
+            "Installed High impact/salvage module",
+            out message);
+    }
+
+    public bool CanInstallStarterHarpoonUpgrade(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return ResolveStarterFittingUpgrade(
+            SessionExtractionConstants.StarterModuleKitItemId,
+            SessionExtractionConstants.StarterHarpoonModuleId,
+            SessionExtractionConstants.StarterThirdHighSlotId,
+            SessionExtractionConstants.HighSlotTypeId,
+            "Starter harpoon is already installed.",
+            out _, out _, out _, out message);
+    }
+
+    public bool TryInstallStarterHarpoonUpgrade(out string message)
+    {
+        return TryInstallStarterFittingUpgrade(
+            SessionExtractionConstants.StarterModuleKitItemId,
+            SessionExtractionConstants.StarterHarpoonModuleId,
+            SessionExtractionConstants.StarterThirdHighSlotId,
+            SessionExtractionConstants.HighSlotTypeId,
+            "Starter harpoon is already installed.",
+            "Installed High harpoon module",
+            out message);
+    }
+
+    public bool CanInstallStarterObservationUpgrade(out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        return ResolveStarterFittingUpgrade(
+            SessionExtractionConstants.StarterModuleKitItemId,
+            SessionExtractionConstants.StarterObservationPostModuleId,
+            SessionExtractionConstants.StarterMidSlotId,
+            SessionExtractionConstants.MidSlotTypeId,
+            "Starter observation post is already installed.",
+            out _, out _, out _, out message);
+    }
+
+    public bool TryInstallStarterObservationUpgrade(out string message)
+    {
+        return TryInstallStarterFittingUpgrade(
+            SessionExtractionConstants.StarterModuleKitItemId,
+            SessionExtractionConstants.StarterObservationPostModuleId,
+            SessionExtractionConstants.StarterMidSlotId,
+            SessionExtractionConstants.MidSlotTypeId,
+            "Starter observation post is already installed.",
+            "Installed Mid observation module",
+            out message);
+    }
+
+    public bool CanInstallNextStarterFittingUpgrade(out string message)
+    {
+        if (CanInstallStarterCargoRackUpgrade(out message)) return true;
+        if (CanInstallStarterGasHarvesterUpgrade(out message)) return true;
+        if (CanInstallStarterMiningHoldUpgrade(out message)) return true;
+        if (CanInstallStarterHarpoonUpgrade(out message)) return true;
+        if (CanInstallStarterObservationUpgrade(out message)) return true;
+        return false;
+    }
+
+    public bool TryInstallNextStarterFittingUpgrade(out string message)
+    {
+        if (CanInstallStarterCargoRackUpgrade(out _)) return TryInstallStarterCargoRackUpgrade(out message);
+        if (CanInstallStarterGasHarvesterUpgrade(out _)) return TryInstallStarterGasHarvesterUpgrade(out message);
+        if (CanInstallStarterMiningHoldUpgrade(out _)) return TryInstallStarterMiningHoldUpgrade(out message);
+        if (CanInstallStarterHarpoonUpgrade(out _)) return TryInstallStarterHarpoonUpgrade(out message);
+        if (CanInstallStarterObservationUpgrade(out _)) return TryInstallStarterObservationUpgrade(out message);
+
+        message = "No starter fitting upgrade is currently installable.";
+        lastSaveMessage = message;
+        return false;
+    }
+
+    public string GetNextStarterFittingUpgradeActionLabel()
+    {
+        if (CanInstallStarterCargoRackUpgrade(out _)) return "Install Low rack";
+        if (CanInstallStarterGasHarvesterUpgrade(out _)) return "Install High gas";
+        if (CanInstallStarterMiningHoldUpgrade(out _)) return "Install High salvage";
+        if (CanInstallStarterHarpoonUpgrade(out _)) return "Install High harpoon";
+        if (CanInstallStarterObservationUpgrade(out _)) return "Install Mid scout";
+        return "Install module";
     }
 
     public bool BeginFlagshipExpedition(FlagshipExpeditionDefinition expedition)
@@ -1087,7 +3667,7 @@ public partial class MetaGameState : MonoBehaviour
             return false;
         }
 
-        bool started = TryBeginFlightSession(null, expedition);
+        bool started = TryBeginFlightSession(null, expedition, false);
         if (!started)
         {
             progress.activeExpedition.Clear();
@@ -1112,6 +3692,13 @@ public partial class MetaGameState : MonoBehaviour
     public bool ReturnFromFlagshipExpedition()
     {
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            progress.activeExpedition?.Clear();
+            lastSaveMessage = "Legacy flagship expedition return is disabled in session extraction core.";
+            return false;
+        }
+
         FlagshipExpeditionState expedition = progress.activeExpedition;
         if (expedition == null || !expedition.active)
         {
@@ -1151,6 +3738,12 @@ public partial class MetaGameState : MonoBehaviour
         EnsureProgressInitialized();
         EnsureWorldConfigLoaded();
 
+        if (sessionExtractionCoreMode)
+        {
+            reason = "Flagship expeditions are disabled in session extraction core.";
+            return false;
+        }
+
         if (expedition == null)
         {
             reason = "Экспедиция не задана.";
@@ -1158,6 +3751,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         expedition.Normalize();
+
         if (progress.activeExpedition != null && progress.activeExpedition.active)
         {
             reason = "Экспедиция уже активна.";
@@ -1243,6 +3837,11 @@ public partial class MetaGameState : MonoBehaviour
     private bool TryStartPlayerFlagshipExpedition(out string message)
     {
         message = "";
+        if (sessionExtractionCoreMode)
+        {
+            return false;
+        }
+
         EnsureWorldConfigLoaded();
 
         FlagshipInteriorState interior = FlagshipInteriorSimulator.EnsurePlayerFlagshipInterior(worldConfig, progress);
@@ -1296,6 +3895,12 @@ public partial class MetaGameState : MonoBehaviour
     {
         message = "";
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            message = "Legacy cargo loading is disabled in session extraction core. Use refuel, sortie extraction, and base processing.";
+            lastSaveMessage = message;
+            return false;
+        }
 
         if (!TryResolveCurrentIslandStorage(out IslandConfig island, out IslandProductionState storage, out message))
         {
@@ -1350,6 +3955,12 @@ public partial class MetaGameState : MonoBehaviour
     {
         message = "";
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            message = "Legacy cargo unloading is disabled in session extraction core. Extracted cargo returns through Extract home.";
+            lastSaveMessage = message;
+            return false;
+        }
 
         if (!TryResolveCurrentIslandStorage(out IslandConfig island, out IslandProductionState storage, out message))
         {
@@ -1407,6 +4018,18 @@ public partial class MetaGameState : MonoBehaviour
     {
         EnsureProgressInitialized();
 
+        if (sessionExtractionCoreMode && progress.HasActiveSortie)
+        {
+            lastSaveMessage = "Docking is disabled during a core sortie. Reach the sortie boundary and extract home.";
+            return false;
+        }
+        if (sessionExtractionCoreMode
+            && (dockKind != DockingLocationKind.Island || !IsCapitalIsland(dockId)))
+        {
+            lastSaveMessage = "Legacy docks are disabled in session extraction core. The base is the only home dock.";
+            return false;
+        }
+
         ShipPhysics ship = GetActiveShip();
         if (ship != null)
         {
@@ -1435,6 +4058,13 @@ public partial class MetaGameState : MonoBehaviour
     public void CompleteFlightMission(MissionDefinitionSO mission)
     {
         EnsureProgressInitialized();
+
+        if (sessionExtractionCoreMode)
+        {
+            progress.activeExpedition?.Clear();
+            lastSaveMessage = "Legacy flight mission completion is disabled in session extraction core. Extract through the sortie boundary instead.";
+            return;
+        }
 
         if (mission != null)
         {
@@ -1470,6 +4100,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         progress.ClearShipCargo();
+        progress.ClearShipConsumableTanks();
         AddStartingShipConsumables();
         progress.StopCargoTransfer();
         ApplyStartingTechTreeNodes();
@@ -1477,8 +4108,12 @@ public partial class MetaGameState : MonoBehaviour
 
         string assemblyMessage = "";
         bool assemblyReady = ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, techTree, progress, out assemblyMessage);
-        string recoveryDockId = string.IsNullOrWhiteSpace(startingDockId) ? GetCapitalIslandId() : startingDockId;
-        DockingLocationKind recoveryDockKind = startingDockKind;
+        string recoveryDockId = sessionExtractionCoreMode || string.IsNullOrWhiteSpace(startingDockId)
+            ? GetCapitalIslandId()
+            : startingDockId;
+        DockingLocationKind recoveryDockKind = sessionExtractionCoreMode
+            ? DockingLocationKind.Island
+            : startingDockKind;
         Vector3 recoveryPosition = GetDockPositionOrFallback(recoveryDockId, recoveryDockKind);
 
         progress.SetDocked(recoveryDockId, recoveryDockKind, recoveryPosition);
@@ -1515,6 +4150,12 @@ public partial class MetaGameState : MonoBehaviour
     public bool StartIdleMining()
     {
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy idle mining is disabled in session extraction core. Use sorties and base processing.";
+            return false;
+        }
+
         if (!IsDocked) return false;
         if (progress.HasActiveProcess("idle_mining")) return false;
 
@@ -1541,6 +4182,12 @@ public partial class MetaGameState : MonoBehaviour
     public bool StartIronSmelting()
     {
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy iron smelting is disabled in session extraction core. Use base processing and cascade production.";
+            return false;
+        }
+
         if (!IsDocked) return false;
         if (!progress.TrySpendResource("ore", Mathf.Max(1, ironSmeltingOreCost))) return false;
 
@@ -1576,6 +4223,12 @@ public partial class MetaGameState : MonoBehaviour
     public bool StartTimedMission(MissionDefinitionSO mission)
     {
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy timed missions are disabled in session extraction core. Use sortie contracts instead.";
+            return false;
+        }
+
         if (!IsDocked || mission == null || !mission.canRunAsTimedMission) return false;
         if (progress.HasActiveProcess("mission_" + mission.missionId)) return false;
         if (progress.IsMissionCompleted(mission.missionId)) return false;
@@ -1616,8 +4269,8 @@ public partial class MetaGameState : MonoBehaviour
         {
             progress.Normalize();
             EnsureWorldConfigLoaded();
-            IslandProductionSimulator.EnsureIslandStates(worldConfig, progress);
-            IslandIndustrySimulator.EnsureIslandStates(worldConfig, progress);
+            SyncSessionExtractionCoreMode();
+            EnsureEconomyRuntimeStates();
 
             if (progress.lastProcessUtcTicks <= 0)
             {
@@ -1630,82 +4283,103 @@ public partial class MetaGameState : MonoBehaviour
                 return 0;
             }
 
-            AdvanceShopRefresh(utcNow);
+            if (sessionExtractionCoreMode)
+            {
+                MigrateLegacyPersonalInventoryToCapitalStorage();
+                DisableLegacyShopForSessionCore();
+            }
+            else
+            {
+                AdvanceShopRefresh(utcNow);
+            }
 
-            if (islandProductionEnabled)
+            if (!sessionExtractionCoreMode && islandProductionEnabled)
             {
                 completedCycles += IslandProductionSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
                 completedCycles += IslandIndustrySimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
             }
 
-            completedCycles += FlagshipInteriorSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks, !suppressFlagshipMoraleDrain);
+            if (!sessionExtractionCoreMode)
+            {
+                completedCycles += FlagshipInteriorSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks, !suppressFlagshipMoraleDrain);
+            }
 
             completedCycles += AdvanceCargoTransfer(utcNow);
             completedCycles += AdvanceTechnologyResearch(utcNow);
-            if (logisticsFleet != null)
+            if (!sessionExtractionCoreMode)
             {
-                completedCycles += logisticsFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
-            }
-
-            if (scoutFleet != null)
-            {
-                completedCycles += scoutFleet.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
-            }
-
-            if (gasHarvesterFleet != null)
-            {
-                completedCycles += gasHarvesterFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
-            }
-
-            completedCycles += MiningWorldSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
-            if (miningFleet != null)
-            {
-                completedCycles += miningFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
-            }
-
-            for (int i = progress.activeProcesses.Count - 1; i >= 0; i--)
-            {
-                TimedProcessState process = progress.activeProcesses[i];
-                if (process == null)
+                if (logisticsFleet != null)
                 {
-                    progress.activeProcesses.RemoveAt(i);
-                    continue;
+                    completedCycles += logisticsFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
                 }
 
-                process.Normalize();
-                if (process.nextCompletionUtcTicks <= 0 || utcNow.Ticks < process.nextCompletionUtcTicks)
+                if (scoutFleet != null)
                 {
-                    continue;
+                    completedCycles += scoutFleet.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
                 }
 
-                long intervalTicks = TimeSpan.FromSeconds(Mathf.Max(1, process.durationSeconds)).Ticks;
-                long rawCycles = ((utcNow.Ticks - process.nextCompletionUtcTicks) / intervalTicks) + 1;
-                int cycles = (int)Math.Min(Math.Max(rawCycles, 1L), 10000L);
-
-                if (!process.repeat)
+                if (gasHarvesterFleet != null)
                 {
-                    cycles = 1;
-                }
-                else if (process.remainingCycles > 0)
-                {
-                    cycles = Mathf.Min(cycles, process.remainingCycles);
+                    completedCycles += gasHarvesterFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
                 }
 
-                CompleteProcessCycles(process, cycles);
-                completedCycles += cycles;
-
-                if (process.repeat && (process.remainingCycles < 0 || process.remainingCycles > cycles))
+                completedCycles += MiningWorldSimulator.Advance(worldConfig, progress, previousProcessTicks, utcNow.Ticks);
+                if (miningFleet != null)
                 {
-                    if (process.remainingCycles > 0)
+                    completedCycles += miningFleet.Advance(worldConfig, progress, ActiveCatalog, techTree, previousProcessTicks, utcNow.Ticks);
+                }
+            }
+
+            if (sessionExtractionCoreMode)
+            {
+                StopLegacyTimedProcessesForSessionCore();
+            }
+            else
+            {
+                for (int i = progress.activeProcesses.Count - 1; i >= 0; i--)
+                {
+                    TimedProcessState process = progress.activeProcesses[i];
+                    if (process == null)
                     {
-                        process.remainingCycles -= cycles;
+                        progress.activeProcesses.RemoveAt(i);
+                        continue;
                     }
 
-                    process.nextCompletionUtcTicks += intervalTicks * cycles;
-                }
-                else
-                {
-                    progress.activeProcesses.RemoveAt(i);
+                    process.Normalize();
+                    if (process.nextCompletionUtcTicks <= 0 || utcNow.Ticks < process.nextCompletionUtcTicks)
+                    {
+                        continue;
+                    }
+
+                    long intervalTicks = TimeSpan.FromSeconds(Mathf.Max(1, process.durationSeconds)).Ticks;
+                    long rawCycles = ((utcNow.Ticks - process.nextCompletionUtcTicks) / intervalTicks) + 1;
+                    int cycles = (int)Math.Min(Math.Max(rawCycles, 1L), 10000L);
+
+                    if (!process.repeat)
+                    {
+                        cycles = 1;
+                    }
+                    else if (process.remainingCycles > 0)
+                    {
+                        cycles = Mathf.Min(cycles, process.remainingCycles);
+                    }
+
+                    CompleteProcessCycles(process, cycles);
+                    completedCycles += cycles;
+
+                    if (process.repeat && (process.remainingCycles < 0 || process.remainingCycles > cycles))
+                    {
+                        if (process.remainingCycles > 0)
+                        {
+                            process.remainingCycles -= cycles;
+                        }
+
+                        process.nextCompletionUtcTicks += intervalTicks * cycles;
+                    }
+                    else
+                    {
+                        progress.activeProcesses.RemoveAt(i);
+                    }
                 }
             }
 
@@ -1957,6 +4631,14 @@ public partial class MetaGameState : MonoBehaviour
         }
     }
 
+    private void StopLegacyTimedProcessesForSessionCore()
+    {
+        if (progress == null || progress.activeProcesses == null || progress.activeProcesses.Count == 0) return;
+
+        progress.activeProcesses.Clear();
+        lastSaveMessage = "Legacy timed processes stopped: session extraction core uses sorties, base processing, cascade production, and technology cycles.";
+    }
+
     private void CompleteProcessCycles(TimedProcessState process, int cycles)
     {
         if (process == null || cycles <= 0) return;
@@ -2013,6 +4695,11 @@ public partial class MetaGameState : MonoBehaviour
         CargoTransferState transfer = progress.cargoTransfer;
         transfer.Normalize();
         if (!transfer.active || !transfer.HasWork) return 0;
+        if (sessionExtractionCoreMode)
+        {
+            StopCargoTransfer("Legacy cargo transfer stopped: session extraction core uses sortie extraction and base processing.");
+            return 0;
+        }
 
         IslandProductionState islandStorage = progress.GetIslandProductionState(transfer.islandId, true);
         if (islandStorage == null)
@@ -2315,6 +5002,16 @@ public partial class MetaGameState : MonoBehaviour
         if (amount <= 0) return true;
 
         EnsureProgressInitialized();
+        if (sessionExtractionCoreMode && !HasActiveSortie)
+        {
+            reason = "Runtime cargo collection is available only during an active core sortie.";
+            return false;
+        }
+        if (sessionExtractionCoreMode && !CanCollectActiveSortieResource(resourceId, out reason))
+        {
+            return false;
+        }
+
         CargoCapacityInfo capacity = CalculateCargoCapacity();
         float addedMassKg = worldConfig != null ? worldConfig.GetItemTransportMassKg(resourceId, amount) : amount;
         float freeKg = Mathf.Max(0f, capacity.maxCargoKg - capacity.currentCargoKg - capacity.currentTankKg);
@@ -2336,6 +5033,34 @@ public partial class MetaGameState : MonoBehaviour
         ApplyCargoMassToShip(GetActiveShip());
         ResetCargoPlan();
         return true;
+    }
+
+    private bool CanCollectActiveSortieResource(string resourceId, out string reason)
+    {
+        reason = "";
+        SortieZoneDefinition zone = progress != null && progress.activeSortie != null
+            ? progress.activeSortie.zone
+            : null;
+        if (zone == null)
+        {
+            reason = "No active sortie resource catalog is available.";
+            return false;
+        }
+
+        zone.Normalize();
+        if (string.IsNullOrWhiteSpace(zone.starterResourceItemId))
+        {
+            reason = "Active sortie has no collectible resource configured.";
+            return false;
+        }
+
+        if (resourceId == zone.starterResourceItemId)
+        {
+            return true;
+        }
+
+        reason = "Active sortie accepts only " + zone.starterResourceItemId + ", not " + resourceId + ".";
+        return false;
     }
 
     public bool TrySpendFractionalShipCargoFromRuntime(string resourceId, float amountKg, ref float spendBufferKg, out string reason)
@@ -2402,6 +5127,682 @@ public partial class MetaGameState : MonoBehaviour
         EnsureProgressInitialized();
         reason = "Отдельного кузова больше нет: пойманная руда лежит в общем грузе корабля и выгружается обычной разгрузкой.";
         return false;
+    }
+
+    private struct SortieEntryState
+    {
+        public Vector3 position;
+        public Quaternion rotation;
+        public Vector3 velocity;
+        public float speedMS;
+    }
+
+    private SortieEntryState BuildSortieEntryState(SortieZoneDefinition zone, Vector3 launchDockPosition, ShipPhysics ship)
+    {
+        if (zone == null)
+        {
+            return new SortieEntryState
+            {
+                position = Vector3.zero,
+                rotation = Quaternion.identity,
+                velocity = Vector3.zero,
+                speedMS = 0f
+            };
+        }
+
+        zone.Normalize();
+        float entrySpeedMS = ResolveSortieEntrySpeedMS(ship);
+        Vector3 outward = FlattenSortieVector(launchDockPosition - zone.centerPosition);
+        if (outward.sqrMagnitude < 0.0001f)
+        {
+            outward = FlattenSortieVector(zone.entryPosition - zone.centerPosition);
+        }
+
+        if (outward.sqrMagnitude < 0.0001f)
+        {
+            outward = Vector3.right;
+        }
+
+        outward.Normalize();
+        Vector3 inbound = -outward;
+        float spawnRadius = Mathf.Max(0f, zone.radiusMeters) + entrySpeedMS * SortieEntryApproachSeconds;
+        float altitude = Mathf.Max(zone.entryPosition.y, zone.stormFloorY + 50f);
+        Vector3 position = new Vector3(
+            zone.centerPosition.x + outward.x * spawnRadius,
+            altitude,
+            zone.centerPosition.z + outward.z * spawnRadius);
+        Quaternion rotation = inbound.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(inbound, Vector3.up)
+            : Quaternion.identity;
+
+        return new SortieEntryState
+        {
+            position = position,
+            rotation = rotation,
+            velocity = inbound * entrySpeedMS,
+            speedMS = entrySpeedMS
+        };
+    }
+
+    private static float ResolveSortieEntrySpeedMS(ShipPhysics ship)
+    {
+        if (ship != null)
+        {
+            return Mathf.Max(1f, ship.EstimateFullSlipstreamCruiseSpeedMS());
+        }
+
+        return SortieEntryDefaultMaxSpeedMS;
+    }
+
+    private void PlaceShipAtSortieEntry(SortieZoneDefinition zone, SortieEntryState entryState)
+    {
+        if (zone == null || progress == null) return;
+
+        if (progress.activeSortie != null && progress.activeSortie.zone != null)
+        {
+            progress.activeSortie.zone.entryPosition = entryState.position;
+        }
+
+        progress.SetFlightPose(entryState.position, entryState.rotation);
+        ApplySessionModeToShip();
+
+        ShipPhysics ship = GetActiveShip();
+        if (ship != null)
+        {
+            Rigidbody body = ship.GetComponent<Rigidbody>();
+            ship.transform.SetPositionAndRotation(entryState.position, entryState.rotation);
+            if (body != null)
+            {
+                body.position = entryState.position;
+                body.rotation = entryState.rotation;
+                body.linearVelocity = entryState.velocity;
+                body.angularVelocity = Vector3.zero;
+                body.WakeUp();
+            }
+
+            ship.altitudeHold = false;
+            ship.targetAltitude = entryState.position.y;
+            ship.headingHold = false;
+            ship.targetHeading = HeadingFromSortieVector(zone.centerPosition - entryState.position);
+            ship.cruiseControl = false;
+            ship.thrustInput = 1f;
+            ship.propellerPitch = 1f;
+            ship.sideInput = 0f;
+            ship.turnInput = 0f;
+            ship.enginePowerLever = ship.CalculateEnginePowerLeverForPropellerEngagement(1f);
+            ship.claudiumSlipstreamEnabled = true;
+            ship.claudiumSlipstreamCharge01 = 1f;
+        }
+
+        WildWindFlightControlBridge controls = WildWindFlightControlBridge.EnsureInstance();
+        if (controls != null)
+        {
+            controls.PrimeSortieEntryCruise(zone.centerPosition, entryState.speedMS);
+            controls.ApplyNow();
+        }
+
+        progress.SetFlightPose(entryState.position, entryState.rotation);
+    }
+
+    private SortieReturnProfile BuildCurrentSortieReturnProfile()
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+
+        ShipPhysics ship = GetActiveShip();
+        if (ship != null)
+        {
+            ApplyFuelConfigToShip(ship);
+        }
+
+        CargoCapacityInfo capacity = CalculateCargoCapacity();
+        SortieZoneDefinition zone = progress.activeSortie != null ? progress.activeSortie.zone : null;
+        bool activeSortieReturn = zone != null;
+        float returnPowerLever = activeSortieReturn ? zone.returnPowerLever : 0.7f;
+        string fuelId = ship != null && !string.IsNullOrWhiteSpace(ship.engineFuelId)
+            ? ship.engineFuelId
+            : GetStartingEngineFuelId();
+        string claudiumId = GetClaudiumResourceId(ship);
+        float fuelEnergyKwhPerKg = ship != null ? ship.engineFuelEnergyKwhPerKg : 4f;
+        ItemConfig fuel = worldConfig != null ? worldConfig.GetItem(fuelId) : null;
+        if (fuel != null && fuel.energyKwhPerKg > 0f)
+        {
+            fuelEnergyKwhPerKg = fuel.energyKwhPerKg;
+        }
+
+        float emptyMassKg = capacity.emptyMassKg > 0f
+            ? capacity.emptyMassKg
+            : ship != null ? ship.baseMass : 0f;
+        float cruiseSpeedMS = activeSortieReturn && zone.returnCruiseSpeedMS > 0f
+            ? zone.returnCruiseSpeedMS
+            : 35f * Mathf.Clamp(returnPowerLever, 0.1f, 1f);
+        float enginePowerKw = ship != null ? ship.enginePowerKwAt100 : 0f;
+        float cruisePowerKw = activeSortieReturn
+            ? 0f
+            : enginePowerKw * Mathf.Clamp(returnPowerLever, 0.05f, 1.2f);
+        float claudiumConsumptionPerTonSecond = activeSortieReturn
+            ? 0f
+            : ship != null ? ship.claudiumConsumptionPerTonSecond : 0f;
+
+        return new SortieReturnProfile
+        {
+            emptyMassKg = emptyMassKg,
+            cargoMassKg = progress.GetShipPayloadMassKg(worldConfig),
+            cruiseSpeedMS = cruiseSpeedMS,
+            enginePowerKw = enginePowerKw,
+            cruisePowerKw = cruisePowerKw,
+            engineFuelEfficiency = ship != null ? ship.engineFuelEfficiency : 0.32f,
+            fuelEnergyKwhPerKg = fuelEnergyKwhPerKg,
+            claudiumConsumptionPerTonSecond = claudiumConsumptionPerTonSecond,
+            currentCoalKg = progress.shipEngineFuelTank.GetAmount(fuelId),
+            currentClaudiumKg = progress.shipClaudiumTank.GetAmount(claudiumId),
+            coalResourceId = fuelId,
+            claudiumResourceId = claudiumId
+        };
+    }
+
+    private static Vector3 GetSortieOutwardDirection(SortieZoneDefinition zone, Vector3 position)
+    {
+        if (zone == null)
+        {
+            return Vector3.right;
+        }
+
+        zone.Normalize();
+        Vector3 delta = new Vector3(
+            position.x - zone.centerPosition.x,
+            0f,
+            position.z - zone.centerPosition.z);
+        return delta.sqrMagnitude > 0.0001f ? delta.normalized : Vector3.right;
+    }
+
+    private static Vector3 FlattenSortieVector(Vector3 value)
+    {
+        value.y = 0f;
+        return value;
+    }
+
+    private static float HeadingFromSortieVector(Vector3 value)
+    {
+        value = FlattenSortieVector(value);
+        if (value.sqrMagnitude <= 0.0001f)
+        {
+            return 0f;
+        }
+
+        float angle = Mathf.Atan2(value.x, value.z) * Mathf.Rad2Deg;
+        return angle < 0f ? angle + 360f : angle;
+    }
+
+    private int TransferShipCargoToCapital()
+    {
+        EnsureProgressInitialized();
+
+        IslandProductionState capitalStorage = GetCapitalStorageState();
+        if (capitalStorage == null) return 0;
+
+        int transferred = 0;
+        progress.shipCargo ??= new List<ResourceStack>();
+        for (int i = 0; i < progress.shipCargo.Count; i++)
+        {
+            ResourceStack stack = progress.shipCargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0) continue;
+
+            transferred += capitalStorage.AddResource(stack.resourceId, stack.amount);
+        }
+
+        return transferred;
+    }
+
+    private OreTypeConfig FindFirstStoredOreType(IslandProductionState storage, out int availableOre)
+    {
+        availableOre = 0;
+        if (storage == null || worldConfig == null || worldConfig.oreTypes == null) return null;
+
+        for (int i = 0; i < worldConfig.oreTypes.Count; i++)
+        {
+            OreTypeConfig oreType = worldConfig.oreTypes[i];
+            if (oreType == null || string.IsNullOrWhiteSpace(oreType.oreItemId)) continue;
+
+            int amount = storage.GetResourceAmount(oreType.oreItemId);
+            if (amount <= 0) continue;
+
+            availableOre = amount;
+            return oreType;
+        }
+
+        return null;
+    }
+
+    private GasCloudTypeConfig FindFirstStoredGasCloudType(IslandProductionState storage, out int availableCondensate)
+    {
+        availableCondensate = 0;
+        if (storage == null || worldConfig == null || worldConfig.gasCloudTypes == null) return null;
+
+        for (int i = 0; i < worldConfig.gasCloudTypes.Count; i++)
+        {
+            GasCloudTypeConfig gasType = worldConfig.gasCloudTypes[i];
+            if (gasType == null || string.IsNullOrWhiteSpace(gasType.condensateItemId)) continue;
+
+            int amount = storage.GetResourceAmount(gasType.condensateItemId);
+            if (amount <= 0) continue;
+
+            availableCondensate = amount;
+            return gasType;
+        }
+
+        return null;
+    }
+
+    private LeviathanTypeConfig FindFirstStoredLeviathanType(IslandProductionState storage, out int availableCarcass)
+    {
+        availableCarcass = 0;
+        if (storage == null || worldConfig == null || worldConfig.leviathanTypes == null) return null;
+
+        for (int i = 0; i < worldConfig.leviathanTypes.Count; i++)
+        {
+            LeviathanTypeConfig leviathanType = worldConfig.leviathanTypes[i];
+            if (leviathanType == null || string.IsNullOrWhiteSpace(leviathanType.carcassItemId)) continue;
+
+            int amount = storage.GetResourceAmount(leviathanType.carcassItemId);
+            if (amount <= 0) continue;
+
+            availableCarcass = amount;
+            return leviathanType;
+        }
+
+        return null;
+    }
+
+    private static string FindFirstStoredAutomatonInput(IslandProductionState storage, out int availableSalvage)
+    {
+        availableSalvage = 0;
+        if (storage == null) return "";
+
+        int brokenAutomatons = storage.GetResourceAmount(SessionExtractionConstants.BrokenAutomatonItemId);
+        if (brokenAutomatons > 0)
+        {
+            availableSalvage = brokenAutomatons;
+            return SessionExtractionConstants.BrokenAutomatonItemId;
+        }
+
+        return "";
+    }
+
+    private static string FindFirstStoredCyberInfoInput(IslandProductionState storage, out int availableInfo)
+    {
+        availableInfo = 0;
+        if (storage == null) return "";
+
+        int rockInfo = storage.GetResourceAmount(SessionExtractionConstants.RockInfoItemId);
+        if (rockInfo > 0)
+        {
+            availableInfo = rockInfo;
+            return SessionExtractionConstants.RockInfoItemId;
+        }
+
+        int cloudInfo = storage.GetResourceAmount(SessionExtractionConstants.CloudInfoItemId);
+        if (cloudInfo > 0)
+        {
+            availableInfo = cloudInfo;
+            return SessionExtractionConstants.CloudInfoItemId;
+        }
+
+        int leviathanInfo = storage.GetResourceAmount(SessionExtractionConstants.LeviathanInfoItemId);
+        if (leviathanInfo > 0)
+        {
+            availableInfo = leviathanInfo;
+            return SessionExtractionConstants.LeviathanInfoItemId;
+        }
+
+        return "";
+    }
+
+    private bool TryGetAvailableBaseProcessingInput(BaseProcessingBranch branch, IslandProductionState storage, out string inputItemId, out int available)
+    {
+        inputItemId = "";
+        available = 0;
+        if (storage == null) return false;
+
+        switch (branch)
+        {
+            case BaseProcessingBranch.Ore:
+            {
+                OreTypeConfig oreType = FindFirstStoredOreType(storage, out available);
+                inputItemId = oreType != null ? oreType.oreItemId : "";
+                return oreType != null && available > 0;
+            }
+            case BaseProcessingBranch.Gas:
+            {
+                GasCloudTypeConfig gasType = FindFirstStoredGasCloudType(storage, out available);
+                inputItemId = gasType != null ? gasType.condensateItemId : "";
+                return gasType != null && available > 0;
+            }
+            case BaseProcessingBranch.AutomatonDismantling:
+                inputItemId = FindFirstStoredAutomatonInput(storage, out available);
+                return !string.IsNullOrWhiteSpace(inputItemId) && available > 0;
+            case BaseProcessingBranch.LeviathanProcessing:
+            {
+                LeviathanTypeConfig leviathanType = FindFirstStoredLeviathanType(storage, out available);
+                inputItemId = leviathanType != null ? leviathanType.carcassItemId : "";
+                return leviathanType != null && available > 0;
+            }
+            case BaseProcessingBranch.CyberneticDeciphering:
+                inputItemId = FindFirstStoredCyberInfoInput(storage, out available);
+                return !string.IsNullOrWhiteSpace(inputItemId) && available > 0;
+            default:
+                return false;
+        }
+    }
+
+    private static int GetProcessingBatchSize(BaseProcessingLineState line, int available)
+    {
+        if (line == null || available <= 0) return 0;
+        return Mathf.Min(available, Mathf.Max(1, Mathf.FloorToInt(line.capacityUnitsPerMinute)));
+    }
+
+    private static int AddOreProcessingOutputs(IslandProductionState storage, OreTypeConfig oreType, int batchKg)
+    {
+        if (storage == null || oreType == null || oreType.composition == null || batchKg <= 0) return 0;
+
+        int totalOutput = 0;
+        for (int i = 0; i < oreType.composition.Count; i++)
+        {
+            OreMineralCompositionConfig composition = oreType.composition[i];
+            if (composition == null || string.IsNullOrWhiteSpace(composition.mineralItemId) || composition.share <= 0f) continue;
+
+            int outputKg = Mathf.FloorToInt(batchKg * composition.share + 0.0001f);
+            if (outputKg <= 0 && batchKg > 0)
+            {
+                outputKg = 1;
+            }
+
+            totalOutput += storage.AddResource(composition.mineralItemId, outputKg);
+        }
+
+        return totalOutput;
+    }
+
+    private static int AddGasProcessingOutputs(IslandProductionState storage, GasCloudTypeConfig gasType, int batch)
+    {
+        if (storage == null || gasType == null || gasType.composition == null || batch <= 0) return 0;
+
+        int totalOutput = 0;
+        for (int i = 0; i < gasType.composition.Count; i++)
+        {
+            GasCloudCompositionConfig composition = gasType.composition[i];
+            if (composition == null || string.IsNullOrWhiteSpace(composition.itemId) || composition.share <= 0f) continue;
+
+            totalOutput += AddScaledProcessingOutput(storage, composition.itemId, batch, composition.share);
+        }
+
+        return totalOutput;
+    }
+
+    private static int AddScaledProcessingOutput(IslandProductionState storage, string itemId, int inputAmount, float share)
+    {
+        if (storage == null || string.IsNullOrWhiteSpace(itemId) || inputAmount <= 0 || share <= 0f) return 0;
+
+        int outputAmount = Mathf.FloorToInt(inputAmount * share + 0.0001f);
+        if (outputAmount <= 0)
+        {
+            outputAmount = 1;
+        }
+
+        return storage.AddResource(itemId, outputAmount);
+    }
+
+    private void ApplyCascadeOrderLoad(CascadeProductionOrderDefinition order)
+    {
+        if (progress == null || order == null) return;
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        order.Normalize();
+
+        for (int i = 0; i < order.loads.Count; i++)
+        {
+            CascadeProductionLoad load = order.loads[i];
+            if (load == null || load.loadUnits <= 0f) continue;
+
+            CascadeProductionLineState line = progress.baseIndustry.GetProduction(load.type);
+            line.totalLoadApplied += load.loadUnits;
+        }
+    }
+
+    private static string BuildCascadeOutputsText(CascadeProductionOrderDefinition order)
+    {
+        if (order == null || order.outputs == null || order.outputs.Count == 0)
+        {
+            return "nothing";
+        }
+
+        List<string> parts = new List<string>();
+        for (int i = 0; i < order.outputs.Count; i++)
+        {
+            CascadeItemAmount output = order.outputs[i];
+            if (output == null || string.IsNullOrWhiteSpace(output.itemId) || output.amount <= 0) continue;
+
+            parts.Add(output.itemId + " x" + output.amount);
+        }
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "nothing";
+    }
+
+    private bool TryInstallStarterFittingUpgrade(
+        string kitItemId,
+        string moduleId,
+        string preferredSlotId,
+        string slotTypeId,
+        string alreadyInstalledMessage,
+        string successMessagePrefix,
+        out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureWorldConfigLoaded();
+        message = "";
+
+        if (!ResolveStarterFittingUpgrade(
+                kitItemId,
+                moduleId,
+                preferredSlotId,
+                slotTypeId,
+                alreadyInstalledMessage,
+                out IslandProductionState storage,
+                out ShipPartDefinitionSO module,
+                out ShipSlotDefinition slot,
+                out message))
+        {
+            lastSaveMessage = message;
+            return false;
+        }
+
+        if (!storage.TrySpendResource(kitItemId, 1))
+        {
+            message = "Upgrade blocked: could not spend " + kitItemId + ".";
+            lastSaveMessage = message;
+            return false;
+        }
+
+        progress.InstallModule(slot.slotId, module.partId);
+        ApplySelectedShip();
+        AutoSaveIfDocked();
+
+        message = successMessagePrefix + ": " + GetPartName(module) + ".";
+        lastSaveMessage = message;
+        return true;
+    }
+
+    private bool ResolveStarterFittingUpgrade(
+        string kitItemId,
+        string moduleId,
+        string preferredSlotId,
+        string slotTypeId,
+        string alreadyInstalledMessage,
+        out IslandProductionState storage,
+        out ShipPartDefinitionSO module,
+        out ShipSlotDefinition slot,
+        out string message)
+    {
+        storage = null;
+        module = null;
+        slot = null;
+        message = "";
+
+        if (!IsDockedAtCapital())
+        {
+            message = "Starter fitting upgrades are available only at the base.";
+            return false;
+        }
+
+        storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            message = "Base storage is missing.";
+            return false;
+        }
+
+        if (storage.GetResourceAmount(kitItemId) <= 0)
+        {
+            message = "Upgrade blocked: build " + kitItemId + " first.";
+            return false;
+        }
+
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog == null)
+        {
+            message = "Ship catalog is missing.";
+            return false;
+        }
+
+        module = activeCatalog.GetPartById(moduleId);
+        if (module == null || !module.IsModule)
+        {
+            message = "Upgrade module is missing: " + moduleId + ".";
+            return false;
+        }
+
+        if (!ShipAssemblyBuilder.IsPartUsable(module, techTree, progress))
+        {
+            message = "Upgrade module is not researched: " + GetPartName(module) + ".";
+            return false;
+        }
+
+        slot = FindAssemblySlotForUpgrade(activeCatalog, preferredSlotId, slotTypeId);
+        if (slot == null)
+        {
+            message = "No " + GetSlotTypeDisplayName(slotTypeId) + " slot is available on the selected hull.";
+            return false;
+        }
+
+        string currentModuleId = progress.GetInstalledModule(slot.slotId);
+        if (currentModuleId == module.partId)
+        {
+            message = alreadyInstalledMessage;
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(currentModuleId))
+        {
+            message = GetSlotTypeDisplayName(slotTypeId) + " slot is already occupied by " + currentModuleId + ".";
+            return false;
+        }
+
+        if (!module.CanFitSlot(slot))
+        {
+            message = GetPartName(module) + " cannot fit " + slot.displayName + ".";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string GetSlotTypeDisplayName(string slotTypeId)
+    {
+        return slotTypeId switch
+        {
+            SessionExtractionConstants.HighSlotTypeId => "High",
+            SessionExtractionConstants.MidSlotTypeId => "Mid",
+            SessionExtractionConstants.LowSlotTypeId => "Low",
+            SessionExtractionConstants.RigSlotTypeId => "Rig",
+            _ => string.IsNullOrWhiteSpace(slotTypeId) ? "fitting" : slotTypeId
+        };
+    }
+
+    private ShipSlotDefinition FindAssemblySlotForUpgrade(ShipCatalogSO activeCatalog, string preferredSlotId, string slotTypeId)
+    {
+        List<ShipSlotDefinition> slots = GetAssemblySlotsForUi(activeCatalog);
+        ShipSlotDefinition fallback = null;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            ShipSlotDefinition candidate = slots[i];
+            if (candidate == null) continue;
+
+            if (candidate.slotId == preferredSlotId)
+            {
+                return candidate;
+            }
+
+            if (fallback == null && candidate.slotTypeId == slotTypeId)
+            {
+                fallback = candidate;
+            }
+        }
+
+        return fallback;
+    }
+
+    private string CountFittingBandText(List<ShipSlotDefinition> slots, ShipCatalogSO activeCatalog, string slotTypeId)
+    {
+        int total = 0;
+        int filled = 0;
+        if (slots != null)
+        {
+            for (int i = 0; i < slots.Count; i++)
+            {
+                ShipSlotDefinition slot = slots[i];
+                if (slot == null || slot.slotTypeId != slotTypeId) continue;
+
+                total++;
+                ShipPartDefinitionSO module = activeCatalog != null ? activeCatalog.GetPartById(progress.GetInstalledModule(slot.slotId)) : null;
+                if (module != null && module.IsModule && module.CanFitSlot(slot))
+                {
+                    filled++;
+                }
+            }
+        }
+
+        return filled + "/" + total;
+    }
+
+    private string BuildFittingBandSummary(List<ShipSlotDefinition> slots, ShipCatalogSO activeCatalog, string slotTypeId)
+    {
+        List<string> parts = new List<string>();
+        if (slots != null)
+        {
+            for (int i = 0; i < slots.Count; i++)
+            {
+                ShipSlotDefinition slot = slots[i];
+                if (slot == null || slot.slotTypeId != slotTypeId) continue;
+
+                ShipPartDefinitionSO module = activeCatalog != null ? activeCatalog.GetPartById(progress.GetInstalledModule(slot.slotId)) : null;
+                string moduleName = module != null && module.IsModule && module.CanFitSlot(slot)
+                    ? GetPartName(module)
+                    : "empty";
+                parts.Add(slot.displayName + "=" + moduleName);
+            }
+        }
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "none";
+    }
+
+    private string BuildStarterAirframeCascadeSummary()
+    {
+        CascadeProductionEstimate estimate = EstimateStarterAirframeCascade();
+        return "Starter airframe kit bottleneck: "
+            + SessionExtractionIndustry.GetProductionDisplayName(estimate.bottleneck)
+            + " ~" + estimate.bottleneckMinutes.ToString("F1") + " min."
+            + (estimate.canRun ? "" : " " + estimate.blockedReason);
     }
 
     private CargoCapacityInfo CalculateCargoCapacity()
@@ -2620,6 +6021,20 @@ public partial class MetaGameState : MonoBehaviour
     {
         if (ship == null || string.IsNullOrWhiteSpace(ship.claudiumResourceId)) return "claudium";
         return ship.claudiumResourceId;
+    }
+
+    private void ResolveCurrentTankResourceIds(out string fuelId, out string claudiumId)
+    {
+        ShipPhysics ship = GetActiveShip();
+        if (ship != null)
+        {
+            ApplyFuelConfigToShip(ship);
+        }
+
+        fuelId = ship != null && !string.IsNullOrWhiteSpace(ship.engineFuelId)
+            ? ship.engineFuelId
+            : GetStartingEngineFuelId();
+        claudiumId = GetClaudiumResourceId(ship);
     }
 
     private void ApplyFuelConfigToShip(ShipPhysics ship)
@@ -2949,13 +6364,21 @@ public partial class MetaGameState : MonoBehaviour
 
         GUILayout.Label("Мета-игра");
         GUILayout.Label("Режим: " + GetModeName(CurrentMode));
+        if (sessionExtractionCoreMode)
+        {
+            GUILayout.Label("Core: session extraction");
+        }
+
         GUILayout.Label("Док: " + progress.currentDockId + " (" + GetDockKindName(progress.currentDockKind) + ")");
         GUILayout.Label("Деньги: " + progress.money);
         GUILayout.Label("Руда: " + progress.GetResourceAmount("ore") + "  Железо: " + progress.GetResourceAmount("iron"));
         GUILayout.Label("Зерно магазина: " + progress.shopSeed + "  обновление через " + FormatRemaining(progress.nextShopRefreshUtcTicks));
         DrawTimeScaleUi();
         DrawSurveyDebugUi();
-        DrawFlagshipExpeditionUi();
+        if (!sessionExtractionCoreMode)
+        {
+            DrawFlagshipExpeditionUi();
+        }
 
         if (!string.IsNullOrWhiteSpace(lastSaveMessage))
         {
@@ -2988,7 +6411,7 @@ public partial class MetaGameState : MonoBehaviour
             : "-";
         string routeText = interior.expeditionActive ? "экспедиция" : "дома";
         GUILayout.Label("Флагман: " + routeText + "  Мораль: " + moraleText);
-        if (progress.activeExpedition != null && progress.activeExpedition.active)
+        if (!sessionExtractionCoreMode && progress.activeExpedition != null && progress.activeExpedition.active)
         {
             GUILayout.Label("Экспедиция: " + GetExpeditionDisplayName(progress.activeExpedition) + " / " + progress.activeExpedition.regionId);
         }
@@ -3046,8 +6469,15 @@ public partial class MetaGameState : MonoBehaviour
     private void DrawDockedDebugUi()
     {
         GUILayout.Label("Стыковка");
-        DrawAssemblyUi();
-        DrawCargoTransferUi();
+        if (UsesLegacyDockAssemblyUi)
+        {
+            DrawAssemblyUi();
+        }
+        if (!sessionExtractionCoreMode)
+        {
+            DrawCargoTransferUi();
+        }
+
         GUILayout.Space(8f);
 
         if (GUILayout.Button(new GUIContent("Сохранить у дока", "Сохраняет прогресс только если корабль находится в режиме стыковки.")))
@@ -3060,14 +6490,23 @@ public partial class MetaGameState : MonoBehaviour
             DeleteSave();
         }
 
-        if (missionController != null && missionController.mission != null && GUILayout.Button(new GUIContent("Вылететь на миссию", "Переводит игру в режим вылета. Прогресс сохранится после стыковки или аварийного возврата.")))
+        if (!sessionExtractionCoreMode)
         {
-            missionController.BeginMission();
+            if (missionController != null && missionController.mission != null && GUILayout.Button(new GUIContent("Вылететь на миссию", "Переводит игру в режим вылета. Прогресс сохранится после стыковки или аварийного возврата.")))
+            {
+                missionController.BeginMission();
+            }
+
+            if (GUILayout.Button(new GUIContent("Свободный вылет", "Начинает полет без активной миссии. Прогресс сохранится только после следующей стыковки.")))
+            {
+                BeginFreeFlight();
+            }
         }
 
-        if (GUILayout.Button(new GUIContent("Свободный вылет", "Начинает полет без активной миссии. Прогресс сохранится только после следующей стыковки.")))
+        DrawSessionExtractionDockedUi();
+        if (sessionExtractionCoreMode)
         {
-            BeginFreeFlight();
+            return;
         }
 
         GUILayout.Space(6f);
@@ -3102,6 +6541,211 @@ public partial class MetaGameState : MonoBehaviour
 
         DrawProcessList();
         DrawIslandProductionList();
+    }
+
+    private void DrawSessionExtractionDockedUi()
+    {
+        GUILayout.Space(8f);
+        GUILayout.Label("Session extraction");
+
+        bool canStart = IsDockedAtCapital();
+        SortieZoneDefinition selectedSortie = GetSelectedSessionSortieDefinition();
+        GUILayout.Label("Selected sortie: " + (selectedSortie != null ? selectedSortie.displayName : "-"));
+        GUILayout.Label("Fitting: " + GetSortieRequirementText(selectedSortie));
+        bool canBeginSelected = CanBeginSessionExtractionSortie(selectedSortie, out string sortieBlockReason);
+        GUI.enabled = canStart;
+        if (GUILayout.Button(new GUIContent("Next sortie", "Cycles through starter extraction zones: ore, gas, automatons, leviathans, and survey data.")))
+        {
+            SelectNextSessionSortie(out _);
+        }
+
+        GUI.enabled = canStart && canBeginSelected;
+        if (GUILayout.Button(new GUIContent("Start selected sortie", "Launches the selected extraction session: bounded cylinder, resource cache, manual Extract home.")))
+        {
+            BeginSelectedSessionSortie();
+        }
+
+        GUI.enabled = true;
+        if (!canStart)
+        {
+            GUILayout.Label("Safe sorties start only from the base.");
+        }
+        else if (!canBeginSelected)
+        {
+            GUILayout.Label(sortieBlockReason);
+        }
+
+        GUILayout.Label("Fitting bands: High work modules, Mid support, Low hull upgrades, Rig passive modifiers.");
+        GUILayout.Label("Slots: " + GetCoreFittingSummaryText());
+        DrawBaseExtractionIndustryUi();
+    }
+
+    private void DrawBaseExtractionIndustryUi()
+    {
+        if (!IsDockedAtCapital())
+        {
+            return;
+        }
+
+        EnsureWorldConfigLoaded();
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        IslandProductionState storage = GetCapitalStorageState();
+
+        GUILayout.Space(6f);
+        GUILayout.Label("Base processing branches");
+        GUILayout.Label(GetBaseProcessingOverviewText());
+        for (int i = 0; i < SessionExtractionIndustry.ProcessingBranches.Length; i++)
+        {
+            BaseProcessingBranch branch = SessionExtractionIndustry.ProcessingBranches[i];
+            BaseProcessingLineState line = progress.baseIndustry.GetProcessing(branch);
+            GUILayout.Label(SessionExtractionIndustry.GetProcessingDisplayName(branch)
+                + ": cap " + line.capacityUnitsPerMinute.ToString("F0")
+                + "/min, done " + line.totalProcessedUnits.ToString("F0"));
+        }
+
+        bool anyProcessable = false;
+        for (int i = 0; i < SessionExtractionIndustry.ProcessingBranches.Length; i++)
+        {
+            BaseProcessingBranch branch = SessionExtractionIndustry.ProcessingBranches[i];
+            bool canProcess = TryGetAvailableBaseProcessingInput(branch, storage, out string inputItemId, out int availableInput);
+            anyProcessable |= canProcess;
+            GUI.enabled = canProcess;
+            if (GUILayout.Button(new GUIContent(
+                "Process " + SessionExtractionIndustry.GetProcessingDisplayName(branch),
+                "Consumes " + (string.IsNullOrWhiteSpace(inputItemId) ? "branch input" : inputItemId)
+                    + " from base storage. Available: " + availableInput + ".")))
+            {
+                TryProcessBaseBatch(branch, out _);
+            }
+        }
+
+        GUI.enabled = true;
+        if (!anyProcessable)
+        {
+            GUILayout.Label("Processing waits for extracted sortie resources in base storage.");
+        }
+
+        GUILayout.Space(4f);
+        GUILayout.Label("Base upgrades");
+        GUILayout.Label(GetNextBaseIndustryUpgradeOverviewText());
+        bool canUpgradeNext = CanUpgradeNextBaseIndustryLine(out string upgradeLineMessage);
+        GUI.enabled = canUpgradeNext;
+        if (GUILayout.Button(new GUIContent("Upgrade next base line", "Spends base materials to increase the next processing or cascade line level and capacity.")))
+        {
+            TryUpgradeNextBaseIndustryLine(out _);
+        }
+
+        GUI.enabled = true;
+        if (!canUpgradeNext)
+        {
+            GUILayout.Label(upgradeLineMessage);
+        }
+
+        GUILayout.Space(4f);
+        GUILayout.Label("Cascade production");
+        GUILayout.Label(GetBaseCascadeProductionOverviewText());
+        GUILayout.Label(GetNextBaseCascadeOrderOverviewText());
+        for (int i = 0; i < SessionExtractionIndustry.CascadeProductionTypes.Length; i++)
+        {
+            CascadeProductionType type = SessionExtractionIndustry.CascadeProductionTypes[i];
+            CascadeProductionLineState line = progress.baseIndustry.GetProduction(type);
+            GUILayout.Label(SessionExtractionIndustry.GetProductionDisplayName(type)
+                + ": cap " + line.capacityUnitsPerMinute.ToString("F0")
+                + "/min, load " + line.totalLoadApplied.ToString("F0"));
+        }
+
+        List<CascadeProductionOrderDefinition> starterOrders = CreateStarterCascadeOrders();
+        bool anyRunnableOrder = false;
+        for (int i = 0; i < starterOrders.Count; i++)
+        {
+            CascadeProductionOrderDefinition order = starterOrders[i];
+            if (order == null) continue;
+
+            CascadeProductionEstimate estimate = EstimateBaseCascadeOrder(order);
+            anyRunnableOrder |= estimate.canRun;
+            GUI.enabled = estimate.canRun;
+            if (GUILayout.Button(new GUIContent(
+                "Run " + order.displayName,
+                estimate.canRun
+                    ? "Bottleneck: " + SessionExtractionIndustry.GetProductionDisplayName(estimate.bottleneck)
+                        + " ~" + estimate.bottleneckMinutes.ToString("F1") + " min."
+                    : estimate.blockedReason)))
+            {
+                TryRunBaseCascadeOrder(order, out _);
+            }
+        }
+
+        GUI.enabled = true;
+        if (!anyRunnableOrder)
+        {
+            CascadeProductionEstimate nextEstimate = EstimateNextBaseCascadeOrder(out CascadeProductionOrderDefinition nextOrder);
+            GUILayout.Label(nextOrder != null
+                ? nextOrder.displayName + ": " + nextEstimate.blockedReason
+                : "No starter cascade orders are configured.");
+        }
+
+        bool canInstallUpgrade = CanInstallNextStarterFittingUpgrade(out string upgradeMessage);
+        GUI.enabled = canInstallUpgrade;
+        if (GUILayout.Button(new GUIContent(GetNextStarterFittingUpgradeActionLabel(), "Consumes a starter kit and installs the next core fitting upgrade.")))
+        {
+            TryInstallNextStarterFittingUpgrade(out _);
+        }
+
+        GUI.enabled = true;
+        if (!canInstallUpgrade)
+        {
+            GUILayout.Label(upgradeMessage);
+        }
+
+        bool canLoadStarterMunitions = CanLoadStarterMunitionsAtBase(out string munitionLoadMessage);
+        GUI.enabled = canLoadStarterMunitions;
+        if (GUILayout.Button(new GUIContent("Load starter munitions", "Consumes a munition bundle at the base and loads weapon cargo for sortie weapons and harpoons.")))
+        {
+            TryLoadStarterMunitionsAtBase(out _);
+        }
+
+        GUI.enabled = true;
+        if (!canLoadStarterMunitions)
+        {
+            GUILayout.Label(munitionLoadMessage);
+        }
+    }
+
+    private void DrawSessionExtractionFlightUi()
+    {
+        if (!HasActiveSortie)
+        {
+            return;
+        }
+
+        SortieReturnEstimate estimate = GetActiveSortieReturnEstimate();
+        SortieSessionState sortie = ActiveSortie;
+        SortieZoneDefinition zone = sortie != null ? sortie.zone : null;
+
+        GUILayout.Space(8f);
+        GUILayout.Label("Session extraction");
+        if (zone != null)
+        {
+            GUILayout.Label($"{zone.displayName}: radius {zone.radiusMeters:F0} m, base {zone.distanceToBaseKm:F0} km away");
+        }
+
+        GUILayout.Label($"Boundary: {estimate.distanceToBoundaryMeters:F0} m, return {FormatDurationSeconds(estimate.returnTimeSeconds)}");
+        GUILayout.Label($"Need: coal {estimate.requiredCoalKg:F0} kg, claudium {estimate.requiredClaudiumKg:F0} kg");
+        GUILayout.Label($"Have: coal {estimate.currentCoalKg:F1} kg, claudium {estimate.currentClaudiumKg:F1} kg");
+        GUILayout.Label(estimate.status);
+        if (!string.IsNullOrWhiteSpace(activeSortieExtractionRunupStatus))
+        {
+            GUILayout.Label(activeSortieExtractionRunupStatus);
+        }
+
+        GUI.enabled = estimate.canExtract;
+        if (GUILayout.Button(new GUIContent("Extract home", "Consumes return coal and claudium, transfers sortie cargo to base, and docks at home.")))
+        {
+            TryExtractActiveSortie(out _);
+        }
+
+        GUI.enabled = true;
     }
 
     private void DrawExpeditionDebugControls()
@@ -3172,7 +6816,9 @@ public partial class MetaGameState : MonoBehaviour
             }
         }
 
-        if (progress.activeExpedition != null && progress.activeExpedition.active)
+        DrawSessionExtractionFlightUi();
+
+        if (!sessionExtractionCoreMode && progress.activeExpedition != null && progress.activeExpedition.active)
         {
             GUILayout.Label("Активная экспедиция: " + GetExpeditionDisplayName(progress.activeExpedition));
             if (GUILayout.Button(new GUIContent("Вернуться из экспедиции", "Завершает экспедицию, возвращает флагман в столицу и восстанавливает мораль.")))
@@ -3181,7 +6827,9 @@ public partial class MetaGameState : MonoBehaviour
             }
         }
 
-        DockingPort nearbyDock = FindAvailableDockingPort(ship);
+        if (!sessionExtractionCoreMode)
+        {
+            DockingPort nearbyDock = FindAvailableDockingPort(ship);
         if (nearbyDock != null)
         {
             GUILayout.Label("Док в радиусе: " + nearbyDock.displayName);
@@ -3203,9 +6851,18 @@ public partial class MetaGameState : MonoBehaviour
             GUI.enabled = true;
         }
 
+        }
+
         if (GUILayout.Button(new GUIContent("Потерять корабль", "Завершает вылет аварией: груз и текущая сборка теряются, игрок возвращается в город на стартовом корабле.")))
         {
-            LoseShipAndReturnToCity("Ручной аварийный возврат");
+            if (HasActiveSortie)
+            {
+                LoseActiveSortieShipAndReturnToBase("Manual sortie loss");
+            }
+            else
+            {
+                LoseShipAndReturnToCity("Ручной аварийный возврат");
+            }
         }
     }
 
@@ -3350,7 +7007,7 @@ public partial class MetaGameState : MonoBehaviour
             int moved = RefillTankFromStorage(progress.shipEngineFuelTank, fuelId, capacity.fuelTankCapacityKg, storage);
             if (moved > 0)
             {
-                ApplyCargoMassToShip(GetActiveShip());
+                SyncShipConsumablesWithCargo(true);
                 AutoSaveIfDocked();
             }
         }
@@ -3361,7 +7018,7 @@ public partial class MetaGameState : MonoBehaviour
             int moved = RefillTankFromStorage(progress.shipClaudiumTank, claudiumId, capacity.claudiumTankCapacityKg, storage);
             if (moved > 0)
             {
-                ApplyCargoMassToShip(GetActiveShip());
+                SyncShipConsumablesWithCargo(true);
                 AutoSaveIfDocked();
             }
         }
@@ -3629,6 +7286,11 @@ public partial class MetaGameState : MonoBehaviour
     private void StartCargoTransfer(IslandConfig island, IslandProductionState storage)
     {
         if (island == null || storage == null || progress == null) return;
+        if (sessionExtractionCoreMode)
+        {
+            lastSaveMessage = "Legacy cargo transfer is disabled in session extraction core.";
+            return;
+        }
 
         CargoCapacityInfo capacity = CalculateCargoCapacity();
         if (GetPlannedCargoMassKg() + capacity.currentTankKg > capacity.maxCargoKg + 0.001f)
@@ -3732,7 +7394,7 @@ public partial class MetaGameState : MonoBehaviour
         if (GUILayout.Button(new GUIContent("Перезагрузить конфиги мира", "Повторно читает CSV из Assets/Data/Config без перезапуска Play Mode.")))
         {
             ReloadWorldConfigs();
-            SpawnConfiguredIslands(true);
+            SpawnConfiguredWorldActors(true);
         }
 
         if (worldConfig == null || !worldConfig.isLoaded)
@@ -4107,7 +7769,7 @@ public partial class MetaGameState : MonoBehaviour
         GUILayout.Label("Масса: " + stats.Get(ShipStatId.BaseMass, 0f).ToString("F0") + " кг");
         GUILayout.Label("Лимит корпуса: " + stats.Get(ShipStatId.HullMaxTakeoffMassKg, 0f).ToString("F0") + " кг взлетной массы");
         GUILayout.Label("Двигатель: " + stats.Get(ShipStatId.EngineMaxPower, 0f).ToString("F0") + " кВт на 100%");
-        GUILayout.Label("Винт: " + stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f).ToString("F1") + " м/с, тяга " + stats.Get(ShipStatId.PropellerMaxThrustKgf, 0f).ToString("F0") + " кгс");
+        GUILayout.Label("Винт: расчет " + stats.Get(ShipStatId.PropellerMaxSpeedMS, 0f).ToString("F1") + " м/с, тяга без жесткого потолка");
         GUILayout.Label("Клавдий: макс. подъем " + stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f).ToString("F0") + " кг");
     }
 
@@ -4124,21 +7786,21 @@ public partial class MetaGameState : MonoBehaviour
 
         if (hull == null) return slots;
 
-        AddAssemblySlotsForUi(slots, hull.slots, "");
+        AddAssemblySlotsForUi(slots, hull.slots, "", progress);
         for (int i = 0; i < slots.Count; i++)
         {
             ShipSlotDefinition slot = slots[i];
             ShipPartDefinitionSO module = activeCatalog.GetPartById(progress.GetInstalledModule(slot.slotId));
             if (module != null && module.IsModule && module.CanFitSlot(slot))
             {
-                AddAssemblySlotsForUi(slots, module.grantedSlots, slot.slotId + ":" + module.partId + ":");
+                AddAssemblySlotsForUi(slots, module.grantedSlots, slot.slotId + ":" + module.partId + ":", progress);
             }
         }
 
         return slots;
     }
 
-    private static void AddAssemblySlotsForUi(List<ShipSlotDefinition> target, List<ShipSlotDefinition> source, string prefix)
+    private static void AddAssemblySlotsForUi(List<ShipSlotDefinition> target, List<ShipSlotDefinition> source, string prefix, PlayerProgress progress)
     {
         if (target == null || source == null) return;
 
@@ -4146,6 +7808,7 @@ public partial class MetaGameState : MonoBehaviour
         {
             ShipSlotDefinition slot = source[i];
             if (slot == null) continue;
+            if (!ShipAssemblyBuilder.ShouldIncludeSlotForProgress(slot, progress)) continue;
 
             string slotId = string.IsNullOrWhiteSpace(slot.slotId) ? "slot_" + i : slot.slotId;
             target.Add(slot.CloneWithId(prefix + slotId));

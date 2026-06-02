@@ -6,6 +6,7 @@ public static class MiningWorldSimulator
     public static int Advance(WorldConfigDatabase config, PlayerProgress progress, long fromUtcTicks, long toUtcTicks)
     {
         if (config == null || !config.isLoaded || progress == null || toUtcTicks <= 0) return 0;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return 0;
 
         EnsureRuntime(config, progress, toUtcTicks);
         int changed = AdvanceNaturalShedding(config, progress, fromUtcTicks, toUtcTicks);
@@ -36,6 +37,8 @@ public static class MiningWorldSimulator
     public static void EnsureRuntime(WorldConfigDatabase config, PlayerProgress progress, long utcTicks)
     {
         if (config == null || !config.isLoaded || progress == null) return;
+        if (SessionExtractionCoreRuntime.IsCoreMode(progress)) return;
+
         progress.Normalize();
 
         for (int i = 0; i < config.miningZones.Count; i++)

@@ -52,7 +52,7 @@ MonoBehaviour:
     value: 900
   - stat: 45
     operation: 0
-    value: 3000
+    value: 3200
   - stat: 11
     operation: 0
     value: 1.225
@@ -82,10 +82,10 @@ MonoBehaviour:
     value: 15
   - stat: 23
     operation: 0
-    value: 5
+    value: 10
   - stat: 24
     operation: 0
-    value: 1
+    value: 10
   - stat: 27
     operation: 0
     value: 0.2

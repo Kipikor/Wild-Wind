@@ -139,8 +139,7 @@ public partial class WorldConfigDatabase
                 completedTechId = Get(row, "complited_tech"),
                 baseMassKg = Mathf.Max(0f, ParseFloat(Get(row, "base_mass_kg"))),
                 maxSpeedMS = Mathf.Max(0f, ParseFloat(Get(row, "max_speed_ms"))),
-                efficiency = Mathf.Clamp01(ParseFloat(Get(row, "efficiency"))),
-                maxThrustKgf = Mathf.Max(0f, ParseFloat(Get(row, "max_thrust_kgf")))
+                efficiency = Mathf.Clamp01(ParseFloat(Get(row, "efficiency")))
             };
 
             if (string.IsNullOrWhiteSpace(propeller.id)) continue;
@@ -263,7 +262,6 @@ public class PropellerConfig
     public float baseMassKg;
     public float maxSpeedMS;
     public float efficiency;
-    public float maxThrustKgf;
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }

@@ -1,13 +1,8 @@
 {
     "name": "WildWind.PlayModeTests",
     "rootNamespace": "",
-    "references": [
-        "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
-    ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "references": [],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,
@@ -17,6 +12,9 @@
     "autoReferenced": false,
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
     ],
     "versionDefines": [],
     "noEngineReferences": false

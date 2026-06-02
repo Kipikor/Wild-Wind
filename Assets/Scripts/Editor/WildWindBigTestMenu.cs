@@ -1,10 +1,13 @@
+using System;
+using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public static class WildWindBigTestMenu
 {
+    private const string WorldScenePath = "Assets/Scenes/WildWindWorldScene.unity";
+
     [MenuItem("Wild Wind/Провести большой тест")]
     public static void RunBigTest()
     {
@@ -14,23 +17,18 @@ public static class WildWindBigTestMenu
             return;
         }
 
-        WorldSceneBuilder.BuildFinalWorldScene();
-        RemoveSceneBigTestRunnersFromActiveScene();
-        WildWindSaveSlots.ClearPendingGameplayLaunch();
-        WildWindUsageAudit.ArmForBigTest();
-        WildWindBigTestRunner.MarkEditorBigTestLaunchPending();
-
-        Scene scene = SceneManager.GetActiveScene();
-        if (scene.IsValid())
+        if (!File.Exists(WorldScenePath))
         {
-            EditorSceneManager.MarkSceneDirty(scene);
-            if (!string.IsNullOrWhiteSpace(scene.path))
-            {
-                EditorSceneManager.SaveScene(scene);
-            }
+            Debug.Log("[WildWindBigTest] World scene is missing, rebuilding once before the big test: " + WorldScenePath);
+            WorldSceneBuilder.BuildFinalWorldScene();
         }
 
-        Debug.Log("[WildWindBigTest] Сцена большого теста готова. Включаю Play Mode, протокол появится в Console и TestReports/WildWindBigTestReport.txt.");
+        WildWindSaveSlots.ClearPendingGameplayLaunch();
+        WildWindUsageAudit.DisarmForBigTest();
+        WildWindBigTestRunner.MarkEditorBigTestLaunchPending();
+        WriteLaunchStatus("launching", "Editor menu requested Play Mode for the big test.");
+
+        Debug.Log("[WildWindBigTest] Starting Play Mode on existing world scene. Report: TestReports/WildWindBigTestReport.txt.");
         WildWindEditorStartSceneGuard.UseWorldSceneForNextPlay();
         EditorApplication.isPlaying = true;
     }
@@ -43,18 +41,26 @@ public static class WildWindBigTestMenu
             !EditorApplication.isPlayingOrWillChangePlaymode;
     }
 
-    private static void RemoveSceneBigTestRunnersFromActiveScene()
+    private static void WriteLaunchStatus(string state, string message)
     {
-        WildWindBigTestRunner[] runners = Object.FindObjectsByType<WildWindBigTestRunner>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        for (int i = 0; i < runners.Length; i++)
+        try
         {
-            WildWindBigTestRunner runner = runners[i];
-            if (runner == null)
-            {
-                continue;
-            }
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string folder = Path.Combine(projectRoot, "TestReports");
+            Directory.CreateDirectory(folder);
 
-            Object.DestroyImmediate(runner.gameObject);
+            string sceneName = EditorSceneManager.GetActiveScene().name;
+            string text =
+                "state: " + (string.IsNullOrWhiteSpace(state) ? "unknown" : state) + Environment.NewLine +
+                "generatedAtUtc: " + DateTime.UtcNow.ToString("O") + Environment.NewLine +
+                "scene: " + sceneName + Environment.NewLine +
+                "message: " + (message ?? "") + Environment.NewLine;
+
+            File.WriteAllText(Path.Combine(folder, "WildWindBigTestStatus.txt"), text);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("[WildWindBigTest] Could not write launch status: " + exception.Message);
         }
     }
 }

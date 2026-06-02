@@ -154,12 +154,10 @@ public enum ShipStatId
     BaseMass = 0,
     [InspectorName("Масса триммирования")]
     TargetTrimMass = 1,
-    [InspectorName("Максимальная скорость винта")]
+    [InspectorName("Расчетная скорость винта")]
     PropellerMaxSpeedMS = 2,
     [InspectorName("КПД винта")]
     PropellerEfficiency = 3,
-    [InspectorName("Максимальная тяга винта")]
-    PropellerMaxThrustKgf = 4,
     [InspectorName("Мощность двигателя на 100%, кВт")]
     EngineMaxPower = 6,
     [InspectorName("КПД топлива двигателя")]
