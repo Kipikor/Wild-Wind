@@ -18,7 +18,9 @@ public enum WildWindInputKey
     Space,
     X,
     LeftCtrl,
-    RightCtrl
+    RightCtrl,
+    LeftAlt,
+    RightAlt
 }
 
 public struct WildWindFlightInputState
@@ -175,6 +177,11 @@ public sealed class WildWindControlSettings : MonoBehaviour
         return false;
     }
 
+    public static bool IsGameplayCursorReleasePressed()
+    {
+        return IsKeyPressed(WildWindInputKey.LeftAlt) || IsKeyPressed(WildWindInputKey.RightAlt);
+    }
+
 #if ENABLE_INPUT_SYSTEM
     private static bool TryReadInputSystemKey(WildWindInputKey key)
     {
@@ -198,6 +205,8 @@ public sealed class WildWindControlSettings : MonoBehaviour
             WildWindInputKey.X => keyboard.xKey.isPressed,
             WildWindInputKey.LeftCtrl => keyboard.leftCtrlKey.isPressed,
             WildWindInputKey.RightCtrl => keyboard.rightCtrlKey.isPressed,
+            WildWindInputKey.LeftAlt => keyboard.leftAltKey.isPressed,
+            WildWindInputKey.RightAlt => keyboard.rightAltKey.isPressed,
             _ => false
         };
     }
@@ -220,6 +229,8 @@ public sealed class WildWindControlSettings : MonoBehaviour
             WildWindInputKey.X => Input.GetKey(KeyCode.X),
             WildWindInputKey.LeftCtrl => Input.GetKey(KeyCode.LeftControl),
             WildWindInputKey.RightCtrl => Input.GetKey(KeyCode.RightControl),
+            WildWindInputKey.LeftAlt => Input.GetKey(KeyCode.LeftAlt),
+            WildWindInputKey.RightAlt => Input.GetKey(KeyCode.RightAlt),
             _ => false
         };
     }

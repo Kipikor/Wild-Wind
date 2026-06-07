@@ -10,47 +10,60 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     private const float HardMaxCameraDistanceMeters = 2000f;
     private const float CalibratedWheelScrollUnitsAcrossZoomRange = 0.383f;
     private const float CalibratedWheelTickUnit = CalibratedWheelScrollUnitsAcrossZoomRange / 6f;
+    private const float CameraWheelEffectivenessMultiplier = 20f;
+    private const float FlightGunToStandardWheelUnits = 1.25f;
+    private const float FlightStandardToHighWheelUnits = 2.25f;
+    private const float FlightHighToScopeWheelUnits = 2f;
+    private const float FlightGunViewHeightMeters = 1.2f;
+    private const float FlightShipStandardHeightMeters = 18f;
+    private const float FlightShipStandardBackOffsetMeters = 24f;
+    private const float FlightShipHighLengthMultiplier = 2f;
+    private const float FlightCameraWideFieldOfView = 55f;
+    private const float FlightScopeReferenceRangeMeters = 20000f;
+    private const float FlightScopeScreenWidthMetersAtReferenceRange = 1000f;
+    private const float FlightScopeMinimumWheelEffectiveness = 0.2f;
 
-    [Header("References")]
-    [SerializeField, InspectorName("Focus")] private Transform focus;
-    [SerializeField, InspectorName("World Camera")] private Camera worldCamera;
-    [SerializeField, InspectorName("Visual Tuner")] private VisualPlayModeTuner visualTuner;
-    [SerializeField, InspectorName("Bubble Streamer")] private WorldBubbleStreamer bubbleStreamer;
-    [SerializeField, InspectorName("Control Settings")] private WildWindControlSettings controlSettings;
-    [SerializeField, InspectorName("Gameplay Session")] private WildWindGameplaySession gameplaySession;
+    [SerializeField, HideInInspector] private Transform focus;
+    [SerializeField, HideInInspector] private Camera worldCamera;
+    [SerializeField, HideInInspector] private VisualPlayModeTuner visualTuner;
+    [SerializeField, HideInInspector] private WorldBubbleStreamer bubbleStreamer;
+    [SerializeField, HideInInspector] private WildWindControlSettings controlSettings;
+    [SerializeField, HideInInspector] private WildWindGameplaySession gameplaySession;
 
-    [Header("Movement")]
-    [SerializeField, Range(50f, 4000f), InspectorName("Cruise Speed, m/s")] private float cruiseSpeedMetersPerSecond = 650f;
-    [SerializeField, Range(50f, 3000f), InspectorName("Vertical Speed, m/s")] private float verticalSpeedMetersPerSecond = 420f;
-    [SerializeField, Range(2f, 20f), InspectorName("Sprint Multiplier")] private float sprintMultiplier = 6f;
+    [SerializeField, HideInInspector, Range(50f, 4000f)] private float cruiseSpeedMetersPerSecond = 650f;
+    [SerializeField, HideInInspector, Range(50f, 3000f)] private float verticalSpeedMetersPerSecond = 420f;
+    [SerializeField, HideInInspector, Range(2f, 20f)] private float sprintMultiplier = 6f;
 
-    [Header("Camera")]
-    [SerializeField, InspectorName("Camera Offset")] private Vector3 cameraOffset = new Vector3(-760f, 240f, -820f);
-    [SerializeField, InspectorName("Camera Look Offset")] private Vector3 cameraLookOffset = new Vector3(120f, 20f, 120f);
-    [SerializeField, Range(0.01f, 1f), InspectorName("Follow Sharpness")] private float followSharpness = 0.22f;
-    [SerializeField, Range(0.01f, 1f), InspectorName("Orbit Sensitivity")] private float orbitSensitivity = 0.18f;
-    [SerializeField, Range(0.1f, 1f), InspectorName("Close Orbit Sensitivity Scale")] private float closeOrbitSensitivityScale = 0.35f;
-    [SerializeField, Range(1f, 4f), InspectorName("Far Orbit Sensitivity Scale")] private float farOrbitSensitivityScale = 2.2f;
-    [SerializeField, Range(0.05f, 2f), InspectorName("Scroll Units Across Zoom Range")] private float scrollUnitsAcrossZoomRange = CalibratedWheelScrollUnitsAcrossZoomRange;
-    [SerializeField, Range(5f, 500f), InspectorName("Min Camera Distance, m")] private float minCameraDistanceMeters = HardMinCameraDistanceMeters;
-    [SerializeField, Range(500f, 2000f), InspectorName("Max Camera Distance, m")] private float maxCameraDistanceMeters = HardMaxCameraDistanceMeters;
-    [SerializeField, Range(5f, 2000f), InspectorName("Takeoff Camera Distance, m")] private float takeoffCameraDistanceMeters = 620f;
-    [SerializeField, Range(0.05f, 2f), InspectorName("Takeoff Camera Blend, s")] private float takeoffCameraBlendSeconds = 0.65f;
-    [SerializeField, Range(0.02f, 1.5f), InspectorName("Flight Pivot Smooth, s")] private float flightCameraPivotSmoothSeconds = 0.22f;
-    [SerializeField, Range(0.04f, 2f), InspectorName("Flight Vertical Pivot Smooth, s")] private float flightCameraVerticalPivotSmoothSeconds = 0.62f;
-    [SerializeField, Range(0.04f, 2f), InspectorName("Flight Camera Height Smooth, s")] private float flightCameraHeightSmoothSeconds = 0.48f;
-    [SerializeField, Range(0.02f, 1f), InspectorName("Flight Camera Rotation Smooth, s")] private float flightCameraRotationSmoothSeconds = 0.14f;
-    [SerializeField, Range(0.02f, 1.5f), InspectorName("Flight Orbit Heading Smooth, s")] private float flightCameraOrbitHeadingSmoothSeconds = 0.38f;
-    [SerializeField, InspectorName("Rigid Flight Camera")] private bool rigidFlightCamera = true;
-    [SerializeField, Range(0f, 45f), InspectorName("Tail Auto Align Window, deg")] private float tailAutoAlignWindowDegrees = 15f;
-    [SerializeField, Range(0f, 1f), InspectorName("Tail Auto Align Delay, s")] private float tailAutoAlignDelaySeconds = 0.12f;
-    [SerializeField, Range(0.02f, 1.5f), InspectorName("Tail Auto Align Smooth, s")] private float tailAutoAlignSmoothSeconds = 0.24f;
-    [SerializeField, Range(-20f, 80f), InspectorName("Min Camera Pitch")] private float minCameraPitchDegrees = 6f;
-    [SerializeField, Range(0f, 85f), InspectorName("Max Camera Pitch")] private float maxCameraPitchDegrees = 58f;
+    [SerializeField, HideInInspector] private Vector3 cameraOffset = new Vector3(-760f, 240f, -820f);
+    [SerializeField, HideInInspector] private Vector3 cameraLookOffset = new Vector3(120f, 20f, 120f);
+    [SerializeField, HideInInspector, Range(0.01f, 1f)] private float followSharpness = 0.22f;
+    [SerializeField, HideInInspector, Range(0.01f, 1f)] private float orbitSensitivity = 0.18f;
+    [SerializeField, HideInInspector, Range(0.1f, 1f)] private float closeOrbitSensitivityScale = 0.35f;
+    [SerializeField, HideInInspector, Range(1f, 4f)] private float farOrbitSensitivityScale = 2.2f;
+    [SerializeField, HideInInspector, Range(0.05f, 2f)] private float scrollUnitsAcrossZoomRange = CalibratedWheelScrollUnitsAcrossZoomRange;
+    [SerializeField, HideInInspector, Range(5f, 500f)] private float minCameraDistanceMeters = HardMinCameraDistanceMeters;
+    [SerializeField, HideInInspector, Range(500f, 2000f)] private float maxCameraDistanceMeters = HardMaxCameraDistanceMeters;
+    [SerializeField, HideInInspector, Range(5f, 2000f)] private float takeoffCameraDistanceMeters = 620f;
+    [SerializeField, HideInInspector, Range(0.05f, 2f)] private float takeoffCameraBlendSeconds = 0.65f;
+    [SerializeField, HideInInspector, Range(0.02f, 1.5f)] private float flightCameraPivotSmoothSeconds = 0.22f;
+    [SerializeField, HideInInspector, Range(0.04f, 2f)] private float flightCameraVerticalPivotSmoothSeconds = 0.62f;
+    [SerializeField, HideInInspector, Range(0.04f, 2f)] private float flightCameraHeightSmoothSeconds = 0.48f;
+    [SerializeField, HideInInspector, Range(0.02f, 1f)] private float flightCameraRotationSmoothSeconds = 0.14f;
+    [SerializeField, HideInInspector, Range(0.02f, 1.5f)] private float flightCameraOrbitHeadingSmoothSeconds = 0.38f;
+    [SerializeField, HideInInspector] private bool rigidFlightCamera = true;
+    [SerializeField, HideInInspector, Range(0f, 45f)] private float tailAutoAlignWindowDegrees = 15f;
+    [SerializeField, HideInInspector, Range(0f, 1f)] private float tailAutoAlignDelaySeconds = 0.12f;
+    [SerializeField, HideInInspector, Range(0.02f, 1.5f)] private float tailAutoAlignSmoothSeconds = 0.24f;
+    [SerializeField, HideInInspector, Range(-20f, 80f)] private float minCameraPitchDegrees = 6f;
+    [SerializeField, HideInInspector, Range(0f, 85f)] private float maxCameraPitchDegrees = 58f;
 
-    [Header("Temporary Wheel Debug")]
-    [SerializeField, InspectorName("Show Wheel Tick Counter")] private bool showWheelTickCounter = false;
-    [SerializeField, Range(0.001f, 0.5f), InspectorName("Wheel Tick Unit")] private float wheelTickUnit = CalibratedWheelTickUnit;
+    [SerializeField, HideInInspector] private bool warshipsFlightMouseLook = true;
+    [SerializeField, HideInInspector] private bool altReleasesCursor = true;
+    [SerializeField, HideInInspector, Range(50f, 1800f)] private float flightAimLookAheadMeters = 650f;
+    [SerializeField, HideInInspector, Range(-50f, 180f)] private float flightAimVerticalOffsetMeters = 28f;
+
+    [SerializeField, HideInInspector] private bool showWheelTickCounter = false;
+    [SerializeField, HideInInspector, Range(0.001f, 0.5f)] private float wheelTickUnit = CalibratedWheelTickUnit;
 
     private Vector3 uiInput;
     private float uiInputUntilTime;
@@ -80,6 +93,18 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     private int wheelTickCounter;
     private int lastWheelTickDirection;
     private string lastWheelInputSource = "none";
+    private bool ownsGameplayCursor;
+    private CursorLockMode storedCursorLockState;
+    private bool storedCursorVisible;
+    private Vector3 lastCameraAimTarget;
+    private float flightCameraWheelRouteUnits;
+    private float flightCameraWheelRoute01;
+    private bool ownsFlightCameraFieldOfView;
+    private float storedFlightCameraFieldOfView;
+
+    public static bool GameplayCursorLockedForMouseLook { get; private set; }
+    public static bool GameplayCursorReleasedForUi { get; private set; }
+    public static float GameplayMouseLookSensitivityScale { get; private set; } = 1f;
 
     public Transform CurrentMovementTarget => GetMovementTarget();
     public float CameraOrbitDistanceMeters => cameraOrbitDistanceMeters;
@@ -89,6 +114,8 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     public float MinimumCameraDistanceMeters => GetMinimumCameraDistanceMeters();
     public float MaximumCameraDistanceMeters => GetMaximumCameraDistanceMeters();
     public Vector3 LastCameraOrbitPivot => lastCameraOrbitPivot;
+    public Vector3 LastCameraAimTarget => lastCameraAimTarget;
+    public float FlightCameraWheelRoute01 => flightCameraWheelRoute01;
 
     private void Awake()
     {
@@ -100,6 +127,22 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     private void OnValidate()
     {
         ApplyWheelCalibrationMigration();
+    }
+
+    private void OnDisable()
+    {
+        RestoreGameplayCursorStateIfOwned();
+        RestoreFlightCameraFieldOfView(true);
+        GameplayMouseLookSensitivityScale = 1f;
+    }
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus && ownsGameplayCursor)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
     }
 
     private void Update()
@@ -138,7 +181,9 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         }
 
         HandleCameraTargetTransition(movementTarget);
-        UpdateCameraOrbitInput();
+        ApplyGameplayCursorState(movementTarget);
+        UpdateGameplayMouseLookSensitivityScale(movementTarget);
+        UpdateCameraOrbitInput(movementTarget);
     }
 
     private void LateUpdate()
@@ -215,6 +260,8 @@ public sealed class WorldDebugTravelController : MonoBehaviour
             takeoffCameraDistanceMeters,
             GetMinimumCameraDistanceMeters(),
             GetMaximumCameraDistanceMeters());
+        flightCameraWheelRouteUnits = 0f;
+        flightCameraWheelRoute01 = 0f;
         cameraWasOrbitingPlayerShip = IsPlayerShipFlightTarget(target);
         BeginTakeoffCameraBlend();
         ApplyCamera(false, target);
@@ -225,8 +272,18 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         InitializeCameraOrbit(GetEffectiveCameraOffset());
         cameraOrbitYawDegrees = NormalizeDegrees(cameraOrbitYawDegrees + yawDeltaDegrees);
         cameraOrbitPitchDegrees = Mathf.Clamp(cameraOrbitPitchDegrees + pitchDeltaDegrees, minCameraPitchDegrees, maxCameraPitchDegrees);
-        ApplyProgressiveZoom(zoomSteps);
-        ApplyCamera(false, GetMovementTarget());
+        Transform target = GetMovementTarget();
+        ApplyCameraWheelZoomForTarget(target, zoomSteps);
+        ApplyCamera(false, target);
+    }
+
+    public bool EvaluateGameplayCursorStateForTests(bool altPressed, out CursorLockMode lockState, out bool cursorVisible)
+    {
+        Transform target = GetMovementTarget();
+        bool shouldControl = ShouldControlGameplayCursor(target);
+        bool releaseCursor = shouldControl && altReleasesCursor && altPressed;
+        ResolveGameplayCursorState(shouldControl, releaseCursor, out lockState, out cursorVisible);
+        return shouldControl;
     }
 
     [ContextMenu("Move To Capital")]
@@ -372,7 +429,7 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         }
     }
 
-    private void UpdateCameraOrbitInput()
+    private void UpdateCameraOrbitInput(Transform movementTarget)
     {
         InitializeCameraOrbit(GetEffectiveCameraOffset());
 
@@ -386,10 +443,10 @@ public sealed class WorldDebugTravelController : MonoBehaviour
 
         if (hasDragDelta)
         {
-            float effectiveOrbitSensitivity = GetOrbitSensitivityForDistance(cameraOrbitDistanceMeters);
+            float effectiveOrbitSensitivity = GetOrbitSensitivityForTarget(movementTarget, cameraOrbitDistanceMeters);
             cameraOrbitYawDegrees = NormalizeDegrees(cameraOrbitYawDegrees + dragDelta.x * effectiveOrbitSensitivity);
             cameraOrbitPitchDegrees = Mathf.Clamp(
-                cameraOrbitPitchDegrees - dragDelta.y * effectiveOrbitSensitivity,
+                cameraOrbitPitchDegrees + dragDelta.y * effectiveOrbitSensitivity,
                 minCameraPitchDegrees,
                 maxCameraPitchDegrees);
             hasCameraOrbitManualDrag = true;
@@ -398,7 +455,8 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         float scroll = ReadCameraZoomScroll();
         if (Mathf.Abs(scroll) > 0.001f)
         {
-            ApplyProgressiveZoom(scroll);
+            ApplyCameraWheelZoomForTarget(movementTarget, scroll);
+            UpdateGameplayMouseLookSensitivityScale(movementTarget);
         }
 
         ApplyTailAutoAlignmentAfterOrbitInput(orbitControlActive);
@@ -440,12 +498,30 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     private Vector2 ReadCameraOrbitDragDelta(out bool orbitControlActive)
     {
         orbitControlActive = false;
-#if ENABLE_INPUT_SYSTEM
-        Mouse mouse = Mouse.current;
-        if (mouse != null && mouse.rightButton.isPressed)
+        if (ShouldUseLockedFlightMouseLook())
         {
             orbitControlActive = true;
-            return mouse.delta.ReadValue();
+#if ENABLE_INPUT_SYSTEM
+            Mouse lockedMouse = Mouse.current;
+            if (lockedMouse != null)
+            {
+                return lockedMouse.delta.ReadValue();
+            }
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * 18f;
+#else
+            return Vector2.zero;
+#endif
+        }
+
+#if ENABLE_INPUT_SYSTEM
+        Mouse dragMouse = Mouse.current;
+        if (dragMouse != null && dragMouse.rightButton.isPressed)
+        {
+            orbitControlActive = true;
+            return dragMouse.delta.ReadValue();
         }
 #endif
 
@@ -569,14 +645,15 @@ public sealed class WorldDebugTravelController : MonoBehaviour
 
         InitializeCameraOrbit(GetEffectiveCameraOffset());
         float effectiveFollowSharpness = controlSettings != null ? controlSettings.DebugCameraFollowSharpness : followSharpness;
-        Vector3 localOrbitOffset = Quaternion.Euler(cameraOrbitPitchDegrees, cameraOrbitYawDegrees, 0f) *
-            (Vector3.back * cameraOrbitDistanceMeters);
-        Vector3 orbitOffset = GetCameraOrbitFrame(target, snap) * localOrbitOffset;
+        Quaternion orbitFrame = GetCameraOrbitFrame(target, snap);
 
         Vector3 rawOrbitPivot = GetCameraOrbitPivot(target);
         lastCameraOrbitPivot = GetSmoothedCameraOrbitPivot(target, rawOrbitPivot, snap);
-        Vector3 targetPosition = lastCameraOrbitPivot + orbitOffset;
-        Quaternion targetRotation = GetCameraLookRotation(targetPosition, lastCameraOrbitPivot);
+        lastCameraAimTarget = GetCameraAimTarget(target, lastCameraOrbitPivot, orbitFrame);
+        Vector3 targetPosition = IsPlayerShipFlightTarget(target)
+            ? GetFlightWheelCameraPosition(target, lastCameraOrbitPivot, lastCameraAimTarget, orbitFrame)
+            : GetOrbitCameraPosition(lastCameraOrbitPivot, orbitFrame);
+        Quaternion targetRotation = GetCameraLookRotation(targetPosition, lastCameraAimTarget);
 
         if (!snap && TryApplyTakeoffCameraBlend(targetPosition, targetRotation))
         {
@@ -587,10 +664,11 @@ public sealed class WorldDebugTravelController : MonoBehaviour
             ? targetPosition
             : GetSmoothedCameraPosition(target, targetPosition, effectiveFollowSharpness);
         worldCamera.transform.position = nextPosition;
-        Quaternion lookRotation = GetCameraLookRotation(nextPosition, lastCameraOrbitPivot);
+        Quaternion lookRotation = GetCameraLookRotation(nextPosition, lastCameraAimTarget);
         worldCamera.transform.rotation = snap
             ? lookRotation
             : GetSmoothedCameraRotation(target, lookRotation);
+        ApplyFlightCameraFieldOfView(target, snap);
     }
 
     private Transform GetMovementTarget()
@@ -622,6 +700,182 @@ public sealed class WorldDebugTravelController : MonoBehaviour
         }
 
         return target.position + GetEffectiveCameraLookOffset();
+    }
+
+    private Vector3 GetCameraAimTarget(Transform target, Vector3 orbitPivot, Quaternion orbitFrame)
+    {
+        if (!IsPlayerShipFlightTarget(target))
+        {
+            return orbitPivot;
+        }
+
+        if (TryGetManualGunCameraAimTarget(target, out Vector3 manualGunAimTarget))
+        {
+            return manualGunAimTarget;
+        }
+
+        Vector3 aimForward = orbitFrame * (Quaternion.Euler(0f, cameraOrbitYawDegrees, 0f) * Vector3.forward);
+        aimForward = Vector3.ProjectOnPlane(aimForward, Vector3.up);
+        if (aimForward.sqrMagnitude <= 0.001f)
+        {
+            aimForward = Vector3.ProjectOnPlane(target.forward, Vector3.up);
+        }
+
+        if (aimForward.sqrMagnitude <= 0.001f)
+        {
+            aimForward = Vector3.forward;
+        }
+
+        float lookAheadMeters = GetFlightAimLookAheadMeters();
+        return orbitPivot +
+            aimForward.normalized * lookAheadMeters +
+            Vector3.up * flightAimVerticalOffsetMeters;
+    }
+
+    private Vector3 GetOrbitCameraPosition(Vector3 orbitPivot, Quaternion orbitFrame)
+    {
+        Vector3 localOrbitOffset = Quaternion.Euler(cameraOrbitPitchDegrees, cameraOrbitYawDegrees, 0f) *
+            (Vector3.back * cameraOrbitDistanceMeters);
+        return orbitPivot + orbitFrame * localOrbitOffset;
+    }
+
+    private Vector3 GetFlightWheelCameraPosition(Transform target, Vector3 orbitPivot, Vector3 aimTarget, Quaternion orbitFrame)
+    {
+        Vector3 shipForward = ResolveFlightShipFlatForward(target);
+        Vector3 gunAnchor = TryGetManualGunCameraAnchor(target, out Vector3 manualGunAnchor)
+            ? manualGunAnchor
+            : orbitPivot + shipForward * 12f;
+
+        Vector3 gunViewPosition = gunAnchor + Vector3.up * FlightGunViewHeightMeters;
+        Vector3 shipStandardPosition = orbitPivot +
+            Vector3.up * FlightShipStandardHeightMeters -
+            shipForward * FlightShipStandardBackOffsetMeters;
+        Vector3 shipHighPosition = orbitPivot +
+            Vector3.up * ResolveFlightShipHighHeightMeters(target) -
+            shipForward * FlightShipStandardBackOffsetMeters;
+
+        float route = Mathf.Clamp(flightCameraWheelRouteUnits, 0f, GetFlightCameraWheelTotalUnits());
+        float gunEnd = GetFlightGunToStandardWheelUnits();
+        float highEnd = gunEnd + GetFlightStandardToHighWheelUnits();
+        if (route <= gunEnd)
+        {
+            float t = Mathf.SmoothStep(0f, 1f, route / gunEnd);
+            return Vector3.Lerp(gunViewPosition, shipStandardPosition, t);
+        }
+
+        if (route <= highEnd)
+        {
+            float t = Mathf.SmoothStep(0f, 1f, (route - gunEnd) / (highEnd - gunEnd));
+            return Vector3.Lerp(shipStandardPosition, shipHighPosition, t);
+        }
+
+        return shipHighPosition;
+    }
+
+    private float ResolveFlightShipHighHeightMeters(Transform target)
+    {
+        float shipLength = ResolveFlightShipLengthMeters(target);
+        float highHeight = shipLength * FlightShipHighLengthMultiplier;
+        return Mathf.Max(FlightShipStandardHeightMeters, highHeight);
+    }
+
+    private static float ResolveFlightShipLengthMeters(Transform target)
+    {
+        if (target == null)
+        {
+            return 20f;
+        }
+
+        Renderer[] renderers = target.GetComponentsInChildren<Renderer>();
+        bool hasBounds = false;
+        Bounds bounds = new Bounds(target.position, Vector3.zero);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (!hasBounds)
+        {
+            return 20f;
+        }
+
+        Vector3 size = bounds.size;
+        float length = Mathf.Max(size.x, size.z);
+        return Mathf.Clamp(length, 8f, 160f);
+    }
+
+    private Vector3 ResolveFlightCameraFlatForward(Transform target, Quaternion orbitFrame)
+    {
+        Vector3 flatForward = orbitFrame * (Quaternion.Euler(0f, cameraOrbitYawDegrees, 0f) * Vector3.forward);
+        flatForward = Vector3.ProjectOnPlane(flatForward, Vector3.up);
+        if (flatForward.sqrMagnitude <= 0.001f && target != null)
+        {
+            flatForward = Vector3.ProjectOnPlane(target.forward, Vector3.up);
+        }
+
+        if (flatForward.sqrMagnitude <= 0.001f)
+        {
+            flatForward = Vector3.forward;
+        }
+
+        return flatForward.normalized;
+    }
+
+    private static Vector3 ResolveFlightShipFlatForward(Transform target)
+    {
+        Vector3 flatForward = target != null
+            ? Vector3.ProjectOnPlane(target.forward, Vector3.up)
+            : Vector3.zero;
+        if (flatForward.sqrMagnitude <= 0.001f)
+        {
+            flatForward = Vector3.forward;
+        }
+
+        return flatForward.normalized;
+    }
+
+    private static bool TryGetManualGunCameraAimTarget(Transform target, out Vector3 aimTarget)
+    {
+        aimTarget = Vector3.zero;
+        if (target == null)
+        {
+            return false;
+        }
+
+        ShipPhysics ship = target.GetComponent<ShipPhysics>();
+        return ship != null && ship.TryGetManualGunCameraAimTarget(out aimTarget);
+    }
+
+    private static bool TryGetManualGunCameraAnchor(Transform target, out Vector3 anchor)
+    {
+        anchor = Vector3.zero;
+        if (target == null)
+        {
+            return false;
+        }
+
+        ShipPhysics ship = target.GetComponent<ShipPhysics>();
+        return ship != null && ship.TryGetManualGunCameraAnchor(out anchor);
+    }
+
+    private float GetFlightAimLookAheadMeters()
+    {
+        float scaledLookAhead = Mathf.Max(flightAimLookAheadMeters, cameraOrbitDistanceMeters * 0.7f);
+        return Mathf.Clamp(scaledLookAhead, 50f, 1800f);
     }
 
     private Vector3 GetSmoothedCameraOrbitPivot(Transform target, Vector3 rawPivot, bool snap)
@@ -819,6 +1073,331 @@ public sealed class WorldDebugTravelController : MonoBehaviour
             gameplaySession.PlayerShipRoot == target;
     }
 
+    private bool ShouldControlGameplayCursor(Transform target)
+    {
+        return warshipsFlightMouseLook && IsPlayerShipFlightTarget(target);
+    }
+
+    private bool ShouldUseLockedFlightMouseLook()
+    {
+        Transform target = GetMovementTarget();
+        return ShouldControlGameplayCursor(target) &&
+            !(altReleasesCursor && WildWindControlSettings.IsGameplayCursorReleasePressed());
+    }
+
+    private void ApplyGameplayCursorState(Transform target)
+    {
+        bool shouldControl = ShouldControlGameplayCursor(target);
+        bool releaseCursor = shouldControl &&
+            altReleasesCursor &&
+            WildWindControlSettings.IsGameplayCursorReleasePressed();
+
+        if (!shouldControl)
+        {
+            RestoreGameplayCursorStateIfOwned();
+            GameplayCursorLockedForMouseLook = false;
+            GameplayCursorReleasedForUi = false;
+            GameplayMouseLookSensitivityScale = 1f;
+            return;
+        }
+
+        if (!ownsGameplayCursor)
+        {
+            storedCursorLockState = Cursor.lockState;
+            storedCursorVisible = Cursor.visible;
+            ownsGameplayCursor = true;
+        }
+
+        ResolveGameplayCursorState(shouldControl, releaseCursor, out CursorLockMode lockState, out bool cursorVisible);
+        Cursor.lockState = lockState;
+        Cursor.visible = cursorVisible;
+        GameplayCursorLockedForMouseLook = lockState == CursorLockMode.Locked;
+        GameplayCursorReleasedForUi = releaseCursor;
+    }
+
+    private void UpdateGameplayMouseLookSensitivityScale(Transform target)
+    {
+        GameplayMouseLookSensitivityScale = IsPlayerShipFlightTarget(target)
+            ? GetFlightMouseLookSensitivityScale()
+            : 1f;
+    }
+
+    private float GetFlightMouseLookSensitivityScale()
+    {
+        float scopeRatio = GetFlightCameraScopeRatio();
+        if (scopeRatio <= 0.001f)
+        {
+            return 1f;
+        }
+
+        float currentVerticalFovDegrees = Mathf.Lerp(
+            FlightCameraWideFieldOfView,
+            GetFlightScopeVerticalFieldOfView(),
+            scopeRatio);
+        return GetFieldOfViewSensitivityScale(FlightCameraWideFieldOfView, currentVerticalFovDegrees);
+    }
+
+    private static float GetFieldOfViewSensitivityScale(float referenceVerticalFovDegrees, float currentVerticalFovDegrees)
+    {
+        float referenceTangent = Mathf.Tan(Mathf.Clamp(referenceVerticalFovDegrees, 0.5f, 179f) * 0.5f * Mathf.Deg2Rad);
+        float currentTangent = Mathf.Tan(Mathf.Clamp(currentVerticalFovDegrees, 0.5f, 179f) * 0.5f * Mathf.Deg2Rad);
+        return referenceTangent > 0.0001f
+            ? Mathf.Clamp(currentTangent / referenceTangent, 0.001f, 1f)
+            : 1f;
+    }
+
+    private void RestoreGameplayCursorStateIfOwned()
+    {
+        if (!ownsGameplayCursor)
+        {
+            return;
+        }
+
+        Cursor.lockState = storedCursorLockState;
+        Cursor.visible = storedCursorVisible;
+        ownsGameplayCursor = false;
+        GameplayCursorLockedForMouseLook = false;
+        GameplayCursorReleasedForUi = false;
+        GameplayMouseLookSensitivityScale = 1f;
+    }
+
+    private void ApplyCameraWheelZoomForTarget(Transform target, float scrollDelta)
+    {
+        if (IsPlayerShipFlightTarget(target))
+        {
+            ApplyFlightCameraWheelRoute(scrollDelta * CameraWheelEffectivenessMultiplier);
+            return;
+        }
+
+        ApplyProgressiveZoom(scrollDelta * CameraWheelEffectivenessMultiplier);
+    }
+
+    private void ApplyFlightCameraWheelRoute(float scrollDelta)
+    {
+        if (Mathf.Abs(scrollDelta) <= 0.001f)
+        {
+            return;
+        }
+
+        flightCameraWheelRouteUnits = ApplyFlightCameraWheelRouteDelta(flightCameraWheelRouteUnits, scrollDelta);
+        flightCameraWheelRoute01 = GetFlightCameraWheelRoute01();
+    }
+
+    private float ApplyFlightCameraWheelRouteDelta(float currentRouteUnits, float scrollDelta)
+    {
+        float total = GetFlightCameraWheelTotalUnits();
+        float scopeStart = GetFlightScopeStartWheelUnits();
+        float clampedRoute = Mathf.Clamp(currentRouteUnits, 0f, total);
+        if (scrollDelta > 0f)
+        {
+            return ApplyPositiveFlightCameraWheelRouteDelta(clampedRoute, scrollDelta, scopeStart, total);
+        }
+
+        return ApplyNegativeFlightCameraWheelRouteDelta(clampedRoute, scrollDelta, scopeStart, total);
+    }
+
+    private float ApplyPositiveFlightCameraWheelRouteDelta(float currentRouteUnits, float scrollDelta, float scopeStart, float total)
+    {
+        if (currentRouteUnits < scopeStart)
+        {
+            float deltaToScopeStart = scopeStart - currentRouteUnits;
+            if (scrollDelta <= deltaToScopeStart)
+            {
+                return Mathf.Clamp(currentRouteUnits + scrollDelta, 0f, total);
+            }
+
+            currentRouteUnits = scopeStart;
+            scrollDelta -= deltaToScopeStart;
+        }
+
+        if (currentRouteUnits >= total)
+        {
+            return total;
+        }
+
+        float rawDeltaToMaxScope = GetRawFlightScopeWheelDelta(currentRouteUnits, total, scopeStart, total);
+        return scrollDelta >= rawDeltaToMaxScope
+            ? total
+            : ApplyFlightScopeWheelDampedDelta(currentRouteUnits, scrollDelta, scopeStart, total);
+    }
+
+    private float ApplyNegativeFlightCameraWheelRouteDelta(float currentRouteUnits, float scrollDelta, float scopeStart, float total)
+    {
+        if (currentRouteUnits > scopeStart)
+        {
+            float rawDeltaToScopeStart = GetRawFlightScopeWheelDelta(currentRouteUnits, scopeStart, scopeStart, total);
+            if (scrollDelta >= rawDeltaToScopeStart)
+            {
+                return ApplyFlightScopeWheelDampedDelta(currentRouteUnits, scrollDelta, scopeStart, total);
+            }
+
+            currentRouteUnits = scopeStart;
+            scrollDelta -= rawDeltaToScopeStart;
+        }
+
+        return Mathf.Clamp(currentRouteUnits + scrollDelta, 0f, total);
+    }
+
+    private float ApplyFlightScopeWheelDampedDelta(float currentRouteUnits, float scrollDelta, float scopeStart, float total)
+    {
+        float scopeLength = Mathf.Max(0.001f, total - scopeStart);
+        float minimumEffectiveness = Mathf.Clamp(FlightScopeMinimumWheelEffectiveness, 0.01f, 1f);
+        float reduction = 1f - minimumEffectiveness;
+        float currentRatio = Mathf.InverseLerp(scopeStart, total, currentRouteUnits);
+        if (reduction <= 0.0001f)
+        {
+            return Mathf.Clamp(currentRouteUnits + scrollDelta, scopeStart, total);
+        }
+
+        float remainingEffectiveness = 1f - reduction * currentRatio;
+        float nextRatio = (1f - remainingEffectiveness * Mathf.Exp(-reduction * scrollDelta / scopeLength)) / reduction;
+        return Mathf.Lerp(scopeStart, total, Mathf.Clamp01(nextRatio));
+    }
+
+    private float GetRawFlightScopeWheelDelta(float fromRouteUnits, float toRouteUnits, float scopeStart, float total)
+    {
+        float scopeLength = Mathf.Max(0.001f, total - scopeStart);
+        float minimumEffectiveness = Mathf.Clamp(FlightScopeMinimumWheelEffectiveness, 0.01f, 1f);
+        float reduction = 1f - minimumEffectiveness;
+        float fromRatio = Mathf.InverseLerp(scopeStart, total, fromRouteUnits);
+        float toRatio = Mathf.InverseLerp(scopeStart, total, toRouteUnits);
+        if (reduction <= 0.0001f)
+        {
+            return (toRatio - fromRatio) * scopeLength;
+        }
+
+        float fromEffectiveness = Mathf.Max(0.001f, 1f - reduction * fromRatio);
+        float toEffectiveness = Mathf.Max(0.001f, 1f - reduction * toRatio);
+        return scopeLength / reduction * Mathf.Log(fromEffectiveness / toEffectiveness);
+    }
+
+    private void ApplyFlightCameraFieldOfView(Transform target, bool snap)
+    {
+        if (worldCamera == null)
+        {
+            return;
+        }
+
+        if (!IsPlayerShipFlightTarget(target))
+        {
+            RestoreFlightCameraFieldOfView(snap);
+            return;
+        }
+
+        if (!ownsFlightCameraFieldOfView)
+        {
+            storedFlightCameraFieldOfView = worldCamera.fieldOfView;
+            ownsFlightCameraFieldOfView = true;
+        }
+
+        float focusRatio = GetFlightCameraScopeRatio();
+        float desiredFieldOfView = Mathf.Lerp(
+            FlightCameraWideFieldOfView,
+            GetFlightScopeVerticalFieldOfView(),
+            focusRatio);
+        worldCamera.fieldOfView = snap
+            ? desiredFieldOfView
+            : Mathf.Lerp(worldCamera.fieldOfView, desiredFieldOfView, 1f - Mathf.Exp(-GetCameraDeltaTime() / 0.08f));
+    }
+
+    private float GetFlightScopeVerticalFieldOfView()
+    {
+        float referenceRange = Mathf.Max(1f, FlightScopeReferenceRangeMeters);
+        float screenWidth = Mathf.Clamp(
+            FlightScopeScreenWidthMetersAtReferenceRange,
+            1f,
+            referenceRange * 2f);
+        float aspect = worldCamera != null
+            ? Mathf.Max(0.01f, worldCamera.aspect)
+            : 16f / 9f;
+
+        float horizontalRadians = 2f * Mathf.Atan((screenWidth * 0.5f) / referenceRange);
+        float verticalRadians = 2f * Mathf.Atan(Mathf.Tan(horizontalRadians * 0.5f) / aspect);
+        return Mathf.Clamp(verticalRadians * Mathf.Rad2Deg, 0.5f, FlightCameraWideFieldOfView);
+    }
+
+    private void RestoreFlightCameraFieldOfView(bool snap)
+    {
+        if (!ownsFlightCameraFieldOfView || worldCamera == null)
+        {
+            return;
+        }
+
+        if (snap)
+        {
+            worldCamera.fieldOfView = storedFlightCameraFieldOfView;
+            ownsFlightCameraFieldOfView = false;
+            return;
+        }
+
+        worldCamera.fieldOfView = Mathf.Lerp(
+            worldCamera.fieldOfView,
+            storedFlightCameraFieldOfView,
+            1f - Mathf.Exp(-GetCameraDeltaTime() / 0.12f));
+        if (Mathf.Abs(worldCamera.fieldOfView - storedFlightCameraFieldOfView) <= 0.05f)
+        {
+            worldCamera.fieldOfView = storedFlightCameraFieldOfView;
+            ownsFlightCameraFieldOfView = false;
+        }
+    }
+
+    private float GetFlightCameraWheelRoute01()
+    {
+        float total = GetFlightCameraWheelTotalUnits();
+        return total > 0.001f ? Mathf.Clamp01(flightCameraWheelRouteUnits / total) : 0f;
+    }
+
+    private float GetFlightCameraScopeRatio()
+    {
+        float scopeStart = GetFlightScopeStartWheelUnits();
+        float total = GetFlightCameraWheelTotalUnits();
+        return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(scopeStart, total, flightCameraWheelRouteUnits));
+    }
+
+    private float GetFlightScopeStartWheelUnits()
+    {
+        return GetFlightGunToStandardWheelUnits() + GetFlightStandardToHighWheelUnits();
+    }
+
+    private float GetFlightCameraWheelTotalUnits()
+    {
+        return GetFlightGunToStandardWheelUnits() +
+            GetFlightStandardToHighWheelUnits() +
+            GetFlightHighToScopeWheelUnits();
+    }
+
+    private float GetFlightGunToStandardWheelUnits()
+    {
+        return FlightGunToStandardWheelUnits;
+    }
+
+    private float GetFlightStandardToHighWheelUnits()
+    {
+        return FlightStandardToHighWheelUnits;
+    }
+
+    private float GetFlightHighToScopeWheelUnits()
+    {
+        return FlightHighToScopeWheelUnits;
+    }
+
+    private static void ResolveGameplayCursorState(
+        bool shouldControl,
+        bool releaseCursor,
+        out CursorLockMode lockState,
+        out bool cursorVisible)
+    {
+        if (!shouldControl || releaseCursor)
+        {
+            lockState = CursorLockMode.None;
+            cursorVisible = true;
+            return;
+        }
+
+        lockState = CursorLockMode.Locked;
+        cursorVisible = false;
+    }
+
     private float GetMinimumCameraDistanceMeters()
     {
         return Mathf.Clamp(minCameraDistanceMeters, HardMinCameraDistanceMeters, HardMaxCameraDistanceMeters);
@@ -827,6 +1406,14 @@ public sealed class WorldDebugTravelController : MonoBehaviour
     private float GetMaximumCameraDistanceMeters()
     {
         return Mathf.Clamp(maxCameraDistanceMeters, GetMinimumCameraDistanceMeters(), HardMaxCameraDistanceMeters);
+    }
+
+    private float GetOrbitSensitivityForTarget(Transform target, float distanceMeters)
+    {
+        float sensitivity = GetOrbitSensitivityForDistance(distanceMeters);
+        return IsPlayerShipFlightTarget(target)
+            ? sensitivity * GetFlightMouseLookSensitivityScale()
+            : sensitivity;
     }
 
     private float GetOrbitSensitivityForDistance(float distanceMeters)

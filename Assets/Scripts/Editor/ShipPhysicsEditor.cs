@@ -415,6 +415,9 @@ public class ShipPhysicsEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("weaponResourceId"), new GUIContent("Ресурс оружия"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("weaponShotCostKg"), new GUIContent("Расход за выстрел, кг"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("weaponShotAlarmRadiusMeters"), new GUIContent("Радиус тревоги выстрела, м"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("showGunAimHud"), new GUIContent("Показывать время полета у курсора"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("manualGunGroupIndex"), new GUIContent("Индекс ручной группы"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("shipGunGroups"), new GUIContent("Орудийные группы"), true);
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
@@ -435,18 +438,15 @@ public class ShipPhysicsEditor : Editor
             }
 
             EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(ship.miningLastMessage) ? "Готов." : ship.miningLastMessage, EditorStyles.wordWrappedLabel);
-
-            if (Application.isPlaying)
+            if (!string.IsNullOrWhiteSpace(ship.weaponAimStatus))
             {
-                EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Выстрел"))
-                {
-                    Undo.RecordObject(ship, "Mining Shot");
-                    ship.TryShootNearestMiningRock(out _);
-                    EditorUtility.SetDirty(ship);
-                }
-                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.LabelField("Прицел", $"{ship.weaponAimFlightTimeSeconds:0.0} с / {ship.weaponAimDistanceMeters:0} м / {ship.weaponAimStatus}", EditorStyles.wordWrappedLabel);
             }
+            if (!string.IsNullOrWhiteSpace(ship.weaponLastMessage))
+            {
+                EditorGUILayout.LabelField("Оружие", ship.weaponLastMessage, EditorStyles.wordWrappedLabel);
+            }
+
         }
     }
 
@@ -494,13 +494,6 @@ public class ShipPhysicsEditor : Editor
             if (Application.isPlaying)
             {
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Выстрел гарпуном"))
-                {
-                    Undo.RecordObject(ship, "Fire Harpoon");
-                    ship.TryFireHarpoonAtNearestLeviathan(out _);
-                    EditorUtility.SetDirty(ship);
-                }
-
                 if (GUILayout.Button("Отцепить"))
                 {
                     Undo.RecordObject(ship, "Detach Harpoon");
@@ -508,13 +501,6 @@ public class ShipPhysicsEditor : Editor
                     EditorUtility.SetDirty(ship);
                 }
                 EditorGUILayout.EndHorizontal();
-
-                if (GUILayout.Button("Выстрел оружием"))
-                {
-                    Undo.RecordObject(ship, "Shoot Leviathan");
-                    ship.TryShootLeviathan(out _);
-                    EditorUtility.SetDirty(ship);
-                }
 
                 if (GUILayout.Button("Забрать тушу в груз"))
                 {
@@ -882,7 +868,7 @@ public static class LeviathanHuntingSetupEditor
             ship.leviathanHuntMaxTargetMassKg = 7000f;
             ship.leviathanHuntMaxTetherDriftMeters = 1500f;
             ship.weaponResourceId = "weapon";
-            ship.weaponShotCostKg = 0.1f;
+            ship.weaponShotCostKg = 0f;
             ship.weaponShotAlarmRadiusMeters = 450f;
             ship.leviathanWeaponShotFlightDamage = 25f;
             ship.harpoonLastMessage = "Гарпун готов к тестовой охоте.";

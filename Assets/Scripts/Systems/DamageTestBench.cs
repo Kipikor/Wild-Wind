@@ -57,7 +57,6 @@ public class DamageTestBench : MonoBehaviour
         caliberMm = 76f,
         damagePoints = 120f,
         hullDamageOnPenetration = 120f,
-        armorPlateDamage = 25f,
         penetrationMm = 80f,
         normalizationDegrees = 5f,
         penetrationRollSpread = 0.1f,
@@ -71,7 +70,6 @@ public class DamageTestBench : MonoBehaviour
         caliberMm = 90f,
         damagePoints = 150f,
         hullDamageOnPenetration = 85f,
-        armorPlateDamage = 55f,
         penetrationMm = 28f,
         explosiveRadiusMeters = 6f,
         normalizationDegrees = 0f,
@@ -515,7 +513,6 @@ public class DamageTestBench : MonoBehaviour
             caliberMm = preset.caliberMm,
             damagePoints = preset.damagePoints,
             hullDamageOnPenetration = preset.hullDamageOnPenetration > 0.001f ? preset.hullDamageOnPenetration : preset.damagePoints,
-            armorPlateDamage = preset.armorPlateDamage,
             penetrationMm = RollPenetration(preset),
             explosiveRadiusMeters = preset.explosiveRadiusMeters,
             normalizationDegrees = preset.normalizationDegrees,
@@ -549,11 +546,12 @@ public class DamageTestBench : MonoBehaviour
         projectileBody.mass = Mathf.Max(0.01f, projectileMassKg);
         projectileBody.useGravity = false;
         projectileBody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-        projectileBody.linearVelocity = direction * Mathf.Max(1f, muzzleVelocityMS);
+        Vector3 initialVelocity = direction * Mathf.Max(1f, muzzleVelocityMS);
+        projectileBody.linearVelocity = initialVelocity;
 
         DamageProjectile projectile = projectileObject.AddComponent<DamageProjectile>();
-        projectile.shell = CopyPreset(preset);
-        projectile.sourceName = name;
+        float lifetime = Mathf.Max(0.2f, maxRangeMeters / Mathf.Max(1f, muzzleVelocityMS) * 3f);
+        projectile.Initialize(CopyPreset(preset), name, null, initialVelocity, Mathf.Max(1f, maxRangeMeters), lifetime, 1f);
         projectile.moveKinematicTargets = !ramKeepTargetAnchored;
         projectile.highExplosiveImpulseScale = highExplosiveImpulseScale;
         projectile.highExplosiveMaxDeltaVelocityMS = highExplosiveMaxTargetDeltaVelocityMS;
@@ -704,8 +702,9 @@ public class DamageTestBench : MonoBehaviour
             caliberMm = preset.caliberMm,
             damagePoints = preset.damagePoints,
             hullDamageOnPenetration = preset.hullDamageOnPenetration,
-            armorPlateDamage = preset.armorPlateDamage,
             penetrationMm = preset.penetrationMm,
+            penetrationAtMaxRangeMultiplier = preset.penetrationAtMaxRangeMultiplier,
+            velocityRetentionAtMaxRange = preset.velocityRetentionAtMaxRange,
             explosiveRadiusMeters = preset.explosiveRadiusMeters,
             normalizationDegrees = preset.normalizationDegrees,
             penetrationRollSpread = preset.penetrationRollSpread,

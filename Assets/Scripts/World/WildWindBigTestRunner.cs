@@ -20,7 +20,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private const string LogPrefix = "[WildWindBigTest] ";
     private const string DefaultConfigFolder = "Data/Config";
     private const int BigTestContractVersion = 2;
-    private const int MinimumExpectedCheckCount = 645;
+    private const int MinimumExpectedCheckCount = 665;
     private const int MaxCapturedConsoleMessages = 32;
     private const string BigTestSessionSavePrefix = "wild_wind_big_test_session_";
 #if UNITY_EDITOR
@@ -48,6 +48,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         "Localization",
         "Грузовые единицы и отсеки кораблей",
         "Pioneer ship catalog",
+        "Starter hull visual asset contract",
         "Симуляция производств",
         "Сид и манифест мира",
         "Большой мир и чанки",
@@ -262,6 +263,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ValidateLocalizationConfig(report);
             ValidateCargoStorageModel(config, report);
             ValidatePioneerShipCatalog(config, report);
+            ValidateStarterHullVisualAssetContract(report);
             ValidateProductionSimulation(config, report);
 
             ValidateWorldDataManifest(report);
@@ -1618,6 +1620,550 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             DestroyBigTestUnityObject(catalog);
         }
     }
+
+    private static void ValidateStarterHullVisualAssetContract(BigTestReport report)
+    {
+        report.Section("Starter hull visual asset contract");
+#if UNITY_EDITOR
+        const string sourceObjPath = "Assets/Data/ShipPrefabs/StarterHullBlender.obj";
+        const string bodyMeshPath = "Assets/Data/ShipPrefabs/StarterHullBodyMesh.asset";
+        const string turretBaseMeshPath = "Assets/Data/ShipPrefabs/StarterHullTurretBaseMesh.asset";
+        const string turretMeshPath = "Assets/Data/ShipPrefabs/StarterHullTurretMesh.asset";
+        const string barrelMeshPath = "Assets/Data/ShipPrefabs/StarterHullBarrelMesh.asset";
+        const string starterHullPrefabPath = "Assets/Data/ShipPrefabs/StarterHull.prefab";
+        const string sampleScenePath = "Assets/Scenes/SampleScene.unity";
+        const string worldScenePath = "Assets/Scenes/WildWindWorldScene.unity";
+        const string oldObjGuid = "9a78659ed94342b4aaf97188d6cd263a";
+        const string oldMergedMeshGuid = "e4d4202973e7486895171db449690183";
+        const string bodyMeshGuid = "b8e4abdf44b04f54873370a03e6f2df1";
+        const string turretBaseMeshGuid = "f24e857d69e0463084d8aaf64b844cd2";
+        const string turretMeshGuid = "0aa0dfb898e24b80abf46bb40541d8f6";
+        const string barrelMeshGuid = "57917e1b1a1e4bd8862d22ff4b151f31";
+        string[] splitMeshReferences =
+        {
+            "m_Mesh: {fileID: 4300000, guid: " + bodyMeshGuid + ", type: 2}",
+            "m_Mesh: {fileID: 4300000, guid: " + turretBaseMeshGuid + ", type: 2}",
+            "m_Mesh: {fileID: 4300000, guid: " + turretMeshGuid + ", type: 2}",
+            "m_Mesh: {fileID: 4300000, guid: " + barrelMeshGuid + ", type: 2}"
+        };
+        string[] forbiddenRuntimeVisualGuids = { oldObjGuid, oldMergedMeshGuid };
+
+        report.Check(File.Exists(Path.Combine(Directory.GetCurrentDirectory(), sourceObjPath)), "Starter hull Blender OBJ source exists.");
+        string sourceObjText = ReadProjectText(sourceObjPath);
+        bool sourceWeaponPartsOk = StarterHullSourceObjIncludesWeaponParts(sourceObjText, out string sourceWeaponPartsMessage);
+        report.Check(sourceWeaponPartsOk,
+            sourceWeaponPartsOk
+                ? "Starter hull OBJ includes turret base, turret and barrel: " + sourceWeaponPartsMessage
+                : "Starter hull OBJ is missing imported weapon parts: " + sourceWeaponPartsMessage);
+
+        const ImportAssetOptions meshImportOptions = ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport;
+        AssetDatabase.Refresh(meshImportOptions);
+        AssetDatabase.ImportAsset(bodyMeshPath, meshImportOptions);
+        AssetDatabase.ImportAsset(turretBaseMeshPath, meshImportOptions);
+        AssetDatabase.ImportAsset(turretMeshPath, meshImportOptions);
+        AssetDatabase.ImportAsset(barrelMeshPath, meshImportOptions);
+        EditorUtility.UnloadUnusedAssetsImmediate(true);
+
+        Mesh bodyMesh = AssetDatabase.LoadAssetAtPath<Mesh>(bodyMeshPath);
+        Mesh turretBaseMesh = AssetDatabase.LoadAssetAtPath<Mesh>(turretBaseMeshPath);
+        Mesh turretMesh = AssetDatabase.LoadAssetAtPath<Mesh>(turretMeshPath);
+        Mesh barrelMesh = AssetDatabase.LoadAssetAtPath<Mesh>(barrelMeshPath);
+        report.Check(bodyMesh != null && bodyMesh.vertexCount > 0,
+            bodyMesh != null
+                ? "Starter hull body mesh is loadable with " + bodyMesh.vertexCount + " vertices."
+                : "Starter hull body mesh is missing.");
+        if (bodyMesh != null)
+        {
+            Vector3 bodySize = bodyMesh.bounds.size;
+            bool bodySizeOk = IsFinite(bodySize) &&
+                bodySize.x >= 5f && bodySize.x <= 7f &&
+                bodySize.y >= 2.5f && bodySize.y <= 4.25f &&
+                bodySize.z >= 18f && bodySize.z <= 22f;
+            report.Check(bodySizeOk,
+                bodySizeOk
+                    ? "Starter hull body mesh keeps the 20m boat envelope: " + FormatVector(bodySize) + "."
+                    : "Starter hull body mesh has the wrong envelope: " + FormatVector(bodySize) + ".");
+
+            bool noseForwardOk = StarterHullNoseFacesPositiveZ(bodyMesh.vertices, out string noseForwardMessage);
+            report.Check(noseForwardOk,
+                noseForwardOk
+                    ? "Starter hull body mesh nose faces +Z: " + noseForwardMessage
+                    : "Starter hull body mesh appears to face backward: " + noseForwardMessage);
+        }
+
+        int splitWeaponVertexCount = (turretBaseMesh != null ? turretBaseMesh.vertexCount : 0) +
+            (turretMesh != null ? turretMesh.vertexCount : 0) +
+            (barrelMesh != null ? barrelMesh.vertexCount : 0);
+        int splitWeaponTriangleCount =
+            CountMeshTriangles(turretBaseMesh) +
+            CountMeshTriangles(turretMesh) +
+            CountMeshTriangles(barrelMesh);
+        bool splitWeaponMeshesOk = turretBaseMesh != null && turretBaseMesh.vertexCount >= 3000 &&
+            turretMesh != null && turretMesh.vertexCount > 0 &&
+            barrelMesh != null && barrelMesh.vertexCount > 0 &&
+            splitWeaponTriangleCount >= 1500;
+        report.Check(splitWeaponMeshesOk,
+            splitWeaponMeshesOk
+                ? "Starter hull weapon is split into loadable base/turret/barrel meshes: " +
+                    splitWeaponVertexCount + " vertices, " + splitWeaponTriangleCount + " triangles."
+                : "Starter hull split weapon meshes are missing or too small: " +
+                    splitWeaponVertexCount + " vertices, " + splitWeaponTriangleCount + " triangles.");
+        if (barrelMesh != null)
+        {
+            Vector3 barrelSize = barrelMesh.bounds.size;
+            Vector3 barrelDiskSize;
+            bool barrelDiskSizeLoaded = TryReadNativeMeshLocalAabbSize(barrelMeshPath, out barrelDiskSize);
+            bool barrelRuntimeAxisOk = StarterHullBarrelAxisIsBakedAlongLocalZ(barrelSize);
+            bool barrelDiskAxisOk = barrelDiskSizeLoaded && StarterHullBarrelAxisIsBakedAlongLocalZ(barrelDiskSize);
+            bool barrelAxisOk = barrelRuntimeAxisOk || barrelDiskAxisOk;
+            report.Check(barrelAxisOk,
+                barrelRuntimeAxisOk
+                    ? "Starter hull barrel mesh is baked along local +Z for Muzzle.forward firing: " + FormatVector(barrelSize) + "."
+                    : barrelDiskAxisOk
+                        ? "Starter hull barrel mesh disk asset is baked along local +Z; Unity runtime mesh cache still reported " +
+                            FormatVector(barrelSize) + " before reimport completes, disk is " + FormatVector(barrelDiskSize) + "."
+                        : "Starter hull barrel mesh is not baked along local +Z: runtime " + FormatVector(barrelSize) +
+                            ", disk " + (barrelDiskSizeLoaded ? FormatVector(barrelDiskSize) : "unreadable") + ".");
+        }
+
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(starterHullPrefabPath);
+        report.Check(prefab != null, "StarterHull prefab is loadable.");
+        if (prefab != null)
+        {
+            MeshFilter[] filters = prefab.GetComponentsInChildren<MeshFilter>(true);
+            MeshRenderer[] renderers = prefab.GetComponentsInChildren<MeshRenderer>(true);
+            bool prefabHasEnabledRenderer = false;
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null && renderers[i].enabled)
+                {
+                    prefabHasEnabledRenderer = true;
+                    break;
+                }
+            }
+
+            bool prefabUsesSplitMeshes = MeshFiltersContainMesh(filters, bodyMesh) &&
+                MeshFiltersContainMesh(filters, turretBaseMesh) &&
+                MeshFiltersContainMesh(filters, turretMesh) &&
+                MeshFiltersContainMesh(filters, barrelMesh);
+            bool prefabHasGunHierarchy = ContainsChildNamed(prefab.transform, "\u041e\u0441\u043d\u043e\u0432\u0430\u043d\u0438\u0435_\u0442\u0443\u0440\u0435\u043b\u0438") &&
+                ContainsChildNamed(prefab.transform, "\u0422\u0443\u0440\u0435\u043b\u044c") &&
+                ContainsChildNamed(prefab.transform, "\u0421\u0442\u0432\u043e\u043b") &&
+                ContainsChildNamed(prefab.transform, "Muzzle");
+            report.Check(prefabUsesSplitMeshes, "StarterHull prefab references the split body, turret base, turret and barrel mesh assets.");
+            report.Check(prefabHasGunHierarchy, "StarterHull prefab exposes turret hierarchy for gun binding: base, turret, barrel and Muzzle.");
+            report.Check(prefabHasEnabledRenderer, "StarterHull prefab has an enabled renderer.");
+            report.Check(!ContainsChildNamed(prefab.transform, "Session Balloon") &&
+                !ContainsChildNamed(prefab.transform, "Session Cabin") &&
+                !ContainsChildNamed(prefab.transform, "Player Ship Proxy"),
+                "StarterHull prefab does not contain legacy fallback ship visuals.");
+        }
+
+        ValidateStarterHullSceneYaml(report, starterHullPrefabPath, splitMeshReferences, forbiddenRuntimeVisualGuids, "StarterHull prefab YAML");
+        ValidateStarterHullSceneYaml(report, sampleScenePath, splitMeshReferences, forbiddenRuntimeVisualGuids, "SampleScene YAML");
+        ValidateStarterHullSceneYaml(report, worldScenePath, splitMeshReferences, forbiddenRuntimeVisualGuids, "WorldScene YAML");
+        bool starterGunfireDoesNotRequireCargo =
+            StarterHullYamlHasFreeGunCost(starterHullPrefabPath) &&
+            StarterHullYamlHasFreeGunCost(sampleScenePath) &&
+            StarterHullYamlHasFreeGunCost(worldScenePath);
+        report.Check(starterGunfireDoesNotRequireCargo,
+            "Starter main gun fire is not blocked by empty weapon cargo in the prefab or starter scenes.");
+        bool starterBarrelBindingIsCurrent =
+            StarterHullYamlHasCurrentBarrelBinding(starterHullPrefabPath) &&
+            StarterHullYamlHasCurrentBarrelBinding(sampleScenePath) &&
+            StarterHullYamlHasCurrentBarrelBinding(worldScenePath);
+        report.Check(starterBarrelBindingIsCurrent,
+            "Starter barrel and Muzzle transforms match the current horizontal Blender barrel import.");
+        ValidateStarterHullRuntimeTransformContract(report, starterHullPrefabPath, worldScenePath);
+
+        string worldSceneText = ReadProjectText(worldScenePath);
+        if (!string.IsNullOrEmpty(worldSceneText))
+        {
+            report.Check(!worldSceneText.Contains("m_Name: Player Ship Proxy"), "WorldScene has no legacy Player Ship Proxy object.");
+            report.Check(!HasActiveLegacyWorldShipPrimitive(worldSceneText), "WorldScene has no active legacy primitive ship children.");
+        }
+#else
+        report.Check(true, "Starter hull visual asset contract validation is editor-only and is skipped in player builds.");
+#endif
+    }
+
+#if UNITY_EDITOR
+    private static void ValidateStarterHullSceneYaml(BigTestReport report, string assetPath, string[] requiredMeshReferences, string[] forbiddenGuids, string label)
+    {
+        string text = ReadProjectText(assetPath);
+        report.Check(!string.IsNullOrEmpty(text), label + " is readable.");
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        bool referencesAllSplitMeshes = true;
+        if (requiredMeshReferences != null)
+        {
+            for (int i = 0; i < requiredMeshReferences.Length; i++)
+            {
+                if (!text.Contains(requiredMeshReferences[i]))
+                {
+                    referencesAllSplitMeshes = false;
+                    break;
+                }
+            }
+        }
+
+        bool hasTurretHierarchyNames = text.Contains("m_Name: \"\\u041E\\u0441\\u043D\\u043E\\u0432\\u0430\\u043D\\u0438\\u0435_\\u0442\\u0443\\u0440\\u0435\\u043B\\u0438\"") &&
+            text.Contains("m_Name: \"\\u0422\\u0443\\u0440\\u0435\\u043B\\u044C\"") &&
+            text.Contains("m_Name: \"\\u0421\\u0442\\u0432\\u043E\\u043B\"") &&
+            text.Contains("m_Name: Muzzle");
+        bool avoidsForbiddenGuids = true;
+        if (forbiddenGuids != null)
+        {
+            for (int i = 0; i < forbiddenGuids.Length; i++)
+            {
+                if (!string.IsNullOrEmpty(forbiddenGuids[i]) && text.Contains(forbiddenGuids[i]))
+                {
+                    avoidsForbiddenGuids = false;
+                    break;
+                }
+            }
+        }
+
+        report.Check(referencesAllSplitMeshes, label + " references body, turret base, turret and barrel split meshes.");
+        report.Check(hasTurretHierarchyNames, label + " keeps named gun hierarchy objects for runtime binding.");
+        report.Check(avoidsForbiddenGuids, label + " does not reference source OBJ or old merged visual mesh GUIDs at runtime.");
+    }
+
+    private static int CountMeshTriangles(Mesh mesh)
+    {
+        return mesh != null && mesh.triangles != null ? mesh.triangles.Length / 3 : 0;
+    }
+
+    private static bool MeshFiltersContainMesh(MeshFilter[] filters, Mesh mesh)
+    {
+        if (filters == null || mesh == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < filters.Length; i++)
+        {
+            if (filters[i] != null && filters[i].sharedMesh == mesh)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool StarterHullYamlHasFreeGunCost(string assetPath)
+    {
+        string text = ReadProjectText(assetPath);
+        return !string.IsNullOrEmpty(text) &&
+            text.Contains("weaponShotCostKg: 0") &&
+            !text.Contains("weaponShotCostKg: 0.1");
+    }
+
+    private static bool StarterHullYamlHasCurrentBarrelBinding(string assetPath)
+    {
+        string text = ReadProjectText(assetPath);
+        return !string.IsNullOrEmpty(text) &&
+            text.Contains("m_LocalPosition: {x: 0, y: 0.1120243, z: 0.4466348}") &&
+            text.Contains("m_LocalPosition: {x: 0, y: 0, z: 1.5438662}");
+    }
+
+    private static bool StarterHullBarrelAxisIsBakedAlongLocalZ(Vector3 size)
+    {
+        return IsFinite(size) &&
+            size.z >= 1.5f &&
+            size.z > size.y * 3f &&
+            size.z > size.x * 10f;
+    }
+
+    private static bool TryReadNativeMeshLocalAabbSize(string assetPath, out Vector3 size)
+    {
+        size = Vector3.zero;
+        string text = ReadProjectText(assetPath);
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        const string extentMarker = "m_Extent:";
+        int extentIndex = text.IndexOf(extentMarker, StringComparison.Ordinal);
+        if (extentIndex < 0)
+        {
+            return false;
+        }
+
+        int lineEnd = text.IndexOf('\n', extentIndex);
+        if (lineEnd < 0)
+        {
+            lineEnd = text.Length;
+        }
+
+        string extentLine = text.Substring(extentIndex, lineEnd - extentIndex);
+        float x;
+        float y;
+        float z;
+        if (!TryReadYamlVectorComponent(extentLine, "x", out x) ||
+            !TryReadYamlVectorComponent(extentLine, "y", out y) ||
+            !TryReadYamlVectorComponent(extentLine, "z", out z))
+        {
+            return false;
+        }
+
+        size = new Vector3(Mathf.Abs(x) * 2f, Mathf.Abs(y) * 2f, Mathf.Abs(z) * 2f);
+        return IsFinite(size);
+    }
+
+    private static bool TryReadYamlVectorComponent(string line, string componentName, out float value)
+    {
+        value = 0f;
+        string marker = componentName + ":";
+        int valueStart = line.IndexOf(marker, StringComparison.Ordinal);
+        if (valueStart < 0)
+        {
+            return false;
+        }
+
+        valueStart += marker.Length;
+        int valueEnd = line.IndexOf(',', valueStart);
+        int braceEnd = line.IndexOf('}', valueStart);
+        if (valueEnd < 0 || braceEnd >= 0 && braceEnd < valueEnd)
+        {
+            valueEnd = braceEnd;
+        }
+
+        if (valueEnd < 0)
+        {
+            valueEnd = line.Length;
+        }
+
+        string token = line.Substring(valueStart, valueEnd - valueStart).Trim();
+        return float.TryParse(
+            token,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out value);
+    }
+
+    private static void ValidateStarterHullRuntimeTransformContract(BigTestReport report, string starterHullPrefabPath, string worldScenePath)
+    {
+        string prefabText = ReadProjectText(starterHullPrefabPath);
+        if (!string.IsNullOrEmpty(prefabText))
+        {
+            ValidateStarterHullTransformIsNotHalfTurnY(report, prefabText, "1441708272496266707",
+                "StarterHull socket container is not rotated 180 degrees.");
+            ValidateStarterHullTransformIsNotHalfTurnY(report, prefabText, "8292213452475038823",
+                "StarterHull visible mesh child is not double-rotated 180 degrees.");
+            ValidateStarterHullTransformIsNotHalfTurnY(report, prefabText, "701100000000000202",
+                "StarterHull turret yaw pivot is not double-rotated 180 degrees.");
+            ValidateStarterHullTransformIsNotHalfTurnY(report, prefabText, "701100000000000302",
+                "StarterHull barrel pitch pivot is not double-rotated 180 degrees.");
+        }
+
+        string worldSceneText = ReadProjectText(worldScenePath);
+        if (!string.IsNullOrEmpty(worldSceneText))
+        {
+            ValidateStarterHullTransformIsNotHalfTurnY(report, worldSceneText, "881536966",
+                "WorldScene starter hull visual child is not double-rotated 180 degrees.");
+            ValidateStarterHullTransformIsNotHalfTurnY(report, worldSceneText, "901536000102",
+                "WorldScene turret yaw pivot is not double-rotated 180 degrees.");
+            ValidateStarterHullTransformIsNotHalfTurnY(report, worldSceneText, "901536000202",
+                "WorldScene barrel pitch pivot is not double-rotated 180 degrees.");
+        }
+    }
+
+    private static void ValidateStarterHullTransformIsNotHalfTurnY(
+        BigTestReport report,
+        string yamlText,
+        string transformFileId,
+        string message)
+    {
+        bool exists = TryGetYamlBlock(yamlText, "--- !u!4 &" + transformFileId, out string block);
+        report.Check(exists, message + " Transform YAML exists.");
+        if (!exists)
+        {
+            return;
+        }
+
+        bool halfTurnY = block.Contains("m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}") ||
+            block.Contains("m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}");
+        report.Check(!halfTurnY, message);
+    }
+
+    private static bool StarterHullNoseFacesPositiveZ(Vector3[] vertices, out string message)
+    {
+        message = "no vertices.";
+        if (vertices == null || vertices.Length == 0)
+        {
+            return false;
+        }
+
+        float minZ = float.PositiveInfinity;
+        float maxZ = float.NegativeInfinity;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector3 vertex = vertices[i];
+            if (!IsFinite(vertex))
+            {
+                continue;
+            }
+
+            minZ = Mathf.Min(minZ, vertex.z);
+            maxZ = Mathf.Max(maxZ, vertex.z);
+        }
+
+        if (!IsFinite(minZ) || !IsFinite(maxZ) || maxZ <= minZ)
+        {
+            message = "invalid z bounds.";
+            return false;
+        }
+
+        float length = maxZ - minZ;
+        float sampleDepth = Mathf.Max(0.5f, length * 0.05f);
+        float bowHalfWidth = 0f;
+        float sternHalfWidth = 0f;
+        int bowCount = 0;
+        int sternCount = 0;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector3 vertex = vertices[i];
+            if (!IsFinite(vertex))
+            {
+                continue;
+            }
+
+            if (vertex.z >= maxZ - sampleDepth)
+            {
+                bowHalfWidth = Mathf.Max(bowHalfWidth, Mathf.Abs(vertex.x));
+                bowCount++;
+            }
+
+            if (vertex.z <= minZ + sampleDepth)
+            {
+                sternHalfWidth = Mathf.Max(sternHalfWidth, Mathf.Abs(vertex.x));
+                sternCount++;
+            }
+        }
+
+        message = "bow(+Z) half-width " + bowHalfWidth.ToString("0.###") +
+            "m across " + bowCount +
+            " vertices, stern(-Z) half-width " + sternHalfWidth.ToString("0.###") +
+            "m across " + sternCount + " vertices.";
+        return bowCount > 0 && sternCount > 0 && sternHalfWidth >= 1f && bowHalfWidth <= sternHalfWidth * 0.65f;
+    }
+
+    private static bool StarterHullSourceObjIncludesWeaponParts(string sourceObjText, out string message)
+    {
+        if (string.IsNullOrEmpty(sourceObjText))
+        {
+            message = "source OBJ is empty.";
+            return false;
+        }
+
+        bool hasTurretBase = sourceObjText.Contains("o \u041e\u0441\u043d\u043e\u0432\u0430\u043d\u0438\u0435_\u0442\u0443\u0440\u0435\u043b\u0438");
+        bool hasTurret = sourceObjText.Contains("o \u0422\u0443\u0440\u0435\u043b\u044c");
+        bool hasBarrel = sourceObjText.Contains("o \u0421\u0442\u0432\u043e\u043b");
+        bool hasDuplicateMergedHull = sourceObjText.Contains("o ShipHull_Emitters_Unity");
+        int materialBandCount = CountOccurrences(sourceObjText, "usemtl ");
+
+        message = "base=" + hasTurretBase +
+            ", turret=" + hasTurret +
+            ", barrel=" + hasBarrel +
+            ", duplicateMergedHull=" + hasDuplicateMergedHull +
+            ", material switches=" + materialBandCount + ".";
+        return hasTurretBase && hasTurret && hasBarrel && !hasDuplicateMergedHull && materialBandCount >= 3;
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(value))
+        {
+            return 0;
+        }
+
+        int count = 0;
+        int index = 0;
+        while (index < text.Length)
+        {
+            int found = text.IndexOf(value, index, StringComparison.Ordinal);
+            if (found < 0)
+            {
+                break;
+            }
+
+            count++;
+            index = found + value.Length;
+        }
+
+        return count;
+    }
+
+    private static bool TryGetYamlBlock(string yamlText, string marker, out string block)
+    {
+        int start = yamlText.IndexOf(marker, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            block = "";
+            return false;
+        }
+
+        int end = yamlText.IndexOf("\n--- !u!", start + marker.Length, StringComparison.Ordinal);
+        if (end < 0)
+        {
+            end = yamlText.Length;
+        }
+
+        block = yamlText.Substring(start, end - start);
+        return true;
+    }
+
+    private static string ReadProjectText(string assetPath)
+    {
+        string fullPath = Path.Combine(Directory.GetCurrentDirectory(), assetPath);
+        return File.Exists(fullPath) ? File.ReadAllText(fullPath) : "";
+    }
+
+    private static bool HasActiveLegacyWorldShipPrimitive(string sceneText)
+    {
+        return HasActiveYamlObject(sceneText, "Balloon") ||
+            HasActiveYamlObject(sceneText, "Keel Cabin") ||
+            HasActiveYamlObject(sceneText, "Balloon Band Front") ||
+            HasActiveYamlObject(sceneText, "Balloon Band Back");
+    }
+
+    private static bool HasActiveYamlObject(string sceneText, string objectName)
+    {
+        string marker = "  m_Name: " + objectName;
+        int index = 0;
+        while (index >= 0 && index < sceneText.Length)
+        {
+            int nameIndex = sceneText.IndexOf(marker, index, StringComparison.Ordinal);
+            if (nameIndex < 0)
+            {
+                return false;
+            }
+
+            int blockEnd = sceneText.IndexOf("\n--- !u!", nameIndex, StringComparison.Ordinal);
+            if (blockEnd < 0)
+            {
+                blockEnd = sceneText.Length;
+            }
+
+            string block = sceneText.Substring(nameIndex, blockEnd - nameIndex);
+            if (block.Contains("  m_IsActive: 1"))
+            {
+                return true;
+            }
+
+            index = blockEnd + 1;
+        }
+
+        return false;
+    }
+#endif
 
     private static void ValidateR1ShipMechanics(WorldConfigDatabase config, BigTestReport report)
     {
@@ -3939,15 +4485,166 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(controls.FlightTargetHeadingChangeDegreesPerSecond > 0f, "Скорость изменения целевого курса положительная: " + controls.FlightTargetHeadingChangeDegreesPerSecond.ToString("0.#") + " град/с.");
         report.Check(controls.FlightMaxReverseTargetSpeedMetersPerSecond >= 0f, "Лимит заднего хода для круиз-контроля не отрицательный: " + controls.FlightMaxReverseTargetSpeedMetersPerSecond.ToString("0.#") + " м/с.");
 
+        ValidateWarshipsCameraContract(report);
+
         WildWindGameplayMenu gameplayMenu = FindFirstObjectByType<WildWindGameplayMenu>();
         report.Check(gameplayMenu != null, gameplayMenu != null ? "Внутриигровое меню найдено в world-сессии." : "Внутриигровое меню не найдено.");
         WildWindGameplayHud hud = FindFirstObjectByType<WildWindGameplayHud>();
         report.Check(hud != null, hud != null ? "Внутриигровой HUD найден в world-сессии." : "Внутриигровой HUD не найден.");
     }
 
+    private static void ValidateWarshipsCameraContract(BigTestReport report)
+    {
+        WorldDebugTravelController travelController = FindFirstObjectByType<WorldDebugTravelController>();
+        report.Check(travelController != null,
+            travelController != null ? "Flight camera controller is present for Warships-style aiming." : "Flight camera controller is missing.");
+        if (travelController != null)
+        {
+            bool mouseLookEnabled = ReadPrivateBool(travelController, "warshipsFlightMouseLook", false);
+            bool altReleasesCursor = ReadPrivateBool(travelController, "altReleasesCursor", false);
+            float aimLookAheadMeters = ReadPrivateFloat(travelController, "flightAimLookAheadMeters", -1f);
+            report.Check(mouseLookEnabled && altReleasesCursor && aimLookAheadMeters >= 50f,
+                "Flight camera keeps Warships-style locked mouse look, Alt cursor release, and a forward aim point: "
+                + "mouseLook=" + mouseLookEnabled
+                + ", altRelease=" + altReleasesCursor
+                + ", lookAhead=" + aimLookAheadMeters.ToString("0.#") + " m.");
+        }
+
+#if UNITY_EDITOR
+        string cameraSource = ReadProjectText("Assets/Scripts/World/WorldDebugTravelController.cs");
+        string shipSource = ReadProjectText("Assets/Scripts/Systems/ShipPhysics.cs");
+        bool cameraLooksAhead = ContainsAllIgnoreCase(
+            cameraSource,
+            "LastCameraAimTarget",
+            "GetCameraAimTarget",
+            "TryGetManualGunCameraAimTarget",
+            "flightAimLookAheadMeters");
+        bool weaponDrawsAimRing = ContainsAllIgnoreCase(
+            shipSource,
+            "ResolveAimGuiPosition",
+            "GameplayCursorLockedForMouseLook",
+            "Screen.width * 0.5f",
+            "WorldToScreenPoint",
+            "TryReadMousePosition",
+            "DrawAimRing");
+        bool reticleRejectsScenePlanes = ContainsAllIgnoreCase(
+            shipSource,
+            "IsManualGunRaycastTarget",
+            "DamageableShip",
+            "Leviathan",
+            "MiningRock");
+        bool reticleUsesRangeSphere = ContainsAllIgnoreCase(
+            shipSource,
+            "ManualGunSphereAimSensitivityDegreesPerPixel",
+            "manualGunSpherePitchDegrees",
+            "ResolveManualGunSphereAimPoint",
+            "ResolveCursorRayRangePoint",
+            "center + fromCenter.normalized * range",
+            "SmoothManualGunTargetPoint");
+        bool reticleTargetsObjectsInsideSphere = ContainsAllIgnoreCase(
+            shipSource,
+            "TryRaycastCursorTarget(ray, maxRange",
+            "maxRangeSqr",
+            "hasHitTarget = true");
+        bool verticalAimInverted = ContainsAllIgnoreCase(
+            shipSource,
+            "manualGunSpherePitchDegrees + aimDelta.y",
+            "ManualGunSphereAimSensitivityDegreesPerPixel") &&
+            cameraSource.Contains("cameraOrbitPitchDegrees + dragDelta.y");
+        bool projectileTrailIsBrighter = ContainsAllIgnoreCase(
+            shipSource,
+            "GunProjectileTrailBrightnessMultiplier",
+            "BuildGunProjectileTrailColor",
+            "trail.startColor",
+            "_EmissionColor");
+        bool cameraUsesManualGunAim = ContainsAllIgnoreCase(
+            cameraSource,
+            "TryGetManualGunCameraAimTarget",
+            "manualGunAimTarget") &&
+            shipSource.Contains("TryGetManualGunCameraAimTarget");
+        bool mouseLookScalesWithScopeFov = ContainsAllIgnoreCase(
+            cameraSource,
+            "GameplayMouseLookSensitivityScale",
+            "UpdateGameplayMouseLookSensitivityScale",
+            "GetFlightMouseLookSensitivityScale",
+            "GetFieldOfViewSensitivityScale",
+            "Mathf.Tan(Mathf.Clamp(currentVerticalFovDegrees",
+            "GetOrbitSensitivityForTarget") &&
+            ContainsAllIgnoreCase(
+                shipSource,
+                "GameplayMouseLookSensitivityScale",
+                "sensitivityScale",
+                "ManualGunSphereAimSensitivityDegreesPerPixel * sensitivityScale");
+        bool wheelUsesWarshipsRoute = ContainsAllIgnoreCase(
+            cameraSource,
+            "flightCameraWheelRoute01",
+            "GetFlightWheelCameraPosition",
+            "FlightGunToStandardWheelUnits",
+            "FlightStandardToHighWheelUnits",
+            "FlightHighToScopeWheelUnits",
+            "FlightShipStandardBackOffsetMeters",
+            "ResolveFlightShipFlatForward",
+            "ResolveFlightShipHighHeightMeters",
+            "ResolveFlightShipLengthMeters",
+            "ApplyFlightCameraWheelRoute",
+            "ApplyFlightCameraWheelRouteDelta",
+            "ApplyFlightScopeWheelDampedDelta",
+            "GetRawFlightScopeWheelDelta",
+            "GetFlightScopeStartWheelUnits",
+            "GetFlightCameraScopeRatio",
+            "GetFlightScopeVerticalFieldOfView",
+            "FlightScopeReferenceRangeMeters = 20000f",
+            "FlightScopeScreenWidthMetersAtReferenceRange = 1000f",
+            "FlightScopeMinimumWheelEffectiveness = 0.2f");
+        bool warshipsInspectorIsCompact = ContainsAllIgnoreCase(
+            cameraSource,
+            "HideInInspector",
+            "CameraWheelEffectivenessMultiplier = 20f",
+            "ApplyFlightCameraWheelRoute(scrollDelta * CameraWheelEffectivenessMultiplier)",
+            "ApplyProgressiveZoom(scrollDelta * CameraWheelEffectivenessMultiplier)",
+            "Mathf.Atan((screenWidth * 0.5f) / referenceRange)",
+            "Mathf.Tan(horizontalRadians * 0.5f) / aspect",
+            "Mathf.Exp(-reduction * scrollDelta / scopeLength)") &&
+            !cameraSource.Contains("[Header(\"Warships Camera\")]") &&
+            !cameraSource.Contains("wheelGunToShip") &&
+            !cameraSource.Contains("wheelShipToHigh") &&
+            !cameraSource.Contains("wheelHighToScope") &&
+            !cameraSource.Contains("gunViewHeightMeters") &&
+            !cameraSource.Contains("shipViewHeightMeters") &&
+            !cameraSource.Contains("scopeFov") &&
+            !cameraSource.Contains("[Header(\"Movement\")]") &&
+            !cameraSource.Contains("[Header(\"Camera\")]") &&
+            !cameraSource.Contains("[Header(\"Temporary Wheel Debug\")]");
+        bool wheelGunViewStaysOverGun = cameraSource.Contains("gunAnchor + Vector3.up") &&
+            !cameraSource.Contains("flightGunBackOffsetMeters");
+        bool scopeUsesFovNotTargetDolly = cameraSource.Contains("return shipHighPosition;") &&
+            !cameraSource.Contains("GetFlightTargetFocusCameraPosition");
+        report.Check(cameraLooksAhead && cameraUsesManualGunAim && mouseLookScalesWithScopeFov && wheelUsesWarshipsRoute && warshipsInspectorIsCompact && wheelGunViewStaysOverGun && scopeUsesFovNotTargetDolly && weaponDrawsAimRing && reticleRejectsScenePlanes && reticleUsesRangeSphere && reticleTargetsObjectsInsideSphere && verticalAimInverted && projectileTrailIsBrighter,
+            cameraLooksAhead && cameraUsesManualGunAim && mouseLookScalesWithScopeFov && wheelUsesWarshipsRoute && warshipsInspectorIsCompact && wheelGunViewStaysOverGun && scopeUsesFovNotTargetDolly && weaponDrawsAimRing && reticleRejectsScenePlanes && reticleUsesRangeSphere && reticleTargetsObjectsInsideSphere && verticalAimInverted && projectileTrailIsBrighter
+                ? "Manual gunnery keeps the locked HUD cursor centered, hides the extra Warships camera sliders, scales camera and reticle mouse look by scope FOV, moves the wheel route at twentyfold effectiveness, damps only the final scope segment down to 20% wheel effectiveness, keeps the camera centered on the gun aim point, uses a Warships-style route from gun to ship to high view, applies FOV-only scope focus calibrated to 1000m screen width at 20km, inverts vertical sphere aim, draws bright projectile trails, and still lets targetable objects inside that sphere capture the cursor ray."
+                : "Manual gunnery camera/reticle source contract is incomplete: cameraLooksAhead=" + cameraLooksAhead
+                    + ", cameraUsesManualGunAim=" + cameraUsesManualGunAim
+                    + ", mouseLookScalesWithScopeFov=" + mouseLookScalesWithScopeFov
+                    + ", wheelUsesWarshipsRoute=" + wheelUsesWarshipsRoute
+                    + ", warshipsInspectorIsCompact=" + warshipsInspectorIsCompact
+                    + ", wheelGunViewStaysOverGun=" + wheelGunViewStaysOverGun
+                    + ", scopeUsesFovNotTargetDolly=" + scopeUsesFovNotTargetDolly
+                    + ", weaponDrawsAimRing=" + weaponDrawsAimRing
+                    + ", reticleRejectsScenePlanes=" + reticleRejectsScenePlanes
+                    + ", reticleUsesRangeSphere=" + reticleUsesRangeSphere
+                    + ", reticleTargetsObjectsInsideSphere=" + reticleTargetsObjectsInsideSphere
+                    + ", verticalAimInverted=" + verticalAimInverted
+                    + ", projectileTrailIsBrighter=" + projectileTrailIsBrighter + ".");
+#else
+        report.Check(true, "Warships camera source contract is editor-only and skipped in player builds.");
+#endif
+    }
+
     private void ValidateShipWindAerodynamics(BigTestReport report)
     {
         report.Section("Корабль, ветер и лётная физика");
+        ValidateActivePlayerShipVisual(report);
+        ValidateBallisticFireControl(report);
         GameObject testShip = null;
         Scene probeScene = default;
         try
@@ -4115,6 +4812,511 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 SceneManager.UnloadSceneAsync(probeScene);
             }
         }
+    }
+
+    private static void ValidateBallisticFireControl(BigTestReport report)
+    {
+        Vector3 origin = Vector3.zero;
+        Vector3 target = new Vector3(1000f, 0f, 0f);
+        Vector3 gravity = Physics.gravity;
+        bool solvedDrop = BallisticFireControl.TrySolveLaunchVelocity(
+            origin,
+            target,
+            Vector3.zero,
+            300f,
+            gravity,
+            1500f,
+            out Vector3 launchVelocity,
+            out float flightTime,
+            out Vector3 predicted);
+        Vector3 impact = BallisticFireControl.EvaluatePosition(origin, launchVelocity, gravity, flightTime);
+        float missMeters = Vector3.Distance(impact, predicted);
+        report.Check(solvedDrop
+            && launchVelocity.y > 0f
+            && flightTime > target.magnitude / 300f
+            && missMeters <= 1.5f,
+            "Ballistic fire control elevates the gun to compensate shell drop: t "
+            + flightTime.ToString("0.00")
+            + " s, error "
+            + missMeters.ToString("0.###")
+            + " m.");
+
+        float dragRetention = 0.58f;
+        float dragPerMeter = BallisticFireControl.CalculateDragPerMeter(1500f, dragRetention);
+        bool solvedDragDrop = BallisticFireControl.TrySolveLaunchVelocity(
+            origin,
+            target,
+            Vector3.zero,
+            300f,
+            gravity,
+            1500f,
+            out Vector3 dragLaunchVelocity,
+            out float dragFlightTime,
+            out Vector3 dragPredicted,
+            dragRetention);
+        Vector3 dragImpact = BallisticFireControl.EvaluatePosition(origin, dragLaunchVelocity, gravity, dragFlightTime, dragPerMeter);
+        float dragMissMeters = Vector3.Distance(dragImpact, dragPredicted);
+        report.Check(solvedDragDrop
+            && dragPerMeter > 0f
+            && dragLaunchVelocity.y > launchVelocity.y
+            && dragFlightTime > flightTime
+            && dragMissMeters <= 5f,
+            "Ballistic fire control solves drag-aware shell drop: t "
+            + dragFlightTime.ToString("0.00")
+            + " s, error "
+            + dragMissMeters.ToString("0.###")
+            + " m, drag "
+            + dragPerMeter.ToString("0.000000")
+            + ".");
+
+        Vector3 movingTarget = new Vector3(900f, 40f, 0f);
+        Vector3 targetVelocity = new Vector3(0f, 0f, 35f);
+        bool solvedLead = BallisticFireControl.TrySolveLaunchVelocity(
+            origin,
+            movingTarget,
+            targetVelocity,
+            320f,
+            gravity,
+            1600f,
+            out Vector3 leadVelocity,
+            out float leadTime,
+            out Vector3 leadPoint);
+        Vector3 leadImpact = BallisticFireControl.EvaluatePosition(origin, leadVelocity, gravity, leadTime);
+        report.Check(solvedLead
+            && leadPoint.z > movingTarget.z + 1f
+            && Vector3.Distance(leadImpact, leadPoint) <= 2f,
+            "Automatic ballistic lead predicts a moving target point instead of aiming at current position: lead "
+            + (leadPoint.z - movingTarget.z).ToString("0.##")
+            + " m.");
+
+        float testSpeed45 = 400f;
+        Vector3 launch45 = new Vector3(testSpeed45 * 0.70710678f, testSpeed45 * 0.70710678f, 0f);
+        float groundTime45 = -2f * launch45.y / gravity.y;
+        Vector3 apex45 = BallisticFireControl.EvaluatePosition(origin, launch45, gravity, groundTime45 * 0.5f);
+        Vector3 ground45 = BallisticFireControl.EvaluatePosition(origin, launch45, gravity, groundTime45);
+        Vector3 range1500At45 = BallisticFireControl.EvaluatePosition(origin, launch45, gravity, 1500f / launch45.x);
+        report.Check(apex45.y > 4000f
+            && Mathf.Abs(ground45.y) <= 1.5f
+            && ground45.x > 15000f
+            && range1500At45.y > 1000f,
+            "Projectile trajectory remains classic parabolic ballistics: 400 m/s at 45 degrees lands after "
+            + groundTime45.ToString("0.0")
+            + " s at "
+            + ground45.x.ToString("0")
+            + " m, so at 1500 m it is still rising at "
+            + range1500At45.y.ToString("0")
+            + " m.");
+        float retainedHalfRange = BallisticFireControl.CalculateRangeVelocityRetention(750f, 1500f, 0.58f);
+        float retainedMaxRange = BallisticFireControl.CalculateRangeVelocityRetention(1500f, 1500f, 0.58f);
+        Vector3 oneSecondVelocity = BallisticFireControl.IntegrateVelocity(
+            new Vector3(400f, 0f, 0f),
+            gravity,
+            1f,
+            dragPerMeter);
+        Vector3 dragRange1500At45 = BallisticFireControl.EvaluatePosition(
+            origin,
+            launch45,
+            gravity,
+            1500f / launch45.x,
+            dragPerMeter);
+        report.Check(retainedHalfRange > retainedMaxRange
+            && Approximately(retainedMaxRange, 0.58f, 0.001f)
+            && oneSecondVelocity.x < 390f
+            && oneSecondVelocity.magnitude < 400f
+            && dragRange1500At45.x < range1500At45.x - 100f
+            && dragRange1500At45.y < range1500At45.y - 50f,
+            "Air resistance bends projectile trajectories and bleeds speed: retention half "
+            + retainedHalfRange.ToString("0.###")
+            + ", max "
+            + retainedMaxRange.ToString("0.###")
+            + ", one-second speed "
+            + oneSecondVelocity.magnitude.ToString("0.#")
+            + " m/s, drag 45deg y "
+            + dragRange1500At45.y.ToString("0")
+            + ".");
+
+        Vector2 spread = BallisticFireControl.CalculateSpreadRadii(40f, 12f, 750f, 1500f);
+        report.Check(Approximately(spread.x, 20f, 0.001f) && Approximately(spread.y, 6f, 0.001f),
+            "Gun dispersion ellipse scales with distance: horizontal "
+            + spread.x.ToString("0.#")
+            + " m, vertical "
+            + spread.y.ToString("0.#")
+            + " m at half range.");
+
+        float nearPenetration = BallisticFireControl.CalculatePenetrationMultiplier(0f, 1500f, 0.5f, 320f, 320f);
+        float farPenetration = BallisticFireControl.CalculatePenetrationMultiplier(1500f, 1500f, 0.5f, 180f, 320f);
+        report.Check(nearPenetration > farPenetration
+            && Approximately(nearPenetration, 1f, 0.001f)
+            && farPenetration < 0.5f,
+            "Armor-piercing penetration falls with range and retained velocity: near "
+            + nearPenetration.ToString("0.###")
+            + ", far "
+            + farPenetration.ToString("0.###")
+            + ".");
+
+        GameObject shipObject = null;
+        try
+        {
+            shipObject = new GameObject("Big Test Ballistic Ship");
+            shipObject.AddComponent<Rigidbody>();
+            ShipPhysics ship = shipObject.AddComponent<ShipPhysics>();
+            ship.enabled = false;
+            ShipGunGroup starterMainGroup = ship.shipGunGroups != null && ship.shipGunGroups.Count > 0
+                ? ship.shipGunGroups[0]
+                : null;
+            report.Check(starterMainGroup != null
+                && starterMainGroup.fireMode == ShipGunFireMode.Manual
+                && Approximately(starterMainGroup.SecondsBetweenSalvos, 1f, 0.001f),
+                "Starter main caliber reloads in 1 second: "
+                + (starterMainGroup != null ? starterMainGroup.SecondsBetweenSalvos.ToString("0.###") : "missing")
+                + " s.");
+            ship.shipGunGroups = new List<ShipGunGroup>
+            {
+                new ShipGunGroup
+                {
+                    groupId = "main",
+                    displayNameRu = "Serialized Old Main Gun",
+                    fireMode = ShipGunFireMode.Manual,
+                    enabled = true,
+                    roundsPerMinute = 10f
+                }
+            };
+            ship.manualGunGroupIndex = 0;
+            bool serializedReloadRepaired = ship.BuildGunAimSolutionForPoint(null, new Vector3(80f, 0f, 0f), Vector3.zero, false, true, out _)
+                && ship.shipGunGroups != null
+                && ship.shipGunGroups.Count > 0
+                && Approximately(ship.shipGunGroups[ship.manualGunGroupIndex].SecondsBetweenSalvos, 1f, 0.001f);
+            report.Check(serializedReloadRepaired,
+                "Serialized old main gun groups are forced back to 1 second reload at runtime.");
+            ShipGunGroup group = new ShipGunGroup
+            {
+                groupId = "test",
+                displayNameRu = "Test group",
+                maxRangeMeters = 500f,
+                muzzleVelocityMS = 200f,
+                gravityScale = 0f,
+                localMuzzleOffset = Vector3.zero,
+                shell = new DamageShellPreset { velocityRetentionAtMaxRange = 1f }
+            };
+
+            bool clamped = ship.BuildGunAimSolutionForPoint(group, new Vector3(1000f, 0f, 0f), Vector3.zero, false, false, out BallisticAimSolution solution)
+                && !solution.inRange
+                && Approximately(solution.distanceFromShipCenter, 500f, 0.05f)
+                && Approximately(solution.travelTimeSeconds, 2.5f, 0.05f);
+            report.Check(clamped,
+                "Gun group range is measured from ship center and clamps empty/out-of-range aim to max range: "
+                + solution.distanceFromShipCenter.ToString("0.#")
+                + " m.");
+
+            ShipGunGroup dragAutoAimGroup = new ShipGunGroup
+            {
+                groupId = "drag_auto_aim_alignment",
+                displayNameRu = "Drag Auto Aim Alignment Gun",
+                maxRangeMeters = 1500f,
+                muzzleVelocityMS = 300f,
+                gravityScale = 1f,
+                localMuzzleOffset = Vector3.zero,
+                minElevationDegrees = -5f,
+                maxElevationDegrees = 70f,
+                shell = new DamageShellPreset
+                {
+                    displayNameRu = "Drag Alignment Shell",
+                    velocityRetentionAtMaxRange = 0.58f
+                }
+            };
+            Vector3 dragAimTarget = ship.transform.position + new Vector3(1000f, 0f, 0f);
+            bool dragWeaponAimBuilt = ship.BuildGunAimSolutionForPoint(
+                dragAutoAimGroup,
+                dragAimTarget,
+                Vector3.zero,
+                false,
+                true,
+                out BallisticAimSolution dragWeaponAim);
+            Vector3 directDragAimDirection = (dragAimTarget - dragWeaponAim.origin).sqrMagnitude > 0.001f
+                ? (dragAimTarget - dragWeaponAim.origin).normalized
+                : Vector3.forward;
+            Vector3 simulatedDragProjectilePosition = SimulateDamageProjectileBallistics(
+                dragWeaponAim.origin,
+                dragWeaponAim.launchVelocity,
+                dragAutoAimGroup.gravityScale,
+                dragAutoAimGroup.maxRangeMeters,
+                dragAutoAimGroup.shell.velocityRetentionAtMaxRange,
+                dragWeaponAim.travelTimeSeconds,
+                Mathf.Max(0.001f, Time.fixedDeltaTime),
+                dragWeaponAim.predictedTargetPoint,
+                out float dragProjectileClosestMeters);
+            report.Check(dragWeaponAimBuilt
+                && dragWeaponAim.valid
+                && dragWeaponAim.dragPerMeter > 0f
+                && dragWeaponAim.launchDirection.y > directDragAimDirection.y + 0.01f
+                && dragProjectileClosestMeters <= 6f,
+                "Weapon auto-elevation and real projectile integration agree with drag: aim elev "
+                + (Mathf.Asin(Mathf.Clamp(dragWeaponAim.launchDirection.y, -1f, 1f)) * Mathf.Rad2Deg).ToString("0.##")
+                + " deg, closest miss "
+                + dragProjectileClosestMeters.ToString("0.###")
+                + " m, final "
+                + FormatVector(simulatedDragProjectilePosition)
+                + ".");
+
+            ship.shipGunGroups = new List<ShipGunGroup>
+            {
+                new ShipGunGroup
+                {
+                    groupId = "auto_only",
+                    displayNameRu = "Auto-only legacy group",
+                    fireMode = ShipGunFireMode.Automatic,
+                    enabled = true
+                }
+            };
+            ship.manualGunGroupIndex = 0;
+            bool manualGroupRecovered = ship.BuildGunAimSolutionForPoint(null, new Vector3(120f, 0f, 40f), Vector3.zero, false, true, out BallisticAimSolution recoveredManualAim)
+                && ship.shipGunGroups != null
+                && ship.shipGunGroups.Count >= 2
+                && ship.shipGunGroups[ship.manualGunGroupIndex] != null
+                && ship.shipGunGroups[ship.manualGunGroupIndex].enabled
+                && ship.shipGunGroups[ship.manualGunGroupIndex].fireMode == ShipGunFireMode.Manual
+                && recoveredManualAim.maxRangeMeters > 0.001f;
+            report.Check(manualGroupRecovered,
+                "ShipPhysics repairs old runtime ships that have no manual main gun group before aiming or firing.");
+
+            ship.weaponShotCostKg = 0f;
+            ship.weaponShotAlarmRadiusMeters = 0f;
+            GameObject testTurretObject = new GameObject("\u0422\u0443\u0440\u0435\u043b\u044c");
+            testTurretObject.transform.SetParent(ship.transform, false);
+            testTurretObject.transform.localPosition = new Vector3(0f, 2.5f, 6f);
+            testTurretObject.transform.localRotation = Quaternion.identity;
+            testTurretObject.transform.localScale = Vector3.one;
+
+            GameObject testBarrelObject = new GameObject("\u0421\u0442\u0432\u043e\u043b");
+            testBarrelObject.transform.SetParent(testTurretObject.transform, false);
+            testBarrelObject.transform.localPosition = new Vector3(0f, 0.15f, 0.2f);
+            testBarrelObject.transform.localRotation = Quaternion.identity;
+            testBarrelObject.transform.localScale = Vector3.one;
+
+            GameObject testMuzzleObject = new GameObject("Muzzle");
+            testMuzzleObject.transform.SetParent(testBarrelObject.transform, false);
+            testMuzzleObject.transform.localPosition = new Vector3(0f, 0.05f, 1.75f);
+            testMuzzleObject.transform.localRotation = Quaternion.identity;
+            testMuzzleObject.transform.localScale = Vector3.one;
+
+            ShipGunGroup liveGroup = new ShipGunGroup
+            {
+                groupId = "runtime_test",
+                displayNameRu = "Existing Turret Test Gun",
+                maxRangeMeters = 500f,
+                muzzleVelocityMS = 200f,
+                gravityScale = 0f,
+                roundsPerMinute = 600f,
+                yawSpeedDegPerSecond = 20000f,
+                elevationUpSpeedDegPerSecond = 20000f,
+                elevationDownSpeedDegPerSecond = 20000f,
+                minElevationDegrees = -10f,
+                maxElevationDegrees = 70f,
+                fireAlignmentToleranceDegrees = 2f,
+                projectileTrailSeconds = 0f,
+                localMuzzleOffset = new Vector3(0f, 2.7f, 7.85f),
+                shell = new DamageShellPreset
+                {
+                    displayNameRu = "Runtime Test Shell",
+                    damagePoints = 1f,
+                    projectileColor = Color.cyan
+                }
+            };
+            liveGroup.muzzle = testTurretObject.transform;
+            liveGroup.yawPivot = testTurretObject.transform;
+            liveGroup.pitchPivot = testTurretObject.transform;
+            int projectilesBefore = FindObjectsByType<DamageProjectile>(FindObjectsSortMode.None).Length;
+            Vector3 runtimeTarget = ship.transform.position + new Vector3(120f, 6f, 60f);
+            bool fired = ship.TryFireGunGroupAtPointForTests(liveGroup, runtimeTarget, Vector3.zero, out string fireReason);
+            int projectilesAfter = FindObjectsByType<DamageProjectile>(FindObjectsSortMode.None).Length;
+            Vector3 muzzleToTarget = runtimeTarget - (liveGroup.muzzle != null ? liveGroup.muzzle.position : ship.transform.position);
+            bool mountAimed = liveGroup.muzzle != null
+                && liveGroup.pitchPivot != null
+                && muzzleToTarget.sqrMagnitude > 0.001f
+                && Vector3.Dot(liveGroup.pitchPivot.forward, muzzleToTarget.normalized) > 0.95f;
+            DamageProjectile spawnedGunProjectile = null;
+            DamageProjectile[] spawnedProjectiles = FindObjectsByType<DamageProjectile>(FindObjectsSortMode.None);
+            for (int i = 0; i < spawnedProjectiles.Length; i++)
+            {
+                DamageProjectile projectile = spawnedProjectiles[i];
+                if (projectile != null && projectile.name.Contains("Existing Turret Test Gun Projectile"))
+                {
+                    spawnedGunProjectile = projectile;
+                    break;
+                }
+            }
+
+            Rigidbody spawnedProjectileBody = spawnedGunProjectile != null ? spawnedGunProjectile.GetComponent<Rigidbody>() : null;
+            Vector3 spawnedVelocity = spawnedProjectileBody != null ? spawnedProjectileBody.linearVelocity : Vector3.zero;
+            bool projectileLeavesMuzzle = spawnedGunProjectile != null
+                && liveGroup.muzzle != null
+                && Vector3.Distance(spawnedGunProjectile.transform.position, liveGroup.muzzle.position) <= 0.05f
+                && spawnedVelocity.sqrMagnitude > 0.001f
+                && Vector3.Dot(spawnedVelocity.normalized, liveGroup.muzzle.forward.normalized) > 0.995f;
+            report.Check(fired
+                && projectilesAfter > projectilesBefore
+                && liveGroup.muzzle != null
+                && liveGroup.yawPivot != null
+                && liveGroup.pitchPivot != null
+                && mountAimed
+                && !ContainsChildNamed(ship.transform, "RuntimeGunMounts"),
+                "Existing gun hierarchy is bound, rotates toward the ballistic aim, and firing creates a visible projectile without runtime fallback: "
+                + fireReason);
+            report.Check(liveGroup.muzzle == testMuzzleObject.transform,
+                "Gun binding overrides stale serialized turret muzzle references with the barrel child Muzzle.");
+            report.Check(projectileLeavesMuzzle,
+                "Gun projectile spawns at the bound Muzzle and leaves along the visible barrel direction.");
+
+            ShipGunGroup slowTraverseGroup = new ShipGunGroup
+            {
+                groupId = "slow_traverse_test",
+                displayNameRu = "Slow Traverse Test Gun",
+                maxRangeMeters = 500f,
+                muzzleVelocityMS = 200f,
+                gravityScale = 0f,
+                roundsPerMinute = 600f,
+                yawSpeedDegPerSecond = 5f,
+                elevationUpSpeedDegPerSecond = 5f,
+                elevationDownSpeedDegPerSecond = 5f,
+                minElevationDegrees = -10f,
+                maxElevationDegrees = 70f,
+                fireAlignmentToleranceDegrees = 1f,
+                projectileTrailSeconds = 0f,
+                localMuzzleOffset = new Vector3(0f, 2.7f, 7.85f),
+                shell = new DamageShellPreset { displayNameRu = "Slow Traverse Test Shell", damagePoints = 1f }
+            };
+            int projectilesBeforeSlowShot = FindObjectsByType<DamageProjectile>(FindObjectsSortMode.None).Length;
+            bool slowShotFired = ship.TryFireGunGroupAtPointForTests(
+                slowTraverseGroup,
+                ship.transform.position + new Vector3(120f, 0f, 0f),
+                Vector3.zero,
+                out string slowReason);
+            int projectilesAfterSlowShot = FindObjectsByType<DamageProjectile>(FindObjectsSortMode.None).Length;
+            report.Check(!slowShotFired
+                && projectilesAfterSlowShot == projectilesBeforeSlowShot
+                && slowReason.Contains("доворачивается"),
+                "Gun traverse speed gates firing until the turret has rotated onto target: " + slowReason);
+
+            ShipGunGroup elevationLimitGroup = new ShipGunGroup
+            {
+                groupId = "elevation_limit_test",
+                displayNameRu = "Elevation Limit Test Gun",
+                maxRangeMeters = 500f,
+                muzzleVelocityMS = 200f,
+                gravityScale = 0f,
+                roundsPerMinute = 600f,
+                yawSpeedDegPerSecond = 20000f,
+                elevationUpSpeedDegPerSecond = 20000f,
+                elevationDownSpeedDegPerSecond = 20000f,
+                minElevationDegrees = -5f,
+                maxElevationDegrees = 10f,
+                fireAlignmentToleranceDegrees = 1f,
+                projectileTrailSeconds = 0f,
+                localMuzzleOffset = new Vector3(0f, 2.7f, 7.85f),
+                shell = new DamageShellPreset { displayNameRu = "Elevation Limit Test Shell", damagePoints = 1f }
+            };
+            int projectilesBeforeLimitShot = FindObjectsByType<DamageProjectile>(FindObjectsSortMode.None).Length;
+            bool limitShotFired = ship.TryFireGunGroupAtPointForTests(
+                elevationLimitGroup,
+                ship.transform.position + new Vector3(40f, 120f, 40f),
+                Vector3.zero,
+                out string elevationReason);
+            int projectilesAfterLimitShot = FindObjectsByType<DamageProjectile>(FindObjectsSortMode.None).Length;
+            report.Check(!limitShotFired
+                && projectilesAfterLimitShot == projectilesBeforeLimitShot
+                && elevationReason.Contains("вне углов"),
+                "Gun elevation limits block firing outside the allowed barrel arc: " + elevationReason);
+
+            DamageProjectile[] projectiles = FindObjectsByType<DamageProjectile>(FindObjectsSortMode.None);
+            for (int i = 0; i < projectiles.Length; i++)
+            {
+                DamageProjectile projectile = projectiles[i];
+                if (projectile != null &&
+                    (projectile.name.Contains("Existing Turret Test Gun Projectile") ||
+                     projectile.name.Contains("Slow Traverse Test Gun Projectile") ||
+                     projectile.name.Contains("Elevation Limit Test Gun Projectile")))
+                {
+                    Destroy(projectile.gameObject);
+                }
+            }
+        }
+        finally
+        {
+            if (shipObject != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(shipObject);
+                }
+                else
+                {
+                    DestroyImmediate(shipObject);
+                }
+            }
+        }
+
+        report.Check(DamageProjectile.MaxActiveProjectiles >= 300,
+            "Projectile pool cap allows 200-300 simultaneous visible shells: "
+            + DamageProjectile.MaxActiveProjectiles.ToString()
+            + ".");
+    }
+
+    private void ValidateActivePlayerShipVisual(BigTestReport report)
+    {
+        ShipPhysics activeShip = metaGameState != null && metaGameState.shipLoader != null
+            ? metaGameState.shipLoader.targetShip
+            : null;
+        if (activeShip == null)
+        {
+            activeShip = FindFirstObjectByType<ShipPhysics>();
+        }
+
+        report.Check(activeShip != null,
+            activeShip != null
+                ? "Active player ShipPhysics is present for visual validation: " + activeShip.name + "."
+                : "Active player ShipPhysics is missing, so the world can fly as empty focus.");
+        if (activeShip == null)
+        {
+            return;
+        }
+
+        MeshFilter[] meshFilters = activeShip.GetComponentsInChildren<MeshFilter>(true);
+        MeshRenderer[] renderers = activeShip.GetComponentsInChildren<MeshRenderer>(true);
+        int usableMeshCount = 0;
+        for (int i = 0; i < meshFilters.Length; i++)
+        {
+            MeshFilter filter = meshFilters[i];
+            if (filter != null && filter.sharedMesh != null && filter.sharedMesh.vertexCount > 0)
+            {
+                usableMeshCount++;
+            }
+        }
+
+        List<MeshRenderer> visibleRenderers = new List<MeshRenderer>();
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            MeshRenderer renderer = renderers[i];
+            if (renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy)
+            {
+                visibleRenderers.Add(renderer);
+            }
+        }
+
+        bool hasFallbackVisual = ContainsChildNamed(activeShip.transform, "Session Balloon") ||
+            ContainsChildNamed(activeShip.transform, "Session Cabin") ||
+            ContainsChildNamed(activeShip.transform, "Emergency Starter Hull Fallback") ||
+            activeShip.name == "Player Session Ship" ||
+            activeShip.name == "Player Ship Proxy";
+        report.Check(!hasFallbackVisual, "Active ship is not a session fallback visual.");
+        report.Check(usableMeshCount > 0, "Active ship has " + usableMeshCount + " usable mesh filter(s).");
+        report.Check(visibleRenderers.Count > 0, "Active ship has " + visibleRenderers.Count + " active mesh renderer(s).");
+
+        bool hasBounds = TryFindVisibleStarterHullMeshSize(meshFilters, out Vector3 size);
+        bool boatSized = hasBounds && IsFinite(size) && size.x >= 5f && size.x <= 7f && size.y >= 2.5f && size.y <= 4.25f && size.z >= 18f && size.z <= 22f;
+        report.Check(boatSized,
+            boatSized
+                ? "Active ship visible mesh size matches the 20m starter hull: " + FormatVector(size) + "."
+                : "Active ship visible mesh size is empty or not the 20m starter hull: " + FormatVector(size) + ".");
     }
 
     private void ValidateExtractionMechanicsAndMetaGame(BigTestReport report)
@@ -5408,6 +6610,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ? loadedMeta.shipLoader.targetShip
             : null;
         GameObject staleBoundaryShipObject = new GameObject("Boundary Stale Ship Probe");
+        Rigidbody staleBoundaryBody = staleBoundaryShipObject.AddComponent<Rigidbody>();
+        staleBoundaryBody.isKinematic = true;
+        staleBoundaryBody.useGravity = false;
         ShipPhysics staleBoundaryShip = staleBoundaryShipObject.AddComponent<ShipPhysics>();
         GameObject boundaryResolverObject = new GameObject("Boundary Resolver Probe");
         SortieBoundaryController boundaryResolver = boundaryResolverObject.AddComponent<SortieBoundaryController>();
@@ -6553,11 +7758,64 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 "Flight camera snaps to the configured ship-bound orbit distance after takeoff.");
 
             float yawBefore = travelController.CameraOrbitYawDegrees;
-            float distanceBefore = travelController.CameraOrbitDistanceMeters;
-            travelController.AdjustCameraOrbitForTests(22f, -4f, -1f);
+            float routeBefore = travelController.FlightCameraWheelRoute01;
+            Vector3 cameraPositionBefore = gameplayCamera != null ? gameplayCamera.transform.position : Vector3.zero;
+            travelController.AdjustCameraOrbitForTests(22f, -4f, 1f);
             bool orbitChanged = Mathf.Abs(Mathf.DeltaAngle(yawBefore, travelController.CameraOrbitYawDegrees)) > 10f &&
-                travelController.CameraOrbitDistanceMeters > distanceBefore;
-            report.Check(orbitChanged, "Flight camera supports orbit rotation and mouse-wheel zoom around the ship.");
+                travelController.FlightCameraWheelRoute01 > routeBefore &&
+                gameplayCamera != null &&
+                Vector3.Distance(gameplayCamera.transform.position, cameraPositionBefore) > 1f;
+            report.Check(orbitChanged, "Flight camera supports orbit rotation and Warships wheel route movement.");
+
+            Vector3 aimOffset = travelController.LastCameraAimTarget - travelController.LastCameraOrbitPivot;
+            Vector3 horizontalAimOffset = Vector3.ProjectOnPlane(aimOffset, Vector3.up);
+            bool cameraCenterAimsAhead = horizontalAimOffset.magnitude >= 50f;
+            report.Check(cameraCenterAimsAhead,
+                cameraCenterAimsAhead
+                    ? "Flight camera centers the reticle ahead of the hull instead of on the ship body."
+                    : "Flight camera reticle target is still too close to the ship body: " + FormatVector(aimOffset) + ".");
+
+            ShipPhysics flightShip = loadedSession.PlayerShipRoot != null
+                ? loadedSession.PlayerShipRoot.GetComponent<ShipPhysics>()
+                : null;
+            Vector3 elevatedGunAimTarget = Vector3.zero;
+            bool elevatedGunAimSet = flightShip != null &&
+                flightShip.SetManualGunSphereAimForTests(35f, 42f, out elevatedGunAimTarget);
+            travelController.ApplyCameraForTests(true);
+            float elevatedAimHeight = elevatedGunAimSet ? elevatedGunAimTarget.y - loadedSession.PlayerPosition.y : 0f;
+            float cameraGunAimError = elevatedGunAimSet
+                ? Vector3.Distance(travelController.LastCameraAimTarget, elevatedGunAimTarget)
+                : float.PositiveInfinity;
+            bool cameraFollowsElevatedGunAim = elevatedGunAimSet &&
+                elevatedAimHeight >= 100f &&
+                cameraGunAimError <= 0.5f;
+            report.Check(cameraFollowsElevatedGunAim,
+                cameraFollowsElevatedGunAim
+                    ? "Flight camera center follows the elevated manual gun sphere aim point instead of a fixed plane."
+                    : "Flight camera is not centered on elevated manual gun sphere aim: set=" + elevatedGunAimSet +
+                      ", height=" + elevatedAimHeight.ToString("0.#") +
+                      ", error=" + cameraGunAimError.ToString("0.###") + ".");
+
+            bool cursorStateResolved = travelController.EvaluateGameplayCursorStateForTests(
+                false,
+                out CursorLockMode normalFlightCursorLock,
+                out bool normalFlightCursorVisible);
+            bool altCursorStateResolved = travelController.EvaluateGameplayCursorStateForTests(
+                true,
+                out CursorLockMode altFlightCursorLock,
+                out bool altFlightCursorVisible);
+            bool warshipsCursorMode =
+                cursorStateResolved &&
+                altCursorStateResolved &&
+                normalFlightCursorLock == CursorLockMode.Locked &&
+                !normalFlightCursorVisible &&
+                altFlightCursorLock == CursorLockMode.None &&
+                altFlightCursorVisible;
+            report.Check(warshipsCursorMode,
+                warshipsCursorMode
+                    ? "Flight camera uses Warships-style locked mouse look, and Alt releases the cursor for UI."
+                    : "Flight camera cursor mode is not Warships-style: normal=" + normalFlightCursorLock + "/" + normalFlightCursorVisible +
+                      ", alt=" + altFlightCursorLock + "/" + altFlightCursorVisible + ".");
 
             travelController.ApplyCameraForTests(true);
             loadedHud.RefreshCompassForTests();
@@ -7015,11 +8273,218 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private void ValidateMaintainability(BigTestReport report)
     {
         report.Section("Методика сопровождения");
+        ValidateLegacyNearestWeaponApiRemoved(report);
+        ValidateArmorDegradationRemoved(report);
+        ValidateShipPhysicsUsesInputSystem(report);
+        ValidateRuntimeGunFallbackRemoved(report);
+        ValidateNoUnauthorizedEditorTools(report);
+        report.Info("PROJECT RULE: NO NEW EDITOR TOOLS. Only the Big Test editor entry point is generally allowed; asset fixes must be made directly and checked here.");
         report.Info("Когда появляется новая крупная механика, добавляем сюда отдельный раздел: конфиг, runtime-состояние, симуляция, граничные условия, производительность и пользовательский маршрут.");
         report.Info("Модульные тесты остаются рядом со своей областью: ProductionAutoTestRunner и WorldAutoTestRunner можно запускать отдельно, а большой тест обязан проверять их ключевые инварианты.");
         report.Info("Если тест ругается WARN, это не блокер, но повод записать решение: оставить допуск, ужесточить его или превратить в FAIL.");
         report.Info("Правило проекта: новая фича не считается принятой, пока её главный сценарий не попал в большой тест.");
         report.Pass("Большой тест сформировал явный текстовый протокол, который можно расширять дальше.");
+    }
+
+    private static void ValidateLegacyNearestWeaponApiRemoved(BigTestReport report)
+    {
+#if UNITY_EDITOR
+        string shipPhysicsText = ReadProjectText("Assets/Scripts/Systems/ShipPhysics.cs");
+        string shipEditorText = ReadProjectText("Assets/Scripts/Editor/ShipPhysicsEditor.cs");
+        string combinedText = shipPhysicsText + "\n" + shipEditorText;
+        string oldMiningApi = "TryShoot" + "NearestMiningRock";
+        string oldLeviathanShotApi = "TryShoot" + "Leviathan";
+        string oldHarpoonApi = "TryFireHarpoonAt" + "NearestLeviathan";
+        bool removed = !combinedText.Contains(oldMiningApi) &&
+            !combinedText.Contains(oldLeviathanShotApi) &&
+            !combinedText.Contains(oldHarpoonApi);
+        report.Check(removed, "Legacy nearest-target weapon APIs are absent from ShipPhysics and its editor.");
+#else
+        report.Check(true, "Legacy nearest-target weapon API source scan is editor-only and skipped in player builds.");
+#endif
+    }
+
+    private static void ValidateShipPhysicsUsesInputSystem(BigTestReport report)
+    {
+#if UNITY_EDITOR
+        string shipPhysicsText = ReadProjectText("Assets/Scripts/Systems/ShipPhysics.cs");
+        string[] legacyInputTokens =
+        {
+            "Input.mousePosition",
+            "Input.GetMouseButton(",
+            "Input.GetMouseButtonDown(",
+            "Input.GetMouseButtonUp("
+        };
+        List<string> leftovers = new List<string>();
+        for (int i = 0; i < legacyInputTokens.Length; i++)
+        {
+            if (shipPhysicsText.Contains(legacyInputTokens[i]))
+            {
+                leftovers.Add(legacyInputTokens[i]);
+            }
+        }
+
+        report.Check(leftovers.Count == 0,
+            leftovers.Count == 0
+                ? "ShipPhysics gameplay input uses the Input System mouse API instead of legacy UnityEngine.Input."
+                : "ShipPhysics still reads legacy UnityEngine.Input tokens: " + string.Join(", ", leftovers));
+#else
+        report.Check(true, "ShipPhysics Input System source scan is editor-only and skipped in player builds.");
+#endif
+    }
+
+    private static void ValidateRuntimeGunFallbackRemoved(BigTestReport report)
+    {
+#if UNITY_EDITOR
+        string shipPhysicsText = ReadProjectText("Assets/Scripts/Systems/ShipPhysics.cs");
+        string starterHullPrefabText = ReadProjectText("Assets/Data/ShipPrefabs/StarterHull.prefab");
+        string worldSceneText = ReadProjectText("Assets/Scenes/WildWindWorldScene.unity");
+        string[] fallbackTokens =
+        {
+            "RuntimeGunMounts",
+            "CreateRuntimeGunMount",
+            "autoCreateRuntimeMount",
+            "EnsureRuntimeGunMounts"
+        };
+        List<string> leftovers = new List<string>();
+        for (int i = 0; i < fallbackTokens.Length; i++)
+        {
+            if (shipPhysicsText.Contains(fallbackTokens[i]) ||
+                starterHullPrefabText.Contains(fallbackTokens[i]) ||
+                worldSceneText.Contains(fallbackTokens[i]))
+            {
+                leftovers.Add(fallbackTokens[i]);
+            }
+        }
+
+        report.Check(leftovers.Count == 0,
+            leftovers.Count == 0
+                ? "Ship guns bind existing turret hierarchy; runtime fallback gun mount generation is absent."
+                : "Runtime gun fallback tokens remain: " + string.Join(", ", leftovers));
+#else
+        report.Check(true, "Runtime gun fallback source scan is editor-only and skipped in player builds.");
+#endif
+    }
+
+    private static void ValidateNoUnauthorizedEditorTools(BigTestReport report)
+    {
+#if UNITY_EDITOR
+        string projectRoot = Directory.GetCurrentDirectory();
+        string editorDir = Path.Combine(projectRoot, "Assets", "Scripts", "Editor");
+        List<string> violations = new List<string>();
+
+        string forbiddenReimporter = Path.Combine(editorDir, "StarterHullBlenderReimporter.cs");
+        if (File.Exists(forbiddenReimporter))
+        {
+            violations.Add("StarterHullBlenderReimporter.cs");
+        }
+
+        if (Directory.Exists(editorDir))
+        {
+            string[] files = Directory.GetFiles(editorDir, "*.cs", SearchOption.AllDirectories);
+            for (int i = 0; i < files.Length; i++)
+            {
+                string path = files[i];
+                string relativePath = ToProjectRelativePath(projectRoot, path);
+                string text = File.ReadAllText(path);
+                string[] lines = text.Split('\n');
+                for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+                {
+                    string trimmed = lines[lineIndex].TrimStart();
+                    if (!trimmed.StartsWith("[MenuItem(\"Wild Wind/", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    bool allowedBigTestMenu = string.Equals(relativePath, "Assets/Scripts/Editor/WildWindBigTestMenu.cs", StringComparison.Ordinal);
+                    if (!allowedBigTestMenu)
+                    {
+                        violations.Add(relativePath + ":" + (lineIndex + 1).ToString());
+                    }
+                }
+            }
+        }
+
+        report.Check(violations.Count == 0,
+            violations.Count == 0
+                ? "PROJECT RULE: no unauthorized Wild Wind editor tools are present; only the Big Test menu may live in the top-level Unity menu."
+                : "Unauthorized editor tools are present: " + string.Join(", ", violations));
+#else
+        report.Check(true, "Editor tool policy source scan is editor-only and skipped in player builds.");
+#endif
+    }
+
+    private static string ToProjectRelativePath(string projectRoot, string fullPath)
+    {
+        string normalizedRoot = projectRoot.Replace('\\', '/').TrimEnd('/');
+        string normalizedPath = fullPath.Replace('\\', '/');
+        if (normalizedPath.StartsWith(normalizedRoot + "/", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalizedPath.Substring(normalizedRoot.Length + 1);
+        }
+
+        return normalizedPath;
+    }
+
+    private static void ValidateArmorDegradationRemoved(BigTestReport report)
+    {
+#if UNITY_EDITOR
+        string[] sourcePaths =
+        {
+            "Assets/Scripts/Systems/DamageModel.cs",
+            "Assets/Scripts/Systems/DamageProjectile.cs",
+            "Assets/Scripts/Systems/DamageTestBench.cs",
+            "Assets/Scripts/Systems/PaintedArmorBody.cs",
+            "Assets/Scripts/Systems/MeshArmorBody.cs",
+            "Assets/Scripts/Editor/DamageTestSceneBuilder.cs",
+            "Assets/Scripts/Editor/MeshArmorBodyEditor.cs",
+            "Docs/ExtractionMechanicsDiscussion.md",
+            "Docs/ShipPhysicsBalanceConstants.md"
+        };
+
+        string[] retiredTokens =
+        {
+            "armor" + "PlateDamage",
+            "remaining" + "ArmorPlateHp",
+            "max" + "ArmorPlateHp",
+            "armor" + "Hp",
+            "max" + "ArmorHp",
+            "Armor" + "Integrity01",
+            "Current" + "ArmorMm",
+            "Apply" + "ArmorPlateDamage",
+            "Reset" + "ArmorHp",
+            "base" + "ArmorMm",
+            "armor" + "Integrity01",
+            "armor" + "DetailId",
+            "hpPer" + "ArmorMm",
+            "Mesh" + "ArmorDetail"
+        };
+
+        bool clean = true;
+        StringBuilder leftovers = new StringBuilder();
+        for (int i = 0; i < sourcePaths.Length; i++)
+        {
+            string text = ReadProjectText(sourcePaths[i]);
+            for (int j = 0; j < retiredTokens.Length; j++)
+            {
+                if (!text.Contains(retiredTokens[j])) continue;
+                clean = false;
+                if (leftovers.Length > 0)
+                {
+                    leftovers.Append("; ");
+                }
+
+                leftovers.Append(sourcePaths[i]).Append(" contains retired armor degradation token");
+                break;
+            }
+        }
+
+        report.Check(clean, clean
+            ? "Armor degradation state is absent from damage runtime, editors, tests, and local docs."
+            : "Armor degradation state still has source leftovers: " + leftovers);
+#else
+        report.Check(true, "Armor degradation source scan is editor-only and skipped in player builds.");
+#endif
     }
 
     private WorldRuntimeState.EntityRuntimeState FindExtractableRuntimeEntity()
@@ -7692,6 +9157,55 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return Mathf.Abs(actual - expected) <= tolerance;
     }
 
+    private static Vector3 SimulateDamageProjectileBallistics(
+        Vector3 origin,
+        Vector3 launchVelocity,
+        float gravityScale,
+        float maxRangeMeters,
+        float velocityRetentionAtMaxRange,
+        float flightTimeSeconds,
+        float fixedDeltaSeconds,
+        Vector3 closestPointTarget,
+        out float closestDistanceMeters)
+    {
+        Vector3 position = origin;
+        Vector3 velocity = launchVelocity;
+        Vector3 gravity = Physics.gravity * Mathf.Max(0f, gravityScale);
+        float dragPerMeter = BallisticFireControl.CalculateDragPerMeter(
+            Mathf.Max(1f, maxRangeMeters),
+            velocityRetentionAtMaxRange);
+        float remaining = Mathf.Max(0f, flightTimeSeconds);
+        float step = Mathf.Clamp(fixedDeltaSeconds, 0.001f, 0.05f);
+        closestDistanceMeters = Vector3.Distance(position, closestPointTarget);
+
+        while (remaining > 0.00001f)
+        {
+            float dt = Mathf.Min(step, remaining);
+            Vector3 previousPosition = position;
+            velocity = BallisticFireControl.IntegrateVelocity(velocity, gravity, dt, dragPerMeter);
+            position += velocity * dt;
+            closestDistanceMeters = Mathf.Min(
+                closestDistanceMeters,
+                DistancePointToSegment(closestPointTarget, previousPosition, position));
+            remaining -= dt;
+        }
+
+        return position;
+    }
+
+    private static float DistancePointToSegment(Vector3 point, Vector3 segmentStart, Vector3 segmentEnd)
+    {
+        Vector3 segment = segmentEnd - segmentStart;
+        float lengthSqr = segment.sqrMagnitude;
+        if (lengthSqr <= 0.000001f)
+        {
+            return Vector3.Distance(point, segmentStart);
+        }
+
+        float t = Mathf.Clamp01(Vector3.Dot(point - segmentStart, segment) / lengthSqr);
+        return Vector3.Distance(point, segmentStart + segment * t);
+    }
+
     private static bool IsFinite(Vector3 value)
     {
         return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
@@ -7717,6 +9231,76 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private static string FormatVector(Vector3 value)
     {
         return "(" + value.x.ToString("0.#") + ", " + value.y.ToString("0.#") + ", " + value.z.ToString("0.#") + ")";
+    }
+
+    private static bool ContainsChildNamed(Transform root, string childName)
+    {
+        if (root == null)
+        {
+            return false;
+        }
+
+        if (root.name == childName)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            if (ContainsChildNamed(root.GetChild(i), childName))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryFindVisibleStarterHullMeshSize(MeshFilter[] filters, out Vector3 size)
+    {
+        size = Vector3.zero;
+        if (filters == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < filters.Length; i++)
+        {
+            MeshFilter filter = filters[i];
+            if (filter == null || filter.sharedMesh == null || filter.sharedMesh.vertexCount <= 0)
+            {
+                continue;
+            }
+
+            MeshRenderer renderer = filter.GetComponent<MeshRenderer>();
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Vector3 meshSize = filter.sharedMesh.bounds.size;
+            Vector3 scale = filter.transform.lossyScale;
+            Vector3 scaledSize = new Vector3(
+                Mathf.Abs(meshSize.x * scale.x),
+                Mathf.Abs(meshSize.y * scale.y),
+                Mathf.Abs(meshSize.z * scale.z));
+
+            if (IsFinite(scaledSize) &&
+                scaledSize.x >= 5f && scaledSize.x <= 7f &&
+                scaledSize.y >= 2.5f && scaledSize.y <= 4.25f &&
+                scaledSize.z >= 18f && scaledSize.z <= 22f)
+            {
+                size = scaledSize;
+                return true;
+            }
+
+            if (size == Vector3.zero)
+            {
+                size = scaledSize;
+            }
+        }
+
+        return false;
     }
 
     private sealed class BigTestConsoleMessage

@@ -110,12 +110,12 @@ public static class DamageTestSceneBuilder
         armor.boxSize = new Vector3(18f, 6f, 10f);
         armor.faces = new List<PaintedArmorFace>
         {
-            PaintedFace(PaintedArmorBoxFace.FrontNegativeZ, "front", "Лобовая плита", 65f, 260f, Color.red),
-            PaintedFace(PaintedArmorBoxFace.RearPositiveZ, "rear", "Корма", 28f, 130f, Color.yellow),
-            PaintedFace(PaintedArmorBoxFace.LeftNegativeX, "left", "Левый борт", 38f, 170f, new Color(1f, 0.5f, 0.1f)),
-            PaintedFace(PaintedArmorBoxFace.RightPositiveX, "right", "Правый борт", 38f, 170f, new Color(1f, 0.5f, 0.1f)),
-            PaintedFace(PaintedArmorBoxFace.TopPositiveY, "top", "Верхняя палуба", 22f, 120f, Color.cyan),
-            PaintedFace(PaintedArmorBoxFace.BottomNegativeY, "bottom", "Нижняя броня", 18f, 110f, Color.blue)
+            PaintedFace(PaintedArmorBoxFace.FrontNegativeZ, "front", "Лобовая плита", 65f, Color.red),
+            PaintedFace(PaintedArmorBoxFace.RearPositiveZ, "rear", "Корма", 28f, Color.yellow),
+            PaintedFace(PaintedArmorBoxFace.LeftNegativeX, "left", "Левый борт", 38f, new Color(1f, 0.5f, 0.1f)),
+            PaintedFace(PaintedArmorBoxFace.RightPositiveX, "right", "Правый борт", 38f, new Color(1f, 0.5f, 0.1f)),
+            PaintedFace(PaintedArmorBoxFace.TopPositiveY, "top", "Верхняя палуба", 22f, Color.cyan),
+            PaintedFace(PaintedArmorBoxFace.BottomNegativeY, "bottom", "Нижняя броня", 18f, Color.blue)
         };
         armor.EnsureCollider();
         armor.RebuildVisualMesh();
@@ -127,7 +127,6 @@ public static class DamageTestSceneBuilder
         string id,
         string nameRu,
         float armorMm,
-        float armorHp,
         Color color)
     {
         return new PaintedArmorFace
@@ -136,8 +135,6 @@ public static class DamageTestSceneBuilder
             zoneId = id,
             displayNameRu = nameRu,
             armorMm = armorMm,
-            maxArmorHp = Mathf.Max(1f, armorHp),
-            armorHp = Mathf.Max(1f, armorHp),
             ricochetAngleDeg = 70f,
             debugColor = new Color(color.r, color.g, color.b, 0.75f)
         };
@@ -329,8 +326,9 @@ public class DamageTestBenchEditor : Editor
         DrawRelative(shell, "caliberMm", "Калибр, мм");
         DrawRelative(shell, "damagePoints", "Старый общий урон");
         DrawRelative(shell, "hullDamageOnPenetration", "Урон корпусу при пробитии");
-        DrawRelative(shell, "armorPlateDamage", "Урон бронелисту");
         DrawRelative(shell, "penetrationMm", "Пробитие, мм");
+        DrawRelative(shell, "penetrationAtMaxRangeMultiplier", "Пробитие на макс. дальности");
+        DrawRelative(shell, "velocityRetentionAtMaxRange", "Скорость на макс. дальности");
         DrawRelative(shell, "explosiveRadiusMeters", "Радиус фугаса, м");
         DrawRelative(shell, "normalizationDegrees", "Нормализация, град");
         DrawRelative(shell, "penetrationRollSpread", "Разброс пробития");
@@ -437,7 +435,7 @@ public class PaintedArmorBodyEditor : Editor
         {
             PaintedArmorFace face = armor.faces[i];
             if (face == null) continue;
-            EditorGUILayout.LabelField(face.displayNameRu, $"{face.CurrentArmorMm:0.0}/{face.armorMm:0.0} мм, прочность {face.armorHp:0.0}/{face.maxArmorHp:0.0}, id={face.zoneId}");
+            EditorGUILayout.LabelField(face.displayNameRu, $"{face.armorMm:0.0} мм, id={face.zoneId}");
         }
     }
 }

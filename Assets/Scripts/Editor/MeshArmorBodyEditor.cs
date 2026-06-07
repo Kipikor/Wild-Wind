@@ -19,14 +19,12 @@ public class MeshArmorBodyEditor : Editor
         DrawProperty("convexColliderForPhysics", "Convex коллайдер для физики", "Нужно включить, если цель должна двигаться от Rigidbody.");
         DrawProperty("ricochetAngleDeg", "Угол рикошета, град", "Общий угол авторикошета для всех бронелистов этой mesh-брони.");
         DrawPlates(serializedObject.FindProperty("plates"));
-        DrawDetails(serializedObject.FindProperty("details"));
 
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Автосборка", EditorStyles.boldLabel);
         DrawProperty("normalAngleThresholdDeg", "Порог угла нормали");
         DrawProperty("planeDistanceThreshold", "Порог расстояния плоскости");
         DrawProperty("defaultArmorMm", "Броня по умолчанию, мм");
-        DrawProperty("hpPerArmorMm", "Прочность на 1 мм брони");
 
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Отладка", EditorStyles.boldLabel);
@@ -59,31 +57,7 @@ public class MeshArmorBodyEditor : Editor
             armor.RebuildPlatesFromMesh();
             EditorUtility.SetDirty(armor);
             SceneView.RepaintAll();
-            Debug.Log($"[Урон] Mesh-броня собрана: бронелистов {armor.plates.Count}. Теперь можно настроить толщину и прочность каждого листа.", armor);
-        }
-
-        if (GUILayout.Button("Каждый бронелист - отдельная бронедеталь"))
-        {
-            Undo.RecordObject(armor, "Make each plate separate armor detail");
-            armor.MakeEachPlateSeparateDetail();
-            EditorUtility.SetDirty(armor);
-            Debug.Log("[Урон] Для каждого бронелиста создана отдельная бронедеталь.", armor);
-        }
-
-        if (GUILayout.Button("Весь корпус - одна бронедеталь"))
-        {
-            Undo.RecordObject(armor, "Make single armor detail");
-            armor.MakeSingleArmorDetail();
-            EditorUtility.SetDirty(armor);
-            Debug.Log("[Урон] Все бронелисты привязаны к одной бронедетали.", armor);
-        }
-
-        if (GUILayout.Button("Сбросить прочность бронедеталей"))
-        {
-            Undo.RecordObject(armor, "Reset mesh armor hp");
-            armor.ResetArmorState();
-            EditorUtility.SetDirty(armor);
-            Debug.Log("[Урон] Прочность mesh-бронедеталей сброшена.", armor);
+            Debug.Log($"[Урон] Mesh-броня собрана: бронелистов {armor.plates.Count}. Теперь можно настроить толщину каждого листа.", armor);
         }
 
         DrawSummary(armor);
@@ -135,10 +109,6 @@ public class MeshArmorBodyEditor : Editor
         if (armor.plates == null || armor.plates.Count == 0)
         {
             armor.RebuildPlatesFromMesh();
-        }
-        if (armor.details == null || armor.details.Count == 0)
-        {
-            armor.MakeEachPlateSeparateDetail();
         }
 
         DamageTestBench[] benches = FindObjectsByType<DamageTestBench>(FindObjectsSortMode.None);
@@ -202,40 +172,9 @@ public class MeshArmorBodyEditor : Editor
             EditorGUI.indentLevel++;
             DrawRelative(plate, "plateId", "ID бронелиста");
             DrawRelative(plate, "displayNameRu", "Название");
-            DrawRelative(plate, "armorDetailId", "ID бронедетали");
             DrawRelative(plate, "armorMm", "Толщина брони, мм");
             DrawRelative(plate, "triangleIndices", "Треугольники mesh");
             DrawRelative(plate, "debugColor", "Цвет отладки");
-            EditorGUI.indentLevel--;
-        }
-        EditorGUI.indentLevel--;
-    }
-
-    private static void DrawDetails(SerializedProperty details)
-    {
-        if (details == null) return;
-
-        details.isExpanded = EditorGUILayout.Foldout(details.isExpanded, $"Бронедетали ({details.arraySize})", true);
-        if (!details.isExpanded) return;
-
-        EditorGUI.indentLevel++;
-        details.arraySize = Mathf.Max(0, EditorGUILayout.IntField("Количество", details.arraySize));
-        for (int i = 0; i < details.arraySize; i++)
-        {
-            SerializedProperty detail = details.GetArrayElementAtIndex(i);
-            SerializedProperty name = detail.FindPropertyRelative("displayNameRu");
-            string title = !string.IsNullOrWhiteSpace(name != null ? name.stringValue : "")
-                ? name.stringValue
-                : $"Бронедеталь {i + 1}";
-
-            detail.isExpanded = EditorGUILayout.Foldout(detail.isExpanded, title, true);
-            if (!detail.isExpanded) continue;
-
-            EditorGUI.indentLevel++;
-            DrawRelative(detail, "detailId", "ID бронедетали");
-            DrawRelative(detail, "displayNameRu", "Название");
-            DrawRelative(detail, "maxArmorHp", "Максимальная прочность");
-            DrawRelative(detail, "armorHp", "Текущая прочность");
             EditorGUI.indentLevel--;
         }
         EditorGUI.indentLevel--;
@@ -261,31 +200,9 @@ public class MeshArmorBodyEditor : Editor
             if (plate == null) continue;
 
             int triangleCount = plate.triangleIndices != null ? plate.triangleIndices.Count : 0;
-            MeshArmorDetail detail = FindDetail(armor, plate.armorDetailId);
-            float integrity = detail != null ? detail.ArmorIntegrity01 : 1f;
-            float currentArmorMm = plate.armorMm * integrity;
-            string detailText = detail != null
-                ? $"{detail.displayNameRu} {detail.armorHp:0.0}/{detail.maxArmorHp:0.0}"
-                : "деталь не найдена";
             EditorGUILayout.LabelField(
                 plate.displayNameRu,
-                $"{currentArmorMm:0.0}/{plate.armorMm:0.0} мм, {detailText}, треугольники {triangleCount}");
+                $"{plate.armorMm:0.0} мм, треугольники {triangleCount}");
         }
-    }
-
-    private static MeshArmorDetail FindDetail(MeshArmorBody armor, string detailId)
-    {
-        if (armor == null || armor.details == null || string.IsNullOrWhiteSpace(detailId)) return null;
-
-        for (int i = 0; i < armor.details.Count; i++)
-        {
-            MeshArmorDetail detail = armor.details[i];
-            if (detail != null && detail.detailId == detailId)
-            {
-                return detail;
-            }
-        }
-
-        return null;
     }
 }

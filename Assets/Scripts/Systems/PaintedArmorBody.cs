@@ -33,12 +33,6 @@ public class PaintedArmorFace
     [InspectorName("Толщина брони, мм")]
     [Tooltip("Реальная толщина целого бронелиста. Расчетная толщина = эта толщина * процент остатка прочности бронелиста.")]
     [Min(0f)] public float armorMm = 40f;
-    [InspectorName("Максимальная прочность бронелиста")]
-    [Tooltip("Прочность этой грани как отдельного бронелиста. Когда прочность падает до 0, расчетная толщина становится 0.")]
-    [Min(1f)] public float maxArmorHp = 100f;
-    [InspectorName("Текущая прочность бронелиста")]
-    [Tooltip("Текущая прочность бронелиста. Чем она ниже, тем меньше расчетная толщина брони.")]
-    [Min(0f)] public float armorHp = 100f;
     [InspectorName("Угол рикошета, град")]
     [Tooltip("Если угол встречи больше этого значения, бронебойное попадание уходит в рикошет.")]
     [Range(0f, 89f)] public float ricochetAngleDeg = 70f;
@@ -46,19 +40,13 @@ public class PaintedArmorFace
     [Tooltip("Цвет этой грани в тестовом бронекоробе и gizmo-подсветке.")]
     public Color debugColor = new Color(1f, 0.6f, 0.1f, 0.35f);
 
-    public float ArmorIntegrity01 => maxArmorHp > 0.001f ? Mathf.Clamp01(armorHp / maxArmorHp) : 0f;
-    public float CurrentArmorMm => Mathf.Max(0f, armorMm) * ArmorIntegrity01;
-    public bool IsDestroyed => ArmorIntegrity01 <= 0.001f;
-
     public ArmorSurface ToSurface()
     {
         return new ArmorSurface
         {
             zoneId = zoneId,
             displayNameRu = displayNameRu,
-            armorMm = CurrentArmorMm,
-            baseArmorMm = armorMm,
-            armorIntegrity01 = ArmorIntegrity01,
+            armorMm = Mathf.Max(0f, armorMm),
             ricochetAngleDeg = ricochetAngleDeg,
             overmatchCaliberMultiplier = 0f,
             structureDamageMultiplier = 1f,
@@ -67,18 +55,6 @@ public class PaintedArmorFace
         };
     }
 
-    public float ApplyArmorPlateDamage(float amount)
-    {
-        float previous = armorHp;
-        armorHp = Mathf.Clamp(armorHp - Mathf.Max(0f, amount), 0f, Mathf.Max(1f, maxArmorHp));
-        return previous - armorHp;
-    }
-
-    public void ResetArmorHp()
-    {
-        maxArmorHp = Mathf.Max(1f, maxArmorHp);
-        armorHp = maxArmorHp;
-    }
 }
 
 [DisallowMultipleComponent]
@@ -191,12 +167,6 @@ public class PaintedArmorBody : MonoBehaviour
         context.deferResultLogging = true;
 
         DamageHitResult result = target.ApplyHit(face.ToSurface(), context);
-        float armorDamageMultiplier = GetArmorDamageMultiplier(result.outcome);
-        float plateDamage = face.ApplyArmorPlateDamage(context.armorPlateDamage * armorDamageMultiplier);
-        result.armorPlateDamage = plateDamage;
-        result.remainingArmorPlateHp = face.armorHp;
-        result.maxArmorPlateHp = face.maxArmorHp;
-        result.message += $" Бронелист: -{plateDamage:0.0}, осталось {face.armorHp:0.0}/{face.maxArmorHp:0.0}, расчетная толщина {face.CurrentArmorMm:0.0} мм.";
         target.FinalizeHitResult(result);
         return result;
     }
@@ -204,14 +174,6 @@ public class PaintedArmorBody : MonoBehaviour
     public void ResetArmorState()
     {
         EnsureDefaultFaces();
-        for (int i = 0; i < faces.Count; i++)
-        {
-            if (faces[i] != null)
-            {
-                faces[i].ResetArmorHp();
-            }
-        }
-
         RebuildVisualMesh();
     }
 
@@ -426,8 +388,6 @@ public class PaintedArmorBody : MonoBehaviour
             zoneId = id,
             displayNameRu = nameRu,
             armorMm = armorMm,
-            maxArmorHp = Mathf.Max(50f, armorMm * 4f),
-            armorHp = Mathf.Max(50f, armorMm * 4f),
             ricochetAngleDeg = 70f,
             debugColor = new Color(color.r, color.g, color.b, 0.75f)
         });
@@ -440,8 +400,8 @@ public class PaintedArmorBody : MonoBehaviour
         {
             PaintedArmorFace face = faces[i];
             if (face == null) continue;
-            face.maxArmorHp = Mathf.Max(1f, face.maxArmorHp);
-            face.armorHp = Mathf.Clamp(face.armorHp, 0f, face.maxArmorHp);
+            face.armorMm = Mathf.Max(0f, face.armorMm);
+            face.ricochetAngleDeg = Mathf.Clamp(face.ricochetAngleDeg, 0f, 89f);
         }
     }
 
@@ -473,19 +433,6 @@ public class PaintedArmorBody : MonoBehaviour
         if (distance > 0.001f && distance < best)
         {
             best = distance;
-        }
-    }
-
-    private static float GetArmorDamageMultiplier(DamageHitOutcome outcome)
-    {
-        switch (outcome)
-        {
-            case DamageHitOutcome.Penetration:
-                return 2f;
-            case DamageHitOutcome.Ricochet:
-                return 0.5f;
-            default:
-                return 1f;
         }
     }
 

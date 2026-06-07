@@ -9,9 +9,6 @@ public class MeshArmorPlate
     public string plateId = "plate";
     [InspectorName("Название")]
     public string displayNameRu = "Бронелист";
-    [InspectorName("ID бронедетали")]
-    [Tooltip("Какая бронедеталь теряет прочность при попадании в этот лист.")]
-    public string armorDetailId = "detail";
     [InspectorName("Толщина брони, мм")]
     [Min(0f)] public float armorMm = 40f;
     [InspectorName("Треугольники mesh")]
@@ -19,16 +16,13 @@ public class MeshArmorPlate
     [InspectorName("Цвет отладки")]
     public Color debugColor = new Color(1f, 0.6f, 0.1f, 0.35f);
 
-    public ArmorSurface ToSurface(float ricochetAngleDeg, MeshArmorDetail detail)
+    public ArmorSurface ToSurface(float ricochetAngleDeg)
     {
-        float armorIntegrity = detail != null ? detail.ArmorIntegrity01 : 1f;
         return new ArmorSurface
         {
             zoneId = plateId,
             displayNameRu = displayNameRu,
-            armorMm = Mathf.Max(0f, armorMm) * armorIntegrity,
-            baseArmorMm = armorMm,
-            armorIntegrity01 = armorIntegrity,
+            armorMm = Mathf.Max(0f, armorMm),
             ricochetAngleDeg = ricochetAngleDeg,
             overmatchCaliberMultiplier = 0f,
             structureDamageMultiplier = 1f,
@@ -40,35 +34,6 @@ public class MeshArmorPlate
     public bool ContainsTriangle(int triangleIndex)
     {
         return triangleIndices != null && triangleIndices.Contains(triangleIndex);
-    }
-}
-
-[Serializable]
-public class MeshArmorDetail
-{
-    [InspectorName("ID бронедетали")]
-    public string detailId = "detail";
-    [InspectorName("Название")]
-    public string displayNameRu = "Бронедеталь";
-    [InspectorName("Максимальная прочность")]
-    [Min(1f)] public float maxArmorHp = 160f;
-    [InspectorName("Текущая прочность")]
-    [Min(0f)] public float armorHp = 160f;
-
-    public float ArmorIntegrity01 => maxArmorHp > 0.001f ? Mathf.Clamp01(armorHp / maxArmorHp) : 0f;
-    public bool IsDestroyed => ArmorIntegrity01 <= 0.001f;
-
-    public float ApplyDamage(float amount)
-    {
-        float previous = armorHp;
-        armorHp = Mathf.Clamp(armorHp - Mathf.Max(0f, amount), 0f, Mathf.Max(1f, maxArmorHp));
-        return previous - armorHp;
-    }
-
-    public void ResetArmorHp()
-    {
-        maxArmorHp = Mathf.Max(1f, maxArmorHp);
-        armorHp = maxArmorHp;
     }
 }
 
@@ -89,9 +54,6 @@ public class MeshArmorBody : MonoBehaviour
     public bool convexColliderForPhysics;
     [InspectorName("Бронелисты")]
     public List<MeshArmorPlate> plates = new List<MeshArmorPlate>();
-    [InspectorName("Бронедетали")]
-    [Tooltip("Прочность хранится здесь. Несколько бронелистов могут ссылаться на одну бронедеталь.")]
-    public List<MeshArmorDetail> details = new List<MeshArmorDetail>();
     [InspectorName("Угол рикошета, град")]
     [Tooltip("Общий угол авторикошета для всех бронелистов этой mesh-брони.")]
     [Range(0f, 89f)] public float ricochetAngleDeg = 70f;
@@ -105,8 +67,6 @@ public class MeshArmorBody : MonoBehaviour
     [Min(0.001f)] public float planeDistanceThreshold = 0.05f;
     [InspectorName("Броня по умолчанию, мм")]
     [Min(0f)] public float defaultArmorMm = 40f;
-    [InspectorName("Прочность на 1 мм брони")]
-    [Min(1f)] public float hpPerArmorMm = 4f;
 
     [Header("Отладка")]
     [InspectorName("Показывать бронелисты")]
@@ -141,12 +101,10 @@ public class MeshArmorBody : MonoBehaviour
     private void OnValidate()
     {
         defaultArmorMm = Mathf.Max(0f, defaultArmorMm);
-        hpPerArmorMm = Mathf.Max(1f, hpPerArmorMm);
         planeDistanceThreshold = Mathf.Max(0.001f, planeDistanceThreshold);
         ricochetAngleDeg = Mathf.Clamp(ricochetAngleDeg, 0f, 89f);
         maxDrawnTriangles = Mathf.Max(1, maxDrawnTriangles);
         ClampPlateState();
-        EnsureDefaultDetails();
         SyncExistingMeshCollider();
     }
 
@@ -204,7 +162,6 @@ public class MeshArmorBody : MonoBehaviour
         if (mesh == null)
         {
             plates = new List<MeshArmorPlate>();
-            details = new List<MeshArmorDetail>();
             return;
         }
 
@@ -236,28 +193,17 @@ public class MeshArmorBody : MonoBehaviour
         }
 
         plates = new List<MeshArmorPlate>();
-        details = new List<MeshArmorDetail>();
         for (int i = 0; i < groups.Count; i++)
         {
             BuildPlateGroup group = groups[i];
             group.center /= Mathf.Max(1, group.triangleIndices.Count);
-            float armorHp = Mathf.Max(1f, defaultArmorMm * hpPerArmorMm);
             Color color = Color.HSVToRGB((i * 0.137f) % 1f, 0.7f, 1f);
-            string detailId = $"armor_detail_{i + 1:00}";
             string plateName = GuessPlateName(group.normal, i + 1);
-            details.Add(new MeshArmorDetail
-            {
-                detailId = detailId,
-                displayNameRu = plateName + " деталь",
-                maxArmorHp = armorHp,
-                armorHp = armorHp
-            });
 
             plates.Add(new MeshArmorPlate
             {
                 plateId = $"mesh_plate_{i + 1:00}",
                 displayNameRu = plateName,
-                armorDetailId = detailId,
                 armorMm = defaultArmorMm,
                 triangleIndices = new List<int>(group.triangleIndices),
                 debugColor = new Color(color.r, color.g, color.b, 0.35f)
@@ -314,87 +260,14 @@ public class MeshArmorBody : MonoBehaviour
         context.internalTravelDistance = CalculateBoundsExitDistance(context.hitPoint, incoming);
         context.deferResultLogging = true;
 
-        MeshArmorDetail detail = GetOrCreateDetailForPlate(plate);
-        DamageHitResult result = target.ApplyHit(plate.ToSurface(ricochetAngleDeg, detail), context);
-        float armorDamageMultiplier = GetArmorDamageMultiplier(result.outcome);
-        float detailDamage = detail.ApplyDamage(context.armorPlateDamage * armorDamageMultiplier);
-        float currentArmorMm = Mathf.Max(0f, plate.armorMm) * detail.ArmorIntegrity01;
-        result.armorPlateDamage = detailDamage;
-        result.remainingArmorPlateHp = detail.armorHp;
-        result.maxArmorPlateHp = detail.maxArmorHp;
-        result.message += $" Бронедеталь {detail.displayNameRu}: -{detailDamage:0.0}, осталось {detail.armorHp:0.0}/{detail.maxArmorHp:0.0}, расчетная толщина листа {currentArmorMm:0.0} мм.";
+        DamageHitResult result = target.ApplyHit(plate.ToSurface(ricochetAngleDeg), context);
         target.FinalizeHitResult(result);
         return result;
     }
 
     public void ResetArmorState()
     {
-        if (details == null) return;
-
-        for (int i = 0; i < details.Count; i++)
-        {
-            if (details[i] != null)
-            {
-                details[i].ResetArmorHp();
-            }
-        }
-    }
-
-    public void MakeEachPlateSeparateDetail()
-    {
-        if (plates == null)
-        {
-            plates = new List<MeshArmorPlate>();
-        }
-
-        details = new List<MeshArmorDetail>();
-        for (int i = 0; i < plates.Count; i++)
-        {
-            MeshArmorPlate plate = plates[i];
-            if (plate == null) continue;
-
-            string detailId = $"armor_detail_{i + 1:00}";
-            float armorHp = Mathf.Max(1f, plate.armorMm * hpPerArmorMm);
-            plate.armorDetailId = detailId;
-            details.Add(new MeshArmorDetail
-            {
-                detailId = detailId,
-                displayNameRu = plate.displayNameRu + " деталь",
-                maxArmorHp = armorHp,
-                armorHp = armorHp
-            });
-        }
-    }
-
-    public void MakeSingleArmorDetail()
-    {
-        if (plates == null)
-        {
-            plates = new List<MeshArmorPlate>();
-        }
-
-        const string detailId = "armor_detail_hull";
-        float armorHp = 0f;
-        for (int i = 0; i < plates.Count; i++)
-        {
-            MeshArmorPlate plate = plates[i];
-            if (plate == null) continue;
-
-            plate.armorDetailId = detailId;
-            armorHp += Mathf.Max(1f, plate.armorMm * hpPerArmorMm);
-        }
-
-        armorHp = Mathf.Max(1f, armorHp);
-        details = new List<MeshArmorDetail>
-        {
-            new MeshArmorDetail
-            {
-                detailId = detailId,
-                displayNameRu = "Бронекорпус",
-                maxArmorHp = armorHp,
-                armorHp = armorHp
-            }
-        };
+        ClampPlateState();
     }
 
     public MeshArmorPlate FindPlate(int triangleIndex)
@@ -512,92 +385,6 @@ public class MeshArmorBody : MonoBehaviour
             MeshArmorPlate plate = plates[i];
             if (plate == null) continue;
             plate.armorMm = Mathf.Max(0f, plate.armorMm);
-            if (string.IsNullOrWhiteSpace(plate.armorDetailId))
-            {
-                plate.armorDetailId = $"armor_detail_{i + 1:00}";
-            }
-        }
-
-        if (details == null)
-        {
-            details = new List<MeshArmorDetail>();
-        }
-
-        for (int i = 0; i < details.Count; i++)
-        {
-            MeshArmorDetail detail = details[i];
-            if (detail == null) continue;
-            if (string.IsNullOrWhiteSpace(detail.detailId))
-            {
-                detail.detailId = $"armor_detail_{i + 1:00}";
-            }
-
-            detail.maxArmorHp = Mathf.Max(1f, detail.maxArmorHp);
-            detail.armorHp = Mathf.Clamp(detail.armorHp, 0f, detail.maxArmorHp);
-        }
-    }
-
-    private void EnsureDefaultDetails()
-    {
-        if (plates == null || plates.Count == 0) return;
-        if (details != null && details.Count > 0) return;
-
-        MakeEachPlateSeparateDetail();
-    }
-
-    private MeshArmorDetail GetOrCreateDetailForPlate(MeshArmorPlate plate)
-    {
-        if (details == null)
-        {
-            details = new List<MeshArmorDetail>();
-        }
-
-        string detailId = !string.IsNullOrWhiteSpace(plate.armorDetailId)
-            ? plate.armorDetailId
-            : plate.plateId + "_detail";
-
-        MeshArmorDetail detail = FindDetail(detailId);
-        if (detail != null) return detail;
-
-        float armorHp = Mathf.Max(1f, plate.armorMm * hpPerArmorMm);
-        detail = new MeshArmorDetail
-        {
-            detailId = detailId,
-            displayNameRu = plate.displayNameRu + " деталь",
-            maxArmorHp = armorHp,
-            armorHp = armorHp
-        };
-        details.Add(detail);
-        plate.armorDetailId = detailId;
-        return detail;
-    }
-
-    private MeshArmorDetail FindDetail(string detailId)
-    {
-        if (string.IsNullOrWhiteSpace(detailId) || details == null) return null;
-
-        for (int i = 0; i < details.Count; i++)
-        {
-            MeshArmorDetail detail = details[i];
-            if (detail != null && detail.detailId == detailId)
-            {
-                return detail;
-            }
-        }
-
-        return null;
-    }
-
-    private static float GetArmorDamageMultiplier(DamageHitOutcome outcome)
-    {
-        switch (outcome)
-        {
-            case DamageHitOutcome.Penetration:
-                return 2f;
-            case DamageHitOutcome.Ricochet:
-                return 0.5f;
-            default:
-                return 1f;
         }
     }
 

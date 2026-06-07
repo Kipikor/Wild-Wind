@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
 public struct RouteEtaInfo
@@ -1274,8 +1276,6 @@ public class Leviathan : MonoBehaviour
                     zoneId = "leviathan_ram",
                     displayNameRu = "таран левиафана",
                     armorMm = 0f,
-                    baseArmorMm = 0f,
-                    armorIntegrity01 = 1f,
                     ricochetAngleDeg = 89f,
                     overmatchCaliberMultiplier = 1f,
                     structureDamageMultiplier = 1f,
@@ -1779,10 +1779,86 @@ public class LeviathanManager : MonoBehaviour
 }
 
 [RequireComponent(typeof(Rigidbody))]
+[System.Serializable]
+public class ShipGunGroup
+{
+    [InspectorName("ID")]
+    public string groupId = "main";
+    [InspectorName("Название")]
+    public string displayNameRu = "Главный калибр";
+    [InspectorName("Включена")]
+    public bool enabled = true;
+    [InspectorName("Режим огня")]
+    public ShipGunFireMode fireMode = ShipGunFireMode.Manual;
+    [InspectorName("Снаряд")]
+    public DamageShellPreset shell = new DamageShellPreset();
+    [InspectorName("Ствол")]
+    public Transform muzzle;
+    [InspectorName("Поворотная часть")]
+    public Transform yawPivot;
+    [InspectorName("Качающаяся часть")]
+    public Transform pitchPivot;
+    [InspectorName("Локальное смещение ствола")]
+    public Vector3 localMuzzleOffset = new Vector3(0f, 2.7f, 7.85f);
+    [InspectorName("Стволов в залпе")]
+    [Min(1)] public int barrelsPerSalvo = 1;
+    [InspectorName("Выстрелов в минуту")]
+    [Min(0f)] public float roundsPerMinute = 60f;
+    [InspectorName("Скорость поворота башни, град/с")]
+    [Min(0f)] public float yawSpeedDegPerSecond = 45f;
+    [InspectorName("Скорость подъёма ствола, град/с")]
+    [Min(0f)] public float elevationUpSpeedDegPerSecond = 25f;
+    [InspectorName("Скорость опускания ствола, град/с")]
+    [Min(0f)] public float elevationDownSpeedDegPerSecond = 35f;
+    [InspectorName("Минимальный угол ствола, град")]
+    public float minElevationDegrees = -5f;
+    [InspectorName("Максимальный угол ствола, град")]
+    public float maxElevationDegrees = 55f;
+    [InspectorName("Допуск готовности к выстрелу, град")]
+    [Min(0f)] public float fireAlignmentToleranceDegrees = 1.5f;
+    [InspectorName("Дальность от центра корабля, м")]
+    [Min(1f)] public float maxRangeMeters = 1500f;
+    [InspectorName("Начальная скорость, м/с")]
+    [Min(1f)] public float muzzleVelocityMS = 320f;
+    [InspectorName("Масса снаряда, кг")]
+    [Min(0.01f)] public float projectileMassKg = 8f;
+    [InspectorName("Радиус снаряда, м")]
+    [Min(0.01f)] public float projectileRadiusMeters = 0.08f;
+    [InspectorName("Горизонтальный разброс на максимальной дальности, м")]
+    [Min(0f)] public float horizontalSpreadAtMaxRangeMeters = 18f;
+    [InspectorName("Вертикальный разброс на максимальной дальности, м")]
+    [Min(0f)] public float verticalSpreadAtMaxRangeMeters = 8f;
+    [InspectorName("Множитель гравитации")]
+    [Min(0f)] public float gravityScale = 1f;
+    [InspectorName("Trail, сек")]
+    [Min(0f)] public float projectileTrailSeconds = 1.6f;
+    [InspectorName("Автоцели: левиафаны")]
+    public bool automaticTargetsLeviathans = true;
+    [InspectorName("Автоцели: корабли")]
+    public bool automaticTargetsDamageableShips;
+
+    [System.NonSerialized] public float nextShotTime;
+
+    public float SecondsBetweenSalvos
+    {
+        get
+        {
+            return roundsPerMinute > 0.001f ? 60f / roundsPerMinute : float.PositiveInfinity;
+        }
+    }
+}
+
 public class ShipPhysics : MonoBehaviour
 {
     private const float EngineAfterburnerPowerMultiplier = 1.2f;
     private const float EngineCheatAfterburnerPowerMultiplier = 6f;
+    private const float MainGunRoundsPerMinute = 60f;
+    private const float ManualGunAimTargetSmoothSeconds = 0.055f;
+    private const float ManualGunSphereAimSensitivityDegreesPerPixel = 0.18f;
+    private const float ManualGunSphereAimMinPitchDegrees = -89f;
+    private const float ManualGunSphereAimMaxPitchDegrees = 89f;
+    private const float GunProjectileTrailBrightnessMultiplier = 6f;
+    private const float GunProjectileTrailEmissionMultiplier = 2.5f;
     public const float ClaudiumSlipstreamActivationMinSpeedMS = 15f;
     public const float ClaudiumSlipstreamActivationSeconds = 20f;
     private const float ClaudiumSlipstreamFullDragMultiplier = 0.05f;
@@ -1899,12 +1975,93 @@ public class ShipPhysics : MonoBehaviour
     [Tooltip("Ресурс в грузовом списке корабля, который тратится на ручные выстрелы.")]
     public string weaponResourceId = "weapon";
     [Tooltip("Сколько килограммов оружия тратит один ручной выстрел.")]
-    public float weaponShotCostKg = 0.1f;
+    public float weaponShotCostKg = 0f;
     [Tooltip("Сколько здоровья левиафан теряет от одного ручного выстрела оружием.")]
     public float leviathanWeaponShotFlightDamage = 25f;
     [Tooltip("В каком радиусе выстрел тревожит ближайших левиафанов.")]
     public float weaponShotAlarmRadiusMeters = 450f;
+    [Tooltip("Показывать прицел и время полета у курсора для ручной орудийной группы.")]
+    public bool showGunAimHud = true;
+    [Tooltip("Индекс ручной группы в списке shipGunGroups.")]
+    public int manualGunGroupIndex;
+    [Tooltip("Орудийные группы корабля: главный калибр, ПМК и будущие группы.")]
+    public List<ShipGunGroup> shipGunGroups = new List<ShipGunGroup>
+    {
+        new ShipGunGroup
+        {
+            groupId = "main",
+            displayNameRu = "Главный калибр",
+            fireMode = ShipGunFireMode.Manual,
+            localMuzzleOffset = new Vector3(0f, 2.7f, 7.85f),
+            barrelsPerSalvo = 1,
+            roundsPerMinute = MainGunRoundsPerMinute,
+            yawSpeedDegPerSecond = 45f,
+            elevationUpSpeedDegPerSecond = 22f,
+            elevationDownSpeedDegPerSecond = 30f,
+            minElevationDegrees = -5f,
+            maxElevationDegrees = 55f,
+            fireAlignmentToleranceDegrees = 1.5f,
+            maxRangeMeters = 2500f,
+            muzzleVelocityMS = 360f,
+            projectileMassKg = 12f,
+            projectileRadiusMeters = 0.10f,
+            horizontalSpreadAtMaxRangeMeters = 24f,
+            verticalSpreadAtMaxRangeMeters = 9f,
+            shell = new DamageShellPreset
+            {
+                displayNameRu = "ББ 76 мм",
+                shellType = DamageShellType.ArmorPiercing,
+                caliberMm = 76f,
+                damagePoints = 120f,
+                hullDamageOnPenetration = 120f,
+                penetrationMm = 85f,
+                penetrationAtMaxRangeMultiplier = 0.55f,
+                velocityRetentionAtMaxRange = 0.62f,
+                normalizationDegrees = 5f,
+                penetrationRollSpread = 0.08f,
+                projectileColor = Color.red
+            }
+        },
+        new ShipGunGroup
+        {
+            groupId = "secondary",
+            displayNameRu = "ПМК",
+            fireMode = ShipGunFireMode.Automatic,
+            localMuzzleOffset = new Vector3(0f, 1.2f, -7.5f),
+            barrelsPerSalvo = 1,
+            roundsPerMinute = 200f,
+            yawSpeedDegPerSecond = 140f,
+            elevationUpSpeedDegPerSecond = 90f,
+            elevationDownSpeedDegPerSecond = 110f,
+            minElevationDegrees = -10f,
+            maxElevationDegrees = 70f,
+            fireAlignmentToleranceDegrees = 3f,
+            maxRangeMeters = 1500f,
+            muzzleVelocityMS = 420f,
+            projectileMassKg = 0.12f,
+            projectileRadiusMeters = 0.035f,
+            horizontalSpreadAtMaxRangeMeters = 35f,
+            verticalSpreadAtMaxRangeMeters = 16f,
+            shell = new DamageShellPreset
+            {
+                displayNameRu = "ББ 20 мм",
+                shellType = DamageShellType.ArmorPiercing,
+                caliberMm = 20f,
+                damagePoints = 18f,
+                hullDamageOnPenetration = 18f,
+                penetrationMm = 18f,
+                penetrationAtMaxRangeMultiplier = 0.45f,
+                velocityRetentionAtMaxRange = 0.58f,
+                normalizationDegrees = 2f,
+                penetrationRollSpread = 0.12f,
+                projectileColor = new Color(0.2f, 0.85f, 1f, 1f)
+            }
+        }
+    };
     [HideInInspector] public string weaponLastMessage = "";
+    [HideInInspector] public float weaponAimFlightTimeSeconds;
+    [HideInInspector] public float weaponAimDistanceMeters;
+    [HideInInspector] public string weaponAimStatus = "";
 
     [Header("Охота на левиафанов")]
     [Tooltip("Дальность ручного выстрела гарпуном по ближайшему левиафану.")]
@@ -2143,10 +2300,30 @@ public class ShipPhysics : MonoBehaviour
     private bool leviathanHuntHasCapturePosition;
     private Vector3 leviathanHuntCapturePosition;
     private Vector3 leviathanHuntTetherDirection;
+    private bool manualGunRangeLocked;
+    private float manualGunLockedRangeMeters;
+    private BallisticAimSolution lastManualGunAim;
+    private bool hasSmoothedManualGunTargetPoint;
+    private Vector3 smoothedManualGunTargetPoint;
+    private bool hasManualGunSphereAim;
+    private float manualGunSphereYawDegrees;
+    private float manualGunSpherePitchDegrees;
     private string gasHarvesterCycleCloudId = "";
     private float surveyTickAccumulator;
     private MetaGameState cachedMetaGameState;
     private readonly List<Leviathan> huntTargetBuffer = new List<Leviathan>();
+    private static readonly List<RaycastResult> uiRaycastResults = new List<RaycastResult>(16);
+
+    private struct GunMountAimState
+    {
+        public bool readyToFire;
+        public bool withinElevationLimits;
+        public float yawErrorDegrees;
+        public float elevationErrorDegrees;
+        public float desiredElevationDegrees;
+        public float clampedElevationDegrees;
+        public string status;
+    }
 
     // Единая ручка управления мощностью (Обороты для CSU / Газ для Manual)
     void Awake()
@@ -2312,8 +2489,6 @@ public class ShipPhysics : MonoBehaviour
             zoneId = "mining_impact_hold",
             displayNameRu = "противоударный кузов",
             armorMm = 0f,
-            baseArmorMm = 0f,
-            armorIntegrity01 = 1f,
             ricochetAngleDeg = 90f,
             overmatchCaliberMultiplier = 3f,
             structureDamageMultiplier = 1f,
@@ -2322,84 +2497,15 @@ public class ShipPhysics : MonoBehaviour
         }, context);
     }
 
-    public bool TryShootNearestMiningRock(out string reason)
-    {
-        MiningRock target = MiningRock.FindNearestShootTarget(transform.position, Mathf.Max(0f, miningManualShotRangeMeters));
-        if (target == null)
-        {
-            reason = "Нет глыбы в дальности выстрела.";
-            miningLastMessage = reason;
-            return false;
-        }
-
-        if (!TrySpendWeaponForShot(out reason))
-        {
-            miningLastMessage = reason;
-            return false;
-        }
-
-        bool success = target.BreakOffByShot(out string shotMessage);
-        Leviathan.AddAlarmNear(
-            target.transform.position,
-            Mathf.Max(0f, weaponShotAlarmRadiusMeters),
-            0.16f,
-            "выстрел по глыбе",
-            null,
-            0f,
-            this);
-        reason = shotMessage + $" Оружие -{Mathf.Max(0f, weaponShotCostKg):0.0} кг.";
-        miningLastMessage = reason;
-        weaponLastMessage = reason;
-        return success;
-    }
-
-    public bool TryShootLeviathan(out string reason)
-    {
-        Leviathan target = activeHarpoon != null && activeHarpoon.IsAttached ? activeHarpoon.target : null;
-        if (target == null || target.CanBeClaimed)
-        {
-            float range = Mathf.Max(Mathf.Max(0f, harpoonRangeMeters), Mathf.Max(0f, leviathanHuntEngageRangeMeters));
-            target = Leviathan.FindNearest(transform.position, range, true);
-        }
-
-        if (target == null)
-        {
-            reason = "Нет живого левиафана в дальности выстрела.";
-            harpoonLastMessage = reason;
-            weaponLastMessage = reason;
-            return false;
-        }
-
-        if (!TrySpendWeaponForShot(out reason))
-        {
-            harpoonLastMessage = reason;
-            return false;
-        }
-
-        float damage = Mathf.Max(0f, leviathanWeaponShotFlightDamage);
-        target.ApplyHarpoonFatigue(damage);
-        Leviathan.AddAlarmNear(
-            target.transform.position,
-            Mathf.Max(0f, weaponShotAlarmRadiusMeters),
-            Mathf.Max(0f, target.alarmShotNearAdd),
-            "выстрел рядом",
-            target,
-            Mathf.Max(0f, target.alarmShotAtSelfAdd),
-            this);
-        reason = $"Выстрел по {target.displayName}: здоровье -{damage:0.#}. Оружие -{Mathf.Max(0f, weaponShotCostKg):0.0} кг.";
-        if (target.CanBeClaimed)
-        {
-            reason += " Цель потеряла здоровье и стала добычей.";
-        }
-
-        harpoonLastMessage = reason;
-        weaponLastMessage = reason;
-        return true;
-    }
-
-    private bool TrySpendWeaponForShot(out string reason)
+    private bool TrySpendWeaponForShot(out string reason, float costMultiplier = 1f)
     {
         reason = "";
+        float costKg = Mathf.Max(0f, weaponShotCostKg) * Mathf.Max(1f, costMultiplier);
+        if (costKg <= 0.0001f)
+        {
+            return true;
+        }
+
         MetaGameState meta = ResolveMetaGameState();
         if (meta == null || meta.progress == null)
         {
@@ -2409,7 +2515,6 @@ public class ShipPhysics : MonoBehaviour
         }
 
         string resourceId = string.IsNullOrWhiteSpace(weaponResourceId) ? "weapon" : weaponResourceId;
-        float costKg = Mathf.Max(0f, weaponShotCostKg);
         bool spent = meta.TrySpendFractionalShipCargoFromRuntime(resourceId, costKg, ref meta.progress.shipWeaponSpendBufferKg, out reason);
         if (!spent)
         {
@@ -2419,7 +2524,7 @@ public class ShipPhysics : MonoBehaviour
         return spent;
     }
 
-    public bool TryFireHarpoonAtNearestLeviathan(out string reason, float maxTargetMassKg = 0f, bool requireSurveyed = false)
+    private bool FireHarpoonAtSelectedHuntTarget(out string reason, Leviathan target, float maxTargetMassKg = 0f)
     {
         reason = "";
         if (activeHarpoon != null && activeHarpoon.IsAttached)
@@ -2429,7 +2534,6 @@ public class ShipPhysics : MonoBehaviour
             return false;
         }
 
-        Leviathan target = FindNearestHarpoonTarget(Mathf.Max(0f, harpoonRangeMeters), "", maxTargetMassKg, requireSurveyed);
         if (target == null)
         {
             if (harpoonMaxCarcassMassKg > 0f)
@@ -2901,7 +3005,7 @@ public class ShipPhysics : MonoBehaviour
                 return;
             }
 
-            TryFireHarpoonAtNearestLeviathan(out string fireMessage, maxAutoTargetMassKg, true);
+            FireHarpoonAtSelectedHuntTarget(out string fireMessage, nearest, maxAutoTargetMassKg);
             leviathanHuntAutopilotMessage = fireMessage;
             return;
         }
@@ -3050,6 +3154,7 @@ public class ShipPhysics : MonoBehaviour
 
     void Start()
     {
+        EnsureGunGroups();
         if (autoStabilizeAtStart)
         {
             PerformAutoStabilization();
@@ -3058,6 +3163,1510 @@ public class ShipPhysics : MonoBehaviour
         {
             UpdateEngineThrottles();
         }
+    }
+
+    private void Update()
+    {
+        if (!Application.isPlaying) return;
+
+        EnsureGunGroups();
+        UpdateManualGunAim();
+        UpdateGunInput();
+        UpdateAutomaticGunGroups();
+    }
+
+    private void OnValidate()
+    {
+        EnsureGunGroups();
+        manualGunGroupIndex = Mathf.Max(0, manualGunGroupIndex);
+        weaponShotCostKg = Mathf.Max(0f, weaponShotCostKg);
+        weaponShotAlarmRadiusMeters = Mathf.Max(0f, weaponShotAlarmRadiusMeters);
+    }
+
+    private void OnGUI()
+    {
+        if (!Application.isPlaying || !showGunAimHud) return;
+        ShipGunGroup group = GetManualGunGroup();
+        if (group == null || !group.enabled) return;
+        if (IsGameplayCursorReleasedForUi()) return;
+
+        BallisticAimSolution aim = lastManualGunAim;
+        if (aim.maxRangeMeters <= 0.001f && !TryBuildManualGunAim(group, manualGunRangeLocked, out aim))
+        {
+            return;
+        }
+
+        if (!TryReadMousePosition(out Vector3 mouse))
+        {
+            return;
+        }
+
+        Vector2 aimGuiPosition = ResolveAimGuiPosition(aim, mouse);
+        Color ringColor = aim.valid && aim.inRange
+            ? new Color(1f, 0.88f, 0.18f, 0.95f)
+            : new Color(1f, 0.25f, 0.18f, 0.95f);
+        DrawAimRing(aimGuiPosition, 13f, 2f, ringColor);
+
+        Rect rect = new Rect(aimGuiPosition.x + 18f, aimGuiPosition.y + 16f, 280f, 64f);
+        string lockText = aim.lockedRange ? " LOCK" : "";
+        string rangeText = aim.inRange ? aim.distanceFromShipCenter.ToString("0") + " m" : "MAX " + aim.maxRangeMeters.ToString("0") + " m";
+        string message = string.IsNullOrWhiteSpace(weaponLastMessage) ? aim.status : weaponLastMessage;
+        GUI.Label(rect, group.displayNameRu + lockText + "\n" + aim.travelTimeSeconds.ToString("0.0") + " s / " + rangeText + "\n" + message);
+    }
+
+    public bool BuildGunAimSolutionForPoint(
+        ShipGunGroup group,
+        Vector3 targetPoint,
+        Vector3 targetVelocity,
+        bool lockedRange,
+        bool hasDirectHitTarget,
+        out BallisticAimSolution solution)
+    {
+        solution = default;
+        group = group ?? GetManualGunGroup();
+        if (group == null) return false;
+
+        Vector3 center = transform.position;
+        EnsureGunMountForGroup(group);
+        Vector3 origin = ResolveGunMuzzlePosition(group);
+        solution = BallisticFireControl.BuildSolution(
+            center,
+            origin,
+            targetPoint,
+            targetVelocity,
+            Mathf.Max(1f, group.muzzleVelocityMS),
+            Mathf.Max(1f, group.maxRangeMeters),
+            Mathf.Max(0f, group.gravityScale),
+            lockedRange,
+            hasDirectHitTarget,
+            group.shell != null ? group.shell.velocityRetentionAtMaxRange : 1f);
+        return true;
+    }
+
+    public bool TryFireManualGunGroup(out string reason)
+    {
+        reason = "";
+        ShipGunGroup group = GetManualGunGroup();
+        if (group == null)
+        {
+            reason = "Нет ручной орудийной группы.";
+            weaponLastMessage = reason;
+            return false;
+        }
+
+        BallisticAimSolution aim = lastManualGunAim;
+        if (aim.maxRangeMeters <= 0.001f && !TryBuildManualGunAim(group, manualGunRangeLocked, out aim))
+        {
+            reason = "Нет баллистического решения.";
+            weaponLastMessage = reason;
+            return false;
+        }
+
+        return TryFireGunGroup(group, aim, out reason);
+    }
+
+    public bool TryGetManualGunCameraAimTarget(out Vector3 targetPoint)
+    {
+        targetPoint = Vector3.zero;
+        ShipGunGroup group = GetManualGunGroup();
+        if (group == null || !group.enabled)
+        {
+            return false;
+        }
+
+        BallisticAimSolution aim = lastManualGunAim;
+        if ((aim.maxRangeMeters <= 0.001f || !IsFinite(aim.targetPoint)) &&
+            !TryBuildManualGunAim(group, manualGunRangeLocked, out aim))
+        {
+            return false;
+        }
+
+        if (!IsFinite(aim.targetPoint))
+        {
+            return false;
+        }
+
+        targetPoint = aim.targetPoint;
+        return true;
+    }
+
+    public bool TryGetManualGunCameraAnchor(out Vector3 anchor)
+    {
+        anchor = Vector3.zero;
+        ShipGunGroup group = GetManualGunGroup();
+        if (group == null || !group.enabled)
+        {
+            return false;
+        }
+
+        EnsureGunMountForGroup(group);
+        if (group.yawPivot != null)
+        {
+            anchor = group.yawPivot.position;
+            return IsFinite(anchor);
+        }
+
+        if (group.muzzle != null)
+        {
+            anchor = group.muzzle.position;
+            return IsFinite(anchor);
+        }
+
+        anchor = ResolveGunMuzzlePosition(group);
+        return IsFinite(anchor);
+    }
+
+    public bool SetManualGunSphereAimForTests(float yawDegrees, float pitchDegrees, out Vector3 targetPoint)
+    {
+        targetPoint = Vector3.zero;
+        ShipGunGroup group = GetManualGunGroup();
+        if (group == null || !group.enabled)
+        {
+            return false;
+        }
+
+        manualGunSphereYawDegrees = NormalizeManualGunDegrees(yawDegrees);
+        manualGunSpherePitchDegrees = Mathf.Clamp(
+            pitchDegrees,
+            ManualGunSphereAimMinPitchDegrees,
+            ManualGunSphereAimMaxPitchDegrees);
+        hasManualGunSphereAim = true;
+        ResetManualGunTargetSmoothing();
+
+        float range = Mathf.Max(1f, group.maxRangeMeters);
+        targetPoint = transform.position + ResolveManualGunSphereDirection() * range;
+        bool built = BuildGunAimSolutionForPoint(group, targetPoint, Vector3.zero, false, false, out lastManualGunAim);
+        if (built)
+        {
+            weaponAimFlightTimeSeconds = lastManualGunAim.travelTimeSeconds;
+            weaponAimDistanceMeters = lastManualGunAim.distanceFromShipCenter;
+            weaponAimStatus = lastManualGunAim.status;
+        }
+
+        return built;
+    }
+
+    public bool TryFireGunGroupAtPointForTests(ShipGunGroup group, Vector3 targetPoint, Vector3 targetVelocity, out string reason)
+    {
+        reason = "";
+        group ??= GetManualGunGroup();
+        if (group == null)
+        {
+            reason = "No gun group.";
+            return false;
+        }
+
+        EnsureGunMountForGroup(group);
+        if (!BuildGunAimSolutionForPoint(group, targetPoint, targetVelocity, false, true, out BallisticAimSolution aim))
+        {
+            reason = "No ballistic solution.";
+            return false;
+        }
+
+        UpdateGunMountPose(group, aim);
+        return TryFireGunGroup(group, aim, out reason);
+    }
+
+    private void UpdateManualGunAim()
+    {
+        ShipGunGroup group = GetManualGunGroup();
+        if (group == null || !group.enabled)
+        {
+            weaponAimFlightTimeSeconds = 0f;
+            weaponAimDistanceMeters = 0f;
+            weaponAimStatus = "";
+            ResetManualGunTargetSmoothing();
+            return;
+        }
+
+        if (IsGameplayCursorReleasedForUi())
+        {
+            ResetManualGunTargetSmoothing();
+            return;
+        }
+
+        if (WasMouseButtonPressedThisFrame(1) && TryBuildManualGunAim(group, false, out BallisticAimSolution initialAim))
+        {
+            manualGunRangeLocked = true;
+            manualGunLockedRangeMeters = Mathf.Clamp(
+                initialAim.distanceFromShipCenter,
+                1f,
+                Mathf.Max(1f, group.maxRangeMeters));
+        }
+        else if (!IsMouseButtonPressed(1))
+        {
+            manualGunRangeLocked = false;
+        }
+
+        if (TryBuildManualGunAim(group, manualGunRangeLocked, out lastManualGunAim, true))
+        {
+            weaponAimFlightTimeSeconds = lastManualGunAim.travelTimeSeconds;
+            weaponAimDistanceMeters = lastManualGunAim.distanceFromShipCenter;
+            GunMountAimState mountAim = UpdateGunMountPose(group, lastManualGunAim);
+            weaponAimStatus = string.IsNullOrWhiteSpace(mountAim.status) ? lastManualGunAim.status : mountAim.status;
+        }
+        else
+        {
+            ResetManualGunTargetSmoothing();
+        }
+    }
+
+    private void UpdateGunInput()
+    {
+        if (IsGameplayCursorReleasedForUi()) return;
+        if (IsPointerOverBlockingUi()) return;
+        if (!WasMouseButtonPressedThisFrame(0)) return;
+
+        TryFireManualGunGroup(out _);
+    }
+
+    private void UpdateAutomaticGunGroups()
+    {
+        if (shipGunGroups == null) return;
+
+        for (int i = 0; i < shipGunGroups.Count; i++)
+        {
+            ShipGunGroup group = shipGunGroups[i];
+            if (group == null || !group.enabled || group.fireMode != ShipGunFireMode.Automatic) continue;
+            if (Time.time + 0.0001f < group.nextShotTime) continue;
+
+            if (!TryBuildAutomaticGunAim(group, out BallisticAimSolution aim)) continue;
+            GunMountAimState mountAim = UpdateGunMountPose(group, aim);
+            if (!mountAim.readyToFire) continue;
+            TryFireGunGroup(group, aim, out _);
+        }
+    }
+
+    private bool TryBuildManualGunAim(ShipGunGroup group, bool useLockedRange, out BallisticAimSolution solution, bool smoothTarget = false)
+    {
+        solution = default;
+        Camera camera = Camera.main;
+        if (camera == null)
+        {
+            if (smoothTarget) ResetManualGunTargetSmoothing();
+            return false;
+        }
+
+        if (!TryReadMousePosition(out Vector3 mousePosition))
+        {
+            if (smoothTarget) ResetManualGunTargetSmoothing();
+            return false;
+        }
+
+        Ray ray = camera.ScreenPointToRay(mousePosition);
+        Vector3 center = transform.position;
+        float maxRange = Mathf.Max(1f, group.maxRangeMeters);
+        float freeAimRange = useLockedRange
+            ? Mathf.Clamp(manualGunLockedRangeMeters, 1f, maxRange)
+            : maxRange;
+        Vector3 targetPoint;
+        Vector3 targetVelocity = Vector3.zero;
+        bool hasHitTarget = false;
+
+        if (TryRaycastCursorTarget(ray, maxRange, out RaycastHit hit))
+        {
+            targetPoint = hit.point;
+            targetVelocity = ResolveHitVelocity(hit.collider);
+            hasHitTarget = true;
+            if (smoothTarget)
+            {
+                SetManualGunSphereAimFromDirection(targetPoint - center);
+            }
+        }
+        else
+        {
+            targetPoint = ResolveManualGunSphereAimPoint(ray, center, freeAimRange, smoothTarget);
+        }
+
+        if (smoothTarget)
+        {
+            targetPoint = SmoothManualGunTargetPoint(targetPoint);
+        }
+
+        return BuildGunAimSolutionForPoint(group, targetPoint, targetVelocity, useLockedRange, hasHitTarget, out solution);
+    }
+
+    private bool TryBuildAutomaticGunAim(ShipGunGroup group, out BallisticAimSolution solution)
+    {
+        solution = default;
+        if (!TryFindAutomaticGunTarget(group, out Vector3 targetPoint, out Vector3 targetVelocity))
+        {
+            return false;
+        }
+
+        return BuildGunAimSolutionForPoint(group, targetPoint, targetVelocity, false, true, out solution);
+    }
+
+    private bool TryFireGunGroup(ShipGunGroup group, BallisticAimSolution aim, out string reason)
+    {
+        reason = "";
+        if (group == null || !group.enabled)
+        {
+            reason = "Орудийная группа выключена.";
+            weaponLastMessage = reason;
+            return false;
+        }
+
+        if (Time.time + 0.0001f < group.nextShotTime)
+        {
+            reason = "Орудийная группа перезаряжается.";
+            weaponLastMessage = reason;
+            return false;
+        }
+
+        GunMountAimState mountAim = UpdateGunMountPose(group, aim);
+        if (!mountAim.readyToFire)
+        {
+            reason = mountAim.status;
+            weaponLastMessage = reason;
+            return false;
+        }
+
+        int barrels = Mathf.Max(1, group.barrelsPerSalvo);
+        if (!TrySpendWeaponForShot(out reason, barrels))
+        {
+            weaponLastMessage = reason;
+            return false;
+        }
+
+        aim = RefreshAimOriginFromCurrentMuzzle(group, aim);
+        for (int i = 0; i < barrels; i++)
+        {
+            BallisticAimSolution shotAim = BuildSpreadSolution(group, aim);
+            SpawnGunProjectile(group, shotAim, i);
+        }
+
+        group.nextShotTime = Time.time + group.SecondsBetweenSalvos;
+        Leviathan.AddAlarmNear(
+            transform.position,
+            Mathf.Max(0f, weaponShotAlarmRadiusMeters),
+            0.08f,
+            "орудийный выстрел",
+            null,
+            0f,
+            this);
+
+        reason = $"{group.displayNameRu}: залп {barrels} шт., время полета {aim.travelTimeSeconds:0.0} с, дальность {aim.distanceFromShipCenter:0} м.";
+        weaponLastMessage = reason;
+        return true;
+    }
+
+    private BallisticAimSolution BuildSpreadSolution(ShipGunGroup group, BallisticAimSolution aim)
+    {
+        Vector3 origin = ResolveGunMuzzlePosition(group);
+        Vector3 forward = ResolveGunMuzzleForward(group, aim.launchDirection);
+        if (forward.sqrMagnitude <= 0.001f)
+        {
+            forward = transform.forward;
+        }
+
+        forward.Normalize();
+        Vector2 radii = BallisticFireControl.CalculateSpreadRadii(
+            group.horizontalSpreadAtMaxRangeMeters,
+            group.verticalSpreadAtMaxRangeMeters,
+            aim.distanceFromShipCenter,
+            group.maxRangeMeters);
+        Vector2 random = Random.insideUnitCircle;
+        Vector3 up = transform.up.sqrMagnitude > 0.001f ? transform.up.normalized : Vector3.up;
+        Vector3 right = Vector3.Cross(up, forward);
+        if (right.sqrMagnitude < 0.001f)
+        {
+            right = transform.right;
+        }
+
+        right.Normalize();
+        float directDistance = Mathf.Max(1f, Vector3.Distance(origin, aim.predictedTargetPoint));
+        float yawDegrees = Mathf.Atan2(random.x * radii.x, directDistance) * Mathf.Rad2Deg;
+        float pitchDegrees = Mathf.Atan2(random.y * radii.y, directDistance) * Mathf.Rad2Deg;
+        Vector3 spreadDirection = Quaternion.AngleAxis(yawDegrees, up)
+            * Quaternion.AngleAxis(-pitchDegrees, right)
+            * forward;
+        if (spreadDirection.sqrMagnitude <= 0.001f)
+        {
+            spreadDirection = forward;
+        }
+
+        spreadDirection.Normalize();
+        aim.origin = origin;
+        aim.launchDirection = spreadDirection;
+        aim.launchVelocity = spreadDirection * Mathf.Max(1f, group.muzzleVelocityMS);
+        aim.directDistanceFromMuzzle = Vector3.Distance(origin, aim.targetPoint);
+        return aim;
+    }
+
+    private void SpawnGunProjectile(ShipGunGroup group, BallisticAimSolution aim, int barrelIndex)
+    {
+        Vector3 spawnPosition = ResolveGunMuzzlePosition(group);
+        Vector3 launchVelocity = aim.launchVelocity.sqrMagnitude > 0.001f
+            ? aim.launchVelocity
+            : ResolveGunMuzzleForward(group, aim.launchDirection) * Mathf.Max(1f, group.muzzleVelocityMS);
+
+        GameObject projectileObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        projectileObject.name = $"{group.displayNameRu} Projectile";
+        projectileObject.transform.position = spawnPosition;
+        projectileObject.transform.localScale = Vector3.one * Mathf.Max(0.02f, group.projectileRadiusMeters * 2f);
+
+        Color projectileColor = group.shell != null ? group.shell.projectileColor : Color.white;
+        Renderer renderer = projectileObject.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material.color = projectileColor;
+        }
+
+        Collider projectileCollider = projectileObject.GetComponent<Collider>();
+        if (projectileCollider != null)
+        {
+            projectileCollider.isTrigger = true;
+        }
+
+        Rigidbody projectileBody = projectileObject.AddComponent<Rigidbody>();
+        projectileBody.mass = Mathf.Max(0.01f, group.projectileMassKg);
+        projectileBody.useGravity = false;
+        projectileBody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        projectileBody.interpolation = RigidbodyInterpolation.Interpolate;
+        projectileBody.linearVelocity = launchVelocity;
+
+        if (group.projectileTrailSeconds > 0.001f)
+        {
+            TrailRenderer trail = projectileObject.AddComponent<TrailRenderer>();
+            trail.time = Mathf.Max(0.05f, group.projectileTrailSeconds);
+            trail.startWidth = Mathf.Max(0.01f, group.projectileRadiusMeters * 2.2f);
+            trail.endWidth = 0f;
+            trail.autodestruct = false;
+            Color trailColor = BuildGunProjectileTrailColor(projectileColor);
+            Color trailEndColor = trailColor;
+            trailEndColor.a = 0f;
+            trail.startColor = trailColor;
+            trail.endColor = trailEndColor;
+            trail.numCapVertices = 3;
+            trail.generateLightingData = true;
+            Shader trailShader = Shader.Find("Sprites/Default");
+            if (trailShader == null) trailShader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (trailShader == null) trailShader = Shader.Find("Standard");
+            Material trailMaterial = trailShader != null ? new Material(trailShader) : null;
+            if (trailMaterial != null)
+            {
+                ApplyGunProjectileTrailMaterialColor(trailMaterial, trailColor);
+                trail.sharedMaterial = trailMaterial;
+            }
+        }
+
+        DamageProjectile projectile = projectileObject.AddComponent<DamageProjectile>();
+        float lifetime = Mathf.Max(0.2f, group.maxRangeMeters / Mathf.Max(1f, group.muzzleVelocityMS) * 3f);
+        projectile.Initialize(
+            group.shell,
+            group.displayNameRu,
+            this,
+            launchVelocity,
+            group.maxRangeMeters,
+            lifetime,
+            group.gravityScale);
+    }
+
+    private static Color BuildGunProjectileTrailColor(Color projectileColor)
+    {
+        if (!IsFinite(projectileColor.r) ||
+            !IsFinite(projectileColor.g) ||
+            !IsFinite(projectileColor.b))
+        {
+            projectileColor = Color.white;
+        }
+
+        if (projectileColor.maxColorComponent <= 0.05f)
+        {
+            projectileColor = Color.white;
+        }
+
+        Color trailColor = projectileColor * GunProjectileTrailBrightnessMultiplier;
+        trailColor.a = 1f;
+        return trailColor;
+    }
+
+    private static void ApplyGunProjectileTrailMaterialColor(Material material, Color trailColor)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        material.color = trailColor;
+        if (material.HasProperty("_Color"))
+        {
+            material.SetColor("_Color", trailColor);
+        }
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", trailColor);
+        }
+
+        Color emissionColor = trailColor * GunProjectileTrailEmissionMultiplier;
+        emissionColor.a = 1f;
+        if (material.HasProperty("_EmissionColor"))
+        {
+            material.SetColor("_EmissionColor", emissionColor);
+            material.EnableKeyword("_EMISSION");
+        }
+    }
+
+    private bool TryFindAutomaticGunTarget(ShipGunGroup group, out Vector3 targetPoint, out Vector3 targetVelocity)
+    {
+        targetPoint = Vector3.zero;
+        targetVelocity = Vector3.zero;
+        float maxSqr = Mathf.Max(1f, group.maxRangeMeters) * Mathf.Max(1f, group.maxRangeMeters);
+        float bestSqr = maxSqr;
+        bool found = false;
+
+        if (group.automaticTargetsLeviathans)
+        {
+            Leviathan.GetActiveLeviathans(huntTargetBuffer, true);
+            for (int i = 0; i < huntTargetBuffer.Count; i++)
+            {
+                Leviathan leviathan = huntTargetBuffer[i];
+                if (leviathan == null || leviathan.isCarcass) continue;
+
+                float sqr = (leviathan.transform.position - transform.position).sqrMagnitude;
+                if (sqr > bestSqr) continue;
+
+                bestSqr = sqr;
+                targetPoint = leviathan.transform.position;
+                Rigidbody targetBody = leviathan.GetComponent<Rigidbody>();
+                targetVelocity = targetBody != null ? targetBody.linearVelocity : Vector3.zero;
+                found = true;
+            }
+        }
+
+        if (group.automaticTargetsDamageableShips)
+        {
+            DamageableShip[] ships = FindObjectsByType<DamageableShip>(FindObjectsSortMode.None);
+            for (int i = 0; i < ships.Length; i++)
+            {
+                DamageableShip targetShip = ships[i];
+                if (targetShip == null || targetShip.GetComponentInParent<ShipPhysics>() == this) continue;
+
+                Vector3 point = targetShip.GetAimPoint();
+                float sqr = (point - transform.position).sqrMagnitude;
+                if (sqr > bestSqr) continue;
+
+                bestSqr = sqr;
+                targetPoint = point;
+                Rigidbody targetBody = targetShip.GetComponentInParent<Rigidbody>();
+                targetVelocity = targetBody != null ? targetBody.linearVelocity : Vector3.zero;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    private bool TryRaycastCursorTarget(Ray ray, float maxRangeMeters, out RaycastHit bestHit)
+    {
+        bestHit = default;
+        RaycastHit[] hits = Physics.RaycastAll(ray, 20000f, ~0, QueryTriggerInteraction.Collide);
+        if (hits == null || hits.Length == 0) return false;
+
+        Vector3 center = transform.position;
+        float maxRange = Mathf.Max(1f, maxRangeMeters);
+        float maxRangeSqr = maxRange * maxRange;
+        float bestDistance = float.PositiveInfinity;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider collider = hits[i].collider;
+            if (collider == null) continue;
+            if (collider.GetComponentInParent<DamageProjectile>() != null) continue;
+            if (collider.transform.IsChildOf(transform)) continue;
+            if (!IsManualGunRaycastTarget(collider)) continue;
+            if ((hits[i].point - center).sqrMagnitude > maxRangeSqr + 0.001f) continue;
+
+            if (hits[i].distance < bestDistance)
+            {
+                bestDistance = hits[i].distance;
+                bestHit = hits[i];
+            }
+        }
+
+        return bestDistance < float.PositiveInfinity;
+    }
+
+    private static bool IsManualGunRaycastTarget(Collider collider)
+    {
+        if (collider == null) return false;
+        if (collider.GetComponentInParent<DamageableShip>() != null) return true;
+        if (collider.GetComponentInParent<Leviathan>() != null) return true;
+
+        MiningRock rock = collider.GetComponentInParent<MiningRock>();
+        return rock != null && !rock.IsDepleted;
+    }
+
+    private Vector3 ResolveManualGunSphereAimPoint(Ray ray, Vector3 center, float rangeMeters, bool updateFromInput)
+    {
+        float range = Mathf.Max(1f, rangeMeters);
+        if (!hasManualGunSphereAim)
+        {
+            InitializeManualGunSphereAim(ray, center, range);
+        }
+
+        if (WorldDebugTravelController.GameplayCursorLockedForMouseLook &&
+            !WildWindControlSettings.IsGameplayCursorReleasePressed())
+        {
+            if (updateFromInput && TryReadManualGunAimDelta(out Vector2 aimDelta))
+            {
+                float sensitivityScale = Mathf.Clamp(
+                    WorldDebugTravelController.GameplayMouseLookSensitivityScale,
+                    0.001f,
+                    1f);
+                manualGunSphereYawDegrees = NormalizeManualGunDegrees(
+                    manualGunSphereYawDegrees + aimDelta.x * ManualGunSphereAimSensitivityDegreesPerPixel * sensitivityScale);
+                manualGunSpherePitchDegrees = Mathf.Clamp(
+                    manualGunSpherePitchDegrees + aimDelta.y * ManualGunSphereAimSensitivityDegreesPerPixel * sensitivityScale,
+                    ManualGunSphereAimMinPitchDegrees,
+                    ManualGunSphereAimMaxPitchDegrees);
+            }
+
+            return center + ResolveManualGunSphereDirection() * range;
+        }
+
+        Vector3 point = ResolveCursorRayRangePoint(ray, center, range);
+        if (updateFromInput)
+        {
+            SetManualGunSphereAimFromDirection(point - center);
+        }
+
+        return point;
+    }
+
+    private void InitializeManualGunSphereAim(Ray ray, Vector3 center, float rangeMeters)
+    {
+        Vector3 point = ResolveCursorRayRangePoint(ray, center, rangeMeters);
+        SetManualGunSphereAimFromDirection(point - center);
+    }
+
+    private void SetManualGunSphereAimFromDirection(Vector3 direction)
+    {
+        if (!IsFinite(direction) || direction.sqrMagnitude <= 0.001f)
+        {
+            direction = transform.forward.sqrMagnitude > 0.001f ? transform.forward : Vector3.forward;
+        }
+
+        direction.Normalize();
+        manualGunSphereYawDegrees = NormalizeManualGunDegrees(Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg);
+        manualGunSpherePitchDegrees = Mathf.Clamp(
+            Mathf.Asin(Mathf.Clamp(direction.y, -1f, 1f)) * Mathf.Rad2Deg,
+            ManualGunSphereAimMinPitchDegrees,
+            ManualGunSphereAimMaxPitchDegrees);
+        hasManualGunSphereAim = true;
+    }
+
+    private Vector3 ResolveManualGunSphereDirection()
+    {
+        float yawRadians = manualGunSphereYawDegrees * Mathf.Deg2Rad;
+        float pitchRadians = manualGunSpherePitchDegrees * Mathf.Deg2Rad;
+        float horizontal = Mathf.Cos(pitchRadians);
+        Vector3 direction = new Vector3(
+            Mathf.Sin(yawRadians) * horizontal,
+            Mathf.Sin(pitchRadians),
+            Mathf.Cos(yawRadians) * horizontal);
+        return direction.sqrMagnitude > 0.001f ? direction.normalized : Vector3.forward;
+    }
+
+    private static bool TryReadManualGunAimDelta(out Vector2 delta)
+    {
+        delta = Vector2.zero;
+        if (!WorldDebugTravelController.GameplayCursorLockedForMouseLook ||
+            WildWindControlSettings.IsGameplayCursorReleasePressed())
+        {
+            return false;
+        }
+
+        Mouse mouse = Mouse.current;
+        if (mouse == null) return false;
+
+        delta = mouse.delta.ReadValue();
+        return delta.sqrMagnitude > 0.0001f;
+    }
+
+    private static float NormalizeManualGunDegrees(float value)
+    {
+        value %= 360f;
+        if (value < 0f)
+        {
+            value += 360f;
+        }
+
+        return value;
+    }
+
+    private Vector3 SmoothManualGunTargetPoint(Vector3 targetPoint)
+    {
+        if (!Application.isPlaying || !IsFinite(targetPoint))
+        {
+            return targetPoint;
+        }
+
+        if (!hasSmoothedManualGunTargetPoint || !IsFinite(smoothedManualGunTargetPoint))
+        {
+            hasSmoothedManualGunTargetPoint = true;
+            smoothedManualGunTargetPoint = targetPoint;
+            return targetPoint;
+        }
+
+        float smooth = Mathf.Max(0.001f, ManualGunAimTargetSmoothSeconds);
+        float t = 1f - Mathf.Exp(-Mathf.Max(0f, Time.deltaTime) / smooth);
+        smoothedManualGunTargetPoint = Vector3.Lerp(smoothedManualGunTargetPoint, targetPoint, Mathf.Clamp01(t));
+        return smoothedManualGunTargetPoint;
+    }
+
+    private void ResetManualGunTargetSmoothing()
+    {
+        hasSmoothedManualGunTargetPoint = false;
+        smoothedManualGunTargetPoint = Vector3.zero;
+    }
+
+    private Vector3 ResolveHitVelocity(Collider collider)
+    {
+        if (collider == null) return Vector3.zero;
+        Rigidbody body = collider.attachedRigidbody;
+        if (body == null)
+        {
+            body = collider.GetComponentInParent<Rigidbody>();
+        }
+
+        return body != null ? body.linearVelocity : Vector3.zero;
+    }
+
+    private Vector3 ResolveGunMuzzlePosition(ShipGunGroup group)
+    {
+        Transform muzzle = EnsureGunMountForGroup(group);
+        if (muzzle != null)
+        {
+            return muzzle.position;
+        }
+
+        Vector3 offset = group != null ? group.localMuzzleOffset : Vector3.zero;
+        return transform.TransformPoint(offset);
+    }
+
+    private Vector3 ResolveGunMuzzleForward(ShipGunGroup group, Vector3 fallbackDirection)
+    {
+        Transform muzzle = EnsureGunMountForGroup(group);
+        if (muzzle != null && muzzle.forward.sqrMagnitude > 0.001f)
+        {
+            return muzzle.forward.normalized;
+        }
+
+        if (group != null && group.pitchPivot != null && group.pitchPivot.forward.sqrMagnitude > 0.001f)
+        {
+            return group.pitchPivot.forward.normalized;
+        }
+
+        if (fallbackDirection.sqrMagnitude > 0.001f)
+        {
+            return fallbackDirection.normalized;
+        }
+
+        return transform.forward.sqrMagnitude > 0.001f ? transform.forward.normalized : Vector3.forward;
+    }
+
+    private BallisticAimSolution RefreshAimOriginFromCurrentMuzzle(ShipGunGroup group, BallisticAimSolution aim)
+    {
+        Vector3 origin = ResolveGunMuzzlePosition(group);
+        if ((origin - aim.origin).sqrMagnitude <= 0.000001f)
+        {
+            return aim;
+        }
+
+        return BallisticFireControl.BuildSolution(
+            aim.shipCenter,
+            origin,
+            aim.targetPoint,
+            aim.targetVelocity,
+            Mathf.Max(1f, group.muzzleVelocityMS),
+            Mathf.Max(1f, group.maxRangeMeters),
+            Mathf.Max(0f, group.gravityScale),
+            aim.lockedRange,
+            aim.hasDirectHitTarget,
+            group.shell != null ? group.shell.velocityRetentionAtMaxRange : 1f);
+    }
+
+    private ShipGunGroup GetManualGunGroup()
+    {
+        EnsureGunGroups();
+        if (shipGunGroups == null || shipGunGroups.Count == 0) return null;
+
+        int index = Mathf.Clamp(manualGunGroupIndex, 0, shipGunGroups.Count - 1);
+        ShipGunGroup indexed = shipGunGroups[index];
+        if (indexed != null && indexed.fireMode == ShipGunFireMode.Manual) return indexed;
+
+        for (int i = 0; i < shipGunGroups.Count; i++)
+        {
+            ShipGunGroup group = shipGunGroups[i];
+            if (group != null && group.fireMode == ShipGunFireMode.Manual)
+            {
+                manualGunGroupIndex = i;
+                return group;
+            }
+        }
+
+        return null;
+    }
+
+    private Transform EnsureGunMountForGroup(ShipGunGroup group)
+    {
+        if (group == null) return null;
+        if (ShouldRebindGunMount(group))
+        {
+            TryBindExistingGunMount(group);
+        }
+
+        return group.muzzle;
+    }
+
+    private bool ShouldRebindGunMount(ShipGunGroup group)
+    {
+        if (group == null) return false;
+        if (group.muzzle == null || group.yawPivot == null || group.pitchPivot == null) return true;
+        if (!group.muzzle.IsChildOf(transform)) return true;
+        if (!IsNamedPitchPivot(group.pitchPivot)) return true;
+        if (!group.muzzle.IsChildOf(group.pitchPivot)) return true;
+        return !IsNamedMuzzle(group.muzzle);
+    }
+
+    private static bool IsNamedMuzzle(Transform candidate)
+    {
+        if (candidate == null) return false;
+        string name = candidate.name;
+        return string.Equals(name, "Muzzle", System.StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("GunMuzzle", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsNamedPitchPivot(Transform candidate)
+    {
+        if (candidate == null) return false;
+        string name = candidate.name;
+        return string.Equals(name, "Barrel", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "BarrelPitch", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "\u0421\u0442\u0432\u043e\u043b", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "РЎС‚РІРѕР»", System.StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("GunPitch", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool TryBindExistingGunMount(ShipGunGroup group)
+    {
+        string suffix = SanitizeName(group.groupId);
+        Transform yaw = FindDeepChild(transform, "GunYaw_" + suffix)
+            ?? FindDeepChild(transform, "GunYaw")
+            ?? FindDeepChild(transform, "TurretYaw")
+            ?? FindDeepChild(transform, "Turret")
+            ?? FindDeepChild(transform, "\u0422\u0443\u0440\u0435\u043b\u044c")
+            ?? FindDeepChild(transform, "Турель");
+        Transform pitch = FindDeepChild(transform, "GunPitch_" + suffix)
+            ?? FindDeepChild(transform, "GunPitch")
+            ?? FindDeepChild(transform, "BarrelPitch")
+            ?? FindDeepChild(transform, "Barrel")
+            ?? FindDeepChild(transform, "\u0421\u0442\u0432\u043e\u043b")
+            ?? FindDeepChild(transform, "Ствол");
+        Transform muzzle = pitch != null
+            ? FindDeepChild(pitch, "GunMuzzle_" + suffix)
+                ?? FindDeepChild(pitch, "GunMuzzle")
+                ?? FindDeepChild(pitch, "Muzzle")
+            : null;
+        muzzle ??= FindDeepChild(transform, "GunMuzzle_" + suffix)
+            ?? FindDeepChild(transform, "GunMuzzle")
+            ?? FindDeepChild(transform, "Muzzle");
+
+        if (muzzle == null)
+        {
+            muzzle = pitch;
+        }
+
+        if (muzzle == null)
+        {
+            return false;
+        }
+
+        group.yawPivot = yaw != null ? yaw : muzzle;
+        group.pitchPivot = pitch != null ? pitch : muzzle;
+        group.muzzle = muzzle;
+        return true;
+    }
+
+    private GunMountAimState UpdateGunMountPose(ShipGunGroup group, BallisticAimSolution aim)
+    {
+        GunMountAimState state = new GunMountAimState
+        {
+            readyToFire = false,
+            withinElevationLimits = true,
+            status = "Орудие ждёт решения наведения."
+        };
+
+        Transform muzzleTransform = EnsureGunMountForGroup(group);
+        if (aim.launchDirection.sqrMagnitude <= 0.0001f)
+        {
+            state.status = "Орудие ждёт баллистическое решение.";
+            return state;
+        }
+
+        Vector3 direction = aim.launchDirection.normalized;
+        Vector3 up = transform.up.sqrMagnitude > 0.0001f ? transform.up.normalized : Vector3.up;
+        Vector3 localDirection = transform.InverseTransformDirection(direction);
+        float desiredYawDegrees = Mathf.Atan2(localDirection.x, localDirection.z) * Mathf.Rad2Deg;
+        float desiredElevationDegrees = Mathf.Asin(Mathf.Clamp(localDirection.y, -1f, 1f)) * Mathf.Rad2Deg;
+        float minElevation = group != null ? group.minElevationDegrees : -89f;
+        float maxElevation = group != null ? group.maxElevationDegrees : 89f;
+        if (maxElevation < minElevation)
+        {
+            float min = maxElevation;
+            maxElevation = minElevation;
+            minElevation = min;
+        }
+
+        float clampedElevationDegrees = Mathf.Clamp(desiredElevationDegrees, minElevation, maxElevation);
+        state.desiredElevationDegrees = desiredElevationDegrees;
+        state.clampedElevationDegrees = clampedElevationDegrees;
+        state.withinElevationLimits = Mathf.Abs(Mathf.DeltaAngle(desiredElevationDegrees, clampedElevationDegrees)) <= 0.05f;
+
+        if (muzzleTransform == null && (group == null || group.yawPivot == null || group.pitchPivot == null))
+        {
+            state.readyToFire = state.withinElevationLimits;
+            state.yawErrorDegrees = 0f;
+            state.elevationErrorDegrees = 0f;
+            state.status = state.withinElevationLimits
+                ? "Орудие без визуального ствола стреляет из offset."
+                : "Цель вне углов ствола: нужно "
+                  + desiredElevationDegrees.ToString("0.#")
+                  + "°, предел "
+                  + minElevation.ToString("0.#")
+                  + ".."
+                  + maxElevation.ToString("0.#")
+                  + "°.";
+            return state;
+        }
+
+        float yawRadians = desiredYawDegrees * Mathf.Deg2Rad;
+        Vector3 yawLocalDirection = new Vector3(Mathf.Sin(yawRadians), 0f, Mathf.Cos(yawRadians));
+        Vector3 yawWorldDirection = transform.TransformDirection(yawLocalDirection);
+        if (yawWorldDirection.sqrMagnitude <= 0.0001f)
+        {
+            yawWorldDirection = Vector3.ProjectOnPlane(transform.forward, up);
+        }
+
+        float elevationRadians = clampedElevationDegrees * Mathf.Deg2Rad;
+        Vector3 pitchLocalDirection = new Vector3(0f, Mathf.Sin(elevationRadians), Mathf.Cos(elevationRadians)).normalized;
+        Vector3 clampedWorldDirection = transform.TransformDirection(new Vector3(
+            Mathf.Sin(yawRadians) * Mathf.Cos(elevationRadians),
+            Mathf.Sin(elevationRadians),
+            Mathf.Cos(yawRadians) * Mathf.Cos(elevationRadians)).normalized);
+
+        float deltaSeconds = Application.isPlaying && Time.deltaTime > 0.0001f ? Time.deltaTime : 1f / 60f;
+        float yawStep = GetGunRotationStep(group != null ? group.yawSpeedDegPerSecond : 0f, deltaSeconds);
+        if (group != null && group.yawPivot != null && group.pitchPivot != null)
+        {
+            if (yawWorldDirection.sqrMagnitude > 0.0001f)
+            {
+                Quaternion targetYaw = Quaternion.LookRotation(yawWorldDirection.normalized, up);
+                group.yawPivot.rotation = Quaternion.RotateTowards(group.yawPivot.rotation, targetYaw, yawStep);
+                state.yawErrorDegrees = Quaternion.Angle(group.yawPivot.rotation, targetYaw);
+            }
+
+            float currentElevation = CalculateWorldElevationDegrees(group.pitchPivot.forward);
+            float elevationSpeed = clampedElevationDegrees >= currentElevation
+                ? (group.elevationUpSpeedDegPerSecond)
+                : (group.elevationDownSpeedDegPerSecond);
+            float elevationStep = GetGunRotationStep(elevationSpeed, deltaSeconds);
+            Quaternion targetPitchLocal = Quaternion.LookRotation(pitchLocalDirection, Vector3.up);
+            if (group.pitchPivot.parent == group.yawPivot)
+            {
+                group.pitchPivot.localRotation = Quaternion.RotateTowards(group.pitchPivot.localRotation, targetPitchLocal, elevationStep);
+                state.elevationErrorDegrees = Quaternion.Angle(group.pitchPivot.localRotation, targetPitchLocal);
+            }
+            else
+            {
+                Quaternion targetPitchWorld = Quaternion.LookRotation(clampedWorldDirection.normalized, up);
+                group.pitchPivot.rotation = Quaternion.RotateTowards(group.pitchPivot.rotation, targetPitchWorld, elevationStep);
+                state.elevationErrorDegrees = Quaternion.Angle(group.pitchPivot.rotation, targetPitchWorld);
+            }
+        }
+        else
+        {
+            Quaternion targetMuzzleRotation = Quaternion.LookRotation(clampedWorldDirection.normalized, up);
+            muzzleTransform.rotation = Quaternion.RotateTowards(muzzleTransform.rotation, targetMuzzleRotation, yawStep);
+            state.yawErrorDegrees = Quaternion.Angle(muzzleTransform.rotation, targetMuzzleRotation);
+            state.elevationErrorDegrees = 0f;
+        }
+
+        float tolerance = group != null ? Mathf.Max(0.05f, group.fireAlignmentToleranceDegrees) : 1.5f;
+        state.readyToFire = state.withinElevationLimits
+            && state.yawErrorDegrees <= tolerance
+            && state.elevationErrorDegrees <= tolerance;
+        if (!state.withinElevationLimits)
+        {
+            state.status = "Цель вне углов ствола: нужно "
+                + desiredElevationDegrees.ToString("0.#")
+                + "°, предел "
+                + minElevation.ToString("0.#")
+                + ".."
+                + maxElevation.ToString("0.#")
+                + "°.";
+        }
+        else if (!state.readyToFire)
+        {
+            state.status = "Орудие доворачивается: yaw "
+                + state.yawErrorDegrees.ToString("0.#")
+                + "°, elev "
+                + state.elevationErrorDegrees.ToString("0.#")
+                + "°.";
+        }
+        else
+        {
+            state.status = "Орудие наведено.";
+        }
+
+        return state;
+    }
+
+    private float CalculateWorldElevationDegrees(Vector3 direction)
+    {
+        if (direction.sqrMagnitude <= 0.0001f) return 0f;
+
+        Vector3 localDirection = transform.InverseTransformDirection(direction.normalized);
+        return Mathf.Asin(Mathf.Clamp(localDirection.y, -1f, 1f)) * Mathf.Rad2Deg;
+    }
+
+    private static float GetGunRotationStep(float speedDegPerSecond, float deltaSeconds)
+    {
+        return speedDegPerSecond <= 0.001f
+            ? 36000f
+            : Mathf.Max(0f, speedDegPerSecond) * Mathf.Max(0f, deltaSeconds);
+    }
+
+    private static Transform FindDeepChild(Transform root, string childName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(childName)) return null;
+        if (root.name == childName) return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindDeepChild(root.GetChild(i), childName);
+            if (found != null) return found;
+        }
+
+        return null;
+    }
+
+    private static string SanitizeName(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "main";
+        return raw.Replace(" ", "_").Replace("/", "_").Replace("\\", "_");
+    }
+
+    private void EnsureGunGroups()
+    {
+        if (shipGunGroups == null)
+        {
+            shipGunGroups = new List<ShipGunGroup>();
+        }
+
+        if (shipGunGroups.Count == 0)
+        {
+            shipGunGroups.Add(CreateDefaultMainGunGroup());
+            shipGunGroups.Add(CreateDefaultSecondaryGunGroup());
+        }
+
+        bool hasSecondaryGroup = false;
+        for (int i = 0; i < shipGunGroups.Count; i++)
+        {
+            ShipGunGroup group = shipGunGroups[i];
+            if (group == null)
+            {
+                group = new ShipGunGroup { groupId = "group_" + (i + 1).ToString("00") };
+                shipGunGroups[i] = group;
+            }
+
+            if (string.IsNullOrWhiteSpace(group.groupId))
+            {
+                group.groupId = "group_" + (i + 1).ToString("00");
+            }
+
+            if (string.IsNullOrWhiteSpace(group.displayNameRu))
+            {
+                group.displayNameRu = group.groupId;
+            }
+
+            group.barrelsPerSalvo = Mathf.Max(1, group.barrelsPerSalvo);
+            group.roundsPerMinute = Mathf.Max(0f, group.roundsPerMinute);
+            group.yawSpeedDegPerSecond = Mathf.Max(0f, group.yawSpeedDegPerSecond);
+            group.elevationUpSpeedDegPerSecond = Mathf.Max(0f, group.elevationUpSpeedDegPerSecond);
+            group.elevationDownSpeedDegPerSecond = Mathf.Max(0f, group.elevationDownSpeedDegPerSecond);
+            if (group.maxElevationDegrees < group.minElevationDegrees)
+            {
+                float min = group.maxElevationDegrees;
+                group.maxElevationDegrees = group.minElevationDegrees;
+                group.minElevationDegrees = min;
+            }
+
+            group.fireAlignmentToleranceDegrees = Mathf.Max(0.05f, group.fireAlignmentToleranceDegrees);
+            group.maxRangeMeters = Mathf.Max(1f, group.maxRangeMeters);
+            group.muzzleVelocityMS = Mathf.Max(1f, group.muzzleVelocityMS);
+            group.projectileMassKg = Mathf.Max(0.01f, group.projectileMassKg);
+            group.projectileRadiusMeters = Mathf.Max(0.01f, group.projectileRadiusMeters);
+            group.horizontalSpreadAtMaxRangeMeters = Mathf.Max(0f, group.horizontalSpreadAtMaxRangeMeters);
+            group.verticalSpreadAtMaxRangeMeters = Mathf.Max(0f, group.verticalSpreadAtMaxRangeMeters);
+            group.gravityScale = Mathf.Max(0f, group.gravityScale);
+            group.projectileTrailSeconds = Mathf.Max(0f, group.projectileTrailSeconds);
+            if (group.shell == null)
+            {
+                group.shell = new DamageShellPreset();
+            }
+
+            if (group.fireMode == ShipGunFireMode.Automatic && string.Equals(group.groupId, "secondary", System.StringComparison.OrdinalIgnoreCase))
+            {
+                hasSecondaryGroup = true;
+            }
+        }
+
+        int enabledManualIndex = FindManualGunGroupIndex(true);
+        if (enabledManualIndex < 0)
+        {
+            int disabledManualIndex = FindManualGunGroupIndex(false);
+            if (disabledManualIndex >= 0)
+            {
+                shipGunGroups[disabledManualIndex].enabled = true;
+                enabledManualIndex = disabledManualIndex;
+            }
+            else
+            {
+                shipGunGroups.Insert(0, CreateDefaultMainGunGroup());
+                enabledManualIndex = 0;
+            }
+        }
+
+        manualGunGroupIndex = Mathf.Clamp(enabledManualIndex, 0, Mathf.Max(0, shipGunGroups.Count - 1));
+        ShipGunGroup manualGroup = shipGunGroups[manualGunGroupIndex];
+        if (manualGroup != null)
+        {
+            manualGroup.roundsPerMinute = MainGunRoundsPerMinute;
+            if (Application.isPlaying)
+            {
+                float latestAllowedShotTime = Time.time + manualGroup.SecondsBetweenSalvos;
+                if (manualGroup.nextShotTime > latestAllowedShotTime)
+                {
+                    manualGroup.nextShotTime = latestAllowedShotTime;
+                }
+            }
+        }
+
+        if (!hasSecondaryGroup && !HasGunGroupId("secondary"))
+        {
+            shipGunGroups.Add(CreateDefaultSecondaryGunGroup());
+        }
+    }
+
+    private int FindManualGunGroupIndex(bool requireEnabled)
+    {
+        if (shipGunGroups == null) return -1;
+
+        for (int i = 0; i < shipGunGroups.Count; i++)
+        {
+            ShipGunGroup group = shipGunGroups[i];
+            if (group == null || group.fireMode != ShipGunFireMode.Manual) continue;
+            if (requireEnabled && !group.enabled) continue;
+            return i;
+        }
+
+        return -1;
+    }
+
+    private bool HasGunGroupId(string groupId)
+    {
+        if (shipGunGroups == null || string.IsNullOrWhiteSpace(groupId)) return false;
+
+        for (int i = 0; i < shipGunGroups.Count; i++)
+        {
+            ShipGunGroup group = shipGunGroups[i];
+            if (group != null && string.Equals(group.groupId, groupId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsPointerOverBlockingUi()
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null || !TryReadMousePosition(out Vector3 mousePosition))
+        {
+            return false;
+        }
+
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            position = mousePosition
+        };
+        uiRaycastResults.Clear();
+        eventSystem.RaycastAll(eventData, uiRaycastResults);
+        for (int i = 0; i < uiRaycastResults.Count; i++)
+        {
+            GameObject target = uiRaycastResults[i].gameObject;
+            if (target == null) continue;
+            if (ExecuteEvents.GetEventHandler<IPointerClickHandler>(target) != null) return true;
+            if (ExecuteEvents.GetEventHandler<IDragHandler>(target) != null) return true;
+            if (ExecuteEvents.GetEventHandler<IScrollHandler>(target) != null) return true;
+            if (ExecuteEvents.GetEventHandler<ISubmitHandler>(target) != null) return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadMousePosition(out Vector3 mousePosition)
+    {
+        if (WorldDebugTravelController.GameplayCursorLockedForMouseLook &&
+            !WildWindControlSettings.IsGameplayCursorReleasePressed())
+        {
+            mousePosition = new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f);
+            return Screen.width > 0 && Screen.height > 0;
+        }
+
+        Mouse mouse = Mouse.current;
+        if (mouse == null)
+        {
+            mousePosition = Vector3.zero;
+            return false;
+        }
+
+        Vector2 position = mouse.position.ReadValue();
+        mousePosition = new Vector3(position.x, position.y, 0f);
+        return true;
+    }
+
+    private static bool WasMouseButtonPressedThisFrame(int button)
+    {
+        Mouse mouse = Mouse.current;
+        if (mouse == null) return false;
+
+        return button switch
+        {
+            0 => mouse.leftButton.wasPressedThisFrame,
+            1 => mouse.rightButton.wasPressedThisFrame,
+            2 => mouse.middleButton.wasPressedThisFrame,
+            _ => false
+        };
+    }
+
+    private static bool IsMouseButtonPressed(int button)
+    {
+        Mouse mouse = Mouse.current;
+        if (mouse == null) return false;
+
+        return button switch
+        {
+            0 => mouse.leftButton.isPressed,
+            1 => mouse.rightButton.isPressed,
+            2 => mouse.middleButton.isPressed,
+            _ => false
+        };
+    }
+
+    private static bool IsGameplayCursorReleasedForUi()
+    {
+        return WorldDebugTravelController.GameplayCursorReleasedForUi ||
+            WildWindControlSettings.IsGameplayCursorReleasePressed();
+    }
+
+    private static Vector3 ResolveCursorRayRangePoint(Ray ray, Vector3 center, float rangeMeters)
+    {
+        float range = Mathf.Max(1f, rangeMeters);
+        Vector3 origin = IsFinite(ray.origin) ? ray.origin : center;
+        Vector3 direction = ray.direction.sqrMagnitude > 0.001f ? ray.direction.normalized : Vector3.forward;
+        Vector3 originToCenter = origin - center;
+        float projectedCenter = Vector3.Dot(originToCenter, direction);
+        float outsideRange = originToCenter.sqrMagnitude - range * range;
+        float discriminant = projectedCenter * projectedCenter - outsideRange;
+        if (discriminant >= 0f)
+        {
+            float root = Mathf.Sqrt(discriminant);
+            float farT = -projectedCenter + root;
+            if (farT > 0.001f)
+            {
+                return origin + direction * farT;
+            }
+
+            float nearT = -projectedCenter - root;
+            if (nearT > 0.001f)
+            {
+                return origin + direction * nearT;
+            }
+        }
+
+        float closestT = Mathf.Max(0f, -projectedCenter);
+        Vector3 closestPoint = origin + direction * closestT;
+        Vector3 fromCenter = closestPoint - center;
+        if (!IsFinite(fromCenter) || fromCenter.sqrMagnitude <= 0.001f)
+        {
+            fromCenter = direction.sqrMagnitude > 0.001f ? direction : Vector3.forward;
+        }
+
+        return center + fromCenter.normalized * range;
+    }
+
+    private static Vector2 ResolveAimGuiPosition(BallisticAimSolution aim, Vector3 fallbackMousePosition)
+    {
+        if (WorldDebugTravelController.GameplayCursorLockedForMouseLook &&
+            !WildWindControlSettings.IsGameplayCursorReleasePressed())
+        {
+            return new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        }
+
+        Camera camera = Camera.main;
+        if (camera != null && IsFinite(aim.targetPoint))
+        {
+            Vector3 screen = camera.WorldToScreenPoint(aim.targetPoint);
+            if (screen.z > 0.001f && IsFinite(screen))
+            {
+                return new Vector2(screen.x, Screen.height - screen.y);
+            }
+        }
+
+        if (!IsFinite(fallbackMousePosition))
+        {
+            fallbackMousePosition = new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f);
+        }
+
+        float screenWidth = Mathf.Max(0f, Screen.width);
+        float screenHeight = Mathf.Max(0f, Screen.height);
+        float x = Mathf.Clamp(fallbackMousePosition.x, 0f, screenWidth);
+        float y = Mathf.Clamp(screenHeight - fallbackMousePosition.y, 0f, screenHeight);
+        return new Vector2(x, y);
+    }
+
+    private static void DrawAimRing(Vector2 center, float radius, float thickness, Color color)
+    {
+        if (radius <= 0.001f || thickness <= 0.001f)
+        {
+            return;
+        }
+
+        Color previousColor = GUI.color;
+        Matrix4x4 previousMatrix = GUI.matrix;
+        GUI.color = color;
+
+        const int SegmentCount = 48;
+        Vector2 previous = center + new Vector2(radius, 0f);
+        for (int i = 1; i <= SegmentCount; i++)
+        {
+            float angle = i * Mathf.PI * 2f / SegmentCount;
+            Vector2 next = center + new Vector2(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
+            DrawGuiLine(previous, next, thickness);
+            previous = next;
+        }
+
+        GUI.matrix = previousMatrix;
+        GUI.color = previousColor;
+    }
+
+    private static void DrawGuiLine(Vector2 start, Vector2 end, float thickness)
+    {
+        Vector2 delta = end - start;
+        float length = delta.magnitude;
+        if (length <= 0.001f)
+        {
+            return;
+        }
+
+        Matrix4x4 previousMatrix = GUI.matrix;
+        float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+        GUIUtility.RotateAroundPivot(angle, start);
+        GUI.DrawTexture(new Rect(start.x, start.y - thickness * 0.5f, length, thickness), Texture2D.whiteTexture);
+        GUI.matrix = previousMatrix;
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
+    }
+
+    private static ShipGunGroup CreateDefaultMainGunGroup()
+    {
+        return new ShipGunGroup
+        {
+            groupId = "main",
+            displayNameRu = "Главный калибр",
+            fireMode = ShipGunFireMode.Manual,
+            localMuzzleOffset = new Vector3(0f, 2.7f, 7.85f),
+            barrelsPerSalvo = 1,
+            roundsPerMinute = MainGunRoundsPerMinute,
+            yawSpeedDegPerSecond = 45f,
+            elevationUpSpeedDegPerSecond = 22f,
+            elevationDownSpeedDegPerSecond = 30f,
+            minElevationDegrees = -5f,
+            maxElevationDegrees = 55f,
+            fireAlignmentToleranceDegrees = 1.5f,
+            maxRangeMeters = 2500f,
+            muzzleVelocityMS = 360f,
+            projectileMassKg = 12f,
+            projectileRadiusMeters = 0.10f,
+            horizontalSpreadAtMaxRangeMeters = 24f,
+            verticalSpreadAtMaxRangeMeters = 9f,
+            shell = new DamageShellPreset
+            {
+                displayNameRu = "ББ 76 мм",
+                shellType = DamageShellType.ArmorPiercing,
+                caliberMm = 76f,
+                damagePoints = 120f,
+                hullDamageOnPenetration = 120f,
+                penetrationMm = 85f,
+                penetrationAtMaxRangeMultiplier = 0.55f,
+                velocityRetentionAtMaxRange = 0.62f,
+                normalizationDegrees = 5f,
+                penetrationRollSpread = 0.08f,
+                projectileColor = Color.red
+            }
+        };
+    }
+
+    private static ShipGunGroup CreateDefaultSecondaryGunGroup()
+    {
+        return new ShipGunGroup
+        {
+            groupId = "secondary",
+            displayNameRu = "ПМК",
+            fireMode = ShipGunFireMode.Automatic,
+            localMuzzleOffset = new Vector3(0f, 1.2f, -7.5f),
+            barrelsPerSalvo = 1,
+            roundsPerMinute = 200f,
+            yawSpeedDegPerSecond = 140f,
+            elevationUpSpeedDegPerSecond = 90f,
+            elevationDownSpeedDegPerSecond = 110f,
+            minElevationDegrees = -10f,
+            maxElevationDegrees = 70f,
+            fireAlignmentToleranceDegrees = 3f,
+            maxRangeMeters = 1500f,
+            muzzleVelocityMS = 420f,
+            projectileMassKg = 0.12f,
+            projectileRadiusMeters = 0.035f,
+            horizontalSpreadAtMaxRangeMeters = 35f,
+            verticalSpreadAtMaxRangeMeters = 16f,
+            shell = new DamageShellPreset
+            {
+                displayNameRu = "ББ 20 мм",
+                shellType = DamageShellType.ArmorPiercing,
+                caliberMm = 20f,
+                damagePoints = 18f,
+                hullDamageOnPenetration = 18f,
+                penetrationMm = 18f,
+                penetrationAtMaxRangeMultiplier = 0.45f,
+                velocityRetentionAtMaxRange = 0.58f,
+                normalizationDegrees = 2f,
+                penetrationRollSpread = 0.12f,
+                projectileColor = new Color(0.2f, 0.85f, 1f, 1f)
+            }
+        };
     }
 
     private void PerformAutoStabilization()

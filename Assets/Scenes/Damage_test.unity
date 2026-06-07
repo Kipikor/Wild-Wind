@@ -162,60 +162,47 @@ MonoBehaviour:
   plates:
   - plateId: mesh_plate_01
     displayNameRu: "\u041A\u043E\u0440\u043C\u0430 01"
-    armorDetailId: armor_detail_hull
     armorMm: 40
     triangleIndices: 0000000001000000
     debugColor: {r: 1, g: 0, b: 0, a: 1}
   - plateId: mesh_plate_02
     displayNameRu: "\u041F\u0440\u0430\u0432\u044B\u0439 \u0431\u043E\u0440\u0442
       02"
-    armorDetailId: armor_detail_hull
     armorMm: 40
     triangleIndices: 020000000300000004000000
     debugColor: {r: 1, g: 0.8754, b: 0.3, a: 0.35}
   - plateId: mesh_plate_03
     displayNameRu: "\u041B\u0435\u0432\u044B\u0439 \u0431\u043E\u0440\u0442 03"
-    armorDetailId: armor_detail_hull
     armorMm: 40
     triangleIndices: 050000000600000007000000
     debugColor: {r: 0.54920006, g: 1, b: 0.3, a: 0.35}
   - plateId: mesh_plate_04
     displayNameRu: "\u0412\u0435\u0440\u0445\u043D\u044F\u044F \u0433\u0440\u0430\u043D\u044C
       04"
-    armorDetailId: armor_detail_hull
     armorMm: 40
     triangleIndices: 0800000009000000
     debugColor: {r: 0.3, g: 1, b: 0.6261999, a: 0.35}
   - plateId: mesh_plate_05
     displayNameRu: "\u041D\u0438\u0436\u043D\u044F\u044F \u0433\u0440\u0430\u043D\u044C
       05"
-    armorDetailId: armor_detail_hull
     armorMm: 40
     triangleIndices: 0a0000000b000000
     debugColor: {r: 0.3, g: 0.7984001, b: 1, a: 0.35}
   - plateId: mesh_plate_06
     displayNameRu: "\u0412\u0435\u0440\u0445\u043D\u044F\u044F \u0433\u0440\u0430\u043D\u044C
       06"
-    armorDetailId: armor_detail_hull
     armorMm: 40
     triangleIndices: 0c0000000d000000
     debugColor: {r: 0.37699977, g: 0.3, b: 1, a: 0.35}
   - plateId: mesh_plate_07
     displayNameRu: "\u041B\u043E\u0431 07"
-    armorDetailId: armor_detail_hull
     armorMm: 40
     triangleIndices: 0e0000000f000000
     debugColor: {r: 0.9523998, g: 0.3, b: 1, a: 0.35}
-  details:
-  - detailId: armor_detail_hull
-    displayNameRu: "\u0411\u0440\u043E\u043D\u0435\u043A\u043E\u0440\u043F\u0443\u0441"
-    maxArmorHp: 600
-    armorHp: 550
   ricochetAngleDeg: 70
   normalAngleThresholdDeg: 8
   planeDistanceThreshold: 0.05
   defaultArmorMm: 40
-  hpPerArmorMm: 4
   drawPlates: 1
   drawOnlyWhenSelected: 1
   maxDrawnTriangles: 180
@@ -1477,7 +1464,6 @@ MonoBehaviour:
     caliberMm: 76
     damagePoints: 120
     hullDamageOnPenetration: 120
-    armorPlateDamage: 25
     moduleDamage: 80
     penetrationMm: 141.6
     explosiveRadiusMeters: 4
@@ -1490,7 +1476,6 @@ MonoBehaviour:
     caliberMm: 90
     damagePoints: 150
     hullDamageOnPenetration: 85
-    armorPlateDamage: 55
     moduleDamage: 35
     penetrationMm: 28
     explosiveRadiusMeters: 6
