@@ -185,8 +185,7 @@ public class DamageProjectile : MonoBehaviour
             if (sourceShip != null && hitCollider.transform.IsChildOf(sourceShip.transform)) continue;
             if (hitCollider.GetComponentInParent<PaintedArmorBody>() == null
                 && hitCollider.GetComponentInParent<MeshArmorBody>() == null
-                && hitCollider.GetComponentInParent<ArmorZone>() == null
-                && hitCollider.GetComponentInParent<Leviathan>() == null)
+                && hitCollider.GetComponentInParent<ArmorZone>() == null)
             {
                 continue;
             }
@@ -245,28 +244,6 @@ public class DamageProjectile : MonoBehaviour
             incomingDirection = direction,
             velocity = velocity
         };
-
-        Leviathan leviathan = hitCollider.GetComponentInParent<Leviathan>();
-        if (leviathan != null)
-        {
-            float damage = Mathf.Max(shell.damagePoints, shell.hullDamageOnPenetration);
-            if (shell.shellType == DamageShellType.ArmorPiercing)
-            {
-                damage *= Mathf.Lerp(0.55f, 1f, penetrationMultiplier);
-            }
-
-            leviathan.ApplyDamage(damage);
-            Leviathan.AddAlarmNear(
-                hitPoint,
-                sourceShip != null ? Mathf.Max(0f, sourceShip.weaponShotAlarmRadiusMeters) : 0f,
-                leviathan.alarmShotNearAdd,
-                "попадание снаряда рядом",
-                leviathan,
-                leviathan.alarmShotAtSelfAdd,
-                sourceShip);
-            hasHit = true;
-            return true;
-        }
 
         PaintedArmorBody paintedArmor = hitCollider.GetComponentInParent<PaintedArmorBody>();
         if (paintedArmor != null)

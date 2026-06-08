@@ -18,6 +18,12 @@ namespace Mirza.AERO
 
         void Update()
         {
+            Material targetMaterial = ResolveMaterial();
+            if (targetMaterial == null)
+            {
+                return;
+            }
+
             int additionalLightCount = additionalLightCountBase;
             Light[] lights = FindObjectsByType<Light>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 
@@ -31,12 +37,39 @@ namespace Mirza.AERO
 
             // Need to loop framecount, else interleaved gradient noise becomes erratic.
 
-            material.SetInteger("_FrameCount", Time.renderedFrameCount % 60);
-            material.SetInteger("_AdditionalLightCount", additionalLightCount);
+            try
+            {
+                targetMaterial.SetInteger("_FrameCount", Time.renderedFrameCount % 60);
+                targetMaterial.SetInteger("_AdditionalLightCount", additionalLightCount);
 
-            Color ambientLighting = RenderSettings.ambientLight * RenderSettings.ambientIntensity;
+                Color ambientLighting = RenderSettings.ambientLight * RenderSettings.ambientIntensity;
+                targetMaterial.SetColor("_AmbientLighting", ambientLighting);
+            }
+            catch (MissingReferenceException)
+            {
+                material = null;
+            }
+        }
 
-            material.SetColor("_AmbientLighting", ambientLighting);
+        private Material ResolveMaterial()
+        {
+            if (material != null)
+            {
+                return material;
+            }
+
+            Renderer renderer = GetComponent<Renderer>();
+            if (renderer == null)
+            {
+                renderer = GetComponentInChildren<Renderer>(true);
+            }
+
+            if (renderer != null && renderer.sharedMaterial != null)
+            {
+                material = renderer.sharedMaterial;
+            }
+
+            return material;
         }
     }
 }

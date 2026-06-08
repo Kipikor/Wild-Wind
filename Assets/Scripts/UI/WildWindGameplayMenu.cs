@@ -15,17 +15,15 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
     {
         "game.menu.title",
         "game.menu.resume",
-        "game.menu.save_exit",
-        "game.menu.exit_without_save",
-        "game.menu.status_saved",
-        "game.menu.status_save_failed"
+        "game.menu.reset_progress_cheat",
+        "game.menu.status_reset_progress",
+        "game.menu.status_reset_failed"
     };
 
     private const string MenuObjectName = "Wild Wind Gameplay Menu";
     private const string CanvasName = "Gameplay Menu Canvas";
     private const string EventSystemName = "Gameplay Menu EventSystem";
 
-    [SerializeField, InspectorName("Menu Scene")] private string menuSceneName = "StartScreen";
     [SerializeField, InspectorName("Reference Resolution")] private Vector2 referenceResolution = new Vector2(1920f, 1080f);
 
     private Canvas canvas;
@@ -33,8 +31,7 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
     private RectTransform panel;
     private Text titleText;
     private Text resumeText;
-    private Text saveExitText;
-    private Text exitWithoutSaveText;
+    private Text resetProgressText;
     private Text statusText;
     private MetaGameState meta;
     private static Font cachedDefaultFont;
@@ -54,7 +51,7 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
 
     private static void EnsureMenuForGameplayScene()
     {
-        if (Object.FindFirstObjectByType<WorldRegionRuntime>() == null)
+        if (!WildWindSessionFlow.IsGameplaySceneLoaded())
         {
             return;
         }
@@ -88,6 +85,12 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
 
     private void Update()
     {
+        if (WasResetProgressCheatPressed())
+        {
+            ResetProgressCheat();
+            return;
+        }
+
         if (WasMenuPressed())
         {
             SetOpen(overlayRoot == null || !overlayRoot.gameObject.activeSelf);
@@ -114,28 +117,25 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
         SetOpen(false);
     }
 
-    private void SaveAndExitToMenu()
+    private void ResetProgressCheat()
     {
         MetaGameState currentMeta = ResolveMeta();
         if (currentMeta == null)
         {
-            SetStatus("game.menu.status_save_failed");
+            SetStatus("game.menu.status_reset_failed");
             return;
         }
 
-        if (!WildWindSessionFlow.TrySaveAndExitToMenu(currentMeta, menuSceneName, out string error))
+        if (!currentMeta.ResetAccountProgressForCheat(out string message))
         {
-            Debug.LogWarning("[WildWindGameplayMenu] Save and exit failed: " + error, this);
-            SetStatus("game.menu.status_save_failed");
+            Debug.LogWarning("[WildWindGameplayMenu] Progress reset failed: " + message, this);
+            SetStatus("game.menu.status_reset_failed");
+            return;
         }
-    }
 
-    private void ExitToMenu()
-    {
-        if (!WildWindSessionFlow.TryExitToMenuWithoutSave(ResolveMeta(), menuSceneName, out string error))
-        {
-            Debug.LogWarning("[WildWindGameplayMenu] Exit to menu failed: " + error, this);
-        }
+        SetStatus("game.menu.status_reset_progress");
+        SetOpen(false);
+        Object.FindFirstObjectByType<WildWindGameplayHud>()?.OpenMetaPortScreenForTests();
     }
 
     private void SetPaused(bool paused)
@@ -188,7 +188,7 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
             anchorMax = new Vector2(0.5f, 0.5f),
             pivot = new Vector2(0.5f, 0.5f),
             anchoredPosition = Vector2.zero,
-            sizeDelta = new Vector2(560f, 430f)
+            sizeDelta = new Vector2(560f, 340f)
         }).GetComponent<RectTransform>();
 
         Image panelImage = panel.gameObject.AddComponent<Image>();
@@ -196,9 +196,8 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
 
         titleText = CreateText(panel, "game.menu.title", 42, new Vector2(42f, -30f), new Vector2(476f, 66f), TextAnchor.MiddleLeft, new Color(0.88f, 0.79f, 0.61f, 1f));
         resumeText = CreateMenuButton(panel, "game.menu.resume", new Vector2(42f, -118f), Resume);
-        saveExitText = CreateMenuButton(panel, "game.menu.save_exit", new Vector2(42f, -198f), SaveAndExitToMenu);
-        exitWithoutSaveText = CreateMenuButton(panel, "game.menu.exit_without_save", new Vector2(42f, -278f), ExitToMenu);
-        statusText = CreateText(panel, "", 20, new Vector2(42f, -356f), new Vector2(476f, 40f), TextAnchor.MiddleLeft, new Color(0.86f, 0.75f, 0.55f, 1f));
+        resetProgressText = CreateMenuButton(panel, "game.menu.reset_progress_cheat", new Vector2(42f, -198f), ResetProgressCheat);
+        statusText = CreateText(panel, "", 20, new Vector2(42f, -276f), new Vector2(476f, 40f), TextAnchor.MiddleLeft, new Color(0.86f, 0.75f, 0.55f, 1f));
         RefreshTexts();
     }
 
@@ -260,8 +259,7 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
     {
         SetLocalizedText(titleText, "game.menu.title");
         SetLocalizedText(resumeText, "game.menu.resume");
-        SetLocalizedText(saveExitText, "game.menu.save_exit");
-        SetLocalizedText(exitWithoutSaveText, "game.menu.exit_without_save");
+        SetLocalizedText(resetProgressText, "game.menu.reset_progress_cheat");
     }
 
     private void SetStatus(string key)
@@ -298,10 +296,21 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
         }
 #endif
 
-#if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(KeyCode.Escape))
+        return false;
+    }
+
+    private static bool WasResetProgressCheatPressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard != null)
         {
-            return true;
+            bool controlHeld = keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
+            bool shiftHeld = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
+            if (controlHeld && shiftHeld && keyboard.backspaceKey.wasPressedThisFrame)
+            {
+                return true;
+            }
         }
 #endif
 
@@ -329,10 +338,10 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
         }
 
 #if ENABLE_INPUT_SYSTEM
-        StandaloneInputModule legacyModule = eventSystemObject.GetComponent<StandaloneInputModule>();
-        if (legacyModule != null)
+        StandaloneInputModule standaloneModule = eventSystemObject.GetComponent<StandaloneInputModule>();
+        if (standaloneModule != null)
         {
-            Destroy(legacyModule);
+            Destroy(standaloneModule);
         }
 
         if (eventSystemObject.GetComponent<InputSystemUIInputModule>() == null)

@@ -1,8 +1,0 @@
-id_need,need_kind,local_name_ru,local_name_en,recovery_item,max_value,restore_per_item,base_decay_per_hour,load_decay_per_hour,satisfied_threshold,description_ru
-need_workforce,Workforce,Рабочая сила,Workforce,food,100,25,0.2,3,1,Физическая работа держится на еде и сменах.
-need_health,Health,Здоровье,Health,medicines,100,25,0.2,3,1,Химия и тяжелые условия требуют медикаментов.
-need_safety,Safety,Безопасность,Safety,weapon,100,25,0.2,3,1,Опасные производства требуют охраны и оружия.
-need_comfort,Comfort,Комфорт,Comfort,cloth,100,25,0.2,3,1,Холод жара шум и грязь компенсируются тканью и бытом.
-need_creativity,Creativity,Творчество,Creativity,paper,100,25,0.2,3,1,Умственная работа требует бумаги записей и свободной мысли.
-need_repair,Repair,Ремонт,Repair,tools,100,20,0.15,2,1,Корпуса механизмы и доки требуют регулярного обслуживания инструментами.
-need_capital_connection,CapitalConnection,Связь со столицей,Capital Connection,passengers_to_island,100,1,0.1,1.5,1,Людям нужна регулярная пассажирская связь между островом и столицей.

@@ -1,4 +1,0 @@
-id_cloud,local_name_ru,local_name_en,cloud_type_id,position_x,position_y,position_z,initial_volume_l
-cloud_capital_common_01,Столичное учебное облако,Capital Tutorial Cloud,common_cloud,800,2600,-650,120
-cloud_mist_training_01,Туманный карман у водосбора,Mist Waterworks Pocket,wet_cloud,4550,2750,-1300,180
-cloud_claudium_wisp_01,Клавдиевый шлейф гряды,Claudium Ridge Wisp,claudic_wisp,4750,3350,2500,90

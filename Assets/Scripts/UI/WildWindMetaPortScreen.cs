@@ -7,11 +7,6 @@ using UnityEngine.UI;
 using UnityEngine.InputSystem.UI;
 #endif
 
-#if UNITY_EDITOR
-using UnityEditor.SceneManagement;
-#endif
-
-[ExecuteAlways]
 public sealed class WildWindMetaPortScreen : MonoBehaviour
 {
     private const string CanvasName = "Meta Port Canvas";
@@ -65,13 +60,12 @@ public sealed class WildWindMetaPortScreen : MonoBehaviour
 
     private void OnEnable()
     {
-        if (!Application.isPlaying && transform.Find(CanvasName) == null)
+        if (Application.isPlaying && transform.Find(CanvasName) == null)
         {
             RebuildScreen();
         }
     }
 
-    [ContextMenu("Rebuild meta port screen")]
     public void RebuildScreen()
     {
         ClearGeneratedChildren();
@@ -81,12 +75,11 @@ public sealed class WildWindMetaPortScreen : MonoBehaviour
         BuildTopBar();
         BuildLayout();
         RefreshScreen();
-        MarkSceneDirtyIfEditing();
     }
 
     public void BindState(WildWindMetaPortUiState externalState)
     {
-        state = externalState ?? WildWindMetaPortUiState.CreateDemo();
+        state = externalState ?? WildWindMetaPortUiState.CreateFromRuntime(FindFirstObjectByType<MetaGameState>());
         RefreshScreen();
     }
 
@@ -171,7 +164,7 @@ public sealed class WildWindMetaPortScreen : MonoBehaviour
 
         Text title = CreateText(topBar, "WILD WIND PORT", 34, new Vector2(44f, -12f), new Vector2(440f, 44f), TextAnchor.MiddleLeft, TextColor);
         title.fontStyle = FontStyle.Bold;
-        CreateText(topBar, "Out-of-sortie economy, ships, production, events and progression", 17, new Vector2(46f, -56f), new Vector2(620f, 26f), TextAnchor.MiddleLeft, MutedTextColor);
+        CreateText(topBar, "Session port: ships, fitting, sorties, production and progression", 17, new Vector2(46f, -56f), new Vector2(620f, 26f), TextAnchor.MiddleLeft, MutedTextColor);
         resourceText = CreateText(topBar, "", 16, new Vector2(-44f, -16f), new Vector2(1180f, 56f), TextAnchor.MiddleRight, AccentColor, new Vector2(1f, 1f));
     }
 
@@ -279,7 +272,7 @@ public sealed class WildWindMetaPortScreen : MonoBehaviour
 
     private WildWindMetaPortUiState EnsureState()
     {
-        state ??= WildWindMetaPortUiState.CreateDemo();
+        state ??= WildWindMetaPortUiState.CreateFromRuntime(FindFirstObjectByType<MetaGameState>());
         return state;
     }
 
@@ -448,20 +441,6 @@ public sealed class WildWindMetaPortScreen : MonoBehaviour
         if (eventSystem.GetComponent<StandaloneInputModule>() == null)
         {
             eventSystem.AddComponent<StandaloneInputModule>();
-        }
-#endif
-    }
-
-    private static void MarkSceneDirtyIfEditing()
-    {
-#if UNITY_EDITOR
-        if (!Application.isPlaying)
-        {
-            UnityEngine.SceneManagement.Scene scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-            if (scene.IsValid())
-            {
-                EditorSceneManager.MarkSceneDirty(scene);
-            }
         }
 #endif
     }

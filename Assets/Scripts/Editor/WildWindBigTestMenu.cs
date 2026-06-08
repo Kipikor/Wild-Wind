@@ -6,7 +6,7 @@ using UnityEngine;
 
 public static class WildWindBigTestMenu
 {
-    private const string WorldScenePath = "Assets/Scenes/WildWindWorldScene.unity";
+    private const string SessionScenePath = "Assets/Scenes/WildWindSessionScene.unity";
 
     [MenuItem("Wild Wind/Провести большой тест")]
     public static void RunBigTest()
@@ -17,19 +17,23 @@ public static class WildWindBigTestMenu
             return;
         }
 
-        if (!File.Exists(WorldScenePath))
+        if (!File.Exists(SessionScenePath))
         {
-            Debug.Log("[WildWindBigTest] World scene is missing, rebuilding once before the big test: " + WorldScenePath);
-            WorldSceneBuilder.BuildFinalWorldScene();
+            Debug.LogError("[WildWindBigTest] Session scene is missing: " + SessionScenePath);
+            return;
         }
 
-        WildWindSaveSlots.ClearPendingGameplayLaunch();
-        WildWindUsageAudit.DisarmForBigTest();
         WildWindBigTestRunner.MarkEditorBigTestLaunchPending();
         WriteLaunchStatus("launching", "Editor menu requested Play Mode for the big test.");
 
-        Debug.Log("[WildWindBigTest] Starting Play Mode on existing world scene. Report: TestReports/WildWindBigTestReport.txt.");
-        WildWindEditorStartSceneGuard.UseWorldSceneForNextPlay();
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+        {
+            Debug.LogWarning("[WildWindBigTest] Big test was not started because modified scenes were not saved.");
+            return;
+        }
+
+        EditorSceneManager.OpenScene(SessionScenePath);
+        Debug.Log("[WildWindBigTest] Starting Play Mode on session scene. Report: TestReports/WildWindBigTestReport.txt.");
         EditorApplication.isPlaying = true;
     }
 

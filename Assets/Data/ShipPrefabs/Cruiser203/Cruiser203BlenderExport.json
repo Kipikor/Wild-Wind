@@ -1,0 +1,770 @@
+[
+  {
+    "sourceName": "Крейсер",
+    "assetName": "Cruiser203Hull",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203Hull.obj",
+    "pivotUnity": [
+      0.0,
+      0.0,
+      -0.0
+    ],
+    "worldBoundsUnityMin": [
+      -16.33487,
+      -7.0,
+      -70.0
+    ],
+    "worldBoundsUnityMax": [
+      16.33487,
+      22.70588,
+      72.26495
+    ],
+    "dimensionsUnity": [
+      32.66974,
+      29.70588,
+      142.26495
+    ],
+    "vertices": 512,
+    "triangles": 1043,
+    "materials": [
+      "Тёмный металл"
+    ]
+  },
+  {
+    "sourceName": "Излучатель.001",
+    "assetName": "Cruiser203EmitterDeck",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203EmitterDeck.obj",
+    "pivotUnity": [
+      0.0,
+      0.0,
+      11.1267
+    ],
+    "worldBoundsUnityMin": [
+      -16.70448,
+      -0.87845,
+      -63.25997
+    ],
+    "worldBoundsUnityMax": [
+      16.70448,
+      1.31567,
+      54.57325
+    ],
+    "dimensionsUnity": [
+      33.40897,
+      2.19411,
+      117.83322
+    ],
+    "vertices": 648,
+    "triangles": 1224,
+    "materials": [
+      "Тёмный металл",
+      "Клавдий",
+      "Дерево"
+    ]
+  },
+  {
+    "sourceName": "Турель",
+    "assetName": "Cruiser203TurretA_House",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretA_House.obj",
+    "pivotUnity": [
+      0.0,
+      9.87574,
+      59.4579
+    ],
+    "worldBoundsUnityMin": [
+      -5.0,
+      8.27574,
+      55.38921
+    ],
+    "worldBoundsUnityMax": [
+      5.0,
+      11.47574,
+      63.57915
+    ],
+    "dimensionsUnity": [
+      10.0,
+      3.2,
+      8.18994
+    ],
+    "vertices": 54,
+    "triangles": 104,
+    "materials": [
+      "Тёмный металл",
+      "Тьма",
+      "Тёмный металл.007",
+      "Тьма.002",
+      "Тёмный металл.008",
+      "Тьма.003"
+    ]
+  },
+  {
+    "sourceName": "Турель.004",
+    "assetName": "Cruiser203TurretA_Ring",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretA_Ring.obj",
+    "pivotUnity": [
+      0.0,
+      9.87574,
+      59.4579
+    ],
+    "worldBoundsUnityMin": [
+      -4.23605,
+      6.99178,
+      55.25656
+    ],
+    "worldBoundsUnityMax": [
+      4.34056,
+      8.40267,
+      63.83317
+    ],
+    "dimensionsUnity": [
+      8.57661,
+      1.41088,
+      8.57661
+    ],
+    "vertices": 185,
+    "triangles": 366,
+    "materials": [
+      "Тёмный металл",
+      "Тьма",
+      "Тёмный металл.007",
+      "Тьма.002",
+      "Тёмный металл.008",
+      "Тьма.003"
+    ]
+  },
+  {
+    "sourceName": "Ствол1",
+    "assetName": "Cruiser203TurretA_Barrel1",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretA_Barrel1.obj",
+    "pivotUnity": [
+      0.0,
+      9.46385,
+      61.96483
+    ],
+    "worldBoundsUnityMin": [
+      -0.61144,
+      8.97681,
+      62.5406
+    ],
+    "worldBoundsUnityMax": [
+      0.61074,
+      10.24214,
+      73.68164
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14104
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл",
+      "Тьма",
+      "Тёмный металл.007",
+      "Тьма.002",
+      "Тёмный металл.008",
+      "Тьма.003"
+    ]
+  },
+  {
+    "sourceName": "ствол2",
+    "assetName": "Cruiser203TurretA_Barrel2",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretA_Barrel2.obj",
+    "pivotUnity": [
+      0.0,
+      9.46385,
+      61.96483
+    ],
+    "worldBoundsUnityMin": [
+      1.88856,
+      8.97681,
+      62.5406
+    ],
+    "worldBoundsUnityMax": [
+      3.11074,
+      10.24214,
+      73.68164
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14104
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл",
+      "Тьма",
+      "Тёмный металл.007",
+      "Тьма.002",
+      "Тёмный металл.008",
+      "Тьма.003"
+    ]
+  },
+  {
+    "sourceName": "Ствол3",
+    "assetName": "Cruiser203TurretA_Barrel3",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretA_Barrel3.obj",
+    "pivotUnity": [
+      0.0,
+      9.46385,
+      61.96483
+    ],
+    "worldBoundsUnityMin": [
+      -3.11144,
+      8.97681,
+      62.5406
+    ],
+    "worldBoundsUnityMax": [
+      -1.88926,
+      10.24214,
+      73.68164
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14104
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл",
+      "Тьма",
+      "Тёмный металл.007",
+      "Тьма.002",
+      "Тёмный металл.008",
+      "Тьма.003"
+    ]
+  },
+  {
+    "sourceName": "Турель.002",
+    "assetName": "Cruiser203TurretB_House",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretB_House.obj",
+    "pivotUnity": [
+      0.0,
+      13.23499,
+      21.95259
+    ],
+    "worldBoundsUnityMin": [
+      -5.0,
+      11.63498,
+      17.8839
+    ],
+    "worldBoundsUnityMax": [
+      5.0,
+      14.83498,
+      26.07384
+    ],
+    "dimensionsUnity": [
+      10.0,
+      3.2,
+      8.18994
+    ],
+    "vertices": 54,
+    "triangles": 104,
+    "materials": [
+      "Тёмный металл.021",
+      "Тьма.016",
+      "Тёмный металл.022",
+      "Тьма.017",
+      "Тёмный металл.023",
+      "Тьма.018"
+    ]
+  },
+  {
+    "sourceName": "Турель.001",
+    "assetName": "Cruiser203TurretB_Ring",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretB_Ring.obj",
+    "pivotUnity": [
+      0.0,
+      13.23499,
+      21.95259
+    ],
+    "worldBoundsUnityMin": [
+      -4.23605,
+      10.35103,
+      17.75125
+    ],
+    "worldBoundsUnityMax": [
+      4.34056,
+      11.76191,
+      26.32786
+    ],
+    "dimensionsUnity": [
+      8.57661,
+      1.41088,
+      8.57661
+    ],
+    "vertices": 185,
+    "triangles": 366,
+    "materials": [
+      "Тёмный металл.021",
+      "Тьма.016",
+      "Тёмный металл.022",
+      "Тьма.017",
+      "Тёмный металл.023",
+      "Тьма.018"
+    ]
+  },
+  {
+    "sourceName": "Ствол1.001",
+    "assetName": "Cruiser203TurretB_Barrel1",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretB_Barrel1.obj",
+    "pivotUnity": [
+      0.0,
+      12.8231,
+      24.45952
+    ],
+    "worldBoundsUnityMin": [
+      -0.61144,
+      12.33606,
+      25.03529
+    ],
+    "worldBoundsUnityMax": [
+      0.61074,
+      13.60138,
+      36.17632
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14103
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл.021",
+      "Тьма.016",
+      "Тёмный металл.022",
+      "Тьма.017",
+      "Тёмный металл.023",
+      "Тьма.018"
+    ]
+  },
+  {
+    "sourceName": "ствол2.001",
+    "assetName": "Cruiser203TurretB_Barrel2",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretB_Barrel2.obj",
+    "pivotUnity": [
+      0.0,
+      12.8231,
+      24.45952
+    ],
+    "worldBoundsUnityMin": [
+      1.88856,
+      12.33606,
+      25.03529
+    ],
+    "worldBoundsUnityMax": [
+      3.11074,
+      13.60138,
+      36.17632
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14103
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл.021",
+      "Тьма.016",
+      "Тёмный металл.022",
+      "Тьма.017",
+      "Тёмный металл.023",
+      "Тьма.018"
+    ]
+  },
+  {
+    "sourceName": "Ствол3.001",
+    "assetName": "Cruiser203TurretB_Barrel3",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretB_Barrel3.obj",
+    "pivotUnity": [
+      0.0,
+      12.8231,
+      24.45952
+    ],
+    "worldBoundsUnityMin": [
+      -3.11144,
+      12.33606,
+      25.03529
+    ],
+    "worldBoundsUnityMax": [
+      -1.88926,
+      13.60138,
+      36.17632
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14103
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл.021",
+      "Тьма.016",
+      "Тёмный металл.022",
+      "Тьма.017",
+      "Тёмный металл.023",
+      "Тьма.018"
+    ]
+  },
+  {
+    "sourceName": "Турель.003",
+    "assetName": "Cruiser203TurretC_House",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretC_House.obj",
+    "pivotUnity": [
+      0.0,
+      11.85046,
+      -34.98094
+    ],
+    "worldBoundsUnityMin": [
+      -5.0,
+      10.25046,
+      -39.04963
+    ],
+    "worldBoundsUnityMax": [
+      5.0,
+      13.45046,
+      -30.85969
+    ],
+    "dimensionsUnity": [
+      10.0,
+      3.2,
+      8.18994
+    ],
+    "vertices": 54,
+    "triangles": 104,
+    "materials": [
+      "Тёмный металл.024",
+      "Тьма.019",
+      "Тёмный металл.025",
+      "Тьма.020",
+      "Тёмный металл.026",
+      "Тьма.021"
+    ]
+  },
+  {
+    "sourceName": "Турель.005",
+    "assetName": "Cruiser203TurretC_Ring",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretC_Ring.obj",
+    "pivotUnity": [
+      0.0,
+      11.85047,
+      -34.98094
+    ],
+    "worldBoundsUnityMin": [
+      -4.23605,
+      8.96651,
+      -39.18229
+    ],
+    "worldBoundsUnityMax": [
+      4.34056,
+      10.37739,
+      -30.60567
+    ],
+    "dimensionsUnity": [
+      8.57661,
+      1.41088,
+      8.57661
+    ],
+    "vertices": 185,
+    "triangles": 366,
+    "materials": [
+      "Тёмный металл.024",
+      "Тьма.019",
+      "Тёмный металл.025",
+      "Тьма.020",
+      "Тёмный металл.026",
+      "Тьма.021"
+    ]
+  },
+  {
+    "sourceName": "Ствол1.002",
+    "assetName": "Cruiser203TurretC_Barrel1",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretC_Barrel1.obj",
+    "pivotUnity": [
+      0.0,
+      11.43857,
+      -32.47401
+    ],
+    "worldBoundsUnityMin": [
+      -0.61144,
+      10.95154,
+      -31.89824
+    ],
+    "worldBoundsUnityMax": [
+      0.61074,
+      12.21686,
+      -20.75721
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14103
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл.024",
+      "Тьма.019",
+      "Тёмный металл.025",
+      "Тьма.020",
+      "Тёмный металл.026",
+      "Тьма.021"
+    ]
+  },
+  {
+    "sourceName": "ствол2.002",
+    "assetName": "Cruiser203TurretC_Barrel2",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretC_Barrel2.obj",
+    "pivotUnity": [
+      0.0,
+      11.43857,
+      -32.47401
+    ],
+    "worldBoundsUnityMin": [
+      1.88856,
+      10.95154,
+      -31.89824
+    ],
+    "worldBoundsUnityMax": [
+      3.11074,
+      12.21686,
+      -20.75721
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14103
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл.024",
+      "Тьма.019",
+      "Тёмный металл.025",
+      "Тьма.020",
+      "Тёмный металл.026",
+      "Тьма.021"
+    ]
+  },
+  {
+    "sourceName": "Ствол3.002",
+    "assetName": "Cruiser203TurretC_Barrel3",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203TurretC_Barrel3.obj",
+    "pivotUnity": [
+      0.0,
+      11.43857,
+      -32.47401
+    ],
+    "worldBoundsUnityMin": [
+      -3.11144,
+      10.95154,
+      -31.89824
+    ],
+    "worldBoundsUnityMax": [
+      -1.88926,
+      12.21686,
+      -20.75721
+    ],
+    "dimensionsUnity": [
+      1.22218,
+      1.26532,
+      11.14103
+    ],
+    "vertices": 72,
+    "triangles": 140,
+    "materials": [
+      "Тёмный металл.024",
+      "Тьма.019",
+      "Тёмный металл.025",
+      "Тьма.020",
+      "Тёмный металл.026",
+      "Тьма.021"
+    ]
+  },
+  {
+    "sourceName": "Куб",
+    "assetName": "Cruiser203CrusherHousing",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203CrusherHousing.obj",
+    "pivotUnity": [
+      0.0,
+      12.20251,
+      -50.0
+    ],
+    "worldBoundsUnityMin": [
+      -11.2266,
+      8.97543,
+      -67.7485
+    ],
+    "worldBoundsUnityMax": [
+      11.63602,
+      14.89595,
+      -43.38535
+    ],
+    "dimensionsUnity": [
+      22.86263,
+      5.92052,
+      24.36314
+    ],
+    "vertices": 20,
+    "triangles": 36,
+    "materials": [
+      "Тёмный металл",
+      "Тьма"
+    ]
+  },
+  {
+    "sourceName": "Жернова дробилки",
+    "assetName": "Cruiser203CrusherRotorR2",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203CrusherRotorR2.obj",
+    "pivotUnity": [
+      7.6,
+      12.5949,
+      -55.75244
+    ],
+    "worldBoundsUnityMin": [
+      5.62331,
+      10.74244,
+      -66.8717
+    ],
+    "worldBoundsUnityMax": [
+      9.57669,
+      14.44737,
+      -44.63317
+    ],
+    "dimensionsUnity": [
+      3.95338,
+      3.70493,
+      22.23853
+    ],
+    "vertices": 24,
+    "triangles": 44,
+    "materials": [
+      "Тёмный металл"
+    ]
+  },
+  {
+    "sourceName": "Жернова дробилки.001",
+    "assetName": "Cruiser203CrusherRotorR1",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203CrusherRotorR1.obj",
+    "pivotUnity": [
+      3.8,
+      12.5949,
+      -55.75244
+    ],
+    "worldBoundsUnityMin": [
+      1.82331,
+      10.74244,
+      -66.8717
+    ],
+    "worldBoundsUnityMax": [
+      5.77669,
+      14.44737,
+      -44.63317
+    ],
+    "dimensionsUnity": [
+      3.95338,
+      3.70493,
+      22.23853
+    ],
+    "vertices": 24,
+    "triangles": 44,
+    "materials": [
+      "Тёмный металл"
+    ]
+  },
+  {
+    "sourceName": "Жернова дробилки.002",
+    "assetName": "Cruiser203CrusherRotorC",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203CrusherRotorC.obj",
+    "pivotUnity": [
+      0.0,
+      12.5949,
+      -55.75244
+    ],
+    "worldBoundsUnityMin": [
+      -1.97669,
+      10.74244,
+      -66.8717
+    ],
+    "worldBoundsUnityMax": [
+      1.97669,
+      14.44737,
+      -44.63317
+    ],
+    "dimensionsUnity": [
+      3.95338,
+      3.70493,
+      22.23853
+    ],
+    "vertices": 24,
+    "triangles": 44,
+    "materials": [
+      "Тёмный металл"
+    ]
+  },
+  {
+    "sourceName": "Жернова дробилки.003",
+    "assetName": "Cruiser203CrusherRotorL1",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203CrusherRotorL1.obj",
+    "pivotUnity": [
+      -3.8,
+      12.5949,
+      -55.75244
+    ],
+    "worldBoundsUnityMin": [
+      -5.77669,
+      10.74244,
+      -66.8717
+    ],
+    "worldBoundsUnityMax": [
+      -1.82331,
+      14.44737,
+      -44.63317
+    ],
+    "dimensionsUnity": [
+      3.95338,
+      3.70493,
+      22.23853
+    ],
+    "vertices": 24,
+    "triangles": 44,
+    "materials": [
+      "Тёмный металл"
+    ]
+  },
+  {
+    "sourceName": "Жернова дробилки.004",
+    "assetName": "Cruiser203CrusherRotorL2",
+    "objPath": "C:/Users/korki/Wild Wind/Assets/Data/ShipPrefabs/Cruiser203/Cruiser203CrusherRotorL2.obj",
+    "pivotUnity": [
+      -7.6,
+      12.5949,
+      -55.75244
+    ],
+    "worldBoundsUnityMin": [
+      -9.57669,
+      10.74244,
+      -66.8717
+    ],
+    "worldBoundsUnityMax": [
+      -5.62331,
+      14.44737,
+      -44.63317
+    ],
+    "dimensionsUnity": [
+      3.95338,
+      3.70493,
+      22.23853
+    ],
+    "vertices": 24,
+    "triangles": 44,
+    "materials": [
+      "Тёмный металл"
+    ]
+  }
+]

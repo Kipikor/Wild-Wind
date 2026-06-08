@@ -3,25 +3,19 @@ using UnityEngine;
 
 public partial class MetaGameState
 {
-    [Header("Ускорение времени")]
-    [InspectorName("Множитель времени")]
+    [Header("Session Time")]
+    [InspectorName("Time Scale")]
     [Range(1f, 64f)]
     public float gameTimeScale = 1f;
-    [InspectorName("Ускорять физику Unity")]
-    [Tooltip("Если включено, полет игрока тоже ускоряется через Time.timeScale, но не выше безопасного лимита ниже.")]
+    [InspectorName("Accelerate Unity Physics")]
+    [Tooltip("When enabled, player flight also uses Time.timeScale, clamped by the safety limit.")]
     public bool accelerateUnityTimeScale = true;
-    [InspectorName("Лимит физики Unity")]
+    [InspectorName("Unity Physics Limit")]
     [Range(1f, 8f)]
     public float maxUnityTimeScale = 4f;
-    [InspectorName("Максимальный шаг мета-времени, сек")]
-    [Tooltip("Большие ускоренные промежутки нарезаются на шаги, чтобы производство, исследования, погрузка и логистика не прыгали одним грубым куском.")]
+    [InspectorName("Max Session Time Step, Seconds")]
+    [Tooltip("Large accelerated intervals are sliced so session processes advance in stable chunks.")]
     public float maxAcceleratedProcessStepSeconds = 15f;
-    [InspectorName("Offline-прогресс при загрузке")]
-    [Tooltip("Если включено, при запуске игры симуляция догоняет время, прошедшее с последнего сохранения.")]
-    public bool processOfflineProgressOnLoad = true;
-    [InspectorName("Лимит offline-догонки, часов")]
-    [Tooltip("Защита от огромных скачков системных часов. Для теста 100 часов оставьте значение выше 100.")]
-    public float maxOfflineCatchUpHours = 240f;
 
     private DateTime lastProcessRealtimeUtc;
     private float originalFixedDeltaTime = -1f;
@@ -166,32 +160,6 @@ public partial class MetaGameState
         return total;
     }
 
-    private bool TryAdvanceOfflineProgressFromLastSave(DateTime realNowUtc, out int changedEvents)
-    {
-        changedEvents = 0;
-        if (!processOfflineProgressOnLoad || progress == null || progress.lastSavedUtcTicks <= 0) return false;
-
-        long elapsedTicks = realNowUtc.Ticks - progress.lastSavedUtcTicks;
-        if (elapsedTicks <= TimeSpan.FromSeconds(1).Ticks) return false;
-
-        double elapsedHours = new TimeSpan(elapsedTicks).TotalHours;
-        double cappedHours = Math.Min(elapsedHours, Math.Max(0.01f, maxOfflineCatchUpHours));
-        if (cappedHours <= 0d) return false;
-
-        suppressFlagshipMoraleDrain = true;
-        try
-        {
-            changedEvents = FastForwardSimulation(TimeSpan.FromHours(cappedHours));
-        }
-        finally
-        {
-            suppressFlagshipMoraleDrain = false;
-        }
-        string capText = elapsedHours > cappedHours + 0.001d ? $" (ограничено с {elapsedHours:0.#} ч)" : "";
-        lastSaveMessage = $"Offline-прогресс: прошло {cappedHours:0.#} ч{capText}, событий {changedEvents}.";
-        return true;
-    }
-
     public int FastForwardSimulationHours(float hours)
     {
         return FastForwardSimulation(TimeSpan.FromHours(Mathf.Max(0f, hours)));
@@ -209,53 +177,8 @@ public partial class MetaGameState
         int changedEvents = AdvanceRealTimeProcessesSliced(new DateTime(targetTicks, DateTimeKind.Utc));
         SyncShipConsumablesWithCargo(false);
         ResetProcessRealtimeClock();
-        lastSaveMessage = $"Перемотка: {duration.TotalHours:0.#} ч, событий {changedEvents}.";
+        lastAccountMessage = $"Р СџР ВµРЎР‚Р ВµР СР С•РЎвЂљР С”Р В°: {duration.TotalHours:0.#} РЎвЂЎ, РЎРѓР С•Р В±РЎвЂ№РЎвЂљР С‘Р в„– {changedEvents}.";
         return changedEvents;
     }
 
-    private void DrawTimeScaleUi()
-    {
-        GUILayout.Space(6f);
-        GUILayout.Label($"Время: x{gameTimeScale:0.#}   физика: x{(accelerateUnityTimeScale ? Mathf.Min(gameTimeScale, maxUnityTimeScale) : 1f):0.#}");
-        GUILayout.BeginHorizontal();
-        DrawTimeScaleButton(1f);
-        DrawTimeScaleButton(2f);
-        DrawTimeScaleButton(4f);
-        DrawTimeScaleButton(8f);
-        GUILayout.EndHorizontal();
-        GUILayout.BeginHorizontal();
-        DrawTimeScaleButton(16f);
-        DrawTimeScaleButton(32f);
-        DrawTimeScaleButton(64f);
-        GUILayout.EndHorizontal();
-        GUILayout.Label("Перемотка");
-        GUILayout.BeginHorizontal();
-        DrawFastForwardButton(1f, "+1ч");
-        DrawFastForwardButton(8f, "+8ч");
-        DrawFastForwardButton(24f, "+24ч");
-        DrawFastForwardButton(100f, "+100ч");
-        GUILayout.EndHorizontal();
-    }
-
-    private void DrawTimeScaleButton(float scale)
-    {
-        bool wasEnabled = GUI.enabled;
-        GUI.enabled = wasEnabled && !Mathf.Approximately(gameTimeScale, scale);
-        if (GUILayout.Button("x" + scale.ToString("0")))
-        {
-            gameTimeScale = scale;
-            ResetProcessRealtimeClock();
-            ApplyUnityTimeScale();
-        }
-
-        GUI.enabled = wasEnabled;
-    }
-
-    private void DrawFastForwardButton(float hours, string label)
-    {
-        if (GUILayout.Button(label))
-        {
-            FastForwardSimulationHours(hours);
-        }
-    }
 }

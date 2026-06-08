@@ -31,7 +31,7 @@ public class DamageableShip : MonoBehaviour
 
     [Header("Отладка")]
     [InspectorName("Писать логи")]
-    public bool debugLogging = true;
+    public bool debugLogging;
     [InspectorName("Последнее сообщение")]
     [TextArea(2, 5)]
     public string lastDamageMessage = "";

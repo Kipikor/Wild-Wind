@@ -83,7 +83,6 @@ MonoBehaviour:
   engineFuelId: wood
   engineFuelEfficiency: 0.32
   engineAfterburnerEnabled: 0
-  engineCheatAfterburnerEnabled: 0
   engineFuelEnergyKwhPerKg: 4
   engineFuelStockKg: 0
   engineResponseRate01PerSecond: 0.1
@@ -106,17 +105,6 @@ MonoBehaviour:
   claudiumRequestedLiftKg: 0
   claudiumSlipstreamEnabled: 0
   claudiumSlipstreamCharge01: 0
-  gasHarvesterEnabled: 0
-  gasHarvesterVolumeM3PerSecond: 0
-  gasHarvesterPowerDrawKw: 0
-  gasHarvesterRadiusMeters: 0
-  gasHarvesterCycleSeconds: 5
-  gasHarvesterWaterOnly: 0
-  gasHarvesterPowerDrawActualKw: 0
-  gasHarvesterCycleProgressSeconds: 0
-  gasHarvesterBufferKg: 0
-  gasHarvesterActiveCloudId:
-  gasHarvesterLastMessage:
   miningImpactHoldCapacityKg: 0
   miningImpactDamageTakenMultiplier: 1
   miningImpactMinDamageSpeedMS: 4
@@ -124,44 +112,9 @@ MonoBehaviour:
   miningCatchRadiusMeters: 10
   miningManualShotRangeMeters: 180
   miningLastMessage:
-  baseObservationRadiusMeters: 100
-  observationRadiusMeters: 100
-  observationFactsAtHalfRadiusPerSecond: 1
-  observationRockInfoEfficiency: 0
-  observationCloudInfoEfficiency: 0
-  observationLeviathanInfoEfficiency: 0
-  surveyPaperToInfoEfficiency: 1
-  leviathanAlarmGenerationMultiplier: 1
-  surveyLastMessage:
   weaponResourceId: weapon
   weaponShotCostKg: 0
-  leviathanWeaponShotFlightDamage: 25
-  weaponShotAlarmRadiusMeters: 450
   weaponLastMessage:
-  harpoonRangeMeters: 280
-  harpoonRopeLengthMeters: 160
-  harpoonMaxTensionKg: 4500
-  harpoonMaxTensionLifetimeSeconds: 5
-  harpoonStiffnessNPerMeter: 360
-  harpoonDampingNsPerMeter: 110
-  harpoonReelForceN: 600
-  harpoonFatiguePerSecond: 18
-  harpoonCarcassCollectionRadiusMeters: 14
-  harpoonCarcassWinchSpeedMS: 7
-  harpoonWeaponCostPerMinute: 0
-  harpoonMaxCarcassMassKg: 0
-  leviathanHuntAutopilotEnabled: 0
-  leviathanHuntSearchRangeMeters: 900
-  leviathanHuntEngageRangeMeters: 240
-  leviathanHuntApproachDistanceMeters: 90
-  leviathanHuntMinimumAltitudeMeters: 45
-  leviathanHuntShotCooldownSeconds: 4
-  leviathanHuntBrokenTargetCooldownSeconds: 25
-  leviathanHuntMaxTargetMassKg: 7000
-  leviathanHuntMaxTetherDriftMeters: 1500
-  leviathanHuntAutopilotMessage:
-  harpoonLastMessage:
-  activeHarpoon: {fileID: 0}
   gyroTurnTorque: 12000
   gyroTurnDamping: 0.8
   currentGyroTurnTorque: 0
@@ -188,19 +141,6 @@ MonoBehaviour:
   headingDamping: 0.5
   maxAutoTurnRateDeg: 5
   maxStructuralTurnRateDeg: 15
-  routeEnabled: 0
-  waypoints: []
-  waypointRadius: 10
-  routeArrivalSpeedMS: 1
-  routeBrakeAccelerationMS2: 2.5
-  routeMaxSpeedMS: 120
-  currentWaypointIndex: 0
-  positionHold: 0
-  targetHoldPosition: {x: 0, y: 0, z: 0}
-  positionHoldRadius: 5
-  positionHoldMaxSpeedMS: 8
-  positionHoldStiffness: 0.35
-  positionHoldDamping: 0.9
   propellerPitch: 0
   speedStiffness: 0.8
   speedDamping: 0.3

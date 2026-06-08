@@ -128,6 +128,12 @@ namespace TrueClouds
 
         protected virtual void Awake()
         {
+            if (ShouldSkipRenderingForCurrentGraphicsDevice())
+            {
+                enabled = false;
+                return;
+            }
+
             _camera = GetComponent<Camera>();
             GameObject child = new GameObject("cloud camera");
             child.hideFlags = HideFlags.HideAndDontSave;
@@ -142,6 +148,12 @@ namespace TrueClouds
 
         private void OnEnable()
         {
+            if (ShouldSkipRenderingForCurrentGraphicsDevice())
+            {
+                enabled = false;
+                return;
+            }
+
             // Cleaning old render textures to support script reloading
             // don't worry, they will be set up again in UpdateChangedSettings
             CleanupRenderTextures();
@@ -249,14 +261,21 @@ namespace TrueClouds
 
         private RenderTexture GetTemporaryTexture(int divider, FilterMode mode)
         {
+            int width = Mathf.Max(1, (int)_camera.pixelRect.size.x / Mathf.Max(1, divider));
+            int height = Mathf.Max(1, (int)_camera.pixelRect.size.y / Mathf.Max(1, divider));
             RenderTexture res = RenderTexture.GetTemporary(
-                (int)_camera.pixelRect.size.x / divider, 
-                (int)_camera.pixelRect.size.y / divider,
+                width,
+                height,
                 16, 
                 RenderTextureFormat.ARGB32, 
                 RenderTextureReadWrite.Linear);
 
             return res;
+        }
+
+        private static bool ShouldSkipRenderingForCurrentGraphicsDevice()
+        {
+            return Application.isBatchMode;
         }
 
         private void ReleaseTemporaryTexture(ref RenderTexture texture)

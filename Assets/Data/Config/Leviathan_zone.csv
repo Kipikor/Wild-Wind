@@ -1,2 +1,0 @@
-id_leviathan_zone,local_name_ru,local_name_en,position_x,position_y,position_z,radius_m,leviathan_type_id,initial_count,max_active,spawn_interval_seconds,min_y,max_y
-tutorial_windminnows,Учебные малые левиафаны,Tutorial Wind Minnows,3600,2600,3900,700,windminnow,2,3,900,2350,2900

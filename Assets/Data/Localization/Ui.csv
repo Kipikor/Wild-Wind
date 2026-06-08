@@ -1,76 +1,27 @@
 key,#name,ru,en
 app.title,Game title,Wild Wind,Wild Wind
-app.subtitle,Main menu subtitle,Небо держится на ветре,The sky is held by wind
-menu.new_world,New world,Новая игра,New Game
-menu.continue,Continue,Продолжить,Continue
-menu.settings,Settings,Настройки,Settings
-menu.exit,Exit,Выход,Exit
-menu.back,Back,Назад,Back
-menu.start_hint,Start hint,Создать новый мир,Create a new world
-continue.title,Continue title,Выберите сохранение,Choose a save
-continue.empty,No saves,Сохранений пока нет,No saves yet
-continue.slot_prefix,Save slot prefix,Мир,World
-settings.title,Settings title,Настройки,Settings
-settings.language,Language label,Язык,Language
-settings.language_ru,Russian language,Русский,Russian
-settings.language_en,English language,Английский,English
-status.new_world,New world status,Создаём новый мир...,Creating a new world...
-status.loading_save,Loading save status,Загружаем сохранение...,Loading save...
-status.missing_scene,Missing scene status,Сцена игры не найдена,Gameplay scene is missing
-error.new_world_save_failed,New world save failed,Не удалось создать мир,Failed to create world
-error.no_save_selected,No save selected,Сохранение не выбрано,No save selected
 game.menu.title,Gameplay menu title,Меню,Menu
 game.menu.resume,Resume game,Продолжить,Resume
-game.menu.save_exit,Save and exit to menu,Сохранить и в меню,Save and Exit to Menu
-game.menu.exit_without_save,Exit to menu without saving,В меню без сохранения,Exit Without Saving
-game.menu.status_saved,Save status,Сохранено,Saved
-game.menu.status_save_failed,Save failed status,Не удалось сохранить,Could not save
+game.menu.reset_progress_cheat,Reset progress cheat,Сбросить прогресс (чит),Reset Progress (Cheat)
+game.menu.status_reset_progress,Progress reset status,Прогресс сброшен,Progress reset
+game.menu.status_reset_failed,Progress reset failed status,Не удалось сбросить прогресс,Could not reset progress
 game.hud.city,HUD city mode,ГОРОД,CITY
 game.hud.flight,HUD flight mode,ПОЛЁТ,FLIGHT
-game.hud.mission_title,Starter delivery title,Задача: доставить 20 ед. еды на Ближний остров,Objective: deliver 20 food to Nearby Island
-game.hud.route,Starter delivery route,Столица -> Ближний остров · 1 км,Capital -> Nearby Island · 1 km
-game.hud.capital_stock,Capital food stock,Еда в столице,Capital food
-game.hud.destination_stock,Destination food stock,Еда на острове,Island food
-game.hud.ship_cargo,Ship food cargo,Еда в трюме,Food in hold
+game.hud.session_objective,Session objective title,Сессия: добыча и возврат,Session extraction
+game.hud.session_path,Session path,База -> выбранная сессия,Base -> selected sortie
+game.hud.base_inputs,Base inputs,Входные ресурсы базы,Base inputs
+game.hud.base_materials,Base materials,Материалы базы,Base materials
+game.hud.ship_supplies,Ship supplies,Запасы корабля,Ship supplies
 game.hud.distance,Distance label,До цели,To target
 game.hud.altitude,Altitude label,Высота,Altitude
 game.hud.target_altitude,Target altitude label,Цель,Target
 game.hud.speed,Speed label,Скорость,Speed
-game.hud.load_food,Load food button,Загрузить еду,Load Food
+game.hud.process_base,Process base button,Обработать базу,Process
 game.hud.takeoff,Takeoff button,Взлететь,Take Off
 game.hud.dock,Dock button,Стыковка,Dock
-game.hud.unload_food,Unload food button,Выгрузить еду,Unload Food
+game.hud.run_base_work,Run base work button,Работа базы,Base Work
 game.hud.menu,Menu button,Меню,Menu
-game.hud.completed,Starter delivery completed,Доставка выполнена,Delivery complete
-game.hud.forward,Flight thrust up,Тяга +,Thrust +
-game.hud.backward,Flight thrust down,Тяга -,Thrust -
-game.hud.left,Flight turn left,Вращ. -,Turn -
-game.hud.right,Flight turn right,Вращ. +,Turn +
-game.hud.ascend,Target altitude up,Цель высоты +,Target alt. +
-game.hud.descend,Target altitude down,Цель высоты -,Target alt. -
-game.hud.flight_controls,Flight controls,Управление,Controls
-game.hud.axis_altitude,Axis altitude,Высота,Altitude
-game.hud.axis_heading,Axis heading,Курс,Heading
-game.hud.axis_speed,Axis speed,Скорость,Speed
-game.hud.mode_manual,Axis manual,Ручн,Manual
-game.hud.mode_assist,Axis assist,Ассист,Assist
-game.hud.mode_autopilot,Axis autopilot,АП,AP
-game.hud.target_altitude_up,Target altitude up,+ выс.,+ alt.
-game.hud.target_altitude_down,Target altitude down,- выс.,- alt.
-game.hud.target_altitude_set,Set target altitude,Задать,Set
+game.hud.completed,Session completed,Сессия завершена,Sortie complete
 game.hud.compass_target,Compass target marker,Цель,Target
-game.hud.target_heading_left,Target heading left,- курс,- hdg.
-game.hud.target_heading_right,Target heading right,+ курс,+ hdg.
-game.hud.target_speed_up,Target speed up,+ скор.,+ spd.
-game.hud.target_speed_down,Target speed down,- скор.,- spd.
-game.hud.autopilot_altitude,Autopilot altitude,АП выс.,AP alt.
-game.hud.autopilot_heading,Autopilot heading,АП курс,AP hdg.
-game.hud.autopilot_speed,Autopilot speed,АП тяга,AP thrust
-game.hud.autopilot_target_task,Autopilot target from task,Цель задания,Task target
-game.hud.autopilot_target_here,Autopilot target here,Цель здесь,Target here
-game.hud.autopilot_target_manual,Autopilot manual target,Ввести XYZ,Set XYZ
-game.hud.autopilot_target_move,Autopilot move target,Сдвинуть +X,Move +X
-game.hud.autopilot_target_delete,Autopilot delete target,Удалить цель,Clear target
-game.hud.autopilot_auto_dock,Autopilot auto dock,Автостык,Auto dock
 game.hud.on,Toggle on,Вкл,On
 game.hud.off,Toggle off,Выкл,Off

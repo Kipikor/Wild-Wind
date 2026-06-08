@@ -15,18 +15,18 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     {
         "game.hud.city",
         "game.hud.flight",
-        "game.hud.mission_title",
-        "game.hud.route",
-        "game.hud.capital_stock",
-        "game.hud.destination_stock",
-        "game.hud.ship_cargo",
+        "game.hud.session_objective",
+        "game.hud.session_path",
+        "game.hud.base_inputs",
+        "game.hud.base_materials",
+        "game.hud.ship_supplies",
         "game.hud.distance",
         "game.hud.altitude",
         "game.hud.speed",
-        "game.hud.load_food",
+        "game.hud.process_base",
         "game.hud.takeoff",
         "game.hud.dock",
-        "game.hud.unload_food",
+        "game.hud.run_base_work",
         "game.hud.menu",
         "game.hud.completed",
         "game.hud.compass_target",
@@ -42,7 +42,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private const float CompassTickStepDegrees = 15f;
     private const float CompassPixelsPerDegree = 3.35f;
     private const float EngineAfterburnerPowerMultiplier = 1.2f;
-    private const float EngineCheatAfterburnerPowerMultiplier = 6f;
     private const float EnginePowerBarHeight = 880f;
     private const float EngineGearSelectorX = 1738f;
     private const float EngineGearSelectorBottomY = 16f;
@@ -56,7 +55,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private const string WindowCargoId = "cargo";
     private const string WindowRadarId = "radar";
     private const string WindowModulesId = "modules";
-    private const string WindowMechanicsId = "mechanics";
     private const string WindowMetaPortId = "meta_port";
     private static readonly Color EngineForwardThrustColor = new Color(0.14f, 0.78f, 0.28f, 0.96f);
     private static readonly Color EngineReverseThrustColor = new Color(0.96f, 0.72f, 0.12f, 0.96f);
@@ -85,11 +83,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private RectTransform compassTargetLine;
     private Text compassTargetText;
     private Text modeText;
-    private Text missionText;
-    private Text routeText;
-    private Text capitalStockText;
-    private Text destinationStockText;
-    private Text shipCargoText;
+    private Text objectiveText;
+    private Text sessionPathText;
+    private Text baseInputsText;
+    private Text baseMaterialsText;
+    private Text shipSuppliesText;
     private Text fittingText;
     private Text baseProcessingText;
     private Text baseCascadeText;
@@ -107,23 +105,22 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private Text sortieStatusDetailText;
     private Text enginePowerText;
     private Text statusText;
-    private Button loadFoodButton;
+    private Button processBaseButton;
     private Button takeoffButton;
     private Button dockButton;
-    private Button unloadFoodButton;
+    private Button runBaseWorkButton;
     private Button sortieButton;
     private Button portButton;
     private Button menuButton;
-    private Text loadFoodText;
+    private Text processBaseText;
     private Text takeoffText;
     private Text dockText;
-    private Text unloadFoodText;
+    private Text runBaseWorkText;
     private Text sortieText;
     private Text portText;
     private Text menuText;
     private Text flightMenuText;
     private Text afterburnerText;
-    private Text cheatAfterburnerText;
     private Text claudiumSlipstreamText;
     private HudWindow locationWindow;
     private HudWindow returnWindow;
@@ -132,7 +129,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private HudWindow cargoWindow;
     private HudWindow radarWindow;
     private HudWindow modulesWindow;
-    private HudWindow mechanicsWindow;
     private HudWindow metaPortWindow;
     private Text locationWindowText;
     private Text returnWindowText;
@@ -142,11 +138,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private Text[] cargoSlotTexts;
     private Text radarBoulderFilterText;
     private Text radarDebrisFilterText;
-    private Text radarLeviathanFilterText;
-    private Text radarCloudFilterText;
     private Text radarWindowText;
     private Text modulesWindowText;
-    private Text mechanicsWindowText;
     private Text metaPortResourceText;
     private Text metaPortShipText;
     private Text metaPortContentText;
@@ -156,16 +149,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private Text[] metaPortTabTexts;
     private WildWindMetaPortScreen fullMetaPortScreen;
     private GameObject fullMetaPortScreenObject;
-    private RadarTacticalWorldOverlay radarWorldOverlay;
-    private WildWindMechanicsLabState mechanicsLab;
+    private RadarTacticalSessionOverlay radarSessionOverlay;
     private WildWindMetaPortUiState metaPortState;
     private readonly Dictionary<string, HudWindow> hudWindows = new Dictionary<string, HudWindow>();
     private readonly List<RadarEntry> radarEntries = new List<RadarEntry>();
-    private readonly List<GasCloud> radarClouds = new List<GasCloud>();
     private readonly List<MiningFragment> radarFragments = new List<MiningFragment>();
     private MetaGameState meta;
     private WildWindGameplaySession session;
-    private WorldDebugTravelController travelController;
+    private WildWindSessionCameraController sessionCameraController;
     private WildWindFlightControlBridge flightControls;
     private Vector3 heldFlightInput;
     private float nextRefreshTime;
@@ -173,18 +164,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private string statusMessage = "";
     private bool radarShowBoulders = true;
     private bool radarShowDebris = true;
-    private bool radarShowLeviathans = true;
-    private bool radarShowClouds = true;
+    private bool openMetaPortOnDockedStart = true;
     private static Font cachedDefaultFont;
 
     public bool IsReady => canvas != null && root != null && ResolveMeta() != null && ResolveSession() != null;
     public bool IsDockedPanelVisible => dockedPanel != null && dockedPanel.gameObject.activeSelf;
     public bool IsFlightPanelVisible => flightPanel != null && flightPanel.gameObject.activeSelf;
-    public bool IsFlightControlsVisible => false;
-    public bool IsAutopilotPanelVisible => false;
     public bool IsFlightCompassVisible => compassPanel != null && compassPanel.gameObject.activeSelf;
     public float LastCompassHeadingDegrees => lastCompassHeadingDegrees;
-    public string MechanicsLabReport => EnsureMechanicsLab().lastReport;
     public string MetaPortReport => EnsureMetaPortState().BuildReport();
     public string MetaPortContentForTests => EnsureMetaPortState().BuildTabContent();
     public string MetaPortSelectedTab => WildWindMetaPortUiState.GetTabDisplayName(EnsureMetaPortState().selectedTab);
@@ -210,7 +197,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private static void EnsureHudForGameplayScene()
     {
-        if (Object.FindFirstObjectByType<WorldRegionRuntime>() == null)
+        if (!WildWindSessionFlow.IsGameplaySceneLoaded())
         {
             return;
         }
@@ -253,6 +240,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         PushHeldFlightInput();
         RefreshCompass();
         RefreshEnginePowerBar();
+        OpenMetaPortOnDockedStartIfReady();
 
         if (Time.unscaledTime < nextRefreshTime)
         {
@@ -263,23 +251,23 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         RefreshState(false);
     }
 
-    public bool TryLoadStarterFood()
+    public bool TryRunBaseProcessAction()
     {
         MetaGameState currentMeta = ResolveMeta();
-        if (currentMeta != null && currentMeta.IsSessionExtractionCoreMode)
+        if (currentMeta != null)
         {
-            bool coreResult = currentMeta.TryGetNextProcessableBaseBranch(out _)
+            bool result = currentMeta.TryGetNextProcessableBaseBranch(out _)
                 ? currentMeta.TryProcessNextBaseBatch(out statusMessage)
                 : currentMeta.CanRefuelBaseShip(out _)
                 ? currentMeta.TryRefuelBaseShip(out statusMessage)
                 : currentMeta.TryLoadStarterMunitionsAtBase(out statusMessage);
             RefreshState(true);
-            return coreResult;
+            return result;
         }
 
-        bool result = WildWindStarterDelivery.TryLoadFood(currentMeta, out statusMessage);
+        statusMessage = "Session runtime is unavailable.";
         RefreshState(true);
-        return result;
+        return false;
     }
 
     public bool TryTakeOff()
@@ -293,7 +281,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return false;
         }
 
-        if (currentMeta != null && currentMeta.IsSessionExtractionCoreMode)
+        if (currentMeta != null)
         {
             string sortieName = currentMeta.GetSelectedSessionSortieDisplayName();
             if (!currentMeta.CanBeginSelectedSessionSortie(out statusMessage))
@@ -302,34 +290,29 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 return false;
             }
 
-            bool coreResult = currentMeta.BeginSelectedSessionSortie();
-            statusMessage = coreResult ? sortieName + " started." : sortieName + " blocked.";
+            bool result = currentMeta.BeginSelectedSessionSortie();
+            statusMessage = result ? sortieName + " started." : sortieName + " blocked.";
             currentSession.RefreshFromMetaProgress();
-            if (coreResult)
+            if (result)
             {
-                ResolveTravelController()?.FocusOnPlayerShipAfterUndocking();
+                ResolveSessionCameraController()?.FocusOnPlayerShipAfterUndocking();
             }
 
             RefreshState(true);
-            return coreResult;
+            return result;
         }
 
-        bool result = currentSession.TryBeginFreeFlight(out statusMessage);
-        if (result)
-        {
-            ResolveTravelController()?.FocusOnPlayerShipAfterUndocking();
-        }
-
+        statusMessage = "Session runtime is unavailable.";
         RefreshState(true);
-        return result;
+        return false;
     }
 
     public bool TryCycleSessionSortie()
     {
         MetaGameState currentMeta = ResolveMeta();
-        if (currentMeta == null || !currentMeta.IsSessionExtractionCoreMode)
+        if (currentMeta == null)
         {
-            statusMessage = "Session extraction core is not active.";
+            statusMessage = "Session runtime is unavailable.";
             RefreshState(true);
             return false;
         }
@@ -350,12 +333,12 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return false;
         }
 
-        if (currentMeta != null && currentMeta.IsSessionExtractionCoreMode && currentMeta.HasActiveSortie)
+        if (currentMeta != null && currentMeta.HasActiveSortie)
         {
-            bool coreResult = currentMeta.TryExtractActiveSortie(out statusMessage);
+            bool extracted = currentMeta.TryExtractActiveSortie(out statusMessage);
             currentSession.RefreshFromMetaProgress();
             RefreshState(true);
-            return coreResult;
+            return extracted;
         }
 
         bool result = currentSession.TryDockAtNearestAvailableDock(out statusMessage);
@@ -363,23 +346,23 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return result;
     }
 
-    public bool TryUnloadStarterFood()
+    public bool TryRunBaseWorkAction()
     {
         MetaGameState currentMeta = ResolveMeta();
-        if (currentMeta != null && currentMeta.IsSessionExtractionCoreMode)
+        if (currentMeta != null)
         {
-            bool coreResult = currentMeta.CanInstallNextStarterFittingUpgrade(out _)
+            bool result = currentMeta.CanInstallNextStarterFittingUpgrade(out _)
                 ? currentMeta.TryInstallNextStarterFittingUpgrade(out statusMessage)
                 : currentMeta.CanUpgradeNextBaseIndustryLine(out _)
                 ? currentMeta.TryUpgradeNextBaseIndustryLine(out statusMessage)
                 : currentMeta.TryRunNextBaseCascadeOrder(out statusMessage);
             RefreshState(true);
-            return coreResult;
+            return result;
         }
 
-        bool result = WildWindStarterDelivery.TryUnloadFood(currentMeta, out statusMessage);
+        statusMessage = "Session runtime is unavailable.";
         RefreshState(true);
-        return result;
+        return false;
     }
 
     public void RefreshCompassForTests()
@@ -394,34 +377,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         {
             menu.SetOpen(true);
         }
-    }
-
-    public bool RunMechanicsLabMiningForTests()
-    {
-        statusMessage = EnsureMechanicsLab().RunMiningScenario();
-        RefreshState(true);
-        return true;
-    }
-
-    public bool RunMechanicsLabHazardsForTests()
-    {
-        statusMessage = EnsureMechanicsLab().RunHazardScenario();
-        RefreshState(true);
-        return true;
-    }
-
-    public bool RunMechanicsLabRelicForTests()
-    {
-        statusMessage = EnsureMechanicsLab().RunRelicScenario();
-        RefreshState(true);
-        return true;
-    }
-
-    public bool RunMechanicsLabMetaForTests()
-    {
-        statusMessage = EnsureMechanicsLab().RunMetaScenario();
-        RefreshState(true);
-        return true;
     }
 
     public bool SelectMetaPortTabForTests(WildWindMetaPortTab tab)
@@ -454,6 +409,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return ToggleMetaPortScreen();
     }
 
+    public bool OpenMetaPortScreenForTests()
+    {
+        return OpenMetaPortScreen();
+    }
+
     private void BuildUi()
     {
         EnsureEventSystem();
@@ -472,7 +432,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         root = CreateRect("Gameplay HUD Root", canvas.transform, StretchFull()).GetComponent<RectTransform>();
 
-        RectTransform topBand = CreatePanel("Mission Strip", root, new RectTransformSpec
+        RectTransform topBand = CreatePanel("Session Status Strip", root, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(1f, 1f),
@@ -482,8 +442,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }, new Color(0.025f, 0.026f, 0.028f, 0.82f));
 
         modeText = CreateText(topBand, "", 28, new Vector2(24f, -12f), new Vector2(240f, 34f), TextAnchor.MiddleLeft, new Color(0.95f, 0.81f, 0.52f, 1f));
-        missionText = CreateText(topBand, "", 24, new Vector2(280f, -14f), new Vector2(760f, 32f), TextAnchor.MiddleLeft, new Color(0.91f, 0.88f, 0.78f, 1f));
-        routeText = CreateText(topBand, "", 20, new Vector2(280f, -50f), new Vector2(760f, 28f), TextAnchor.MiddleLeft, new Color(0.70f, 0.78f, 0.82f, 1f));
+        objectiveText = CreateText(topBand, "", 24, new Vector2(280f, -14f), new Vector2(760f, 32f), TextAnchor.MiddleLeft, new Color(0.91f, 0.88f, 0.78f, 1f));
+        sessionPathText = CreateText(topBand, "", 20, new Vector2(280f, -50f), new Vector2(760f, 28f), TextAnchor.MiddleLeft, new Color(0.70f, 0.78f, 0.82f, 1f));
         distanceText = CreateText(topBand, "", 22, new Vector2(1480f, -30f), new Vector2(300f, 34f), TextAnchor.MiddleRight, new Color(0.86f, 0.80f, 0.64f, 1f));
 
         BuildCompass();
@@ -497,16 +457,16 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             sizeDelta = new Vector2(920f, 342f)
         }, new Color(0.026f, 0.024f, 0.022f, 0.84f));
 
-        capitalStockText = CreateText(dockedPanel, "", 21, new Vector2(24f, -22f), new Vector2(460f, 30f), TextAnchor.MiddleLeft, new Color(0.88f, 0.83f, 0.68f, 1f));
-        destinationStockText = CreateText(dockedPanel, "", 21, new Vector2(24f, -58f), new Vector2(460f, 30f), TextAnchor.MiddleLeft, new Color(0.70f, 0.78f, 0.82f, 1f));
-        shipCargoText = CreateText(dockedPanel, "", 21, new Vector2(24f, -94f), new Vector2(460f, 30f), TextAnchor.MiddleLeft, new Color(0.91f, 0.88f, 0.78f, 1f));
+        baseInputsText = CreateText(dockedPanel, "", 21, new Vector2(24f, -22f), new Vector2(460f, 30f), TextAnchor.MiddleLeft, new Color(0.88f, 0.83f, 0.68f, 1f));
+        baseMaterialsText = CreateText(dockedPanel, "", 21, new Vector2(24f, -58f), new Vector2(460f, 30f), TextAnchor.MiddleLeft, new Color(0.70f, 0.78f, 0.82f, 1f));
+        shipSuppliesText = CreateText(dockedPanel, "", 21, new Vector2(24f, -94f), new Vector2(460f, 30f), TextAnchor.MiddleLeft, new Color(0.91f, 0.88f, 0.78f, 1f));
         fittingText = CreateText(dockedPanel, "", 17, new Vector2(24f, -121f), new Vector2(460f, 22f), TextAnchor.MiddleLeft, new Color(0.74f, 0.84f, 0.86f, 1f));
         baseProcessingText = CreateText(dockedPanel, "", 15, new Vector2(512f, -22f), new Vector2(380f, 86f), TextAnchor.UpperLeft, new Color(0.83f, 0.84f, 0.72f, 1f));
         baseCascadeText = CreateText(dockedPanel, "", 15, new Vector2(512f, -116f), new Vector2(380f, 106f), TextAnchor.UpperLeft, new Color(0.72f, 0.84f, 0.86f, 1f));
         baseCascadeOrderText = CreateText(dockedPanel, "", 15, new Vector2(512f, -232f), new Vector2(380f, 84f), TextAnchor.UpperLeft, new Color(0.91f, 0.84f, 0.62f, 1f));
-        loadFoodText = CreateButton(dockedPanel, "Load Food", new Vector2(24f, -144f), new Vector2(220f, 54f), TryLoadStarterFood, out loadFoodButton);
+        processBaseText = CreateButton(dockedPanel, "Process", new Vector2(24f, -144f), new Vector2(220f, 54f), TryRunBaseProcessAction, out processBaseButton);
         takeoffText = CreateButton(dockedPanel, "Takeoff", new Vector2(264f, -144f), new Vector2(220f, 54f), TryTakeOff, out takeoffButton);
-        unloadFoodText = CreateButton(dockedPanel, "Unload Food", new Vector2(24f, -206f), new Vector2(220f, 54f), TryUnloadStarterFood, out unloadFoodButton);
+        runBaseWorkText = CreateButton(dockedPanel, "Base work", new Vector2(24f, -206f), new Vector2(220f, 54f), TryRunBaseWorkAction, out runBaseWorkButton);
         sortieText = CreateButton(dockedPanel, "Next Sortie", new Vector2(264f, -206f), new Vector2(220f, 54f), TryCycleSessionSortie, out sortieButton);
         portText = CreateButton(dockedPanel, "Port", new Vector2(24f, -268f), new Vector2(220f, 42f), ToggleMetaPortScreen, out portButton);
         menuText = CreateButton(dockedPanel, "Menu", new Vector2(264f, -268f), new Vector2(220f, 42f), () => { OpenMenu(); return true; }, out menuButton);
@@ -527,8 +487,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         dockText = CreateButton(flightPanel, "Dock", new Vector2(1280f, -22f), new Vector2(220f, 54f), TryDockNearest, out dockButton);
         flightMenuText = CreateButton(flightPanel, "Menu Flight", new Vector2(1520f, -22f), new Vector2(180f, 54f), () => { OpenMenu(); return true; }, out _);
         afterburnerText = CreateButton(flightPanel, "Afterburner", new Vector2(1520f, -86f), new Vector2(180f, 36f), ToggleAfterburner, out _);
-        cheatAfterburnerText = CreateButton(flightPanel, "Cheat Afterburner", new Vector2(1520f, -128f), new Vector2(180f, 36f), ToggleCheatAfterburner, out _);
-        claudiumSlipstreamText = CreateButton(flightPanel, "Claudium Slipstream", new Vector2(1520f, -170f), new Vector2(180f, 36f), ToggleClaudiumSlipstream, out _);
+        claudiumSlipstreamText = CreateButton(flightPanel, "Claudium Slipstream", new Vector2(1520f, -128f), new Vector2(180f, 36f), ToggleClaudiumSlipstream, out _);
 
         sortiePanel = CreatePanel("Sortie Overview", root, new RectTransformSpec
         {
@@ -576,8 +535,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         CreateWindowDockButton(WindowCargoId, "Трюм", -154f);
         CreateWindowDockButton(WindowRadarId, "Радар", -196f);
         CreateWindowDockButton(WindowModulesId, "Модули", -238f);
-        CreateWindowDockButton(WindowMechanicsId, "MECH", -280f);
-        CreateWindowDockButton(WindowMetaPortId, "PORT", -322f);
+        CreateWindowDockButton(WindowMetaPortId, "PORT", -280f);
 
         locationWindow = CreateHudWindow(WindowLocationId, "ГДЕ Я", new Vector2(154f, -136f), new Vector2(430f, 178f), true);
         locationWindowText = CreateText(locationWindow.content, "", 16, new Vector2(12f, -12f), new Vector2(390f, 124f), TextAnchor.UpperLeft, new Color(0.82f, 0.90f, 0.92f, 1f));
@@ -594,19 +552,10 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         radarWindow = CreateHudWindow(WindowRadarId, "РАДАР", new Vector2(1390f, -338f), new Vector2(480f, 312f), true);
         radarBoulderFilterText = CreateButton(radarWindow.content, "Radar Boulders", new Vector2(12f, -10f), new Vector2(96f, 28f), ToggleRadarBoulders, out _);
         radarDebrisFilterText = CreateButton(radarWindow.content, "Radar Debris", new Vector2(116f, -10f), new Vector2(104f, 28f), ToggleRadarDebris, out _);
-        radarLeviathanFilterText = CreateButton(radarWindow.content, "Radar Leviathans", new Vector2(228f, -10f), new Vector2(110f, 28f), ToggleRadarLeviathans, out _);
-        radarCloudFilterText = CreateButton(radarWindow.content, "Radar Clouds", new Vector2(346f, -10f), new Vector2(92f, 28f), ToggleRadarClouds, out _);
         radarWindowText = CreateText(radarWindow.content, "", 14, new Vector2(12f, -48f), new Vector2(430f, 212f), TextAnchor.UpperLeft, new Color(0.80f, 0.88f, 0.90f, 1f));
 
         modulesWindow = CreateHudWindow(WindowModulesId, "МОДУЛИ", new Vector2(620f, -740f), new Vector2(570f, 178f), true);
         modulesWindowText = CreateText(modulesWindow.content, "", 15, new Vector2(12f, -12f), new Vector2(532f, 126f), TextAnchor.UpperLeft, new Color(0.88f, 0.84f, 0.66f, 1f));
-
-        mechanicsWindow = CreateHudWindow(WindowMechanicsId, "MECHANICS LAB", new Vector2(620f, -530f), new Vector2(570f, 196f), false);
-        CreateButton(mechanicsWindow.content, "Lab Mining", new Vector2(12f, -10f), new Vector2(126f, 30f), RunMechanicsLabMiningForTests, out _);
-        CreateButton(mechanicsWindow.content, "Lab Hazards", new Vector2(146f, -10f), new Vector2(126f, 30f), RunMechanicsLabHazardsForTests, out _);
-        CreateButton(mechanicsWindow.content, "Lab Relic", new Vector2(280f, -10f), new Vector2(110f, 30f), RunMechanicsLabRelicForTests, out _);
-        CreateButton(mechanicsWindow.content, "Lab Meta", new Vector2(398f, -10f), new Vector2(110f, 30f), RunMechanicsLabMetaForTests, out _);
-        mechanicsWindowText = CreateText(mechanicsWindow.content, "", 14, new Vector2(12f, -50f), new Vector2(532f, 94f), TextAnchor.UpperLeft, new Color(0.82f, 0.88f, 0.78f, 1f));
 
         metaPortWindow = CreateHudWindow(WindowMetaPortId, "META PORT", new Vector2(210f, -104f), new Vector2(1460f, 760f), false);
         metaPortResourceText = CreateText(metaPortWindow.content, "", 16, new Vector2(12f, -8f), new Vector2(1400f, 28f), TextAnchor.MiddleLeft, new Color(0.96f, 0.84f, 0.54f, 1f));
@@ -956,16 +905,15 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private void RefreshTexts()
     {
-        SetText(loadFoodText, WildWindLocalization.Get("game.hud.load_food"));
+        SetText(processBaseText, WildWindLocalization.Get("game.hud.process_base"));
         SetText(takeoffText, WildWindLocalization.Get("game.hud.takeoff"));
         SetText(dockText, WildWindLocalization.Get("game.hud.dock"));
-        SetText(unloadFoodText, WildWindLocalization.Get("game.hud.unload_food"));
+        SetText(runBaseWorkText, WildWindLocalization.Get("game.hud.run_base_work"));
         SetText(sortieText, "Next sortie");
         SetText(portText, "Port");
         SetText(menuText, WildWindLocalization.Get("game.hud.menu"));
         SetText(flightMenuText, WildWindLocalization.Get("game.hud.menu"));
         RefreshAfterburnerText();
-        RefreshCheatAfterburnerText();
         RefreshClaudiumSlipstreamText();
         RefreshState(true);
     }
@@ -982,45 +930,32 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             }
 
             SetHudWindowLayerVisible(false);
-            SetRadarWorldOverlayVisible(false);
+            SetRadarSessionOverlayVisible(false);
             return;
         }
 
         currentMeta.EnsureProgressInitialized();
         PlayerProgress progress = currentMeta.progress;
         bool docked = currentMeta.CurrentMode == GameSessionMode.Docked;
-        bool sessionExtractionCore = currentMeta.IsSessionExtractionCoreMode;
-        bool dockedAtBase = docked
-            && progress.currentDockKind == DockingLocationKind.Island
-            && progress.currentDockId == currentMeta.GetCapitalIslandId();
-        bool completed = WildWindStarterDelivery.IsCompleted(progress);
-        bool hasActiveDelivery = !sessionExtractionCore && WildWindStarterDelivery.HasActiveDelivery(progress);
-        int sourceStock = WildWindStarterDelivery.GetSourceStock(progress);
-        int destinationStock = WildWindStarterDelivery.GetDestinationStock(progress);
-        int shipCargo = WildWindStarterDelivery.GetShipCargo(progress);
-        int deliveryAmount = WildWindStarterDelivery.GetActiveDeliveryAmount(progress);
-        float distance = Vector3.Distance(GetPlayerPosition(currentSession), GetDestinationPosition(currentMeta));
-        IslandProductionState baseStorage = sessionExtractionCore ? currentMeta.GetCapitalStorageState() : null;
-        SortieReturnEstimate sortieEstimate = sessionExtractionCore && currentMeta.HasActiveSortie
+        bool dockedAtBase = docked && currentMeta.IsDockedAtCapital();
+        float distance = 0f;
+        PortStorageState baseStorage = currentMeta.GetCapitalStorageState();
+        SortieReturnEstimate sortieEstimate = currentMeta.HasActiveSortie
             ? currentMeta.GetActiveSortieReturnEstimate()
             : default;
-        string selectedSortieName = sessionExtractionCore ? currentMeta.GetSelectedSessionSortieDisplayName() : "";
-        string selectedSortieRequirement = sessionExtractionCore ? currentMeta.GetSelectedSessionSortieRequirementText() : "";
+        string selectedSortieName = currentMeta.GetSelectedSessionSortieDisplayName();
+        string selectedSortieRequirement = currentMeta.GetSelectedSessionSortieRequirementText();
         string selectedSortieBlocker = "";
-        bool canBeginSelectedSortie = !sessionExtractionCore;
-        if (sessionExtractionCore)
-        {
-            canBeginSelectedSortie = currentMeta.CanBeginSelectedSessionSortie(out selectedSortieBlocker);
-        }
+        bool canBeginSelectedSortie = currentMeta.CanBeginSelectedSessionSortie(out selectedSortieBlocker);
 
         BaseProcessingBranch nextProcessingBranch = BaseProcessingBranch.Ore;
-        bool hasProcessableBaseBatch = sessionExtractionCore && currentMeta.TryGetNextProcessableBaseBranch(out nextProcessingBranch);
-        bool canRefuelBaseShip = sessionExtractionCore && currentMeta.CanRefuelBaseShip(out _);
-        bool canLoadStarterMunitions = sessionExtractionCore && currentMeta.CanLoadStarterMunitionsAtBase(out _);
-        bool canInstallStarterFitting = sessionExtractionCore && currentMeta.CanInstallNextStarterFittingUpgrade(out _);
-        bool canUpgradeBaseIndustry = sessionExtractionCore && !canInstallStarterFitting && currentMeta.CanUpgradeNextBaseIndustryLine(out _);
+        bool hasProcessableBaseBatch = currentMeta.TryGetNextProcessableBaseBranch(out nextProcessingBranch);
+        bool canRefuelBaseShip = currentMeta.CanRefuelBaseShip(out _);
+        bool canLoadStarterMunitions = currentMeta.CanLoadStarterMunitionsAtBase(out _);
+        bool canInstallStarterFitting = currentMeta.CanInstallNextStarterFittingUpgrade(out _);
+        bool canUpgradeBaseIndustry = !canInstallStarterFitting && currentMeta.CanUpgradeNextBaseIndustryLine(out _);
         CascadeProductionOrderDefinition nextCascadeOrder = null;
-        CascadeProductionEstimate nextCascadeEstimate = sessionExtractionCore && !canInstallStarterFitting
+        CascadeProductionEstimate nextCascadeEstimate = !canInstallStarterFitting
             ? currentMeta.EstimateNextBaseCascadeOrder(out nextCascadeOrder)
             : null;
         string processButtonText = hasProcessableBaseBatch
@@ -1041,51 +976,35 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         SetHudWindowLayerVisible(!docked);
         if (docked)
         {
-            SetRadarWorldOverlayVisible(false);
+            SetRadarSessionOverlayVisible(false);
         }
 
         SetText(modeText, WildWindLocalization.Get(docked ? "game.hud.city" : "game.hud.flight"));
-        SetText(missionText, sessionExtractionCore
-            ? "Session extraction"
-            : completed
-            ? WildWindLocalization.Get("game.hud.completed")
-            : WildWindStarterDelivery.GetMissionTitle(progress));
-        SetText(routeText, sessionExtractionCore
-            ? (currentMeta.HasActiveSortie
+        SetText(objectiveText, "Session extraction");
+        SetText(sessionPathText, currentMeta.HasActiveSortie
                 ? currentMeta.ActiveSortie.zone.displayName + " -> manual extraction"
-                : "Base -> " + selectedSortieName + " (" + selectedSortieRequirement + ")")
-            : WildWindStarterDelivery.GetRouteText(progress));
-        SetText(capitalStockText, sessionExtractionCore
-            ? "Inputs: " + GetStoredCoreInputsText(baseStorage)
-            : WildWindStarterDelivery.GetSourceStockLabel(progress) + ": " + sourceStock);
-        SetText(destinationStockText, sessionExtractionCore
-            ? "Materials: ferron " + GetStorageAmount(baseStorage, "ferron")
+                : "Base -> " + selectedSortieName + " (" + selectedSortieRequirement + ")");
+        SetText(baseInputsText, "Inputs: " + GetStoredCoreInputsText(baseStorage));
+        SetText(baseMaterialsText, "Materials: ferron " + GetStorageAmount(baseStorage, "ferron")
                 + ", silvate " + GetStorageAmount(baseStorage, "silvate")
                 + ", kits " + GetStorageAmount(baseStorage, SessionExtractionConstants.StarterAirframeKitItemId)
                 + "/" + GetStorageAmount(baseStorage, SessionExtractionConstants.StarterModuleKitItemId)
-                + "/" + GetStorageAmount(baseStorage, SessionExtractionConstants.StarterMunitionBundleItemId)
-            : WildWindStarterDelivery.GetDestinationStockLabel(progress) + ": " + destinationStock + (deliveryAmount > 0 ? " / " + deliveryAmount : ""));
-        SetText(shipCargoText, sessionExtractionCore
-            ? "Tanks: " + currentMeta.GetBaseRefuelStatusText()
-                + " | weapon " + progress.GetShipCargoAmount(SessionExtractionConstants.StarterWeaponCargoItemId)
-            : WildWindStarterDelivery.GetShipCargoLabel(progress) + ": " + shipCargo);
-        SetText(fittingText, sessionExtractionCore ? currentMeta.GetCoreFittingCompactText() : "");
-        SetText(baseProcessingText, sessionExtractionCore ? currentMeta.GetBaseProcessingOverviewText() : "");
-        SetText(baseCascadeText, sessionExtractionCore ? currentMeta.GetBaseCascadeProductionOverviewText() : "");
-        SetText(baseCascadeOrderText, sessionExtractionCore
-            ? currentMeta.GetNextBaseIndustryUpgradeOverviewText() + "\n" + currentMeta.GetNextBaseCascadeOrderOverviewText()
-            : "");
-        SetText(loadFoodText, sessionExtractionCore ? processButtonText : WildWindStarterDelivery.GetLoadButtonText(progress));
-        SetText(takeoffText, sessionExtractionCore ? "Start " + ShortenButtonLabel(selectedSortieName, 16) : WildWindLocalization.Get("game.hud.takeoff"));
-        SetText(dockText, sessionExtractionCore ? "Extract home" : WildWindLocalization.Get("game.hud.dock"));
-        SetText(unloadFoodText, sessionExtractionCore
-            ? (canInstallStarterFitting
+                + "/" + GetStorageAmount(baseStorage, SessionExtractionConstants.StarterMunitionBundleItemId));
+        SetText(shipSuppliesText, "Tanks: " + currentMeta.GetBaseRefuelStatusText()
+                + " | weapon " + progress.GetShipCargoAmount(SessionExtractionConstants.StarterWeaponCargoItemId));
+        SetText(fittingText, currentMeta.GetCoreFittingCompactText());
+        SetText(baseProcessingText, currentMeta.GetBaseProcessingOverviewText());
+        SetText(baseCascadeText, currentMeta.GetBaseCascadeProductionOverviewText());
+        SetText(baseCascadeOrderText, currentMeta.GetNextBaseIndustryUpgradeOverviewText() + "\n" + currentMeta.GetNextBaseCascadeOrderOverviewText());
+        SetText(processBaseText, processButtonText);
+        SetText(takeoffText, "Start " + ShortenButtonLabel(selectedSortieName, 16));
+        SetText(dockText, "Extract home");
+        SetText(runBaseWorkText, canInstallStarterFitting
                 ? currentMeta.GetNextStarterFittingUpgradeActionLabel()
                 : canUpgradeBaseIndustry
                 ? "Upgrade base"
-                : cascadeButtonText)
-            : WildWindStarterDelivery.GetUnloadButtonText(progress));
-        SetText(sortieText, sessionExtractionCore ? "Next sortie" : "");
+                : cascadeButtonText);
+        SetText(sortieText, "Next sortie");
         SetText(portText, "Port");
         WildWindFlightControlBridge controls = ResolveFlightControls();
         float currentAltitude = GetPlayerPosition(currentSession).y;
@@ -1096,7 +1015,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         RefreshHudWindows(currentMeta, currentSession, progress, controls, sortieEstimate, !docked);
         RefreshMetaPortWindow();
-        SetText(distanceText, sessionExtractionCore && currentMeta.HasActiveSortie
+        SetText(distanceText, currentMeta.HasActiveSortie
             ? FormatBoundaryDistance(sortieEstimate.distanceToBoundaryMeters)
                 + " | Slip " + sortieEstimate.extractionRunupSeconds.ToString("0.0")
                 + "/" + sortieEstimate.requiredExtractionRunupSeconds.ToString("0.0")
@@ -1104,7 +1023,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             : WildWindLocalization.Get("game.hud.distance") + ": " + FormatDistance(distance));
         SetText(altitudeText, WildWindLocalization.Get("game.hud.altitude") + ": " + currentAltitude.ToString("0") + " м");
         SetText(speedText, WildWindLocalization.Get("game.hud.speed") + ": " + GetShipSpeed(currentMeta).ToString("0.0") + " м/с");
-        string runupStatus = sessionExtractionCore && !docked && currentMeta.HasActiveSortie
+        string runupStatus = !docked && currentMeta.HasActiveSortie
             ? currentMeta.ActiveSortieExtractionRunupStatus
             : "";
         string visibleStatus = statusMessage;
@@ -1112,11 +1031,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         {
             visibleStatus = runupStatus;
         }
-        else if (sessionExtractionCore && dockedAtBase && !canBeginSelectedSortie && string.IsNullOrWhiteSpace(visibleStatus))
+        else if (dockedAtBase && !canBeginSelectedSortie && string.IsNullOrWhiteSpace(visibleStatus))
         {
             visibleStatus = selectedSortieBlocker;
         }
-        else if (sessionExtractionCore && !docked && currentMeta.HasActiveSortie && string.IsNullOrWhiteSpace(visibleStatus))
+        else if (!docked && currentMeta.HasActiveSortie && string.IsNullOrWhiteSpace(visibleStatus))
         {
             visibleStatus = sortieEstimate.status;
         }
@@ -1127,25 +1046,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         if (controls != null)
         {
             RefreshAfterburnerText();
-            RefreshCheatAfterburnerText();
             RefreshClaudiumSlipstreamText();
         }
 
-        string sourceDockId = WildWindStarterDelivery.GetActiveSourceDockId(progress);
-        string destinationDockId = WildWindStarterDelivery.GetActiveDestinationDockId(progress);
-        bool atSource = docked && progress.currentDockId == sourceDockId;
-        bool atDestination = docked && progress.currentDockId == destinationDockId;
-        SetInteractable(loadFoodButton, sessionExtractionCore
-            ? dockedAtBase && (hasProcessableBaseBatch || canRefuelBaseShip || canLoadStarterMunitions)
-            : hasActiveDelivery && atSource && !completed && shipCargo < deliveryAmount && sourceStock > 0);
-        SetInteractable(takeoffButton, docked && (!sessionExtractionCore || (dockedAtBase && canBeginSelectedSortie)));
-        SetInteractable(dockButton, sessionExtractionCore
-            ? !docked && currentMeta.HasActiveSortie && sortieEstimate.canExtract
-            : !docked);
-        SetInteractable(unloadFoodButton, sessionExtractionCore
-            ? dockedAtBase && (canInstallStarterFitting || canUpgradeBaseIndustry || (nextCascadeEstimate != null && nextCascadeEstimate.canRun))
-            : hasActiveDelivery && atDestination && !completed && shipCargo > 0);
-        SetInteractable(sortieButton, sessionExtractionCore && dockedAtBase);
+        SetInteractable(processBaseButton, dockedAtBase && (hasProcessableBaseBatch || canRefuelBaseShip || canLoadStarterMunitions));
+        SetInteractable(takeoffButton, docked && dockedAtBase && canBeginSelectedSortie);
+        SetInteractable(dockButton, !docked && currentMeta.HasActiveSortie && sortieEstimate.canExtract);
+        SetInteractable(runBaseWorkButton, dockedAtBase && (canInstallStarterFitting || canUpgradeBaseIndustry || (nextCascadeEstimate != null && nextCascadeEstimate.canRun)));
+        SetInteractable(sortieButton, dockedAtBase);
         SetInteractable(portButton, docked);
         SetInteractable(menuButton, true);
     }
@@ -1164,24 +1072,24 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
     }
 
-    private RadarTacticalWorldOverlay EnsureRadarWorldOverlay()
+    private RadarTacticalSessionOverlay EnsureRadarSessionOverlay()
     {
-        if (radarWorldOverlay != null)
+        if (radarSessionOverlay != null)
         {
-            return radarWorldOverlay;
+            return radarSessionOverlay;
         }
 
-        GameObject overlayObject = new GameObject("Radar Tactical World Overlay");
+        GameObject overlayObject = new GameObject("Radar Tactical Session Overlay");
         overlayObject.transform.SetParent(transform, false);
-        radarWorldOverlay = overlayObject.AddComponent<RadarTacticalWorldOverlay>();
-        return radarWorldOverlay;
+        radarSessionOverlay = overlayObject.AddComponent<RadarTacticalSessionOverlay>();
+        return radarSessionOverlay;
     }
 
-    private void SetRadarWorldOverlayVisible(bool visible)
+    private void SetRadarSessionOverlayVisible(bool visible)
     {
-        if (radarWorldOverlay != null)
+        if (radarSessionOverlay != null)
         {
-            radarWorldOverlay.SetVisible(visible);
+            radarSessionOverlay.SetVisible(visible);
         }
     }
 
@@ -1215,6 +1123,33 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         statusMessage = visible ? "Port screen opened." : "Port screen closed.";
         RefreshState(true);
         return true;
+    }
+
+    private bool OpenMetaPortScreen()
+    {
+        WildWindMetaPortScreen screen = EnsureFullMetaPortScreen();
+        screen.SetVisible(true);
+        statusMessage = "Port screen opened.";
+        RefreshState(true);
+        return true;
+    }
+
+    private void OpenMetaPortOnDockedStartIfReady()
+    {
+        if (!openMetaPortOnDockedStart)
+        {
+            return;
+        }
+
+        MetaGameState currentMeta = ResolveMeta();
+        WildWindGameplaySession currentSession = ResolveSession();
+        if (currentMeta == null || currentSession == null || !currentMeta.IsDocked)
+        {
+            return;
+        }
+
+        openMetaPortOnDockedStart = false;
+        OpenMetaPortScreen();
     }
 
     private WildWindMetaPortScreen EnsureFullMetaPortScreen()
@@ -1359,7 +1294,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
 
         ShipPhysics ship = GetHudShip();
-        WorldConfigDatabase config = currentMeta.WorldConfig;
+        SessionConfigDatabase config = currentMeta.SessionConfig;
         Vector3 position = GetPlayerPosition(currentSession);
         SortieSessionState sortie = currentMeta.HasActiveSortie ? currentMeta.ActiveSortie : null;
         SortieZoneDefinition zone = sortie != null ? sortie.zone : null;
@@ -1422,10 +1357,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         RefreshRadarWindow(position);
         RefreshModulesWindow(ship, controls, resourceId, progress);
-        RefreshMechanicsWindow();
     }
 
-    private void RefreshCargoSlots(PlayerProgress progress, WorldConfigDatabase config)
+    private void RefreshCargoSlots(PlayerProgress progress, SessionConfigDatabase config)
     {
         if (cargoSlotTexts == null) return;
 
@@ -1450,8 +1384,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     {
         SetText(radarBoulderFilterText, (radarShowBoulders ? "[x] " : "[ ] ") + "Глыбы");
         SetText(radarDebrisFilterText, (radarShowDebris ? "[x] " : "[ ] ") + "Обломки");
-        SetText(radarLeviathanFilterText, (radarShowLeviathans ? "[x] " : "[ ] ") + "Левиафаны");
-        SetText(radarCloudFilterText, (radarShowClouds ? "[x] " : "[ ] ") + "Облака");
 
         radarEntries.Clear();
         if (radarShowBoulders)
@@ -1478,30 +1410,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             }
         }
 
-        if (radarShowClouds)
-        {
-            GasCloud.GetActiveClouds(radarClouds);
-            for (int i = 0; i < radarClouds.Count; i++)
-            {
-                GasCloud cloud = radarClouds[i];
-                if (cloud == null) continue;
-                AddRadarEntry(string.IsNullOrWhiteSpace(cloud.displayName) ? cloud.cloudId : cloud.displayName, "облако", RadarEntryKind.Cloud, cloud.transform, playerPosition);
-            }
-        }
-
-        if (radarShowLeviathans)
-        {
-            Leviathan[] leviathans = Object.FindObjectsByType<Leviathan>(FindObjectsSortMode.None);
-            for (int i = 0; i < leviathans.Length; i++)
-            {
-                Leviathan leviathan = leviathans[i];
-                if (leviathan == null) continue;
-                AddRadarEntry(string.IsNullOrWhiteSpace(leviathan.displayName) ? leviathan.leviathanId : leviathan.displayName, "левиафан", RadarEntryKind.Leviathan, leviathan.transform, playerPosition);
-            }
-        }
-
         radarEntries.Sort((a, b) => a.distanceMeters.CompareTo(b.distanceMeters));
-        RadarTacticalWorldOverlay overlay = EnsureRadarWorldOverlay();
+        RadarTacticalSessionOverlay overlay = EnsureRadarSessionOverlay();
         if (overlay != null)
         {
             ShipPhysics ship = GetHudShip();
@@ -1568,29 +1478,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private void RefreshModulesWindow(ShipPhysics ship, WildWindFlightControlBridge controls, string resourceId, PlayerProgress progress)
     {
         string activeBur = "БУР: " + (ship != null ? "готов " + MakeAsciiBar(0.63f, 10) : "-");
-        string activeGas = "ГАЗ: " + (ship != null && ship.gasHarvesterEnabled ? "цикл " + MakeAsciiBar(0.42f, 10) : "выкл");
-        string activeHarpoon = "ГАРПУН: " + (ship != null && ship.activeHarpoon != null ? "трос" : "готов");
         string activeWeapon = "ОРУЖИЕ: " + (progress != null ? progress.GetShipCargoAmount(SessionExtractionConstants.StarterWeaponCargoItemId) + " ед." : "-");
         string passive = "Пассивные: ГРУЗ | БРОНЯ | ДВИГ | РИГ";
-        SetText(modulesWindowText, activeBur + "\n" + activeGas + "\n" + activeHarpoon + "\n" + activeWeapon + "\n" + passive);
-    }
-
-    private void RefreshMechanicsWindow()
-    {
-        WildWindMechanicsLabState lab = EnsureMechanicsLab();
-        SetText(mechanicsWindowText,
-            "Minimal rules stand for the two design docs."
-            + "\nMining: scan -> shed -> crusher -> ram damage."
-            + "\nHazards: ice, fire, gas disarm, electric detonation."
-            + "\nRelic: careful crane/drone extraction only."
-            + "\nMeta: slots, Pioneer fallback, sale XP, processing, containers."
-            + "\nLast: " + lab.lastReport);
-    }
-
-    private WildWindMechanicsLabState EnsureMechanicsLab()
-    {
-        mechanicsLab ??= WildWindMechanicsLabState.Create();
-        return mechanicsLab;
+        SetText(modulesWindowText, activeBur + "\n" + activeWeapon + "\n" + passive);
     }
 
     private void RefreshSortiePanel(
@@ -1608,7 +1498,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         bool visible = inFlight
             && currentMeta != null
             && progress != null
-            && currentMeta.IsSessionExtractionCoreMode
             && currentMeta.HasActiveSortie;
         sortiePanel.gameObject.SetActive(visible);
         if (!visible)
@@ -1618,7 +1507,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         SortieSessionState sortie = currentMeta.ActiveSortie;
         SortieZoneDefinition zone = sortie != null ? sortie.zone : null;
-        WorldConfigDatabase config = currentMeta.WorldConfig;
+        SessionConfigDatabase config = currentMeta.SessionConfig;
         string zoneName = zone != null && !string.IsNullOrWhiteSpace(zone.displayName)
             ? zone.displayName
             : "Unknown sortie";
@@ -1717,9 +1606,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return;
         }
 
-        float displayPowerMultiplier = ship.engineCheatAfterburnerEnabled
-            ? EngineCheatAfterburnerPowerMultiplier
-            : EngineAfterburnerPowerMultiplier;
+        float displayPowerMultiplier = EngineAfterburnerPowerMultiplier;
         float maxPowerKw = Mathf.Max(0.001f, ship.enginePowerKwAt100 * displayPowerMultiplier);
         float liftPowerKw = Mathf.Clamp(ship.claudiumPowerDrawKw, 0f, maxPowerKw);
         float modulePowerKw = Mathf.Clamp(GetShipModulePowerKw(ship), 0f, maxPowerKw - liftPowerKw);
@@ -1834,7 +1721,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         };
     }
 
-    private static string GetStoredOreText(IslandProductionState storage)
+    private static string GetStoredOreText(PortStorageState storage)
     {
         int windshale = GetStorageAmount(storage, "windshale_ore");
         int dawnspar = GetStorageAmount(storage, "dawnspar_ore");
@@ -1845,16 +1732,12 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return "windshale " + windshale + ", dawnspar " + dawnspar + ", bluebrass " + bluebrass;
     }
 
-    private static string GetStoredCoreInputsText(IslandProductionState storage)
+    private static string GetStoredCoreInputsText(PortStorageState storage)
     {
         int ore = SumStorageAmounts(storage, "windshale_ore", "dawnspar_ore", "bluebrass_ore");
         int gas = SumStorageAmounts(storage, "mist_condensate", "cloud_condensate", "wet_condensate", "storm_condensate");
         int leviathan = SumStorageAmounts(storage, "windcalf_carcass", "windminnow_carcass", "mistwhale_carcass");
-        int info = SumStorageAmounts(
-            storage,
-            SessionExtractionConstants.RockInfoItemId,
-            SessionExtractionConstants.CloudInfoItemId,
-            SessionExtractionConstants.LeviathanInfoItemId);
+        int info = SumStorageAmounts(storage, SessionExtractionConstants.RockInfoItemId);
         int automaton = GetStorageAmount(storage, SessionExtractionConstants.BrokenAutomatonItemId);
 
         return "ore " + ore
@@ -1864,14 +1747,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             + ", info " + info;
     }
 
-    private static bool HasStoredOre(IslandProductionState storage)
+    private static bool HasStoredOre(PortStorageState storage)
     {
         return GetStorageAmount(storage, "windshale_ore") > 0
             || GetStorageAmount(storage, "dawnspar_ore") > 0
             || GetStorageAmount(storage, "bluebrass_ore") > 0;
     }
 
-    private static int SumStorageAmounts(IslandProductionState storage, params string[] itemIds)
+    private static int SumStorageAmounts(PortStorageState storage, params string[] itemIds)
     {
         if (itemIds == null) return 0;
 
@@ -1884,7 +1767,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return total;
     }
 
-    private static int GetStorageAmount(IslandProductionState storage, string itemId)
+    private static int GetStorageAmount(PortStorageState storage, string itemId)
     {
         return storage != null && !string.IsNullOrWhiteSpace(itemId) ? storage.GetResourceAmount(itemId) : 0;
     }
@@ -1896,7 +1779,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return 0f;
         }
 
-        return Mathf.Max(0f, ship.gasHarvesterPowerDrawActualKw);
+        return 0f;
     }
 
     private bool ToggleAfterburner()
@@ -1907,7 +1790,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             controls.ToggleAfterburner();
             statusMessage = controls.StatusMessage;
             RefreshAfterburnerText();
-            RefreshCheatAfterburnerText();
             RefreshClaudiumSlipstreamText();
             RefreshState(true);
             return true;
@@ -1926,40 +1808,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             ? "Afterburner 120% enabled."
             : "Afterburner disabled.";
         RefreshAfterburnerText();
-        RefreshCheatAfterburnerText();
-        RefreshClaudiumSlipstreamText();
-        RefreshState(true);
-        return true;
-    }
-
-    private bool ToggleCheatAfterburner()
-    {
-        WildWindFlightControlBridge controls = ResolveFlightControls();
-        if (controls != null)
-        {
-            controls.ToggleCheatAfterburner();
-            statusMessage = controls.StatusMessage;
-            RefreshAfterburnerText();
-            RefreshCheatAfterburnerText();
-            RefreshClaudiumSlipstreamText();
-            RefreshState(true);
-            return true;
-        }
-
-        ShipPhysics ship = GetHudShip();
-        if (ship == null)
-        {
-            return false;
-        }
-
-        ship.engineCheatAfterburnerEnabled = !ship.engineCheatAfterburnerEnabled;
-        ship.enginePowerLever = Mathf.Min(ship.enginePowerLever, ship.EnginePowerLeverLimit);
-
-        statusMessage = ship.engineCheatAfterburnerEnabled
-            ? "Cheat afterburner +500% enabled."
-            : "Cheat afterburner disabled.";
-        RefreshAfterburnerText();
-        RefreshCheatAfterburnerText();
         RefreshClaudiumSlipstreamText();
         RefreshState(true);
         return true;
@@ -2009,34 +1857,12 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return true;
     }
 
-    private bool ToggleRadarLeviathans()
-    {
-        radarShowLeviathans = !radarShowLeviathans;
-        RefreshState(true);
-        return true;
-    }
-
-    private bool ToggleRadarClouds()
-    {
-        radarShowClouds = !radarShowClouds;
-        RefreshState(true);
-        return true;
-    }
-
     private void RefreshAfterburnerText()
     {
         ShipPhysics ship = GetHudShip();
         bool enabled = ship != null && ship.engineAfterburnerEnabled;
         string state = WildWindLocalization.Get(enabled ? "game.hud.on" : "game.hud.off");
         SetText(afterburnerText, "Форсаж 120%: " + state);
-    }
-
-    private void RefreshCheatAfterburnerText()
-    {
-        ShipPhysics ship = GetHudShip();
-        bool enabled = ship != null && ship.engineCheatAfterburnerEnabled;
-        string state = WildWindLocalization.Get(enabled ? "game.hud.on" : "game.hud.off");
-        SetText(cheatAfterburnerText, "Чит +500%: " + state);
     }
 
     private void RefreshClaudiumSlipstreamText()
@@ -2100,7 +1926,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 controls?.ClearDirectInput();
             }
 
-            ResolveTravelController()?.ClearUiInput();
+            ResolveSessionCameraController()?.ClearUiInput();
             return;
         }
 
@@ -2131,7 +1957,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return;
         }
 
-        WorldDebugTravelController controller = ResolveTravelController();
+        WildWindSessionCameraController controller = ResolveSessionCameraController();
         if (controller != null)
         {
             controller.SetUiInput(heldFlightInput);
@@ -2274,48 +2100,10 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return true;
         }
 
-        if (currentMeta != null && currentMeta.progress != null && WildWindStarterDelivery.HasActiveDelivery(currentMeta.progress))
-        {
-            return TryBuildCompassHeadingFromPosition(
-                currentSession,
-                GetDestinationPosition(currentMeta),
-                WildWindLocalization.Get("game.hud.compass_target"),
-                CompassDefaultTargetColor,
-                out targetHeading,
-                out targetLabel,
-                out markerColor);
-        }
-
         targetHeading = 0f;
         targetLabel = "";
         markerColor = CompassDefaultTargetColor;
         return false;
-    }
-
-    private static bool TryBuildCompassHeadingFromPosition(
-        WildWindGameplaySession currentSession,
-        Vector3 targetPosition,
-        string label,
-        Color color,
-        out float targetHeading,
-        out string targetLabel,
-        out Color markerColor)
-    {
-        Vector3 from = GetPlayerPosition(currentSession);
-        Vector3 toTarget = targetPosition - from;
-        toTarget.y = 0f;
-        if (toTarget.sqrMagnitude <= 0.01f)
-        {
-            targetHeading = 0f;
-            targetLabel = "";
-            markerColor = color;
-            return false;
-        }
-
-        targetHeading = NormalizeHeading(Mathf.Atan2(toTarget.x, toTarget.z) * Mathf.Rad2Deg);
-        targetLabel = label;
-        markerColor = color;
-        return true;
     }
 
     private static bool TryGetActiveSortieExitDirection(
@@ -2370,14 +2158,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return session;
     }
 
-    private WorldDebugTravelController ResolveTravelController()
+    private WildWindSessionCameraController ResolveSessionCameraController()
     {
-        if (travelController == null)
+        if (sessionCameraController == null)
         {
-            travelController = Object.FindFirstObjectByType<WorldDebugTravelController>();
+            sessionCameraController = Object.FindFirstObjectByType<WildWindSessionCameraController>();
         }
 
-        return travelController;
+        return sessionCameraController;
     }
 
     private WildWindFlightControlBridge ResolveFlightControls()
@@ -2388,31 +2176,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
 
         return flightControls;
-    }
-
-    private Vector3 GetDestinationPosition(MetaGameState currentMeta)
-    {
-        PlayerProgress progress = currentMeta != null ? currentMeta.progress : null;
-        string destinationDockId = WildWindStarterDelivery.GetActiveDestinationDockId(progress);
-        if (string.IsNullOrWhiteSpace(destinationDockId))
-        {
-            return GetPlayerPosition(ResolveSession());
-        }
-
-        DockingPort[] docks = Object.FindObjectsByType<DockingPort>(FindObjectsSortMode.None);
-        for (int i = 0; i < docks.Length; i++)
-        {
-            DockingPort dock = docks[i];
-            if (dock != null && dock.dockId == destinationDockId)
-            {
-                return dock.DockPosition;
-            }
-        }
-
-        IslandConfig island = currentMeta != null && currentMeta.WorldConfig != null
-            ? currentMeta.WorldConfig.GetIsland(destinationDockId)
-            : null;
-        return island != null ? island.position : new Vector3(2300f, 2550f, 1200f);
     }
 
     private static Vector3 GetPlayerPosition(WildWindGameplaySession currentSession)
@@ -2619,7 +2382,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return restSeconds + "s";
     }
 
-    private static string GetItemDisplayName(WorldConfigDatabase config, string itemId)
+    private static string GetItemDisplayName(SessionConfigDatabase config, string itemId)
     {
         if (string.IsNullOrWhiteSpace(itemId))
         {
@@ -2648,9 +2411,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return "engine -";
         }
 
-        string mode = ship.engineCheatAfterburnerEnabled
-            ? "+500%"
-            : ship.engineAfterburnerEnabled
+        string mode = ship.engineAfterburnerEnabled
             ? "120%"
             : "normal";
         return "engine " + mode + ", T " + (ship.thrustInput * 100f).ToString("0") + "%";
@@ -2735,10 +2496,10 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
 
 #if ENABLE_INPUT_SYSTEM
-        StandaloneInputModule legacyModule = eventSystemObject.GetComponent<StandaloneInputModule>();
-        if (legacyModule != null)
+        StandaloneInputModule standaloneModule = eventSystemObject.GetComponent<StandaloneInputModule>();
+        if (standaloneModule != null)
         {
-            Destroy(legacyModule);
+            Destroy(standaloneModule);
         }
 
         if (eventSystemObject.GetComponent<InputSystemUIInputModule>() == null)
@@ -2989,7 +2750,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     }
 
     [DefaultExecutionOrder(10000)]
-    private sealed class RadarTacticalWorldOverlay : MonoBehaviour
+    private sealed class RadarTacticalSessionOverlay : MonoBehaviour
     {
         private static readonly float[] RingMeters = { 100f, 250f, 500f, 1000f, 2000f, 5000f, 10000f };
         private const int RingSegments = 160;
@@ -3197,7 +2958,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             visual.stem.SetPosition(0, projected);
             visual.stem.SetPosition(1, actual);
 
-            float markerSize = entry.entryKind == RadarEntryKind.Leviathan ? MarkerSizeMeters * 1.7f : MarkerSizeMeters;
+            float markerSize = MarkerSizeMeters;
             visual.marker.positionCount = 5;
             visual.marker.widthMultiplier = Mathf.Max(1.4f, StemWidthMeters);
             visual.marker.startColor = color;
@@ -3271,10 +3032,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                     return new Color(0.76f, 0.66f, 0.48f, 0.95f);
                 case RadarEntryKind.Debris:
                     return new Color(0.96f, 0.78f, 0.28f, 0.96f);
-                case RadarEntryKind.Cloud:
-                    return new Color(0.52f, 0.86f, 0.92f, 0.85f);
-                case RadarEntryKind.Leviathan:
-                    return new Color(1f, 0.32f, 0.30f, 0.96f);
                 default:
                     return Color.white;
             }
@@ -3311,9 +3068,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private enum RadarEntryKind
     {
         Boulder,
-        Debris,
-        Cloud,
-        Leviathan
+        Debris
     }
 
     private struct RadarEntry

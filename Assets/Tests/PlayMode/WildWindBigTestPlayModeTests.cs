@@ -3,6 +3,7 @@ using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
@@ -18,11 +19,18 @@ public sealed class WildWindBigTestPlayModeTests
         Type runnerType = RequireType(RunnerTypeName);
         Type resultType = RequireType(ResultTypeName);
         object result = null;
+        bool previousIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
+        bool ignoreHeadlessRenderLogs = Application.isBatchMode && SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null;
 
         SetStaticProperty(runnerType, "SuppressRunOnStartForAutomation", true);
         try
         {
-            SceneManager.LoadScene(GetConstString(runnerType, "DefaultWorldSceneName"));
+            if (ignoreHeadlessRenderLogs)
+            {
+                LogAssert.ignoreFailingMessages = true;
+            }
+
+            SceneManager.LoadScene(GetConstString(runnerType, "DefaultSessionSceneName"));
             yield return null;
             yield return null;
 
@@ -34,7 +42,7 @@ public sealed class WildWindBigTestPlayModeTests
                 yield return null;
             }
 
-            Assert.NotNull(runner, "WildWindBigTestRunner must exist in the world scene.");
+            Assert.NotNull(runner, "WildWindBigTestRunner must exist in the session scene.");
 
             Invoke(runnerType, runner, "ResetRunStateForEditor");
             SetMember(runnerType, runner, "runOnStart", false);
@@ -49,6 +57,7 @@ public sealed class WildWindBigTestPlayModeTests
         }
         finally
         {
+            LogAssert.ignoreFailingMessages = previousIgnoreFailingMessages;
             SetStaticProperty(runnerType, "SuppressRunOnStartForAutomation", false);
             Time.timeScale = 1f;
         }

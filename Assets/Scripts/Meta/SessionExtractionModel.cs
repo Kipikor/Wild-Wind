@@ -5,12 +5,13 @@ using UnityEngine;
 public static class SessionExtractionConstants
 {
     public const float DefaultSortieRadiusMeters = 1500f;
-    public const float LegacyDefaultSortieRadiusMeters = 5000f;
+    public const float DefaultSortiePocketOriginMeters = 250000f;
+    public const float DefaultSortiePocketMinimumDockSeparationMeters = 100000f;
+    public const float DefaultSortiePocketSpacingMeters = 12000f;
     public const string HighSlotTypeId = "high";
     public const string MidSlotTypeId = "mid";
     public const string LowSlotTypeId = "low";
     public const string RigSlotTypeId = "rig";
-    public const string LegacyUtilitySlotTypeId = "utility";
 
     public const string DefaultSafeOreSortieId = "safe_ore_boulders";
     public const string DefaultSafeOreSortieName = "Safe Ore Boulders";
@@ -32,16 +33,15 @@ public static class SessionExtractionConstants
     public const int StarterWeaponUnitsPerMunitionBundle = 8;
     public const int StarterWeaponLoadoutTargetUnits = 24;
     public const string StarterCargoRackModuleId = "starter_cargo_rack";
-    public const string StarterGasHarvesterModuleId = "starter_gas_harvester";
+    public const string StarterGasExtractorModuleId = "starter_gas_extractor";
     public const string StarterMiningHoldModuleId = "starter_mining_hold";
     public const string StarterObservationPostModuleId = "starter_observation_post";
-    public const string StarterHarpoonModuleId = "starter_harpoon_rig";
+    public const string StarterLeviathanSalvageModuleId = "starter_leviathan_salvage_rig";
     public const string StarterLowSlotId = "low_01";
     public const string StarterHighSlotId = "high_01";
     public const string StarterSecondHighSlotId = "high_02";
     public const string StarterThirdHighSlotId = "high_03";
     public const string StarterMidSlotId = "mid_01";
-    public const string LegacyUtilitySlotId = "utility_01";
     public const string BrokenAutomatonItemId = "broken_automaton";
     public const string AutomatonCoreItemId = "automaton_core";
     public const string LeviathanFatItemId = "leviathan_fat";
@@ -49,20 +49,10 @@ public static class SessionExtractionConstants
     public const string ClaudiumGlandItemId = "claudium_gland";
     public const string MineralShellItemId = "mineral_shell";
     public const string RockInfoItemId = "rock_info";
-    public const string CloudInfoItemId = "cloud_info";
-    public const string LeviathanInfoItemId = "leviathan_info";
     public const string FundamentalExperienceItemId = "fundamental_experience";
     public const string DesignExperienceItemId = "design_experience";
     public const string MechanismsItemId = "mechanisms";
     public const string ToolsItemId = "tools";
-}
-
-public static class SessionExtractionCoreRuntime
-{
-    public static bool IsCoreMode(PlayerProgress progress)
-    {
-        return progress != null && progress.sessionExtractionCoreMode;
-    }
 }
 
 public enum ShipFittingSlotBand
@@ -531,16 +521,15 @@ public static class SessionExtractionFitting
         string id = (module.id ?? "").ToLowerInvariant();
         string name = ((module.localNameEn ?? "") + " " + (module.localNameRu ?? "") + " " + (module.descriptionRu ?? "")).ToLowerInvariant();
 
-        if (module.gasHarvesterVolumeM3PerSecond > 0f
+        if (id.Contains("gas_extractor")
             || module.miningImpactHoldCapacityKg > 0f
-            || module.harpoonRangeMeters > 0f
-            || module.harpoonFlightDamage > 0f
+            || id.Contains("leviathan_salvage")
             || id.Contains("weapon"))
         {
             return ShipFittingSlotBand.High;
         }
 
-        if (module.observationRadiusMeters > 0f
+        if (id.Contains("observation")
             || id.Contains("radar")
             || id.Contains("scanner")
             || id.Contains("sensor")
@@ -550,7 +539,7 @@ public static class SessionExtractionFitting
             return ShipFittingSlotBand.Mid;
         }
 
-        if ((id.Contains("rig") || name.Contains(" rig")) && module.harpoonRangeMeters <= 0f)
+        if (id.Contains("rig") || name.Contains(" rig"))
         {
             return ShipFittingSlotBand.Rig;
         }
@@ -564,8 +553,6 @@ public class SortieZoneDefinition
 {
     public const float DefaultReturnCoalKgPerSecond = 0.0055f;
     public const float DefaultReturnClaudiumKgPerTonSecond = 0.00045f;
-    private const float LegacyDefaultReturnCoalKgPerSecond = 0.006f;
-    private const float LegacyDefaultReturnClaudiumKgPerTonSecond = 0.001f;
 
     public string sortieId = SessionExtractionConstants.DefaultSafeOreSortieId;
     public string displayName = SessionExtractionConstants.DefaultSafeOreSortieName;
@@ -598,8 +585,7 @@ public class SortieZoneDefinition
             ? SessionExtractionConstants.DefaultSafeOreSortieId
             : sortieId.Trim();
         displayName = string.IsNullOrWhiteSpace(displayName) ? sortieId : displayName.Trim();
-        if (radiusMeters <= 0f
-            || Mathf.Abs(radiusMeters - SessionExtractionConstants.LegacyDefaultSortieRadiusMeters) <= 0.1f)
+        if (radiusMeters <= 0f)
         {
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters;
         }
@@ -612,14 +598,12 @@ public class SortieZoneDefinition
         returnReserveMultiplier = Mathf.Max(1f, returnReserveMultiplier);
         extractionRunupRequiredSeconds = Mathf.Max(0f, extractionRunupRequiredSeconds);
         extractionRunupSpeedRatio = Mathf.Clamp01(extractionRunupSpeedRatio);
-        fallbackCoalKgPerSecond = NormalizeLegacyReturnRate(
-            fallbackCoalKgPerSecond,
-            LegacyDefaultReturnCoalKgPerSecond,
-            DefaultReturnCoalKgPerSecond);
-        fallbackClaudiumKgPerTonSecond = NormalizeLegacyReturnRate(
-            fallbackClaudiumKgPerTonSecond,
-            LegacyDefaultReturnClaudiumKgPerTonSecond,
-            DefaultReturnClaudiumKgPerTonSecond);
+        fallbackCoalKgPerSecond = fallbackCoalKgPerSecond <= 0f
+            ? DefaultReturnCoalKgPerSecond
+            : Mathf.Max(0f, fallbackCoalKgPerSecond);
+        fallbackClaudiumKgPerTonSecond = fallbackClaudiumKgPerTonSecond <= 0f
+            ? DefaultReturnClaudiumKgPerTonSecond
+            : Mathf.Max(0f, fallbackClaudiumKgPerTonSecond);
         starterResourceItemId ??= "";
         starterResourceChunkMin = Mathf.Max(1, starterResourceChunkMin);
         starterResourceChunkMax = Mathf.Max(starterResourceChunkMin, starterResourceChunkMax);
@@ -644,16 +628,6 @@ public class SortieZoneDefinition
         }
     }
 
-    private static float NormalizeLegacyReturnRate(float value, float legacyDefault, float currentDefault)
-    {
-        if (value <= 0f || Mathf.Abs(value - legacyDefault) <= 0.000001f)
-        {
-            return currentDefault;
-        }
-
-        return Mathf.Max(0f, value);
-    }
-
     public SortieZoneDefinition Clone()
     {
         string json = JsonUtility.ToJson(this);
@@ -671,7 +645,6 @@ public class SortieSessionState
     public SortieZoneDefinition zone = new SortieZoneDefinition();
     public long startedUtcTicks;
     public string launchedFromDockId = "capital";
-    public DockingLocationKind launchedFromDockKind = DockingLocationKind.Island;
     public Vector3 launchPosition;
     public Vector3 lastKnownPosition;
     public float extractionRunupSeconds;
@@ -689,13 +662,12 @@ public class SortieSessionState
         }
     }
 
-    public void Begin(SortieZoneDefinition definition, long utcTicks, string dockId, DockingLocationKind dockKind, Vector3 dockPosition)
+    public void Begin(SortieZoneDefinition definition, long utcTicks, string dockId, Vector3 dockPosition)
     {
         active = true;
         zone = definition != null ? definition.Clone() : new SortieZoneDefinition();
         startedUtcTicks = Math.Max(0L, utcTicks);
         launchedFromDockId = string.IsNullOrWhiteSpace(dockId) ? "capital" : dockId.Trim();
-        launchedFromDockKind = dockKind;
         launchPosition = dockPosition;
         lastKnownPosition = zone.entryPosition;
         extractionRunupSeconds = 0f;

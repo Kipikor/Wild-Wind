@@ -49,25 +49,6 @@ public class MiningFragment : MonoBehaviour
         return false;
     }
 
-    public static MiningFragment FindNearestForLeviathan(Vector3 position, float radiusMeters)
-    {
-        MiningFragment best = null;
-        float bestSqr = Mathf.Max(0f, radiusMeters) * Mathf.Max(0f, radiusMeters);
-        for (int i = 0; i < ActiveFragments.Count; i++)
-        {
-            MiningFragment fragment = ActiveFragments[i];
-            if (fragment == null || fragment.amountKg <= 0) continue;
-
-            float sqr = (fragment.transform.position - position).sqrMagnitude;
-            if (sqr > bestSqr) continue;
-
-            best = fragment;
-            bestSqr = sqr;
-        }
-
-        return best;
-    }
-
     public void Initialize(string itemId, int amount, float fallSpeed, float stormLevelY, Color color)
     {
         oreItemId = itemId ?? "";
@@ -88,13 +69,6 @@ public class MiningFragment : MonoBehaviour
         transform.Rotate(Vector3.up, spinSpeedDeg * Time.deltaTime, Space.World);
 
         if (transform.position.y <= stormY)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Leviathan eater = Leviathan.FindFragmentEater(transform.position);
-        if (eater != null && eater.TryEatOre(oreItemId, amountKg))
         {
             Destroy(gameObject);
             return;

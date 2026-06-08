@@ -1,7 +1,0 @@
-id_island,local_name_ru,local_name_en,position_x,position_y,position_z,archetype_id,Island_production,docking_radius,time_for_one_item_load
-capital,Столица,Capital,0,2500,0,,,160,0.8
-Island1,Ферма отца,Father's Farm,-2600,2500,-1000,farming,Island_production_food,130,0.8
-Island2,Аэролитовый остров,Aerolite Island,2300,2550,1200,ore,Island_production_aerolite,130,0.8
-Island3,Угольный причал,Coal Wharf,-1800,2500,3200,coal,Island_production_charcoal,120,0.8
-Island4,Туманный водосбор,Mist Waterworks,4200,2650,-1700,mist,Island_production_water,120,0.8
-Island5,Клавдиевая гряда,Claudium Ridge,4400,3200,2700,claudium,Island_production_claudium,140,0.8

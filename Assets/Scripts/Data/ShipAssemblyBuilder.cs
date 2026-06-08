@@ -10,10 +10,9 @@ public class ShipAssemblyResult
     public List<InstalledModuleState> installedModules = new List<InstalledModuleState>();
     public ShipStatBlock stats = new ShipStatBlock();
 }
-
 public static class ShipAssemblyBuilder
 {
-    public static bool TryBuild(ShipCatalogSO catalog, TechTreeDefinitionSO techTree, PlayerProgress progress, out ShipAssemblyResult result)
+    public static bool TryBuild(ShipCatalogSO catalog, PlayerProgress progress, out ShipAssemblyResult result)
     {
         result = new ShipAssemblyResult();
         if (catalog == null)
@@ -29,7 +28,6 @@ public static class ShipAssemblyBuilder
         }
 
         progress.Normalize();
-        bool sessionExtractionCoreMode = SessionExtractionCoreRuntime.IsCoreMode(progress);
         ShipPartDefinitionSO hull = catalog.GetPartById(progress.selectedHullId);
         if (hull == null || !hull.IsHull)
         {
@@ -42,14 +40,14 @@ public static class ShipAssemblyBuilder
             return false;
         }
 
-        if (!IsPartUsable(hull, techTree, progress))
+        if (!IsPartUsable(hull, progress))
         {
             result.message = "Корпус еще не куплен.";
             return false;
         }
 
         result.hull = hull;
-        AddSlots(result.slots, hull.slots, "", sessionExtractionCoreMode);
+        AddSlots(result.slots, hull.slots, "");
         if (!ValidateSlotIds(result.slots, out result.message))
         {
             return false;
@@ -83,7 +81,7 @@ public static class ShipAssemblyBuilder
                 return false;
             }
 
-            if (!IsPartUsable(module, techTree, progress))
+            if (!IsPartUsable(module, progress))
             {
                 result.message = "Модуль еще не куплен: " + module.displayName;
                 return false;
@@ -95,7 +93,7 @@ public static class ShipAssemblyBuilder
                 return false;
             }
 
-            AddSlots(result.slots, module.grantedSlots, slot.slotId + ":" + module.partId + ":", sessionExtractionCoreMode);
+            AddSlots(result.slots, module.grantedSlots, slot.slotId + ":" + module.partId + ":");
             if (!ValidateSlotIds(result.slots, out result.message))
             {
                 return false;
@@ -107,7 +105,7 @@ public static class ShipAssemblyBuilder
         return true;
     }
 
-    public static bool AutoInstallRequiredModules(ShipCatalogSO catalog, TechTreeDefinitionSO techTree, PlayerProgress progress, out string message)
+    public static bool AutoInstallRequiredModules(ShipCatalogSO catalog, PlayerProgress progress, out string message)
     {
         message = "";
         if (catalog == null || progress == null)
@@ -117,7 +115,6 @@ public static class ShipAssemblyBuilder
         }
 
         progress.Normalize();
-        bool sessionExtractionCoreMode = SessionExtractionCoreRuntime.IsCoreMode(progress);
         ShipPartDefinitionSO hull = catalog.GetPartById(progress.selectedHullId);
         if (hull == null || !hull.IsHull)
         {
@@ -131,7 +128,7 @@ public static class ShipAssemblyBuilder
         }
 
         List<ShipSlotDefinition> slots = new List<ShipSlotDefinition>();
-        AddSlots(slots, hull.slots, "", sessionExtractionCoreMode);
+        AddSlots(slots, hull.slots, "");
 
         bool changed = false;
         for (int i = 0; i < slots.Count; i++)
@@ -144,7 +141,7 @@ public static class ShipAssemblyBuilder
             bool installedIsValid = installedModule != null
                 && installedModule.IsModule
                 && installedModule.CanFitSlot(slot)
-                && IsPartUsable(installedModule, techTree, progress);
+                && IsPartUsable(installedModule, progress);
 
             if (!installedIsValid && !string.IsNullOrWhiteSpace(installedId))
             {
@@ -154,7 +151,7 @@ public static class ShipAssemblyBuilder
 
             if (!installedIsValid && slot.required)
             {
-                ShipPartDefinitionSO replacement = FindFirstAvailableModule(catalog, techTree, progress, slot);
+                ShipPartDefinitionSO replacement = FindFirstAvailableModule(catalog, progress, slot);
                 if (replacement == null)
                 {
                     message = "Нет купленного подходящего модуля для обязательного слота: " + slot.displayName;
@@ -168,7 +165,7 @@ public static class ShipAssemblyBuilder
 
             if (installedModule != null && installedModule.IsModule && installedModule.CanFitSlot(slot))
             {
-                AddSlots(slots, installedModule.grantedSlots, slot.slotId + ":" + installedModule.partId + ":", sessionExtractionCoreMode);
+                AddSlots(slots, installedModule.grantedSlots, slot.slotId + ":" + installedModule.partId + ":");
             }
         }
 
@@ -178,18 +175,10 @@ public static class ShipAssemblyBuilder
 
     public static bool ShouldIncludeSlotForProgress(ShipSlotDefinition slot, PlayerProgress progress)
     {
-        if (slot == null) return false;
-        return !SessionExtractionCoreRuntime.IsCoreMode(progress) || !IsLegacyUtilitySlot(slot);
+        return slot != null;
     }
 
-    private static bool IsLegacyUtilitySlot(ShipSlotDefinition slot)
-    {
-        if (slot == null) return false;
-        return slot.slotTypeId == SessionExtractionConstants.LegacyUtilitySlotTypeId
-            || slot.slotId == SessionExtractionConstants.LegacyUtilitySlotId;
-    }
-
-    public static bool IsPartUsable(ShipPartDefinitionSO part, TechTreeDefinitionSO techTree, PlayerProgress progress)
+    public static bool IsPartUsable(ShipPartDefinitionSO part, PlayerProgress progress)
     {
         if (part == null || progress == null) return false;
 
@@ -201,14 +190,14 @@ public static class ShipAssemblyBuilder
         return true;
     }
 
-    public static ShipPartDefinitionSO FindFirstAvailableModule(ShipCatalogSO catalog, TechTreeDefinitionSO techTree, PlayerProgress progress, ShipSlotDefinition slot)
+    public static ShipPartDefinitionSO FindFirstAvailableModule(ShipCatalogSO catalog, PlayerProgress progress, ShipSlotDefinition slot)
     {
         if (catalog == null || slot == null || catalog.parts == null) return null;
 
         for (int i = 0; i < catalog.parts.Count; i++)
         {
             ShipPartDefinitionSO part = catalog.parts[i];
-            if (part != null && part.IsModule && part.CanFitSlot(slot) && IsPartUsable(part, techTree, progress))
+            if (part != null && part.IsModule && part.CanFitSlot(slot) && IsPartUsable(part, progress))
             {
                 return part;
             }
@@ -217,7 +206,7 @@ public static class ShipAssemblyBuilder
         return null;
     }
 
-    public static int ApplyCsvShipPartConfigs(ShipCatalogSO catalog, WorldConfigDatabase config)
+    public static int ApplyCsvShipPartConfigs(ShipCatalogSO catalog, SessionConfigDatabase config)
     {
         if (catalog == null || config == null) return 0;
         catalog.parts ??= new List<ShipPartDefinitionSO>();
@@ -308,7 +297,7 @@ public static class ShipAssemblyBuilder
         return applied;
     }
 
-    public static int ApplySpecialModuleConfigs(ShipCatalogSO catalog, WorldConfigDatabase config)
+    public static int ApplySpecialModuleConfigs(ShipCatalogSO catalog, SessionConfigDatabase config)
     {
         if (catalog == null || config == null || config.specialModules == null) return 0;
         catalog.parts ??= new List<ShipPartDefinitionSO>();
@@ -376,66 +365,20 @@ public static class ShipAssemblyBuilder
         return part;
     }
 
-    private static List<ShipSlotDefinition> BuildHullSlots(HullConfig hullConfig, WorldConfigDatabase config)
+    private static List<ShipSlotDefinition> BuildHullSlots(HullConfig hullConfig, SessionConfigDatabase config)
     {
         List<ShipSlotDefinition> slots = new List<ShipSlotDefinition>();
         if (hullConfig == null) return slots;
 
-        if (R1ShipDesignCatalog.TryGetByHullId(hullConfig.id, out R1ShipDesignDefinition r1Design))
-        {
-            AddDesignSlots(slots, r1Design);
-            return slots;
-        }
-
-        if (R2TenderDesignCatalog.TryGetByHullId(hullConfig.id, out R1ShipDesignDefinition r2TenderDesign))
-        {
-            AddDesignSlots(slots, r2TenderDesign);
-            return slots;
-        }
-
-        if (hullConfig.id == "starter_hull")
-        {
-            slots.Add(CreateRequiredSlot("engine_main", "Маршевый двигатель", "engine_main", "starter_engine"));
-            slots.Add(CreateRequiredSlot("propeller_main", "Винт", "propeller_main", "starter_propeller"));
-            slots.Add(CreateRequiredSlot("claudium_loop", "Клавдиевый контур", "claudium_loop", "starter_claudium_loop"));
-            AddSessionExtractionSlots(slots);
-            slots.Add(new ShipSlotDefinition
-            {
-                slotId = "utility_01",
-                displayName = "Вспомогательный слот",
-                slotTypeId = "utility",
-                required = false,
-                allowedPartIds = new List<string>()
-            });
-            return slots;
-        }
-
-        slots.Add(CreateRequiredSlot("engine_main", "Маршевый двигатель", "engine_main"));
-        slots.Add(CreateRequiredSlot("propeller_main", "Винт", "propeller_main"));
-        slots.Add(CreateRequiredSlot("claudium_loop", "Клавдиевый контур", "claudium_loop"));
+        string engineId = hullConfig.id == "starter_hull" ? "starter_engine" : "";
+        string propellerId = hullConfig.id == "starter_hull" ? "starter_propeller" : "";
+        string claudiumLoopId = hullConfig.id == "starter_hull" ? "starter_claudium_loop" : "";
+        slots.Add(CreateRequiredSlot("engine_main", "Main engine", "engine_main", engineId));
+        slots.Add(CreateRequiredSlot("propeller_main", "Propeller", "propeller_main", propellerId));
+        slots.Add(CreateRequiredSlot("claudium_loop", "Claudium loop", "claudium_loop", claudiumLoopId));
         AddSessionExtractionSlots(slots);
-        slots.Add(new ShipSlotDefinition
-        {
-            slotId = "utility_01",
-            displayName = "Вспомогательный слот",
-            slotTypeId = "utility",
-            required = false,
-            allowedPartIds = new List<string>()
-        });
         return slots;
     }
-
-    private static void AddDesignSlots(List<ShipSlotDefinition> slots, R1ShipDesignDefinition design)
-    {
-        if (slots == null || design == null) return;
-
-        slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.EngineSlotId, "Маршевый двигатель", "engine_main", design.GetAllowedEngineIds()));
-        slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.PropellerSlotId, "Винт", "propeller_main", design.GetAllowedPropellerIds()));
-        slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.ClaudiumLoopSlotId, "Клавдиевый контур", "claudium_loop", design.GetAllowedClaudiumLoopIds()));
-        slots.Add(CreateRequiredSlot(R1ShipDesignCatalog.RoleModuleSlotId, "Ролевой модуль", "utility", design.GetAllowedSpecialModuleIds()));
-        AddSessionExtractionSlots(slots);
-    }
-
     private static void AddSessionExtractionSlots(List<ShipSlotDefinition> slots)
     {
         if (slots == null) return;
@@ -532,7 +475,6 @@ public static class ShipAssemblyBuilder
         AddStat(modifiers, ShipStatId.AltitudeDriftTolerance, ShipStatOperation.Set, hullConfig.altitudeDriftToleranceM);
         AddStat(modifiers, ShipStatId.HeadingStiffness, ShipStatOperation.Set, hullConfig.headingStiffness);
         AddStat(modifiers, ShipStatId.HeadingDamping, ShipStatOperation.Set, hullConfig.headingDamping);
-        AddStat(modifiers, ShipStatId.WaypointRadius, ShipStatOperation.Set, hullConfig.waypointRadiusM);
         AddStat(modifiers, ShipStatId.SpeedStiffness, ShipStatOperation.Set, hullConfig.speedStiffness);
         AddStat(modifiers, ShipStatId.SpeedDamping, ShipStatOperation.Set, hullConfig.speedDamping);
         AddStat(modifiers, ShipStatId.StructureHp, ShipStatOperation.Set, hullConfig.structureHp);
@@ -586,7 +528,7 @@ public static class ShipAssemblyBuilder
         });
     }
 
-    private static void AddSlots(List<ShipSlotDefinition> target, List<ShipSlotDefinition> source, string prefix, bool sessionExtractionCoreMode = false)
+    private static void AddSlots(List<ShipSlotDefinition> target, List<ShipSlotDefinition> source, string prefix)
     {
         if (target == null || source == null) return;
 
@@ -594,8 +536,6 @@ public static class ShipAssemblyBuilder
         {
             ShipSlotDefinition slot = source[i];
             if (slot == null) continue;
-            if (sessionExtractionCoreMode && IsLegacyUtilitySlot(slot)) continue;
-
             string slotId = string.IsNullOrWhiteSpace(slot.slotId) ? "slot_" + i : slot.slotId;
             target.Add(slot.CloneWithId(prefix + slotId));
         }
@@ -633,43 +573,12 @@ public static class ShipAssemblyBuilder
         if (moduleConfig == null) return modifiers;
 
         AddSpecialModuleStat(modifiers, ShipStatId.BaseMass, ShipStatOperation.Add, moduleConfig.baseMassKg);
-        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterVolumeM3PerSecond, ShipStatOperation.Set, moduleConfig.gasHarvesterVolumeM3PerSecond);
-        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterPowerDrawKw, ShipStatOperation.Set, moduleConfig.gasHarvesterPowerDrawKw);
-        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterRadiusMeters, ShipStatOperation.Set, moduleConfig.gasHarvesterRadiusMeters);
-        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterCycleSeconds, ShipStatOperation.Set, moduleConfig.gasHarvesterCycleSeconds);
-        AddSpecialModuleStat(modifiers, ShipStatId.GasHarvesterWaterOnly, ShipStatOperation.Set, moduleConfig.gasHarvesterWaterOnly ? 1f : 0f);
         AddSpecialModuleStat(modifiers, ShipStatId.MiningImpactHoldCapacityKg, ShipStatOperation.Set, moduleConfig.miningImpactHoldCapacityKg);
         AddSpecialModuleStat(modifiers, ShipStatId.MiningImpactDamageTakenMultiplier, ShipStatOperation.Set, moduleConfig.miningImpactDamageTakenMultiplier);
-        AddSpecialModuleStat(modifiers, ShipStatId.ObservationRadiusMeters, ShipStatOperation.Set, moduleConfig.observationRadiusMeters);
-        AddSpecialModuleStat(modifiers, ShipStatId.ObservationFactsAtHalfRadiusPerSecond, ShipStatOperation.Set, moduleConfig.observationFactsAtHalfRadiusPerSecond);
-        AddSpecialModuleStat(modifiers, ShipStatId.ObservationRockInfoEfficiency, ShipStatOperation.Set, moduleConfig.observationRockInfoEfficiency);
-        AddSpecialModuleStat(modifiers, ShipStatId.ObservationCloudInfoEfficiency, ShipStatOperation.Set, moduleConfig.observationCloudInfoEfficiency);
-        AddSpecialModuleStat(modifiers, ShipStatId.ObservationLeviathanInfoEfficiency, ShipStatOperation.Set, moduleConfig.observationLeviathanInfoEfficiency);
-        AddSpecialModuleStat(modifiers, ShipStatId.SurveyPaperToInfoEfficiency, ShipStatOperation.Set, moduleConfig.surveyPaperToInfoEfficiency);
-        AddSpecialModuleStat(modifiers, ShipStatId.LeviathanAlarmGenerationMultiplier, ShipStatOperation.Set, moduleConfig.leviathanAlarmGenerationMultiplier);
-        AddSpecialModuleStat(modifiers, ShipStatId.HarpoonWeaponCostPerMinute, ShipStatOperation.Set, moduleConfig.harpoonWeaponCostPerMinute);
-        AddSpecialModuleStat(modifiers, ShipStatId.HarpoonMaxCarcassMassKg, ShipStatOperation.Set, moduleConfig.harpoonMaxCarcassMassKg);
-        AddSpecialModuleStat(modifiers, ShipStatId.HarpoonFlightDamage, ShipStatOperation.Set, moduleConfig.harpoonFlightDamage);
-        AddSpecialModuleStat(modifiers, ShipStatId.HarpoonRangeMeters, ShipStatOperation.Set, moduleConfig.harpoonRangeMeters);
-        AddSpecialModuleStat(modifiers, ShipStatId.NeedWorkforceRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needWorkforceRecoveryPerHour);
-        AddSpecialModuleStat(modifiers, ShipStatId.NeedHealthRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needHealthRecoveryPerHour);
-        AddSpecialModuleStat(modifiers, ShipStatId.NeedSafetyRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needSafetyRecoveryPerHour);
-        AddSpecialModuleStat(modifiers, ShipStatId.NeedComfortRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needComfortRecoveryPerHour);
-        AddSpecialModuleStat(modifiers, ShipStatId.NeedCreativityRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needCreativityRecoveryPerHour);
-        AddSpecialModuleStat(modifiers, ShipStatId.NeedRepairRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needRepairRecoveryPerHour);
-        AddSpecialModuleStat(modifiers, ShipStatId.NeedCapitalConnectionRecoveryPerHour, ShipStatOperation.Add, moduleConfig.needCapitalConnectionRecoveryPerHour);
         AddSpecialModuleStat(modifiers, ShipStatId.CargoVanCapacityKg, ShipStatOperation.Add, moduleConfig.cargoVanCapacityKg);
-        AddSpecialModuleStat(modifiers, ShipStatId.PassengerSeatCapacity, ShipStatOperation.Add, moduleConfig.passengerSeatCapacity);
         AddSpecialModuleStat(modifiers, ShipStatId.BulkHoldCapacityKg, ShipStatOperation.Add, moduleConfig.bulkHoldCapacityKg);
         AddSpecialModuleStat(modifiers, ShipStatId.LiquidTankCapacityKg, ShipStatOperation.Add, moduleConfig.liquidTankCapacityKg);
         AddSpecialModuleStat(modifiers, ShipStatId.GasCylinderCapacityKg, ShipStatOperation.Add, moduleConfig.gasCylinderCapacityKg);
-        AddSpecialModuleStat(modifiers, ShipStatId.ShipDockSlots, ShipStatOperation.Add, moduleConfig.shipDockSlots);
-        if (moduleConfig.shipDockSlots > 0f)
-        {
-            AddSpecialModuleStat(modifiers, ShipStatId.ShipDockMaxClass, ShipStatOperation.Set, (float)moduleConfig.shipDockMaxClass);
-            AddSpecialModuleStat(modifiers, ShipStatId.DockedShipMassFactor, ShipStatOperation.Set, moduleConfig.dockedShipMassFactor);
-            AddSpecialModuleStat(modifiers, ShipStatId.DockSupportClaudiumPerTonHour, ShipStatOperation.Set, moduleConfig.dockSupportClaudiumPerTonHour);
-        }
         return modifiers;
     }
 
@@ -786,7 +695,6 @@ public class ShipStatBlock
         ship.altDriftTolerance = Mathf.Max(0f, Get(ShipStatId.AltitudeDriftTolerance, ship.altDriftTolerance));
         ship.headingStiffness = Mathf.Max(0f, Get(ShipStatId.HeadingStiffness, ship.headingStiffness));
         ship.headingDamping = Mathf.Max(0f, Get(ShipStatId.HeadingDamping, ship.headingDamping));
-        ship.waypointRadius = Mathf.Max(0.1f, Get(ShipStatId.WaypointRadius, ship.waypointRadius));
         ship.speedStiffness = Mathf.Max(0f, Get(ShipStatId.SpeedStiffness, ship.speedStiffness));
         ship.speedDamping = Mathf.Max(0f, Get(ShipStatId.SpeedDamping, ship.speedDamping));
         ship.claudiumConsumptionPerTonSecond = Mathf.Max(0f, Get(ShipStatId.ClaudiumConsumptionPerTonSecond, 0f));
@@ -801,24 +709,8 @@ public class ShipStatBlock
 
         ship.enginePowerKwAt100 = Mathf.Max(0f, Get(ShipStatId.EngineMaxPower, ship.enginePowerKwAt100));
         ship.engineFuelEfficiency = Mathf.Clamp(Get(ShipStatId.EngineFuelEfficiency, ship.engineFuelEfficiency), 0.01f, 0.95f);
-        ship.gasHarvesterVolumeM3PerSecond = Mathf.Max(0f, Get(ShipStatId.GasHarvesterVolumeM3PerSecond, 0f));
-        ship.gasHarvesterPowerDrawKw = Mathf.Max(0f, Get(ShipStatId.GasHarvesterPowerDrawKw, 0f));
-        ship.gasHarvesterRadiusMeters = Mathf.Max(0f, Get(ShipStatId.GasHarvesterRadiusMeters, 0f));
-        ship.gasHarvesterCycleSeconds = Mathf.Max(0.1f, Get(ShipStatId.GasHarvesterCycleSeconds, 5f));
-        ship.gasHarvesterWaterOnly = Get(ShipStatId.GasHarvesterWaterOnly, ship.gasHarvesterWaterOnly ? 1f : 0f) > 0.5f;
         ship.miningImpactHoldCapacityKg = Mathf.Max(0f, Get(ShipStatId.MiningImpactHoldCapacityKg, 0f));
         ship.miningImpactDamageTakenMultiplier = Mathf.Max(0f, Get(ShipStatId.MiningImpactDamageTakenMultiplier, ship.miningImpactDamageTakenMultiplier));
-        ship.observationRadiusMeters = Mathf.Max(ship.baseObservationRadiusMeters, Get(ShipStatId.ObservationRadiusMeters, ship.baseObservationRadiusMeters));
-        ship.observationFactsAtHalfRadiusPerSecond = Mathf.Max(0.01f, Get(ShipStatId.ObservationFactsAtHalfRadiusPerSecond, 1f));
-        ship.observationRockInfoEfficiency = Mathf.Clamp01(Get(ShipStatId.ObservationRockInfoEfficiency, 0f));
-        ship.observationCloudInfoEfficiency = Mathf.Clamp01(Get(ShipStatId.ObservationCloudInfoEfficiency, 0f));
-        ship.observationLeviathanInfoEfficiency = Mathf.Clamp01(Get(ShipStatId.ObservationLeviathanInfoEfficiency, 0f));
-        ship.surveyPaperToInfoEfficiency = Mathf.Clamp(Get(ShipStatId.SurveyPaperToInfoEfficiency, ship.surveyPaperToInfoEfficiency), 0.01f, 1f);
-        ship.leviathanAlarmGenerationMultiplier = Mathf.Max(0f, Get(ShipStatId.LeviathanAlarmGenerationMultiplier, ship.leviathanAlarmGenerationMultiplier));
-        ship.harpoonWeaponCostPerMinute = Mathf.Max(0f, Get(ShipStatId.HarpoonWeaponCostPerMinute, ship.harpoonWeaponCostPerMinute));
-        ship.harpoonMaxCarcassMassKg = Mathf.Max(0f, Get(ShipStatId.HarpoonMaxCarcassMassKg, ship.harpoonMaxCarcassMassKg));
-        ship.leviathanWeaponShotFlightDamage = Mathf.Max(0f, Get(ShipStatId.HarpoonFlightDamage, ship.leviathanWeaponShotFlightDamage));
-        ship.harpoonRangeMeters = Mathf.Max(0f, Get(ShipStatId.HarpoonRangeMeters, ship.harpoonRangeMeters));
         DamageableShip damageableShip = ship.GetComponentInParent<DamageableShip>();
         if (damageableShip != null)
         {

@@ -1,2 +1,0 @@
-id_mining_zone,local_name_ru,local_name_en,position_x,position_z,radius_m,ore_type_id,max_active_rocks,spawn_interval_seconds,initial_rocks,initial_age_fraction,storm_y,storm_safety_clearance_y,spawn_y,apex_y,descent_speed_ms,ascent_duration_seconds,rock_radius_m,rock_ore_kg
-aerolite_training_belt,Учебный аэролитовый пояс,Aerolite Training Belt,2900,1600,750,"windshale,dawnspar,bluebrass,silverdrift",2,720,1,0.45,-100,45,-100,165,0.075,90,12,8000

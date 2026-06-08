@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: StarterMiningHold
   m_EditorClassIdentifier: Assembly-CSharp::ShipPartDefinitionSO
   partId: starter_mining_hold
-  displayName: "\u041F\u0440\u043E\u0442\u0438\u0432\u043E\u0443\u0434\u0430\u0440\u043D\u044B\u0439 \u043A\u0443\u0437\u043E\u0432 I"
-  description: "\u0421\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u043C\u0430\u0439\u043D\u0438\u043D\u0433\u043E\u0432\u044B\u0439 \u043C\u043E\u0434\u0443\u043B\u044C: \u043B\u043E\u0432\u0438\u0442 \u043F\u0430\u0434\u0430\u044E\u0449\u0438\u0435 \u043A\u0443\u0441\u043A\u0438 \u0440\u0443\u0434\u044B \u0438 \u0434\u0435\u0440\u0436\u0438\u0442 \u0438\u0445 \u0432 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u043E\u043C \u043F\u0440\u043E\u0442\u0438\u0432\u043E\u0443\u0434\u0430\u0440\u043D\u043E\u043C \u043A\u0443\u0437\u043E\u0432\u0435."
+  displayName: Impact Ore Hold I
+  description: Starter high-slot ore and wreck collector.
   completedTechId:
   kind: 1
   prefab: {fileID: 6200010000000000001, guid: 5e35cbdc196840f5996817ed98d4292f, type: 3}
   engineFuelId:
   slots: []
   compatibleSlotTypeIds:
-  - utility
+  - high
   grantedSlots: []
   statModifiers:
   - stat: 0
@@ -29,4 +29,13 @@ MonoBehaviour:
     value: 55
   - stat: 60
     operation: 0
+    value: 60
+  - stat: 61
+    operation: 0
+    value: 1
+  - stat: 100
+    operation: 1
+    value: 25
+  - stat: 102
+    operation: 1
     value: 60

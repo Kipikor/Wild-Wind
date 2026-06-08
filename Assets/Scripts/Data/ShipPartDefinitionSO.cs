@@ -190,8 +190,6 @@ public enum ShipStatId
     HeadingStiffness = 30,
     [InspectorName("Демпфирование курса")]
     HeadingDamping = 31,
-    [InspectorName("Радиус точки маршрута")]
-    WaypointRadius = 32,
     [InspectorName("Жесткость скорости")]
     SpeedStiffness = 34,
     [InspectorName("Демпфирование скорости")]
@@ -210,74 +208,18 @@ public enum ShipStatId
     GyroTurnDamping = 44,
     [InspectorName("Максимальная взлетная масса корпуса, кг")]
     HullMaxTakeoffMassKg = 45,
-    [InspectorName("Харвестер: производительность, м3/с")]
-    GasHarvesterVolumeM3PerSecond = 50,
-    [InspectorName("Харвестер: забор мощности, кВт")]
-    GasHarvesterPowerDrawKw = 51,
-    [InspectorName("Харвестер: радиус забора, м")]
-    GasHarvesterRadiusMeters = 52,
-    [InspectorName("Харвестер: длительность цикла, сек")]
-    GasHarvesterCycleSeconds = 53,
-    [InspectorName("Харвестер: водный режим")]
-    GasHarvesterWaterOnly = 54,
     [InspectorName("Майнинг: вместимость противоударного кузова, кг")]
     MiningImpactHoldCapacityKg = 60,
     [InspectorName("Майнинг: множитель урона от глыб")]
     MiningImpactDamageTakenMultiplier = 61,
-    [InspectorName("Разведка: радиус наблюдения, м")]
-    ObservationRadiusMeters = 70,
-    [InspectorName("Разведка: скорость сведений на 50% радиуса")]
-    ObservationFactsAtHalfRadiusPerSecond = 71,
-    [InspectorName("Разведка: эффективность информации по глыбам")]
-    ObservationRockInfoEfficiency = 72,
-    [InspectorName("Разведка: эффективность информации по облакам")]
-    ObservationCloudInfoEfficiency = 73,
-    [InspectorName("Разведка: эффективность информации по левиафанам")]
-    ObservationLeviathanInfoEfficiency = 74,
-    [InspectorName("Разведка: КПД бумаги в информацию")]
-    SurveyPaperToInfoEfficiency = 75,
-    [InspectorName("Разведка: множитель тревоги левиафанов")]
-    LeviathanAlarmGenerationMultiplier = 76,
-    [InspectorName("Гарпун: расход оружия в минуту")]
-    HarpoonWeaponCostPerMinute = 80,
-    [InspectorName("Гарпун: максимальная масса туши")]
-    HarpoonMaxCarcassMassKg = 81,
-    [InspectorName("Гарпун: урон выстрела")]
-    HarpoonFlightDamage = 82,
-    [InspectorName("Гарпун: дальность")]
-    HarpoonRangeMeters = 83,
-    [InspectorName("Потребность: рабочая сила, восстановление/час")]
-    NeedWorkforceRecoveryPerHour = 90,
-    [InspectorName("Потребность: здоровье, восстановление/час")]
-    NeedHealthRecoveryPerHour = 91,
-    [InspectorName("Потребность: безопасность, восстановление/час")]
-    NeedSafetyRecoveryPerHour = 92,
-    [InspectorName("Потребность: комфорт, восстановление/час")]
-    NeedComfortRecoveryPerHour = 93,
-    [InspectorName("Потребность: творчество, восстановление/час")]
-    NeedCreativityRecoveryPerHour = 94,
-    [InspectorName("Потребность: ремонт, восстановление/час")]
-    NeedRepairRecoveryPerHour = 95,
-    [InspectorName("Потребность: связь со столицей, восстановление/час")]
-    NeedCapitalConnectionRecoveryPerHour = 96,
     [InspectorName("Груз: общий лимит, кг")]
     CargoVanCapacityKg = 100,
-    [InspectorName("Груз: пассажирские места")]
-    PassengerSeatCapacity = 101,
     [InspectorName("Груз: кузов, кг")]
     BulkHoldCapacityKg = 102,
     [InspectorName("Груз: цистерна, кг")]
     LiquidTankCapacityKg = 103,
     [InspectorName("Груз: баллоны, кг")]
     GasCylinderCapacityKg = 104,
-    [InspectorName("Груз: док, слоты")]
-    ShipDockSlots = 105,
-    [InspectorName("Груз: док, максимальный класс")]
-    ShipDockMaxClass = 106,
-    [InspectorName("Груз: масса корабля в доке")]
-    DockedShipMassFactor = 107,
-    [InspectorName("Груз: клавдий дока, кг/т/ч")]
-    DockSupportClaudiumPerTonHour = 108,
     [InspectorName("РџСЂРѕС‡РЅРѕСЃС‚СЊ РєРѕСЂРїСѓСЃР°")]
     StructureHp = 111
 }

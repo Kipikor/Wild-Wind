@@ -24,7 +24,7 @@ public class ShipLoader : MonoBehaviour
         targetShip = FindFirstObjectByType<ShipPhysics>();
     }
 
-    public bool ApplyAssembly(PlayerProgress progress, TechTreeDefinitionSO techTree, out string message)
+    public bool ApplyAssembly(PlayerProgress progress, out string message)
     {
         message = "";
         if (catalog == null || !catalog.HasAssemblyParts())
@@ -33,7 +33,7 @@ public class ShipLoader : MonoBehaviour
             return false;
         }
 
-        if (!ShipAssemblyBuilder.TryBuild(catalog, techTree, progress, out ShipAssemblyResult result))
+        if (!ShipAssemblyBuilder.TryBuild(catalog, progress, out ShipAssemblyResult result))
         {
             message = result.message;
             return false;

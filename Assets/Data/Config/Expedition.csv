@@ -1,3 +1,0 @@
-id_expedition,local_name_ru,local_name_en,region_id,scene_name,return_dock_id,return_dock_kind,minimum_flagship_rank,morale_drain_multiplier,summary_ru
-frontier_trial,Тестовая окраина,Frontier Trial,frontier_trial_region,WildWindWorldScene,capital,Island,3,1.25,Первый каркас отдельной экспедиции для флагмана R3+: старт из столицы возврат домой и мораль как таймер региона.
-storm_reach,Штормовая кромка,Storm Reach,storm_reach_region,WildWindWorldScene,capital,Island,4,1.6,Более тяжёлая экспедиция для следующего ранга флагманов с ускоренным падением морали.
