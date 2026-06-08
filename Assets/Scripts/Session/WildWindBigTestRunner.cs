@@ -882,6 +882,17 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
         }
 
+        if (mainCamera != null)
+        {
+            report.Check(mainCamera.clearFlags == CameraClearFlags.Skybox,
+                "MainCamera clears to the skybox so the flight scene cannot fall back to a black background.");
+        }
+
+        report.Check(RenderSettings.skybox != null,
+            RenderSettings.skybox != null
+                ? "Runtime skybox material is assigned: " + RenderSettings.skybox.name + "."
+                : "Runtime skybox material is missing.");
+
         if (RenderSettings.fog)
         {
             report.Pass("Unity fog РІРєР»СЋС‡С‘РЅ РєР°Рє Р±Р°Р·РѕРІР°СЏ СЃС‚СЂР°С…РѕРІРѕС‡РЅР°СЏ РґС‹РјРєР°.");
@@ -2826,6 +2837,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         float calmVisibility = ReadPrivateFloat(sessionAtmosphereTuner, "calmStormVisibility", -1f);
         float deadlyDrawDistance = ReadPrivateFloat(sessionAtmosphereTuner, "deadlyStormDrawDistance", -1f);
         bool useAltitudeAtmosphere = ReadPrivateBool(sessionAtmosphereTuner, "useAltitudeAtmosphere", false);
+        bool leanRuntimeAtmosphere = ReadPrivateBool(sessionAtmosphereTuner, "leanRuntimeAtmosphere", false);
+        bool useUnityFogFallback = ReadPrivateBool(sessionAtmosphereTuner, "useUnityFogFallback", false);
+
+        report.Check(leanRuntimeAtmosphere && useUnityFogFallback,
+            "Runtime atmosphere uses a lean Unity fog fallback by default instead of always running expensive AERO/TrueClouds passes.");
 
         report.Check(useAltitudeAtmosphere, "Р’С‹СЃРѕС‚РЅРѕРµ СѓРїСЂР°РІР»РµРЅРёРµ AERO-С‚СѓРјР°РЅРѕРј РІРєР»СЋС‡РµРЅРѕ.");
         report.Check(Approximately(transitionHalfWidth, 50f, 0.5f), "РџР»Р°РІРЅС‹Р№ РїРµСЂРµС…РѕРґ РІС‹СЃРѕС‚РЅС‹С… Р·РѕРЅ РґРµСЂР¶РёС‚СЃСЏ РѕРєРѕР»Рѕ +-50 Рј: " + transitionHalfWidth.ToString("0.#") + " Рј.");
@@ -2890,17 +2906,25 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         {
             bool mouseLookEnabled = ReadPrivateBool(sessionCameraController, "warshipsFlightMouseLook", false);
             bool altReleasesCursor = ReadPrivateBool(sessionCameraController, "altReleasesCursor", false);
+            bool rigidFlightCamera = ReadPrivateBool(sessionCameraController, "rigidFlightCamera", true);
             float aimLookAheadMeters = ReadPrivateFloat(sessionCameraController, "flightAimLookAheadMeters", -1f);
             report.Check(mouseLookEnabled && altReleasesCursor && aimLookAheadMeters >= 50f,
                 "Flight camera keeps Warships-style locked mouse look, Alt cursor release, and a forward aim point: "
                 + "mouseLook=" + mouseLookEnabled
                 + ", altRelease=" + altReleasesCursor
                 + ", lookAhead=" + aimLookAheadMeters.ToString("0.#") + " m.");
+            report.Check(!rigidFlightCamera,
+                "Flight camera uses smoothed follow in flight instead of rigid raw physics poses.");
         }
 
 #if UNITY_EDITOR
         string cameraSource = ReadProjectText("Assets/Scripts/Session/WildWindSessionCameraController.cs");
         string shipSource = ReadProjectText("Assets/Scripts/Systems/ShipPhysics.cs");
+        bool cameraUsesUnscaledTime =
+            cameraSource.Contains("Time.unscaledDeltaTime > 0f") &&
+            !cameraSource.Contains("Mathf.Max(Time.unscaledDeltaTime, Time.deltaTime)");
+        report.Check(cameraUsesUnscaledTime,
+            "Flight camera smoothing uses unscaled delta time and is not amplified by simulation time scale.");
         bool cameraLooksAhead = ContainsAllIgnoreCase(
             cameraSource,
             "LastCameraAimTarget",
@@ -3051,21 +3075,26 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ship.windVelocity = new Vector3(0f, 0f, 10f);
             report.Check(Approximately(ship.EffectiveWindVelocity.magnitude, 12f, 0.001f), "РџР»РѕС…Р°СЏ Р°СЌСЂРѕРґРёРЅР°РјРёРєР° 1.2 СѓСЃРёР»РёРІР°РµС‚ РІРѕР·РґРµР№СЃС‚РІРёРµ РІРµС‚СЂР° РґРѕ 12 Рј/СЃ.");
 
-            body.linearVelocity = new Vector3(14f, 0f, 0f);
+            ship.baseMaxSpeedMS = 50f;
+            ship.propellerMaxSpeedMS = 50f;
+            ship.slipstreamActivationSpeedRatio = 0.8f;
+            ship.slipstreamMaxSpeedMultiplier = 5f;
+            body.linearVelocity = new Vector3(39f, 0f, 0f);
             bool slipstreamBlockedBelowSpeed = !ship.TrySetClaudiumSlipstreamEnabled(true, out _);
-            body.linearVelocity = new Vector3(16f, 0f, 0f);
+            body.linearVelocity = new Vector3(41f, 0f, 0f);
             bool slipstreamEnabledAboveSpeed = ship.TrySetClaudiumSlipstreamEnabled(true, out _);
             ship.claudiumSlipstreamCharge01 = 1f;
-            bool slipstreamFullEffect = Approximately(ship.ClaudiumSlipstreamDragMultiplier, 0.05f, 0.001f)
-                && Approximately(ship.ClaudiumSlipstreamClaudiumMultiplier, 10f, 0.001f);
-            body.linearVelocity = new Vector3(14f, 0f, 0f);
+            bool slipstreamFullEffect = Approximately(ship.CurrentMaxSpeedMS, 250f, 0.001f)
+                && Approximately(ship.ClaudiumSlipstreamDragMultiplier, 1f, 0.001f)
+                && Approximately(ship.ClaudiumSlipstreamClaudiumMultiplier, 1f, 0.001f);
+            body.linearVelocity = new Vector3(39f, 0f, 0f);
             bool slipstreamDisabledAfterSlowdown = TryInvokePrivateMethod(ship, "FixedUpdate", report)
                 && !ship.claudiumSlipstreamEnabled;
             report.Check(slipstreamBlockedBelowSpeed
                 && slipstreamEnabledAboveSpeed
                 && slipstreamDisabledAfterSlowdown
                 && slipstreamFullEffect,
-                "Claudium slipstream activates only above 15 m/s, drops out below 15 m/s, then reaches x0.05 drag and x10 claudium consumption.");
+                "Claudium slipstream uses a relative 80% clean-speed threshold, ramps max ход x5, and no longer changes drag or claudium burn.");
             ship.TrySetClaudiumSlipstreamEnabled(false, out _);
             ship.claudiumSlipstreamCharge01 = 0f;
 
@@ -3179,6 +3208,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 report.Check(expectedMaxSpeed > 0f && IsFinite(expectedMaxSpeed), "Р Р°СЃС‡С‘С‚РЅР°СЏ РјР°РєСЃРёРјР°Р»СЊРЅР°СЏ СЃРєРѕСЂРѕСЃС‚СЊ РґР»СЏ С‚РµСЃС‚РѕРІРѕРіРѕ РєРѕСЂР°Р±Р»СЏ РєРѕРЅРµС‡РЅР°: " + expectedMaxSpeed.ToString("0.###") + " Рј/СЃ.");
                 report.Check(Mathf.Abs(actualSpeed - expectedMaxSpeed) <= tolerance, "РЎРёРјСѓР»СЏС†РёСЏ РїРѕР»РЅРѕРіРѕ РіР°Р·Р° СЃС…РѕРґРёС‚СЃСЏ Рє СЂР°СЃС‡С‘С‚РЅРѕР№ СЃРєРѕСЂРѕСЃС‚Рё: СЂР°СЃС‡С‘С‚ " + expectedMaxSpeed.ToString("0.###") + " Рј/СЃ, С„Р°РєС‚ " + actualSpeed.ToString("0.###") + " Рј/СЃ, РґРѕРїСѓСЃРє " + tolerance.ToString("0.###") + " Рј/СЃ.");
             }
+
+            ValidateShipPhysicsPushPreservesExternalImpulse(probeScene, physicsScene, report);
         }
         finally
         {
@@ -5173,6 +5204,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             resourceCacheController = cacheControllerObject.AddComponent<SortieResourceCacheController>();
         }
 
+        report.Check(MiningFragment.DefaultMaxActiveFragments <= 200 && MiningFragment.MaxActiveFragments <= 200,
+            "Mining fragments are capped so high-altitude sortie drops cannot accumulate hundreds of active sphere renderers.");
+
         ValidateStarterResourceCacheSortie(
             report,
             loadedMeta,
@@ -6219,6 +6253,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ship.sideResistance = 1f;
         ship.verticalAreaFactor = 4f;
         ship.windVelocity = Vector3.zero;
+        ship.baseMaxSpeedMS = 0f;
+        ship.loadSpeedMultiplier = 1f;
+        ship.damageSpeedMultiplier = 1f;
+        ship.nearMaxThrustFadeStartRatio = 0.72f;
+        ship.nearMaxThrustFadeEndRatio = 1f;
+        ship.slipstreamMaxSpeedMultiplier = 5f;
+        ship.slipstreamActivationSpeedRatio = 0.8f;
+        ship.slipstreamMaxRampSeconds = ShipPhysics.ClaudiumSlipstreamActivationSeconds;
+        ship.claudiumSlipstreamEnabled = false;
+        ship.claudiumSlipstreamCharge01 = 0f;
         ship.autoStabilizeAtStart = false;
         ship.altitudeHold = false;
         ship.cruiseControl = false;
@@ -6285,7 +6329,205 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return 0f;
         }
 
-        return Mathf.Pow(usefulPowerW / dragPerSpeedSquared, 1f / 3f);
+        float powerTerminalSpeed = Mathf.Pow(usefulPowerW / dragPerSpeedSquared, 1f / 3f);
+        return Mathf.Min(powerTerminalSpeed, ship.CurrentMaxSpeedMS);
+    }
+
+    private static void ValidateShipPhysicsPushPreservesExternalImpulse(Scene probeScene, PhysicsScene physicsScene, BigTestReport report)
+    {
+        if (!probeScene.IsValid() || !physicsScene.IsValid())
+        {
+            report.Fail("Ship push physics probe did not receive a valid isolated scene.");
+            return;
+        }
+
+        GameObject overspeedObject = null;
+        GameObject strongObject = null;
+        GameObject weakObject = null;
+        try
+        {
+            overspeedObject = CreateShipPushProbeObject(
+                "Big Test External Overspeed Probe",
+                probeScene,
+                Vector3.zero,
+                Quaternion.identity,
+                1000f,
+                0f,
+                5f);
+            ShipPhysics overspeedShip = overspeedObject.GetComponent<ShipPhysics>();
+            Rigidbody overspeedBody = overspeedObject.GetComponent<Rigidbody>();
+            overspeedShip.thrustInput = 0f;
+            overspeedShip.propellerPitch = 0f;
+            overspeedBody.linearVelocity = new Vector3(0f, 0f, 20f);
+
+            if (StepShipPhysicsProbes(physicsScene, 10, report, overspeedShip))
+            {
+                Vector3 overspeedVelocity = overspeedBody.linearVelocity;
+                overspeedVelocity.y = 0f;
+                report.Check(overspeedVelocity.magnitude > 19f && overspeedShip.CurrentMaxSpeedMS <= 5.1f,
+                    "Ship max ход limits only own thrust: external overspeed "
+                    + overspeedVelocity.magnitude.ToString("0.###")
+                    + " m/s remains above max "
+                    + overspeedShip.CurrentMaxSpeedMS.ToString("0.###")
+                    + " m/s without Rigidbody velocity clamp.");
+            }
+
+            DestroyBigTestObject(overspeedObject);
+            overspeedObject = null;
+
+            strongObject = CreateShipPushProbeObject(
+                "Big Test Strong Push Ship",
+                probeScene,
+                new Vector3(0f, 0f, -1.02f),
+                Quaternion.identity,
+                2000f,
+                40f,
+                18f);
+            weakObject = CreateShipPushProbeObject(
+                "Big Test Weak Push Ship",
+                probeScene,
+                new Vector3(0f, 0f, 1.02f),
+                Quaternion.Euler(0f, 180f, 0f),
+                1000f,
+                10f,
+                18f);
+
+            ShipPhysics strongShip = strongObject.GetComponent<ShipPhysics>();
+            ShipPhysics weakShip = weakObject.GetComponent<ShipPhysics>();
+            Rigidbody strongBody = strongObject.GetComponent<Rigidbody>();
+            Rigidbody weakBody = weakObject.GetComponent<Rigidbody>();
+            float weakStartZ = weakBody.position.z;
+
+            strongShip.thrustInput = 1f;
+            strongShip.propellerPitch = 1f;
+            strongShip.enginePowerLever = 1f;
+            weakShip.thrustInput = 1f;
+            weakShip.propellerPitch = 1f;
+            weakShip.enginePowerLever = 1f;
+
+            if (StepShipPhysicsProbes(physicsScene, 160, report, strongShip, weakShip))
+            {
+                bool weakPushedBack = weakBody.position.z > weakStartZ + 0.25f
+                    && weakBody.linearVelocity.z > 0.25f;
+                bool strongStillPushing = strongShip.propellerThrustKgf > weakShip.propellerThrustKgf;
+                report.Check(weakPushedBack && strongStillPushing,
+                    "More powerful Rigidbody ship can push a weaker ship in contact: weak z "
+                    + weakStartZ.ToString("0.###")
+                    + " -> "
+                    + weakBody.position.z.ToString("0.###")
+                    + ", weak vz "
+                    + weakBody.linearVelocity.z.ToString("0.###")
+                    + " m/s, thrust "
+                    + strongShip.propellerThrustKgf.ToString("0.#")
+                    + " vs "
+                    + weakShip.propellerThrustKgf.ToString("0.#")
+                    + " kgf.");
+            }
+        }
+        finally
+        {
+            DestroyBigTestObject(overspeedObject);
+            DestroyBigTestObject(strongObject);
+            DestroyBigTestObject(weakObject);
+        }
+    }
+
+    private static GameObject CreateShipPushProbeObject(
+        string name,
+        Scene scene,
+        Vector3 position,
+        Quaternion rotation,
+        float massKg,
+        float enginePowerKw,
+        float maxSpeedMS)
+    {
+        GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        probe.name = name;
+        probe.transform.SetPositionAndRotation(position, rotation);
+        probe.transform.localScale = new Vector3(2f, 1f, 2f);
+        SceneManager.MoveGameObjectToScene(probe, scene);
+
+        Rigidbody body = probe.AddComponent<Rigidbody>();
+        body.mass = Mathf.Max(1f, massKg);
+        body.useGravity = false;
+        body.linearDamping = 0f;
+        body.angularDamping = 0f;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+
+        ShipPhysics ship = probe.AddComponent<ShipPhysics>();
+        ship.enabled = false;
+        ship.baseMass = Mathf.Max(1f, massKg);
+        ship.cargoMassKg = 0f;
+        ship.enginePowerKwAt100 = Mathf.Max(0f, enginePowerKw);
+        ship.engineFuelEfficiency = 1f;
+        ship.engineFuelEnergyKwhPerKg = 4f;
+        ship.engineFuelStockKg = 1000f;
+        ship.enginePowerLever = enginePowerKw > 0f ? 1f : 0f;
+        ship.engineResponseRate01PerSecond = 0f;
+        ship.baseMaxSpeedMS = Mathf.Max(1f, maxSpeedMS);
+        ship.propellerMaxSpeedMS = Mathf.Max(1f, maxSpeedMS);
+        ship.propellerEfficiency = 1f;
+        ship.airDensity = 0f;
+        ship.dragCoefficient = 0f;
+        ship.frontalArea = 0f;
+        ship.sideResistance = 0f;
+        ship.claudiumStock = 0f;
+        ship.claudiumMaxLiftKg = 0f;
+        ship.claudiumLiftEfficiency = 0f;
+        ship.claudiumConsumptionPerTonSecond = 0f;
+        ship.loadSpeedMultiplier = 1f;
+        ship.damageSpeedMultiplier = 1f;
+        ship.nearMaxThrustFadeStartRatio = 0.85f;
+        ship.nearMaxThrustFadeEndRatio = 1f;
+        ship.slipstreamMaxSpeedMultiplier = 5f;
+        ship.slipstreamActivationSpeedRatio = 0.8f;
+        ship.RefreshRuntimeShipSettings();
+        ship.StabilizeForFlightStart(false);
+        body.useGravity = false;
+        body.linearDamping = 0f;
+        body.angularDamping = 0f;
+        body.mass = Mathf.Max(1f, massKg);
+        return probe;
+    }
+
+    private static bool StepShipPhysicsProbes(PhysicsScene physicsScene, int steps, BigTestReport report, params ShipPhysics[] ships)
+    {
+        if (ships == null || ships.Length == 0)
+        {
+            report.Fail("Ship physics probe step did not receive ships.");
+            return false;
+        }
+
+        if (!physicsScene.IsValid())
+        {
+            report.Fail("Ship physics probe step did not receive a valid PhysicsScene.");
+            return false;
+        }
+
+        int stepCount = Mathf.Max(0, steps);
+        float deltaTime = Mathf.Max(Time.fixedDeltaTime, 0.001f);
+        for (int i = 0; i < stepCount; i++)
+        {
+            for (int shipIndex = 0; shipIndex < ships.Length; shipIndex++)
+            {
+                if (!TryInvokePrivateMethod(ships[shipIndex], "FixedUpdate", report))
+                {
+                    return false;
+                }
+            }
+
+            try
+            {
+                physicsScene.Simulate(deltaTime);
+            }
+            catch (Exception exception)
+            {
+                report.Fail("Ship physics probe could not simulate a multi-ship physics step: " + exception.Message);
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void ResetFlightProbeBody(Rigidbody body, Vector3 position, Quaternion rotation, bool useGravity)

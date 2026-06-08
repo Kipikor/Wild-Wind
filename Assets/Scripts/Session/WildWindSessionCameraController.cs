@@ -48,7 +48,7 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     [SerializeField, HideInInspector, Range(0.04f, 2f)] private float flightCameraHeightSmoothSeconds = 0.48f;
     [SerializeField, HideInInspector, Range(0.02f, 1f)] private float flightCameraRotationSmoothSeconds = 0.14f;
     [SerializeField, HideInInspector, Range(0.02f, 1.5f)] private float flightCameraOrbitHeadingSmoothSeconds = 0.38f;
-    [SerializeField, HideInInspector] private bool rigidFlightCamera = true;
+    [SerializeField, HideInInspector] private bool rigidFlightCamera = false;
     [SerializeField, HideInInspector, Range(0f, 45f)] private float tailAutoAlignWindowDegrees = 15f;
     [SerializeField, HideInInspector, Range(0f, 1f)] private float tailAutoAlignDelaySeconds = 0.12f;
     [SerializeField, HideInInspector, Range(0.02f, 1.5f)] private float tailAutoAlignSmoothSeconds = 0.24f;
@@ -846,7 +846,8 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
 
     private static float GetCameraDeltaTime()
     {
-        return Mathf.Max(0.0001f, Mathf.Max(Time.unscaledDeltaTime, Time.deltaTime));
+        float dt = Time.unscaledDeltaTime > 0f ? Time.unscaledDeltaTime : Time.deltaTime;
+        return Mathf.Max(0.0001f, dt);
     }
 
     private void BeginTakeoffCameraBlend()

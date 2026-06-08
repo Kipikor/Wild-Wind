@@ -3,17 +3,25 @@ using UnityEngine;
 public class MiningFragment : MonoBehaviour
 {
     private static readonly System.Collections.Generic.List<MiningFragment> ActiveFragments = new System.Collections.Generic.List<MiningFragment>();
+    private static readonly MaterialPropertyBlock ColorBlock = new MaterialPropertyBlock();
+    private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
+    public const int DefaultMaxActiveFragments = 160;
 
     public string oreItemId = "";
     public int amountKg = 1;
     public float fallSpeedMS = 4f;
     public float stormY = -100f;
     public float spinSpeedDeg = 90f;
+    public float maxLifetimeSeconds = 45f;
 
     private ShipPhysics cachedShip;
     private MetaGameState cachedMeta;
+    private float spawnedAtTime;
 
     public static int ActiveCount => ActiveFragments.Count;
+    public static int MaxActiveFragments { get; set; } = DefaultMaxActiveFragments;
+    public static bool CanSpawnMore => ActiveCount < Mathf.Max(1, MaxActiveFragments);
 
     public static void GetActiveFragments(System.Collections.Generic.List<MiningFragment> results)
     {
@@ -57,10 +65,8 @@ public class MiningFragment : MonoBehaviour
         stormY = stormLevelY;
 
         Renderer renderer = GetComponent<Renderer>();
-        if (renderer != null)
-        {
-            renderer.material.color = color;
-        }
+        ApplyRendererColor(renderer, color);
+        spawnedAtTime = Time.time;
     }
 
     private void Update()
@@ -68,7 +74,7 @@ public class MiningFragment : MonoBehaviour
         transform.position += Vector3.down * (fallSpeedMS * Time.deltaTime);
         transform.Rotate(Vector3.up, spinSpeedDeg * Time.deltaTime, Space.World);
 
-        if (transform.position.y <= stormY)
+        if (transform.position.y <= stormY || Time.time - spawnedAtTime >= Mathf.Max(1f, maxLifetimeSeconds))
         {
             Destroy(gameObject);
             return;
@@ -110,6 +116,7 @@ public class MiningFragment : MonoBehaviour
 
     private void OnEnable()
     {
+        spawnedAtTime = Time.time;
         if (!ActiveFragments.Contains(this))
         {
             ActiveFragments.Add(this);
@@ -119,5 +126,15 @@ public class MiningFragment : MonoBehaviour
     private void OnDisable()
     {
         ActiveFragments.Remove(this);
+    }
+
+    public static void ApplyRendererColor(Renderer renderer, Color color)
+    {
+        if (renderer == null) return;
+
+        renderer.GetPropertyBlock(ColorBlock);
+        ColorBlock.SetColor(BaseColorPropertyId, color);
+        ColorBlock.SetColor(ColorPropertyId, color);
+        renderer.SetPropertyBlock(ColorBlock);
     }
 }

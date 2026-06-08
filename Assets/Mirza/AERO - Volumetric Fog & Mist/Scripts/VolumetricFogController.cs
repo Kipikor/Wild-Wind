@@ -8,8 +8,14 @@ namespace Mirza.AERO
     [ExecuteAlways]
     public class VolumetricFogController : MonoBehaviour
     {
+        private const float LightCountRefreshSeconds = 0.5f;
+
         public Material material;
         public int additionalLightCountBase;
+
+        private float nextLightCountRefreshTime;
+        private int cachedAdditionalLightCount = -1;
+        private int cachedAdditionalLightCountBase = int.MinValue;
 
         void Start()
         {
@@ -24,16 +30,7 @@ namespace Mirza.AERO
                 return;
             }
 
-            int additionalLightCount = additionalLightCountBase;
-            Light[] lights = FindObjectsByType<Light>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-
-            for (int i = 0; i < lights.Length; i++)
-            {
-                if (lights[i].type != LightType.Directional)
-                {
-                    additionalLightCount++;
-                }
-            }
+            int additionalLightCount = GetAdditionalLightCount();
 
             // Need to loop framecount, else interleaved gradient noise becomes erratic.
 
@@ -49,6 +46,32 @@ namespace Mirza.AERO
             {
                 material = null;
             }
+        }
+
+        private int GetAdditionalLightCount()
+        {
+            if (Application.isPlaying &&
+                cachedAdditionalLightCount >= 0 &&
+                cachedAdditionalLightCountBase == additionalLightCountBase &&
+                Time.unscaledTime < nextLightCountRefreshTime)
+            {
+                return cachedAdditionalLightCount;
+            }
+
+            int additionalLightCount = additionalLightCountBase;
+            Light[] lights = FindObjectsByType<Light>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < lights.Length; i++)
+            {
+                if (lights[i].type != LightType.Directional)
+                {
+                    additionalLightCount++;
+                }
+            }
+
+            cachedAdditionalLightCount = additionalLightCount;
+            cachedAdditionalLightCountBase = additionalLightCountBase;
+            nextLightCountRefreshTime = Time.unscaledTime + LightCountRefreshSeconds;
+            return cachedAdditionalLightCount;
         }
 
         private Material ResolveMaterial()

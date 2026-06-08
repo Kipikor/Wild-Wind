@@ -137,10 +137,7 @@ public sealed class SafeOreSortieController : MonoBehaviour
             }
 
             Renderer renderer = boulderObject.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                renderer.material.color = oreType.color;
-            }
+            MiningFragment.ApplyRendererColor(renderer, oreType.color);
 
             SafeOreBoulder boulder = boulderObject.AddComponent<SafeOreBoulder>();
             boulder.Initialize(oreType, Mathf.Max(1, orePerBoulderKg), Mathf.Max(0.25f, shedIntervalSeconds), Mathf.Max(1, chunkMinKg), Mathf.Max(chunkMinKg, chunkMaxKg), zone.stormFloorY);
@@ -209,6 +206,11 @@ public sealed class SafeOreSortieController : MonoBehaviour
 
         private void SpawnFragment()
         {
+            if (!MiningFragment.CanSpawnMore)
+            {
+                return;
+            }
+
             int amount = Mathf.Min(remainingKg, Random.Range(chunkMinKg, chunkMaxKg + 1));
             if (amount <= 0) return;
 

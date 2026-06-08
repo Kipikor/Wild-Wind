@@ -77,6 +77,20 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
     [SerializeField, InspectorName("Показывать туманные частицы")] private bool showFogParticles = true;
     [SerializeField, InspectorName("Применять постоянно")] private bool applyContinuously = true;
 
+    [Header("Runtime Performance")]
+    [SerializeField, InspectorName("Lean runtime atmosphere")] private bool leanRuntimeAtmosphere = true;
+    [SerializeField, InspectorName("Use Unity fog fallback")] private bool useUnityFogFallback = true;
+    [SerializeField, InspectorName("Disable TrueClouds runtime")] private bool disableTrueCloudsInLeanRuntime = true;
+    [SerializeField, InspectorName("Disable AERO runtime")] private bool disableAeroInLeanRuntime = true;
+
+    private Camera cachedPerformanceCamera;
+    private Behaviour[] cachedCameraBehaviours;
+    private Behaviour cachedAeroFogController;
+    private Camera cachedRendererSelectionCamera;
+    private int cachedRendererIndex = -1;
+    private Material runtimeSkyboxFallbackMaterial;
+    private int lastRuntimeApplyFrame = -1;
+
     public void ConfigureReferences(
         Camera camera,
         Light moon,
@@ -116,6 +130,19 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
 
     public void ApplyNow()
     {
+        if (Application.isPlaying && lastRuntimeApplyFrame == Time.frameCount)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            lastRuntimeApplyFrame = Time.frameCount;
+        }
+
+        ResolveMissingReferences();
+        ApplyRendererSelection();
+        ApplyExpensiveAtmosphereState();
         ApplyCamera();
         ApplySkybox();
         ApplyFog();
@@ -146,7 +173,7 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
 
     private void Update()
     {
-        if (applyContinuously)
+        if (applyContinuously && !Application.isPlaying)
         {
             ApplyNow();
         }
@@ -225,41 +252,131 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
             return;
         }
 
-        int rendererIndex = Application.isBatchMode ? DefaultRendererIndex : AeroRendererIndex;
+        if (visualCamera != cachedRendererSelectionCamera)
+        {
+            cachedRendererSelectionCamera = visualCamera;
+            cachedRendererIndex = -1;
+        }
+
+        int rendererIndex = Application.isBatchMode || ShouldUseLeanRuntimeAtmosphere()
+            ? DefaultRendererIndex
+            : AeroRendererIndex;
+        if (cachedRendererIndex == rendererIndex)
+        {
+            return;
+        }
+
         cameraData.SetRenderer(rendererIndex);
+        cachedRendererIndex = rendererIndex;
     }
 
     private void ApplySkybox()
     {
-        if (skyboxMaterial == null)
+        Material activeSkyboxMaterial = ResolveSkyboxMaterial();
+        if (visualCamera != null)
+        {
+            visualCamera.clearFlags = activeSkyboxMaterial != null
+                ? CameraClearFlags.Skybox
+                : CameraClearFlags.SolidColor;
+            visualCamera.backgroundColor = new Color(0.12f, 0.18f, 0.28f, 1f);
+        }
+
+        if (activeSkyboxMaterial == null)
         {
             return;
         }
 
-        RenderSettings.skybox = skyboxMaterial;
-        SetFloat(skyboxMaterial, "_Exposure", skyExposure);
-        SetFloat(skyboxMaterial, "_Rotation", skyRotation);
-        SetColor(skyboxMaterial, "_Tint", skyTint);
+        RenderSettings.skybox = activeSkyboxMaterial;
+        SetFloat(activeSkyboxMaterial, "_Exposure", skyExposure);
+        SetFloat(activeSkyboxMaterial, "_Rotation", skyRotation);
+        SetColor(activeSkyboxMaterial, "_Tint", skyTint);
+        SetColor(activeSkyboxMaterial, "_SkyTint", new Color(skyTint.r, skyTint.g, skyTint.b, 1f));
+        SetColor(activeSkyboxMaterial, "_GroundColor", new Color(0.08f, 0.11f, 0.16f, 1f));
+        SetFloat(activeSkyboxMaterial, "_AtmosphereThickness", 0.85f);
+        SetFloat(activeSkyboxMaterial, "_SunSize", 0.035f);
+    }
+
+    private Material ResolveSkyboxMaterial()
+    {
+        if (IsUsableSkyboxMaterial(skyboxMaterial))
+        {
+            return skyboxMaterial;
+        }
+
+        if (IsUsableSkyboxMaterial(runtimeSkyboxFallbackMaterial))
+        {
+            return runtimeSkyboxFallbackMaterial;
+        }
+
+        Shader fallbackShader = Shader.Find("Skybox/Procedural");
+        if (fallbackShader == null || !fallbackShader.isSupported)
+        {
+            return null;
+        }
+
+        runtimeSkyboxFallbackMaterial = new Material(fallbackShader)
+        {
+            name = "Runtime Lean Skybox",
+            hideFlags = HideFlags.DontSave
+        };
+        return runtimeSkyboxFallbackMaterial;
+    }
+
+    private static bool IsUsableSkyboxMaterial(Material material)
+    {
+        return material != null &&
+            material.shader != null &&
+            material.shader.isSupported &&
+            material.shader.name != "Hidden/InternalErrorShader";
     }
 
     private void ApplyFog()
     {
-        if (aeroFogMaterial == null)
-        {
-            return;
-        }
-
         AltitudeAtmosphere atmosphere = BuildAltitudeAtmosphere();
         float appliedDensity = useAltitudeAtmosphere ? atmosphere.density : fogDensity;
         float appliedMaxDistance = useAltitudeAtmosphere ? atmosphere.visibility : fogMaxDistance;
         float appliedAlpha = useAltitudeAtmosphere ? atmosphere.alpha : fogAlpha;
         Color appliedColor = useAltitudeAtmosphere ? atmosphere.color : fogColor;
 
+        if (ShouldUseLeanRuntimeAtmosphere())
+        {
+            ApplyUnityFogFallback(appliedColor, appliedAlpha, appliedMaxDistance);
+            return;
+        }
+
+        if (useUnityFogFallback)
+        {
+            RenderSettings.fog = false;
+        }
+
+        if (aeroFogMaterial == null)
+        {
+            return;
+        }
+
         SetFloat(aeroFogMaterial, "_Density", appliedDensity);
         SetFloat(aeroFogMaterial, "_Max_Distance", appliedMaxDistance);
         SetFloat(aeroFogMaterial, "_ADDITIONAL_LIGHTS", 0f);
         SetColor(aeroFogMaterial, "_Colour", new Color(appliedColor.r, appliedColor.g, appliedColor.b, appliedAlpha));
         aeroFogMaterial.DisableKeyword("_ADDITIONAL_LIGHTS");
+    }
+
+    private void ApplyUnityFogFallback(Color appliedColor, float appliedAlpha, float appliedMaxDistance)
+    {
+        if (!useUnityFogFallback)
+        {
+            RenderSettings.fog = false;
+            return;
+        }
+
+        float visibility = Mathf.Max(80f, appliedMaxDistance);
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.ExponentialSquared;
+        RenderSettings.fogColor = appliedColor;
+        RenderSettings.fogDensity = Mathf.Clamp(1.35f / visibility, 0.00008f, 0.014f) *
+            Mathf.Clamp01(Mathf.Max(0.25f, appliedAlpha));
+        RenderSettings.fogStartDistance = 0f;
+        RenderSettings.fogEndDistance = visibility;
     }
 
     private void ApplyLight()
@@ -281,7 +398,7 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
     private void ApplyCloudSea()
     {
         AltitudeAtmosphere atmosphere = BuildAltitudeAtmosphere();
-        bool cloudSeaVisible = showCloudSea && (!useAltitudeAtmosphere || atmosphere.showDeadlyStormSurface);
+        bool cloudSeaVisible = !ShouldUseLeanRuntimeAtmosphere() && showCloudSea && (!useAltitudeAtmosphere || atmosphere.showDeadlyStormSurface);
 
         if (cloudSeaRoot != null)
         {
@@ -424,14 +541,79 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
     {
         if (cloudRoot != null)
         {
-            cloudRoot.gameObject.SetActive(showClouds);
+            cloudRoot.gameObject.SetActive(showClouds && !ShouldUseLeanRuntimeAtmosphere());
         }
 
         if (fogParticlesRoot != null)
         {
-            fogParticlesRoot.gameObject.SetActive(showFogParticles);
+            fogParticlesRoot.gameObject.SetActive(showFogParticles && !ShouldUseLeanRuntimeAtmosphere());
         }
 
+    }
+
+    private bool ShouldUseLeanRuntimeAtmosphere()
+    {
+        return Application.isPlaying && leanRuntimeAtmosphere;
+    }
+
+    private void ApplyExpensiveAtmosphereState()
+    {
+        bool leanRuntime = ShouldUseLeanRuntimeAtmosphere();
+        ResolvePerformanceReferences();
+
+        if (cachedCameraBehaviours != null && disableTrueCloudsInLeanRuntime)
+        {
+            for (int i = 0; i < cachedCameraBehaviours.Length; i++)
+            {
+                Behaviour behaviour = cachedCameraBehaviours[i];
+                if (behaviour == null) continue;
+
+                System.Type type = behaviour.GetType();
+                if (type != null && type.FullName != null && type.FullName.StartsWith("TrueClouds."))
+                {
+                    behaviour.enabled = !leanRuntime && showClouds;
+                }
+            }
+        }
+
+        if (cachedAeroFogController != null && disableAeroInLeanRuntime)
+        {
+            cachedAeroFogController.enabled = !leanRuntime;
+        }
+    }
+
+    private void ResolvePerformanceReferences()
+    {
+        if (visualCamera != cachedPerformanceCamera)
+        {
+            cachedPerformanceCamera = visualCamera;
+            cachedCameraBehaviours = visualCamera != null ? visualCamera.GetComponents<Behaviour>() : null;
+        }
+
+        if (cachedAeroFogController != null)
+        {
+            return;
+        }
+
+        GameObject aeroControllerObject = GameObject.Find("AERO Visual Fog Controller");
+        if (aeroControllerObject == null)
+        {
+            return;
+        }
+
+        Behaviour[] behaviours = aeroControllerObject.GetComponents<Behaviour>();
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            Behaviour behaviour = behaviours[i];
+            if (behaviour == null) continue;
+
+            System.Type type = behaviour.GetType();
+            if (type != null && type.FullName != null && type.FullName.Contains("VolumetricFogController"))
+            {
+                cachedAeroFogController = behaviour;
+                return;
+            }
+        }
     }
 
     private static void SetFloat(Material material, string property, float value)

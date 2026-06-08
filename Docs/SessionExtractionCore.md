@@ -58,7 +58,7 @@ Activation rule:
 5. The ship's horizontal movement or nose direction must stay within `15 degrees` of the base/outward vector, so the compass marker is usable as the exit aim.
 6. The ship must maintain that slipstream exit condition for `12 seconds`.
 
-Claudium slipstream can be enabled only above `15 m/s`; if the ship slows to `15 m/s` or below, the mode shuts off. It ramps in over `20 seconds`; during the ramp it linearly lowers aerodynamic drag to `5%` of normal and raises claudium consumption up to `10x`.
+Claudium slipstream uses a relative speed threshold: by default the ship must reach `80%` of its clean base ход. If it slows below that threshold, the mode shuts off. It ramps the ship's available maximum ход over `20 seconds`; it no longer changes aerodynamic drag or claudium burn.
 
 When the activation timer completes, the manual sortie ends and the march-engine extraction calculation begins. If the ship stops moving toward home, re-enters the mission area, disables claudium slipstream, enters the storm, or loses the required reserve state, the timer resets.
 

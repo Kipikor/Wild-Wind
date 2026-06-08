@@ -156,10 +156,7 @@ public sealed class SortieResourceCacheController : MonoBehaviour
             }
 
             Renderer renderer = cacheObject.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                renderer.material.color = zone.starterResourceColor;
-            }
+            MiningFragment.ApplyRendererColor(renderer, zone.starterResourceColor);
 
             ResourceCacheNode cache = cacheObject.AddComponent<ResourceCacheNode>();
             cache.Initialize(zone);
@@ -214,6 +211,7 @@ public sealed class SortieResourceCacheController : MonoBehaviour
         {
             itemId = "";
             if (zone == null || string.IsNullOrWhiteSpace(zone.starterResourceItemId)) return false;
+            if (!MiningFragment.CanSpawnMore) return false;
 
             int amount = Random.Range(zone.starterResourceChunkMin, zone.starterResourceChunkMax + 1);
             if (amount <= 0) return false;

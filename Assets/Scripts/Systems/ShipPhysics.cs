@@ -87,8 +87,8 @@ public class ShipPhysics : MonoBehaviour
     private const float GunProjectileTrailEmissionMultiplier = 2.5f;
     public const float ClaudiumSlipstreamActivationMinSpeedMS = 15f;
     public const float ClaudiumSlipstreamActivationSeconds = 20f;
-    private const float ClaudiumSlipstreamFullDragMultiplier = 0.05f;
-    private const float ClaudiumSlipstreamFullClaudiumMultiplier = 10f;
+    private const float ClaudiumSlipstreamFullDragMultiplier = 1f;
+    private const float ClaudiumSlipstreamFullClaudiumMultiplier = 1f;
 
     private Rigidbody rb;
 
@@ -122,6 +122,27 @@ public class ShipPhysics : MonoBehaviour
     public float propellerMaxSpeedMS = 30f;
     [Tooltip("Доля мощности двигателя, которая превращается в полезную тягу винта.")]
     public float propellerEfficiency = 0.8f;
+
+    [Header("Ход и скольжение")]
+    [Tooltip("Чистый обычный максимальный ход корабля, м/с. 0 = взять значение из расчетной скорости винта.")]
+    public float baseMaxSpeedMS = 0f;
+    [Tooltip("Текущий множитель хода от нагрузки. Активные устройства должны снижать его вместо публичного расхода мощности.")]
+    public float loadSpeedMultiplier = 1f;
+    [Tooltip("Текущий множитель хода от повреждений.")]
+    public float damageSpeedMultiplier = 1f;
+    [Tooltip("С какой доли текущего хода собственная тяга начинает плавно слабеть.")]
+    [Range(0f, 1f)] public float nearMaxThrustFadeStartRatio = 0.72f;
+    [Tooltip("На какой доле текущего хода собственная тяга перестает разгонять корабль дальше.")]
+    [Range(0.01f, 1.5f)] public float nearMaxThrustFadeEndRatio = 1.0f;
+    [Tooltip("Во сколько раз скольжение поднимает доступный максимальный ход.")]
+    public float slipstreamMaxSpeedMultiplier = 5f;
+    [Tooltip("Доля чистого хода, которую нужно набрать для включения скольжения.")]
+    [Range(0f, 1.5f)] public float slipstreamActivationSpeedRatio = 0.8f;
+    [Tooltip("Сколько секунд максимум хода разгоняется от обычного до полного скольжения.")]
+    public float slipstreamMaxRampSeconds = ClaudiumSlipstreamActivationSeconds;
+    [HideInInspector] public float currentMaxSpeedMS;
+    [HideInInspector] public float currentOwnThrustSpeedFactor = 1f;
+
     [Header("Клавдиевый контур")]
     [Tooltip("Ресурс клавдия в грузовом списке корабля.")]
     public string claudiumResourceId = "claudium";
@@ -140,7 +161,7 @@ public class ShipPhysics : MonoBehaviour
     [HideInInspector] public float claudiumPowerDrawWatts;
     [HideInInspector] public float claudiumPowerDrawKw;
     [HideInInspector] public float claudiumRequestedLiftKg;
-    [Tooltip("Claudium slipstream request. Can be enabled only above 15 m/s, then ramps over 20 seconds.")]
+    [Tooltip("Claudium slipstream request. Can be enabled above the relative clean-speed threshold, then ramps max ход.")]
     public bool claudiumSlipstreamEnabled;
     [HideInInspector] public float claudiumSlipstreamCharge01;
 
@@ -272,7 +293,10 @@ public class ShipPhysics : MonoBehaviour
     public float ClaudiumSlipstreamClaudiumMultiplier => Mathf.Lerp(1f, ClaudiumSlipstreamFullClaudiumMultiplier, ClaudiumSlipstreamCharge01);
     public bool ClaudiumSlipstreamActive => claudiumSlipstreamEnabled;
     public float HorizontalSpeedMS => GetHorizontalSpeedMS();
-    public bool CanActivateClaudiumSlipstream => HorizontalSpeedMS > ClaudiumSlipstreamActivationMinSpeedMS;
+    public float CleanBaseMaxSpeedMS => ResolveCleanBaseMaxSpeedMS();
+    public float SlipstreamActivationSpeedMS => Mathf.Max(0f, CleanBaseMaxSpeedMS * Mathf.Max(0f, slipstreamActivationSpeedRatio));
+    public float CurrentMaxSpeedMS => CalculateCurrentMaxSpeedMS();
+    public bool CanActivateClaudiumSlipstream => HorizontalSpeedMS >= SlipstreamActivationSpeedMS;
     public float CurrentAeroDrag => 0.5f * airDensity * dragCoefficient * ClaudiumSlipstreamDragMultiplier * frontalArea;
     public float CurrentWindAerodynamicFactor => Mathf.Max(0f, dragCoefficient * ClaudiumSlipstreamDragMultiplier);
     public Vector3 EffectiveWindVelocity => GetEffectiveWindVelocity();
@@ -288,7 +312,7 @@ public class ShipPhysics : MonoBehaviour
         {
             claudiumSlipstreamEnabled = false;
             reason = "Claudium slipstream needs speed above "
-                + ClaudiumSlipstreamActivationMinSpeedMS.ToString("0")
+                + SlipstreamActivationSpeedMS.ToString("0")
                 + " m/s.";
             return false;
         }
@@ -318,11 +342,11 @@ public class ShipPhysics : MonoBehaviour
         float dragPerSpeedSquared = 0.5f
             * Mathf.Max(0f, airDensity)
             * Mathf.Max(0f, dragCoefficient)
-            * ClaudiumSlipstreamFullDragMultiplier
             * Mathf.Max(0f, frontalArea);
+        float fullSlipstreamMaxSpeedMS = CalculateMaxSpeedMS(1f);
         if (dragPerSpeedSquared <= 0.0001f || propellerEfficiency <= 0f)
         {
-            return Mathf.Max(1f, propellerMaxSpeedMS > 0f ? propellerMaxSpeedMS : 1f);
+            return Mathf.Max(1f, fullSlipstreamMaxSpeedMS);
         }
 
         float mass = rb != null ? Mathf.Max(1f, rb.mass) : GetTotalMassKg();
@@ -338,8 +362,7 @@ public class ShipPhysics : MonoBehaviour
         }
 
         float terminalSpeedMS = Mathf.Pow(usefulPowerW / dragPerSpeedSquared, 1f / 3f);
-        float configuredCap = propellerMaxSpeedMS > 0f ? propellerMaxSpeedMS : terminalSpeedMS;
-        return Mathf.Max(1f, Mathf.Min(terminalSpeedMS, configuredCap));
+        return Mathf.Max(1f, Mathf.Min(terminalSpeedMS, fullSlipstreamMaxSpeedMS));
     }
 
     [Header("Автопилот и Системы")]
@@ -2363,13 +2386,37 @@ public class ShipPhysics : MonoBehaviour
         }
 
         float target = claudiumSlipstreamEnabled ? 1f : 0f;
-        float step = ClaudiumSlipstreamActivationSeconds > 0f
-            ? Mathf.Max(0f, deltaSeconds) / ClaudiumSlipstreamActivationSeconds
+        float step = slipstreamMaxRampSeconds > 0f
+            ? Mathf.Max(0f, deltaSeconds) / slipstreamMaxRampSeconds
             : 1f;
         claudiumSlipstreamCharge01 = Mathf.MoveTowards(
             Mathf.Clamp01(claudiumSlipstreamCharge01),
             target,
             step);
+        currentMaxSpeedMS = CalculateCurrentMaxSpeedMS();
+    }
+
+    private float ResolveCleanBaseMaxSpeedMS()
+    {
+        float configuredSpeed = baseMaxSpeedMS > 0f ? baseMaxSpeedMS : propellerMaxSpeedMS;
+        return Mathf.Max(1f, configuredSpeed);
+    }
+
+    private float CalculateCurrentMaxSpeedMS()
+    {
+        return CalculateMaxSpeedMS(ClaudiumSlipstreamCharge01);
+    }
+
+    private float CalculateMaxSpeedMS(float slipstreamCharge01)
+    {
+        float cleanSpeed = ResolveCleanBaseMaxSpeedMS();
+        float loadMultiplier = Mathf.Max(0f, loadSpeedMultiplier);
+        float damageMultiplier = Mathf.Max(0f, damageSpeedMultiplier);
+        float slipMultiplier = Mathf.Lerp(
+            1f,
+            Mathf.Max(1f, slipstreamMaxSpeedMultiplier),
+            Mathf.Clamp01(slipstreamCharge01));
+        return Mathf.Max(1f, cleanSpeed * loadMultiplier * damageMultiplier * slipMultiplier);
     }
 
     private float GetHorizontalSpeedMS()
@@ -2414,9 +2461,37 @@ public class ShipPhysics : MonoBehaviour
         Vector3 horizontalAirVelocity = Vector3.ProjectOnPlane(rb.linearVelocity - GetEffectiveWindVelocity(), Vector3.up);
         float signedAirspeedWithThrust = Vector3.Dot(horizontalAirVelocity, thrustAxis) * thrustDirection;
         float powerLimitedThrustN = propellerUsefulPowerKw * 1000f / Mathf.Max(1f, Mathf.Abs(signedAirspeedWithThrust));
+        currentOwnThrustSpeedFactor = CalculateOwnThrustSpeedFactor(signedAirspeedWithThrust);
+        powerLimitedThrustN *= currentOwnThrustSpeedFactor;
 
         propellerThrustKgf = (powerLimitedThrustN / 9.81f) * thrustDirection;
         rb.AddForce(thrustAxis * (propellerThrustKgf * 9.81f), ForceMode.Force);
+    }
+
+    private float CalculateOwnThrustSpeedFactor(float signedAirspeedWithThrust)
+    {
+        if (signedAirspeedWithThrust <= 0f)
+        {
+            return 1f;
+        }
+
+        float maxSpeed = Mathf.Max(1f, CurrentMaxSpeedMS);
+        float ratio = signedAirspeedWithThrust / maxSpeed;
+        float fadeStart = Mathf.Clamp01(nearMaxThrustFadeStartRatio);
+        float fadeEnd = Mathf.Max(fadeStart + 0.001f, nearMaxThrustFadeEndRatio);
+        if (ratio <= fadeStart)
+        {
+            return 1f;
+        }
+
+        if (ratio >= fadeEnd)
+        {
+            return 0f;
+        }
+
+        float t = Mathf.InverseLerp(fadeStart, fadeEnd, ratio);
+        t = t * t * (3f - 2f * t);
+        return 1f - t;
     }
 
     private void ApplyNeutralStopBrake()
