@@ -4,6 +4,13 @@ Status: first session-extraction vertical slice implemented in code and covered 
 Date: 2026-05-29.
 Branch: codex/session-extraction-core.
 
+Design update 2026-06-10:
+
+- sortie launch and return no longer spend stored coal, claudium, fuel, or other external resources;
+- the sortie cost is ship wear / operational sortie resource;
+- coal/fuel/claudium-related wording should be read as ship autonomy, range, internal endurance, or legacy implementation language unless explicitly stated otherwise;
+- the player should not refuel or load fuel before a sortie.
+
 ## Core Shift
 
 Wild Wind moves from an island logistics simulator toward a session-based extraction game.
@@ -11,12 +18,146 @@ Wild Wind moves from an island logistics simulator toward a session-based extrac
 The main loop is:
 
 ```text
-Base -> choose sortie -> fly in a limited zone -> farm resources -> reach extraction boundary -> pay return reserves -> home -> process -> cascade production -> upgrade -> new sortie
+Base -> choose sortie -> fly in a limited zone -> farm resources -> complete objective -> reach extraction boundary -> home -> spend ship wear -> process -> cascade production -> upgrade -> new sortie
 ```
 
-The base is the only home dock in the core loop. The player does not freely take off from the base into an endless world. The base is a management layer for storage, fitting, processing, cascade production, repairs, refueling, research, and sortie selection.
+The base is the only home dock in the core loop. The player does not freely take off from the base into an endless world. The base is a management layer for storage, fitting, processing, cascade production, repairs, research, and sortie selection.
 
 Inter-island logistics, social needs, passenger traffic, and visible ship compartments are not part of the core loop.
+
+## Размерные классы кораблей
+
+Класс корабля означает размер корпуса, а не разделение на боевой и небоевой. Все корабли игрока в целом боеспособны.
+
+Рабочие размерности:
+
+| Класс | Длина | Рабочая масса | Разворот 180 | Груз за вылет | Главный способ игры |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Фрегат | 90-120 м | 1.8-3.2 тыс. т | 8 сек | 40 т | Играет собой: просочился, навел корпус, ударил, увернулся, ушел. |
+| Крейсер | 190-260 м | 16-30 тыс. т | 25 сек | 400 т | Играет качеством работы: меньше точек, но сложнее цель и выше отдача. |
+| Линкор | 420-520 м | 250-500 тыс. т | 70 сек | 4000 т | Играет маршрутом: заранее проложил проход, воюет по пути, выходит по плану. |
+
+`Груз за вылет` - это нормальный полезный груз в боевой конфигурации, а не абсолютный физический максимум корпуса. Узкоспециализированные добывающие варианты могут брать больше, но платят за это специализацией.
+
+Отдельный линейный крейсер для базового деления не нужен: есть крейсер и есть линкор.
+
+### Угроза в вылете
+
+В вылет выходит один активный корабль игрока. В локации уже есть враги, цели и видимые события.
+
+Угроза растет от боя и шумных действий. Чем выше угроза, тем сильнее реакция врагов. Скрытность - это не отдельный тип миссии, а ранняя низкошумная фаза того же боевого вылета.
+
+### Радиус заметности
+
+У каждого корпуса только три состояния заметности. Скорость сама по себе заметность не меняет.
+
+| Корпус | База | Активное действие / бой | Клавдиевое скольжение |
+| --- | ---: | ---: | ---: |
+| Фрегат | 2 км | 5 км | 8 км |
+| Линкор | 10 км | 10 км | 20 км |
+
+Активные действия фрегата: стрельба, громкие рабочие модули и другие шумные действия. Запуск торпеды остается тихим; взрыв торпеды поднимает угрозу в районе цели.
+
+У линкора нет скрытного режима. Враги всегда знают, что линкор находится в районе вылета.
+
+### Фрегат
+
+Фрегат может пройти часть вылета тихо:
+
+- подойти к точке взлома или атаки вне радиуса обнаружения;
+- выпустить медленную тихую торпеду по тяжелой цели или базе;
+- уйти до того, как угроза после взрыва догонит его;
+- при срыве скрытности выживать скоростью, уклонением и дистанцией.
+
+Провал фрегата - быть замедленным или зажатым. Магнитные замедлители и близкие перехватчики опасны именно потому, что забирают его скорость.
+
+Специализация фрегата узкая: одна сильная способность и несколько посредственных. Фрегат не может быть абсолютным мастером на 5 звезд: слишком много корпуса уходит в ход, уклонение и маневр.
+
+### Крейсер
+
+Крейсер не должен быть просто серединой между фрегатом и линкором.
+
+Его смысл: он может стать настоящим мастером одной задачи. Не объехать столько точек, сколько фрегат, но взять более сложную цель и вытащить из нее больше.
+
+Пример со взломом:
+
+- фрегат быстрее обходит много простых точек;
+- крейсер медленнее перемещается между точками, но быстрее ломает сложные замки;
+- крейсер может брать замки выше уровнем и доставать больше данных из одной точки;
+- линкор взламывает примерно на уровне хорошего крейсера, но ему трудно ездить по множеству точек.
+
+Специализация крейсера: одна-две сильные способности и несколько посредственных. Если крейсер стал сильным сборщиком или взломщиком, это его основной выбор, а не бесплатная добавка ко всему.
+
+### Линкор
+
+Линкор входит в вылет уже видимым и уже провоцирует эскалацию.
+
+Его базовый цикл:
+
+```text
+проложил маршрут -> вошел видимым -> держит эскалацию -> работает под огнем -> выходит по плану
+```
+
+Сильные стороны линкора:
+
+- огромная живучесть;
+- встроенный ремонт как базовая линкорная особенность;
+- главный калибр, опасный почти любой цели;
+- много автоматического ПМК, где фрегатский калибр становится вторичным оружием линкора;
+- хорошая боеспособность даже у не полностью боевых линкоров;
+- большой груз и широкая миссионная емкость.
+
+Взлом линкора - это боевой взлом. Он работает рядом с целью, пока ПМК отстреливает угрозы. Легкий вес информационных ресурсов не решает его главную проблему: линкору тяжело быстро ездить между многими точками.
+
+Специализация линкора широкая: несколько сильных способностей и несколько посредственных. Добывающий линкор все равно хорошо дерется; дорогой поздний линкор может быть одновременно сильным добытчиком, сильным сборщиком и сильным боевым кораблем.
+
+### Задачи по размерностям
+
+| Задача | Фрегат | Крейсер | Линкор |
+| --- | --- | --- | --- |
+| Прямой бой | Не любит долгую прямую драку; держится скоростью, уклонением, торпедами и выбором момента. | Зависит от специализации: может быть почти небоевым на уровне фрегата или крепким боевым кораблем. | Почти всегда крепкий боевик: держит удар, стреляет главным калибром и ПМК, хорошо живет в эскалации. |
+| Разведка и сканирование | Силен за счет близкого тихого подхода; тихий скан чаще всего не увеличивает заметность. | Может быть тихим разведчиком или мощной подсветкой; сильный скан поднимает заметность до активного радиуса. | Всегда мощный скан без скрытности; дальний скан слабее из-за дистанции, близкий скан очень сильный. |
+| Взлом | Обходит много простых точек. | Берет меньше точек, но сложнее замки и больше данных с точки. | Взламывает примерно как хороший крейсер, но плохо ездит между точками. |
+| Газ | Берет образцы и малые объемы; 40 т быстро забиваются водяным концентратом. | Нормальная добыча: 400 т уже дают серьезный объем концентрата. | Лучшая массовая добыча: 4000 т, место под выпариватели; поздние корпуса могут иметь сепарацию. |
+| Руда | Берет малые партии ценной руды. | Нормальная промышленная добыча. | Массовая добыча и вывоз тяжелой руды. |
+| Левиафаны | Плохой самостоятельный охотник: обычный левиафан крепкий, бронированный и движется; чаще надо уходить или пытаться торпедировать. | Хороший базовый охотник: может драться с обычным левиафаном почти на равных. | Тяжелый доминатор: для большинства левиафанов сам становится главной угрозой, кроме самых огромных особей. |
+| Узлы автоматонов | Охотится за мелкими дорогими узлами с высокой ценностью на тонну. | Снимает больше узлов и лучше работает со сложными крупными обломками. | Может снять очень много и очень качественно, но ограничен маршрутом и не бегает за каждой мелочью. |
+
+В газе, руде и левиафанах размер прежде всего дает объем вывоза и возможность поставить тяжелое оборудование. Фрегат может быть полезен, но чаще как разведчик, доборщик образцов или точечный сборщик дорогой мелочи.
+
+Полевой salvage и базовая разборка автоматонов - разные этапы.
+
+- В вылете корабль не увозит целого врага своего размера; он снимает узлы с островов, обломков и крупных автоматонов.
+- Узлы: ядра, сенсоры, сервоприводы, оружейные блоки, память, редкие регуляторы и другие ценные сборки.
+- Малые узлы лучше по ценности на тонну; фрегат охотится за ними, потому что быстро облетает много мест.
+- Большие узлы тяжелее и хуже по концентрации ценности, но суммарно дороже; крейсер и линкор могут брать их нормально.
+- На базе разборка автоматонов перерабатывает привезенные узлы в материалы, механизмы, инструменты, ядра и опыт.
+- Вылет решает, что игрок сумел снять под угрозой; база решает, во что это будет разобрано.
+
+Сканирование работает как свет: чем дальше цель, тем слабее результат. Близкий тихий подход фрегата поэтому ценен сам по себе, а мощный скан крейсера или линкора является заметным действием.
+
+Постановка маяков, зарядов, датчиков, ловушек и временных устройств пока не считается отдельной core-активностью карты. Выход из района тоже не отдельная специализация, а общая обязательная часть каждого вылета.
+
+### Боевые почерки поставщиков
+
+Поставщик не означает узкую профессию корабля. Любой поставщик может иметь боевые, добычные, разведывательные и взломные корпуса. Поставщик задает боевое правило: как корабль стреляет, держит дистанцию, маскируется, сканирует, танкует или входит в пик эффективности.
+
+Рабочие решения:
+
+| Поставщик | Боевой почерк |
+| --- | --- |
+| Аэролит | Мобильность: быстрый ход, хорошее ускорение, маневр, смена дистанции и выход из плохой позиции. Плата - пониженный боевой ресурсный трюм. |
+| Горизонт | Дальность и точность: стрельба, взлом, рабочие модули, захват и другие действия получают увеличенную дистанцию применения; дальний бой и дальняя подсветка сильнее обычного. |
+| Каптаж | Искусственные облака, дымовая маскировка, поджоги и более активное использование дронов. Корабли создают окна видимости, сбрасывают захват и работают из-за облака; их снаряды лучше вызывают пожар. |
+| Бастион | Хорошая бронекомпоновка, наклонная броня, сильное ПМК. Главный калибр мощный, но с большой перезарядкой, поэтому корабль часто живет вторичкой. |
+| Старатели | Сплошные снаряды и орудия-инструменты: хороший пробой брони, корки руды и твердых оболочек, но пониженный разрывной урон. |
+| Архивариус | Сильные сканеры, скрытность и торпеды. Дальний и точный скан быстрее раскрывает информацию, слабые места и дает подсказки для стрельбы. Даже крупные корпуса могут иметь скрытое сканирование. |
+| Верфь-17 | Пики эффективности: заряжаемые режимы или боевые инструкции, которые временно сильно улучшают корабль, например скорострельность, ход, ремонт или работу модулей. |
+| Лагуна | Магнитный захват и химические снаряды. Хорошо замедляет, удерживает цель и накладывает коррозию вместо обычного пожара. Без регена как поставщицкой особенности. |
+
+Аэролит и Горизонт не одно и то же. Аэролит про мобильность и смену дистанции. Горизонт про дальность и точность применения систем.
+
+Дроны есть в игре как общий инструмент, но Каптаж использует их активнее остальных: для работы из облака, подсветки, сброса захвата, отвлечения и поддержки модулей.
 
 ## Sortie Zone
 
@@ -31,13 +172,13 @@ A sortie happens inside a limited cylindrical play area.
 - Runtime behavior does not physically clamp the ship against the horizontal ring; crossing it counts as reaching/passing the extraction threshold.
 - The flight compass shows the base/exit side during an active sortie as a `BASE SLIP 12s` marker. The marker points outward from the sortie center through the ship, which is the direction the ship must move while outside the cylinder.
 
-The sortie is not infinite in every direction. The boundary is part of the play: the player must reach it with enough reserves to return home.
+The sortie is not infinite in every direction. The boundary is part of the play: after completing the objective, the player must reach the extraction side and hold the exit conditions to return home.
 
 ## Return Home
 
 Returning home is a calculated extraction, not a free button.
 
-The ship must be near the sortie boundary and have enough coal and claudium for the off-screen trip back to base.
+The ship must be near the sortie boundary after the sortie objective is complete. Return is gated by position, sortie state, ship control state, and ship wear/validity, not by stored fuel reserves.
 
 Return uses the ship's march engines, not the direct player-control engines.
 
@@ -53,23 +194,23 @@ Activation rule:
 
 1. The ship must be at or outside the circular sortie cylinder edge and try to leave the active mission area.
 2. The ship must be above the storm layer.
-3. The ship must have enough coal and claudium for the calculated return.
+3. The sortie objective must be complete, unless this is a special failure/evacuation rule.
 4. Claudium slipstream must be active.
 5. The ship's horizontal movement or nose direction must stay within `15 degrees` of the base/outward vector, so the compass marker is usable as the exit aim.
 6. The ship must maintain that slipstream exit condition for `12 seconds`.
 
 Claudium slipstream uses a relative speed threshold: by default the ship must reach `80%` of its clean base ход. If it slows below that threshold, the mode shuts off. It ramps the ship's available maximum ход over `20 seconds`; it no longer changes aerodynamic drag or claudium burn.
 
-When the activation timer completes, the manual sortie ends and the march-engine extraction calculation begins. If the ship stops moving toward home, re-enters the mission area, disables claudium slipstream, enters the storm, or loses the required reserve state, the timer resets.
+When the activation timer completes, the manual sortie ends and the march-engine extraction handoff begins. If the ship stops moving toward home, re-enters the mission area, disables claudium slipstream, enters the storm, or loses the required sortie state, the timer resets.
 
-Return calculation uses:
+Return calculation uses ship stats, not stored fuel:
 
 - distance to base, for example 220 km or 1000 km;
 - estimated march cruise speed;
 - estimated return time;
-- coal required for march-engine travel;
-- claudium required for lift and loaded mass;
-- current coal and claudium in ship tanks.
+- ship autonomy/range profile;
+- loaded mass and cargo risk;
+- ship wear/operational state.
 
 Example:
 
@@ -77,18 +218,16 @@ Example:
 Distance to base: 220 km
 Estimated speed: 35 m/s
 Return time: 104 min
-Coal required: about 44 kg
-Claudium required: about 14-20 kg, depending on loaded mass
-Coal onboard: 50 kg
-Claudium onboard: 21 kg
+Ship autonomy: sufficient
+Operational resource: 8/10 sorties
 Extraction possible.
 ```
 
-If reserves are insufficient, extraction is blocked and the UI must explain what is missing.
+If extraction is blocked, the UI must explain the actual state problem: objective incomplete, wrong boundary position, storm layer, interrupted slipstream, invalid/lost ship, or another non-fuel rule.
 
 On successful extraction:
 
-- required coal and claudium are consumed;
+- the completed sortie spends ship wear / operational resource;
 - sortie cargo transfers to base storage;
 - the game returns to base mode;
 - progress is saved.
@@ -99,7 +238,7 @@ If the ship is destroyed during a sortie:
 
 - the player returns to base;
 - all extracted resources from the sortie are lost;
-- the active ship, its fitted High/Mid/Low/Rig modules, cargo, and remaining tank reserves are destroyed or marked lost;
+- the active ship, its installed rigs, active loadout state, and cargo are destroyed or marked lost;
 - the player is never soft-locked.
 
 The fallback ship is the Pioneer.
@@ -111,9 +250,8 @@ Pioneer is the reserve airfield of the game economy.
 - It is weak.
 - It is free.
 - It is always available when the player has no usable ship.
-- It receives a free minimal refuel of coal and claudium.
-- At the base, if the active ship is the Pioneer/starter hull and the base has no matching fuel, refuel still tops the ship back to the minimal starter reserve without spending storage.
-- In core mode, if a save points at a missing or invalid hull, the base treats it as a Pioneer fallback case and restores the starter hull during free fallback refuel.
+- It does not need a free fuel/refuel step.
+- In core mode, if a save points at a missing or invalid hull, the base treats it as a Pioneer fallback case and restores the starter hull.
 - It can always attempt safe starter sorties.
 The Pioneer keeps failure meaningful without forcing a full restart.
 
@@ -133,44 +271,47 @@ The player:
 1. Flies to a safe ore field.
 2. Holds the ship under a shedding ore boulder.
 3. Catches falling fragments in the cargo hold.
-4. Watches coal, claudium, mass, and cargo capacity.
+4. Watches ship autonomy, mass, cargo capacity, and wear state.
 5. Reaches the boundary.
-6. Extracts home if reserves are sufficient.
+6. Extracts home if the objective and exit-state rules are satisfied.
 7. Processes ore at base.
 8. Uses processed materials for upgrades.
 
 This makes the first loop about positioning, mass, resources, and extraction timing.
 
-## Consumables
+## Ship Autonomy
 
-Coal and claudium remain core constraints.
+Coal and claudium are no longer external sortie consumables.
 
-- Coal powers engine travel, thrust, and some active systems.
-- Claudium supports lift, loaded mass, altitude stability, and return viability.
-- A full cargo hold makes return planning harder.
-- The player should feel the decision: keep farming or leave now.
+They remain useful as ship design language:
 
-## Ship Fitting
+- coal/fuel can describe a ship's autonomy, range, or endurance profile;
+- claudium can describe lift, storm safety, slipstream stability, or special construction requirements;
+- neither should require player-facing pre-sortie refueling;
+- neither should be consumed from base storage by launching or returning from a sortie.
 
-Visible compartments are removed from the core direction.
+The player pays for completed sorties through ship wear / operational resource.
 
-Ships use EVE-like fitting slots:
+## Ship Loadout
 
-- High: active work modules, such as drills, gas harvesters, harpoons, weapons.
-- Mid: control and support, such as radar, stabilizers, shock absorbers, autopilot.
-- Low: hull improvements, such as cargo, engine economy, armor, lift support.
-- Rig: strong passive modifications with tradeoffs.
+Visible compartments and High/Mid/Low fitting bands are removed from the active design direction.
 
-Ship visuals do not need to reflect every fitted module. Fitting affects stats, actions, and session behavior.
+Ships use a simpler loadout model:
 
-Current transition rule:
+- rigs: permanent/passive ship modifications, shown as 7 slots in the dock;
+- economic consumables: one-sortie reward boosters;
+- field/combat consumables: one-sortie tactical tools;
+- perks: a commander/player build with limited points and active slots.
+
+Ship visuals do not need to reflect every installed rig or active perk. Loadout affects stats, actions, risk, and reward preview.
+
+Current design rule:
 
 - fixed infrastructure slots such as maneuver engine, march engine, propeller, and claudium loop may remain required ship internals;
-- special modules are classified into High, Mid, Low, or Rig bands;
-- the starter core hull exposes multiple High slots plus Mid, Low, and Rig slots, so the first branch tools can coexist without visible compartments;
-- sortie zones may require a fitted module in the appropriate band, for example a High gas harvester, High harpoon, High impact/salvage module, or Mid observation module; the gate checks the actual fitting band, not only the module id;
-- legacy `utility` slot data may remain in old catalog/setup assets for non-core compatibility, but core assembly and fitting UI ignore those slots; sortie gates must be satisfied by High/Mid/Low/Rig fitting.
-- the public fitting API in core mode accepts only current High/Mid/Low/Rig slots and rejects legacy `utility` or wrong-band module installs.
+- these internals are not player-facing High/Mid/Low equipment slots;
+- activity capability should come from ship type, rigs, perks, and maybe later dedicated systems, not from High/Mid/Low module bands;
+- legacy `utility`, High, Mid, and Low slot data may remain in old catalog/setup assets for non-core compatibility, but active dock UI ignores those slots;
+- the active player-facing slot UI is rigs, economic consumables, field consumables, and perks.
 - the old free hull selector is blocked in core mode; ship replacement belongs to Pioneer fallback and base assembly/cascade systems instead of legacy catalog picking.
 
 ## Removed From Core Loop
@@ -207,9 +348,9 @@ Current runtime rule:
 - legacy island cargo loading, unloading, and timed cargo-transfer jobs are blocked in core mode; ship cargo enters the loop through sortie collection and returns through extraction;
 - normal docking is restricted to the base in core mode; non-base legacy `DockAt` calls are blocked, and an active sortie can end through boundary extraction or ship loss, not through legacy docking;
 - the legacy simulators remain available for old tests and experiments when core mode is disabled;
-- the main gameplay HUD in core mode shows base processing inputs, processed materials, starter kit counts, ship tanks, weapon loadout cargo, boundary distance, claudium-slipstream exit progress, compact High/Mid/Low/Rig fitting occupancy, a compact overview of all five processing branches, all eight cascade production types, the next cascade order, and exposes Process branch, Refuel, Load munitions, Next sortie, Start selected sortie, Extract home, Run cascade, and next starter fitting upgrade actions;
-- the old HUD dock action is replaced by boundary extraction while a core sortie is active, and is enabled only when the return calculation allows extraction;
-- the debug dock UI also hides the legacy assembly/compartment panel and foregrounds sortie launch, High/Mid/Low/Rig fitting, base storage, base processing, cascade production, and fitting upgrades instead of legacy free flight and island-city controls.
+- the main gameplay HUD in core mode shows base processing inputs, processed materials, starter kit counts, ship wear/autonomy state, boundary distance, claudium-slipstream exit progress, compact rig/loadout occupancy, a compact overview of all five processing branches, all eight cascade production types, the next cascade order, and exposes Process branch, Next sortie, Start selected sortie, Extract home, Run cascade, and next starter upgrade actions;
+- the old HUD dock action is replaced by boundary extraction while a core sortie is active, and is enabled only when sortie completion and exit-state rules allow extraction;
+- the debug dock UI also hides the legacy assembly/compartment panel and foregrounds sortie launch, rigs/loadout, base storage, base processing, cascade production, and upgrades instead of legacy free flight and island-city controls.
 
 ## Base
 
@@ -219,7 +360,6 @@ It contains:
 
 - storage;
 - hangar and fitting;
-- refueling;
 - repairs;
 - processing;
 - cascade production;
@@ -232,8 +372,8 @@ Current runtime rule:
 - it always contains the five processing branches and eight cascade production types;
 - the player can select among five starter sortie zones: ore boulders, gas condensate, automaton wrecks, leviathan remains, and survey ruins;
 - each starter sortie is a bounded 5 km radius cylinder for the first implementation, with its own entry point, primary processing branch, and starter resource item;
-- the first starter sortie catalog currently represents a close safe theater: all five starter zones are about 220 km from base so the Pioneer can return with starter tanks while coal and claudium still matter;
-- non-ore starter sorties are gated by fitting: gas wants a gas harvester, automatons want an impact/salvage module, leviathan remains want a harpoon, and survey ruins want observation gear;
+- the first starter sortie catalog currently represents a close safe theater; autonomy/range is a ship characteristic, not a stored fuel gate;
+- non-ore starter sorties should be gated by ship role, rigs, perks, activity ratings, and mission rules, not by High/Mid/Low module bands;
 - starter resource caches shed collectible fragments in non-ore starter sorties, while the safe ore sortie keeps the overhead boulder behavior;
 - ore processing consumes extracted ore from base storage and outputs minerals from `Ore_type.csv`;
 - gas processing consumes cloud condensates and outputs gas/material fractions from `Gas_cloud_type.csv`;
@@ -241,13 +381,13 @@ Current runtime rule:
 - leviathan processing consumes carcasses and outputs fat, hides, mineral shell, and claudium glands;
 - cybernetic deciphering consumes `rock_info`, `cloud_info`, or `leviathan_info` and outputs research experience;
 - starter cascade orders are represented as production orders with inputs, outputs, load per production type, estimated bottleneck, and estimated time;
-- the starter catalog currently includes airframe kit, module kit, and munition bundle orders; Pioneer remains the only ship and base production upgrades its fitting rather than commissioning another hull;
+- the starter catalog currently includes legacy airframe/module/munition orders; active design should translate these into ship improvements, rigs, or loadout support rather than High/Mid/Low modules;
 - the base overview exposes all five processing branches, all eight cascade production lines, and the next cascade order/bottleneck to make the home layer read as the main progression machine;
 - base processing and cascade production lines have levels and upgradeable capacity; upgrades spend processed base materials such as ferron, silvate, and charcoal, then raise the line level and throughput;
 - the starter airframe order consumes minerals and charcoal, produces `airframe_kit`, and records load against all eight production types.
-- the starter module order consumes early ore/base materials, produces `module_kit`, and can install the first branch tools through normal fitting: `starter_gas_harvester` in High for gas, `starter_mining_hold` in High for automatons, `starter_harpoon_rig` in High for leviathans, and `starter_observation_post` in Mid for survey; automaton cores are reserved for later, stronger modules so early branch unlocks are not deadlocked behind their own resources.
-- the starter munition bundle can be loaded only at the base into ship `weapon` cargo, giving weapons and harpoons a core-mode supply path after legacy island cargo loading is disabled.
-- the first Low fitting upgrade consumes `airframe_kit` and installs `starter_cargo_rack` into a Low slot.
+- the legacy starter module order should be replaced or reinterpreted as starter rigs/loadout unlocks for gas, automaton salvage, leviathan, and survey branches.
+- the starter munition bundle can remain as an industrial output only if it supports the combat loop without becoming a pre-sortie loading gate.
+- the old Low-slot cargo rack upgrade is superseded by ship stats, rigs, or hull improvements.
 
 ## Five Processing Branches
 
@@ -327,20 +467,25 @@ Which tiny component should the player craft manually next?
 
 The first implementation target is:
 
-1. Base screen/state with storage, refuel, High/Mid/Low/Rig fitting actions, and safe sortie launch.
+1. Base screen/state with storage, rigs/loadout actions, ship wear state, and safe sortie launch.
 2. Starter sortie catalog for ore, gas, automaton, leviathan, and survey/info branches.
 3. Bounded sortie cylinders with falling starter resources.
 4. Ship cargo collection.
-5. Coal and claudium consumption.
-6. Boundary extraction with return reserve calculation.
+5. Ship wear / operational resource spent by completed sorties.
+6. Boundary extraction with slipstream handoff and no external fuel reserve gate.
 7. Cargo transfer to base storage.
 8. Ore processing into early material.
-9. Starter fitting upgrades using cascade output.
+9. Starter rig/loadout upgrades using cascade output.
 10. Big test coverage for the full loop and all five processing branches.
 
 This is the new playable spine.
 
 Current verification rule:
 
+The verification list should keep the useful vertical-slice coverage, but update any old fuel/refuel reserve checks and legacy fitting-band checks to the active design.
+
 - the big test contains a `Session extraction core` section;
-- it verifies base start, fresh core seed cleanup, free-flight and legacy flight-mission blocking, legacy XP/money tech-tree blocking, legacy money/direct-resource/ship-XP reward blocking, legacy personal inventory migration, legacy shop refresh shutdown, legacy free-world actor suppression, legacy runtime shutdown, direct flagship social API blocking, public legacy flagship expedition return blocking, legacy dock timed-process blocking including stale save jobs, legacy island cargo-transfer blocking, non-base legacy `DockAt` blocking, legacy `DockAt` blocking during active sorties, legacy flagship expedition suppression during sortie start, base refuel, base home overview for all five processing branches and all eight cascade production types, base line upgrades from processed resources, default 5 km sortie catalog coverage for all five processing branches, HUD sortie cycling, fitting-gated sortie launch, legacy utility no longer satisfying core sortie gates, public fitting API blocking of legacy utility and wrong-band installs, public hull selector blocking, runtime ship-cargo collection blocked outside active sorties, wrong-resource runtime cargo blocking inside active sorties, ad hoc cascade order blocking, HUD selected sortie launch, extraction blocked inside the sortie cylinder, extraction blocked in the storm layer, extraction blocked without coal/claudium reserves, extraction blocked until the claudium-slipstream exit hold completes, HUD boundary extraction reserve consumption and return, cargo return, non-ore starter sortie cache spawning with collectible gas, automaton, leviathan, and survey fragments plus extraction home, all five processing branches, starter cascade catalog outputs, starter High/Mid branch upgrades from `module_kit`, base munition loading into ship `weapon` cargo, Low-slot upgrade from `airframe_kit`, High/Mid/Low/Rig fitting bands without visible legacy utility slots or legacy dock assembly UI, sortie-loss recovery through the Pioneer fallback with old fitted modules and tank reserves destroyed, missing-hull restoration through the Pioneer fallback, and free Pioneer minimum refuel with empty base fuel storage.
+- it verifies base start, fresh core seed cleanup, legacy-mode blocking, save/job cleanup, dock interaction blocking during active sorties, base home overview for all five processing branches, cascade production outputs, sortie catalog coverage, HUD sortie cycling, launch gating, ship-cargo collection, cargo return, processing branches, sortie-loss recovery through the Pioneer fallback, missing-hull restoration through the Pioneer fallback, and starter rig/loadout upgrades from cascade output;
+- it must not require external coal, claudium, fuel, refuel, or reserve spending to start or finish a sortie;
+- it should gate sorties through ship wear, ship role, range/autonomy stats, rigs, economic consumables, field consumables, perks, activity ratings, and mission rules;
+- it should not verify legacy utility slots or wrong-band module installs as the active player-facing model.
