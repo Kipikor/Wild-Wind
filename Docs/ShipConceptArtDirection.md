@@ -22,6 +22,20 @@ This document tracks current ship concept references and visual constraints.
 - No propellers on the current claudium-contour ship line. Lift and thrust come from claudium rails, emitters, and integrated contour machinery.
 - Do not use balloons, zeppelins, aircraft wings, sleek sci-fi thrusters, or external glowing rear booster modules.
 
+## Supplier Visual Identities
+
+Full lore and doctrine notes live in `Docs/SupplierShipDoctrinesDraft.md`. This table is the quick concept-art read for the lore-first supplier set.
+
+| Supplier | Visual read |
+|---|---|
+| Kilvater Chamber | Sturdy port-service hulls, tug frames, searchlights, rescue markings, thick keels, emergency hatches, cranes and service doors. |
+| Vysotniki | Long light hulls, exposed structural frames, extended claudium rails, altitude marks, worn leading edges, warning stripes, low spare volume. |
+| Rudnye Arteli | Top crushers, ore mouths, reinforced work decks, ore chutes, heavy noses, replaceable teeth, dust, chips, conveyors, tool-guns. |
+| Kaptazh Workshops | Condensers, smoke combs, nozzles, side tanks, chemical stains, soot, drone lockers, cloud machinery as the main silhouette. |
+| Zavodnye Houses | Segmented bodies, manipulators, servo joints, drone nests, brass parts, lenses, visible drives, numbered service panels, signal lamps. |
+| Harpoon Houses | Harpoon mounts, winches, chain mechanisms, butchery decks, shell plates, heavy side armor, protective ribs, hunting marks. |
+| Chamber of Measures | Sensor masts, quartz lenses, calibration marks, enclosed observation bridges, clean sightlines, surveyor geometry, instrument decks. |
+
 ## Armed Mining Frigate Note
 
 The current crusher frigate image is only a draft. Its role direction is right: armed mining vessel, not warship with a crusher. Its surface treatment is too noisy. Next iteration should be more ORE-like in design logic: practical industrial modules, large simple masses, fewer rivets, less visual chatter.
