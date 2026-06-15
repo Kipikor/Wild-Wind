@@ -14,6 +14,9 @@ public partial class SessionConfigDatabase
     private readonly Dictionary<string, LeviathanTypeConfig> leviathanTypesById = new Dictionary<string, LeviathanTypeConfig>();
     private readonly Dictionary<string, TechnologyConfig> technologiesById = new Dictionary<string, TechnologyConfig>();
     private readonly Dictionary<string, SpecialModuleConfig> specialModulesById = new Dictionary<string, SpecialModuleConfig>();
+    private readonly Dictionary<string, ResourceCategoryConfig> resourceCategoriesById = new Dictionary<string, ResourceCategoryConfig>();
+    private readonly Dictionary<string, ModifierDefinitionConfig> modifierDefinitionsById = new Dictionary<string, ModifierDefinitionConfig>();
+    private readonly Dictionary<string, QuestDefinitionConfig> questDefinitionsById = new Dictionary<string, QuestDefinitionConfig>();
 
     public List<ItemConfig> items = new List<ItemConfig>();
     public List<PortConfig> ports = new List<PortConfig>();
@@ -22,6 +25,9 @@ public partial class SessionConfigDatabase
     public List<LeviathanTypeConfig> leviathanTypes = new List<LeviathanTypeConfig>();
     public List<TechnologyConfig> technologies = new List<TechnologyConfig>();
     public List<SpecialModuleConfig> specialModules = new List<SpecialModuleConfig>();
+    public List<ResourceCategoryConfig> resourceCategories = new List<ResourceCategoryConfig>();
+    public List<ModifierDefinitionConfig> modifierDefinitions = new List<ModifierDefinitionConfig>();
+    public List<QuestDefinitionConfig> questDefinitions = new List<QuestDefinitionConfig>();
 
     public bool isLoaded;
     public string lastError = "";
@@ -39,14 +45,15 @@ public partial class SessionConfigDatabase
         try
         {
             LoadItems(Path.Combine(folder, "Item.csv"));
+            LoadResourceCategories(Path.Combine(folder, "Resource_category.csv"));
+            LoadModifierDefinitions(Path.Combine(folder, "Modifier_catalog.csv"));
             LoadGasCondensateTypes(Path.Combine(folder, "Gas_condensate_type.csv"));
             LoadOreTypes(Path.Combine(folder, "Ore_type.csv"));
             LoadPorts(Path.Combine(folder, "Port.csv"));
             LoadLeviathanTypes(Path.Combine(folder, "Leviathan_type.csv"));
             LoadTechnologies(Path.Combine(folder, "Technology.csv"));
+            LoadQuestDefinitions(Path.Combine(folder, "Quest.csv"));
             LoadHulls(Path.Combine(folder, "Hull.csv"));
-            LoadEngines(Path.Combine(folder, "Engine.csv"));
-            LoadPropellers(Path.Combine(folder, "Propeller.csv"));
             LoadClaudiumLoops(Path.Combine(folder, "Claudium_loop.csv"));
             LoadSpecialModules(Path.Combine(folder, "Special_module.csv"));
             LoadShipTree(Path.Combine(folder, "Ship_tree.csv"));
@@ -113,30 +120,32 @@ public partial class SessionConfigDatabase
         return module;
     }
 
+    public ResourceCategoryConfig GetResourceCategory(string categoryId)
+    {
+        if (string.IsNullOrWhiteSpace(categoryId)) return null;
+        resourceCategoriesById.TryGetValue(categoryId, out ResourceCategoryConfig category);
+        return category;
+    }
+
+    public ModifierDefinitionConfig GetModifierDefinition(string modifierId)
+    {
+        if (string.IsNullOrWhiteSpace(modifierId)) return null;
+        modifierDefinitionsById.TryGetValue(modifierId, out ModifierDefinitionConfig modifier);
+        return modifier;
+    }
+
+    public QuestDefinitionConfig GetQuestDefinition(string questId)
+    {
+        if (string.IsNullOrWhiteSpace(questId)) return null;
+        questDefinitionsById.TryGetValue(questId, out QuestDefinitionConfig quest);
+        return quest;
+    }
+
     public string GetItemNameRu(string itemId)
     {
         ItemConfig item = GetItem(itemId);
         if (item == null) return itemId ?? "";
         return string.IsNullOrWhiteSpace(item.localNameRu) ? item.id : item.localNameRu;
-    }
-
-    public CargoUnitKind GetItemUnitKind(string itemId)
-    {
-        ItemConfig item = GetItem(itemId);
-        if (item != null) return item.cargoUnitKind;
-        return CargoUnitKind.Piece;
-    }
-
-    public CargoStorageKind GetItemStorageKind(string itemId)
-    {
-        ItemConfig item = GetItem(itemId);
-        if (item != null) return item.cargoStorageKind;
-        return CargoStorageKind.Van;
-    }
-
-    public float GetItemStorageAmount(string itemId, int amount)
-    {
-        return GetItemTransportMassKg(itemId, amount);
     }
 
     public float GetItemTransportMassKg(string itemId, int amount)
@@ -164,6 +173,13 @@ public partial class SessionConfigDatabase
         return string.IsNullOrWhiteSpace(technology.localNameRu) ? technology.id : technology.localNameRu;
     }
 
+    public string GetModifierNameRu(string modifierId)
+    {
+        ModifierDefinitionConfig modifier = GetModifierDefinition(modifierId);
+        if (modifier == null) return modifierId ?? "";
+        return string.IsNullOrWhiteSpace(modifier.localNameRu) ? modifier.id : modifier.localNameRu;
+    }
+
     private void Clear()
     {
         items.Clear();
@@ -173,6 +189,9 @@ public partial class SessionConfigDatabase
         leviathanTypes.Clear();
         technologies.Clear();
         specialModules.Clear();
+        resourceCategories.Clear();
+        modifierDefinitions.Clear();
+        questDefinitions.Clear();
         ClearShipPartConfigs();
         itemsById.Clear();
         portsById.Clear();
@@ -181,6 +200,9 @@ public partial class SessionConfigDatabase
         leviathanTypesById.Clear();
         technologiesById.Clear();
         specialModulesById.Clear();
+        resourceCategoriesById.Clear();
+        modifierDefinitionsById.Clear();
+        questDefinitionsById.Clear();
         isLoaded = false;
         lastError = "";
     }
@@ -190,22 +212,70 @@ public partial class SessionConfigDatabase
         foreach (Dictionary<string, string> row in ReadCsv(path))
         {
             string itemId = Get(row, "id_item");
-            CargoUnitKind parsedUnitKind = ParseCargoUnitKind(Get(row, "cargo_unit_kind"), itemId);
-            CargoStorageKind parsedStorageKind = ParseCargoStorageKind(Get(row, "cargo_storage_kind"), itemId);
             ItemConfig item = new ItemConfig
             {
                 id = itemId,
                 localNameRu = Get(row, "local_name_ru"),
                 localNameEn = Get(row, "local_name_en"),
-                energyKwhPerKg = Mathf.Max(0f, ParseFloat(Get(row, "energy_kwh_per_kg"))),
-                cargoUnitKind = NormalizeCargoUnitKind(itemId, parsedUnitKind, parsedStorageKind),
-                cargoStorageKind = NormalizeCargoStorageKind(itemId, parsedUnitKind, parsedStorageKind),
                 massKgPerUnit = Mathf.Max(0f, ParseFloat(Get(row, "mass_kg_per_unit"), 1f))
             };
 
             if (string.IsNullOrWhiteSpace(item.id)) continue;
             items.Add(item);
             itemsById[item.id] = item;
+        }
+    }
+
+    private void LoadResourceCategories(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            ResourceCategoryConfig category = new ResourceCategoryConfig
+            {
+                id = Get(row, "category_id"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                sourceConfig = Get(row, "source_config"),
+                notesRu = Get(row, "notes_ru")
+            };
+
+            category.itemIds.AddRange(SplitInlineList(Get(row, "item_ids"), '|'));
+
+            if (string.IsNullOrWhiteSpace(category.id)) continue;
+            resourceCategories.Add(category);
+            resourceCategoriesById[category.id] = category;
+        }
+    }
+
+    private void LoadModifierDefinitions(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            ModifierDefinitionConfig modifier = new ModifierDefinitionConfig
+            {
+                id = Get(row, "modifier_id"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                categoryId = Get(row, "category_id"),
+                valueKind = Get(row, "value_kind"),
+                stackingRule = Get(row, "stacking_rule"),
+                defaultOperation = Get(row, "default_operation"),
+                descriptionRu = Get(row, "description_ru")
+            };
+
+            if (string.IsNullOrWhiteSpace(modifier.id)) continue;
+            modifierDefinitions.Add(modifier);
+            modifierDefinitionsById[modifier.id] = modifier;
         }
     }
 
@@ -327,6 +397,19 @@ public partial class SessionConfigDatabase
                 color = ParseColor(Get(row, "color_hex"), new Color(0.35f, 0.55f, 0.7f, 1f))
             };
 
+            List<string> itemIds = SplitInlineList(Get(row, "composition_id_item"));
+            List<string> shares = SplitInlineList(Get(row, "composition_share"));
+            int count = Mathf.Min(itemIds.Count, shares.Count);
+            for (int i = 0; i < count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(itemIds[i])) continue;
+                type.composition.Add(new LeviathanButcheryCompositionConfig
+                {
+                    itemId = itemIds[i],
+                    share = Mathf.Max(0f, ParseFloat(shares[i]))
+                });
+            }
+
             if (string.IsNullOrWhiteSpace(type.id)) continue;
             leviathanTypes.Add(type);
             leviathanTypesById[type.id] = type;
@@ -344,12 +427,37 @@ public partial class SessionConfigDatabase
                 localNameEn = Get(row, "local_name_en"),
                 rank = Mathf.Max(0, ParseInt(Get(row, "rank"), 0)),
                 branch = Get(row, "branch"),
+                categoryId = Get(row, "category_id"),
+                categoryNameRu = Get(row, "category_name_ru"),
+                treeColumn = Mathf.Max(0, ParseInt(Get(row, "tree_column"), 0)),
+                treeRow = Mathf.Max(0, ParseInt(Get(row, "tree_row"), 0)),
+                iconText = Get(row, "icon_text"),
+                lockSummaryRu = Get(row, "lock_summary_ru"),
                 unlockSummaryRu = Get(row, "unlock_summary_ru"),
                 cycleTimeSeconds = Mathf.Max(0, ParseInt(Get(row, "cycle_time_seconds"), 1)),
                 requiredCycles = Mathf.Max(1, ParseInt(Get(row, "required_cycles"), 1))
             };
 
+            if (string.IsNullOrWhiteSpace(technology.categoryId))
+            {
+                technology.categoryId = string.IsNullOrWhiteSpace(technology.branch) ? "general" : technology.branch;
+            }
+
+            if (string.IsNullOrWhiteSpace(technology.categoryNameRu))
+            {
+                technology.categoryNameRu = technology.categoryId;
+            }
+
             technology.prerequisiteTechnologyIds.AddRange(SplitInlineList(Get(row, "required_technology")));
+            List<string> spCosts = SplitInlineList(Get(row, "sp_cost_by_level"));
+            for (int i = 0; i < spCosts.Count; i++)
+            {
+                int cost = Mathf.Max(0, ParseInt(spCosts[i]));
+                if (cost > 0)
+                {
+                    technology.spCostByLevel.Add(cost);
+                }
+            }
 
             List<string> itemIds = SplitInlineList(Get(row, "cycle_cost_item"));
             List<string> amounts = SplitInlineList(Get(row, "cycle_cost_amount"));
@@ -366,6 +474,32 @@ public partial class SessionConfigDatabase
                     itemId = itemIds[i],
                     amount = amount
                 });
+            }
+
+            List<string> modifierIds = SplitInlineList(Get(row, "modifier_id"));
+            List<string> operations = SplitInlineList(Get(row, "modifier_operation"));
+            List<string> values = SplitInlineList(Get(row, "modifier_value_per_level"));
+            List<string> targets = SplitInlineList(Get(row, "modifier_target_id"));
+            for (int i = 0; i < modifierIds.Count; i++)
+            {
+                string modifierId = modifierIds[i];
+                if (string.IsNullOrWhiteSpace(modifierId)) continue;
+
+                TechnologyModifierGrantConfig grant = new TechnologyModifierGrantConfig
+                {
+                    modifierId = modifierId,
+                    operation = i < operations.Count ? operations[i] : "",
+                    valuePerLevel = i < values.Count ? ParseFloat(values[i]) : 0f,
+                    targetId = i < targets.Count ? targets[i] : ""
+                };
+
+                if (string.IsNullOrWhiteSpace(grant.operation))
+                {
+                    ModifierDefinitionConfig definition = GetModifierDefinition(grant.modifierId);
+                    grant.operation = definition != null ? definition.defaultOperation : "add_percent";
+                }
+
+                technology.modifierGrants.Add(grant);
             }
 
             if (string.IsNullOrWhiteSpace(technology.id)) continue;
@@ -400,6 +534,53 @@ public partial class SessionConfigDatabase
             specialModules.Add(module);
             specialModulesById[module.id] = module;
         }
+    }
+
+    private void LoadQuestDefinitions(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            QuestDefinitionConfig quest = new QuestDefinitionConfig
+            {
+                id = Get(row, "quest_id"),
+                localNameRu = Get(row, "local_name_ru"),
+                localNameEn = Get(row, "local_name_en"),
+                categoryId = Get(row, "category_id"),
+                descriptionRu = Get(row, "description_ru"),
+                objectiveType = Get(row, "objective_type"),
+                targetId = Get(row, "target_id"),
+                targetAmount = Mathf.Max(1, ParseInt(Get(row, "target_amount"), 1)),
+                activationMode = Get(row, "activation_mode"),
+                claimMode = Get(row, "claim_mode"),
+                requiredQuestId = Get(row, "required_quest_id"),
+                rewardItemId = Get(row, "reward_item_id"),
+                rewardAmount = Mathf.Max(0, ParseInt(Get(row, "reward_amount"), 0)),
+                sortOrder = ParseInt(Get(row, "sort_order"), 0)
+            };
+
+            if (string.IsNullOrWhiteSpace(quest.id)) continue;
+            if (string.IsNullOrWhiteSpace(quest.categoryId)) quest.categoryId = "main";
+            if (string.IsNullOrWhiteSpace(quest.objectiveType)) quest.objectiveType = "event";
+            if (string.IsNullOrWhiteSpace(quest.targetId)) quest.targetId = "any";
+            if (string.IsNullOrWhiteSpace(quest.activationMode)) quest.activationMode = QuestDefinitionConfig.ActivationRetroactive;
+            if (string.IsNullOrWhiteSpace(quest.claimMode)) quest.claimMode = QuestDefinitionConfig.ClaimManual;
+            questDefinitions.Add(quest);
+            questDefinitionsById[quest.id] = quest;
+        }
+
+        questDefinitions.Sort((left, right) =>
+        {
+            if (left == null && right == null) return 0;
+            if (left == null) return -1;
+            if (right == null) return 1;
+            int order = left.sortOrder.CompareTo(right.sortOrder);
+            return order != 0 ? order : string.Compare(left.id, right.id, StringComparison.OrdinalIgnoreCase);
+        });
     }
 
     private static IEnumerable<Dictionary<string, string>> ReadCsv(string path)
@@ -468,15 +649,19 @@ public partial class SessionConfigDatabase
         return values;
     }
 
-    private static List<string> SplitInlineList(string value)
+    private static List<string> SplitInlineList(string value, char separator = ',')
     {
         List<string> result = new List<string>();
         if (string.IsNullOrWhiteSpace(value)) return result;
 
-        string[] parts = value.Split(',');
+        string[] parts = value.Split(separator);
         for (int i = 0; i < parts.Length; i++)
         {
-            result.Add(parts[i].Trim());
+            string item = parts[i].Trim();
+            if (!string.IsNullOrWhiteSpace(item))
+            {
+                result.Add(item);
+            }
         }
 
         return result;
@@ -510,56 +695,6 @@ public partial class SessionConfigDatabase
         return color;
     }
 
-    private static CargoUnitKind ParseCargoUnitKind(string value, string itemId)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return CargoUnitKind.Piece;
-        }
-
-        return Enum.TryParse(value, true, out CargoUnitKind parsed) ? parsed : CargoUnitKind.Piece;
-    }
-
-    private static CargoUnitKind NormalizeCargoUnitKind(string itemId, CargoUnitKind parsedUnitKind, CargoStorageKind parsedStorageKind)
-    {
-        return CargoUnitKind.Piece;
-    }
-
-    private static CargoStorageKind ParseCargoStorageKind(string value, string itemId)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return CargoStorageKind.Van;
-        }
-
-        string normalized = value.Trim().Replace("-", "").Replace("_", "");
-        if (string.Equals(normalized, "bulk", StringComparison.OrdinalIgnoreCase))
-        {
-            return CargoStorageKind.BulkHold;
-        }
-
-        if (string.Equals(normalized, "liquid", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "tank", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "cistern", StringComparison.OrdinalIgnoreCase))
-        {
-            return CargoStorageKind.LiquidTank;
-        }
-
-        if (string.Equals(normalized, "gas", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "cylinder", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(normalized, "bottle", StringComparison.OrdinalIgnoreCase))
-        {
-            return CargoStorageKind.GasCylinder;
-        }
-
-        return Enum.TryParse(value, true, out CargoStorageKind parsed) ? parsed : CargoStorageKind.Van;
-    }
-
-    private static CargoStorageKind NormalizeCargoStorageKind(string itemId, CargoUnitKind parsedUnitKind, CargoStorageKind parsedStorageKind)
-    {
-        return parsedStorageKind;
-    }
-
     private static bool ParseBool01(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return false;
@@ -582,10 +717,19 @@ public class ItemConfig
     public string id = "";
     public string localNameRu = "";
     public string localNameEn = "";
-    public float energyKwhPerKg;
-    public CargoUnitKind cargoUnitKind = CargoUnitKind.Piece;
-    public CargoStorageKind cargoStorageKind = CargoStorageKind.Van;
     public float massKgPerUnit = 1f;
+}
+
+public class ResourceCategoryConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public string sourceConfig = "";
+    public string notesRu = "";
+    public List<string> itemIds = new List<string>();
+
+    public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }
 
 public class PortConfig
@@ -655,9 +799,16 @@ public class LeviathanTypeConfig
     public float ramDamageMultiplier = 1f;
     public float carcassMassFraction = 0.55f;
     public Color color = new Color(0.35f, 0.55f, 0.7f, 1f);
+    public List<LeviathanButcheryCompositionConfig> composition = new List<LeviathanButcheryCompositionConfig>();
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
     public int CarcassMassKg => Mathf.Max(1, Mathf.RoundToInt(massKg * Mathf.Clamp01(carcassMassFraction)));
+}
+
+public class LeviathanButcheryCompositionConfig
+{
+    public string itemId = "";
+    public float share;
 }
 
 public class TechnologyConfig
@@ -667,17 +818,74 @@ public class TechnologyConfig
     public string localNameEn = "";
     public int rank;
     public string branch = "";
+    public string categoryId = "";
+    public string categoryNameRu = "";
+    public int treeColumn;
+    public int treeRow;
+    public string iconText = "";
+    public string lockSummaryRu = "";
     public string unlockSummaryRu = "";
     public int cycleTimeSeconds = 1;
     public int requiredCycles = 1;
+    public List<int> spCostByLevel = new List<int>();
     public List<string> prerequisiteTechnologyIds = new List<string>();
     public List<TechnologyCostConfig> cycleCost = new List<TechnologyCostConfig>();
+    public List<TechnologyModifierGrantConfig> modifierGrants = new List<TechnologyModifierGrantConfig>();
+
+    public string CategoryDisplayNameRu => string.IsNullOrWhiteSpace(categoryNameRu) ? categoryId : categoryNameRu;
 }
 
 public class TechnologyCostConfig
 {
     public string itemId = "";
     public int amount;
+}
+
+public class TechnologyModifierGrantConfig
+{
+    public string modifierId = "";
+    public string operation = "";
+    public float valuePerLevel;
+    public string targetId = "";
+}
+
+public class ModifierDefinitionConfig
+{
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public string categoryId = "";
+    public string valueKind = "";
+    public string stackingRule = "";
+    public string defaultOperation = "";
+    public string descriptionRu = "";
+}
+
+public class QuestDefinitionConfig
+{
+    public const string ActivationRetroactive = "retroactive";
+    public const string ActivationFromAccept = "from_accept";
+    public const string ClaimAuto = "auto";
+    public const string ClaimManual = "manual";
+
+    public string id = "";
+    public string localNameRu = "";
+    public string localNameEn = "";
+    public string categoryId = "";
+    public string descriptionRu = "";
+    public string objectiveType = "";
+    public string targetId = "";
+    public int targetAmount = 1;
+    public string activationMode = ActivationRetroactive;
+    public string claimMode = ClaimManual;
+    public string requiredQuestId = "";
+    public string rewardItemId = "";
+    public int rewardAmount;
+    public int sortOrder;
+
+    public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
+    public bool IsRetroactive => !string.Equals(activationMode, ActivationFromAccept, StringComparison.OrdinalIgnoreCase);
+    public bool IsAutoClaim => string.Equals(claimMode, ClaimAuto, StringComparison.OrdinalIgnoreCase);
 }
 
 public class SpecialModuleConfig

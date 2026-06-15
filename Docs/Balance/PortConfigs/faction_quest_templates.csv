@@ -1,0 +1,13 @@
+template_id,faction_id,quest_kind,objective_family,target_count_min,target_count_max,input_or_activity_fe,reward_currency,reward_currency_amount,reputation_reward,mastery_reward,unlock_weight,notes_ru
+capital_daily_supply,capital,daily,load_capital_goods,2,4,1200,solid,8,20,30,30,Простая ежедневка столицы.
+capital_campaign_ship,capital,campaign,use_capital_ship_or_upgrade,1,3,12000,solid,60,180,180,5,Длинная цепочка; может открыть товар.
+wind_daily_courier,wind_houses,daily,complete_courier_orders,2,5,900,freight,900,25,35,35,Усиливает курьерку.
+wind_campaign_routes,wind_houses,campaign,complete_logistics_chain,4,10,9000,freight,8000,160,160,6,Открывает логистические товары.
+mist_daily_gas,mist_synod,daily,process_gas_condensate,2,4,1000,nobel,8,25,35,25,Ежедневный газовый контур.
+mist_campaign_ritual,mist_synod,campaign,deliver_nobel_or_gases,3,8,10000,nobel,55,160,160,5,Открывает сильные газовые товары.
+stone_daily_ore,stone_vault,daily,process_ore,2,4,1000,gems,7,25,35,25,Рудная ежедневка.
+stone_campaign_foundry,stone_vault,campaign,build_or_process_metals,3,8,10000,gems,50,160,160,5,Открывает металлургические чертежи.
+ark_daily_salvage,clockwork_ark,daily,disassemble_automaton_modules,1,3,1200,perfcards,6,25,35,25,Ежедневка автоматонов.
+ark_campaign_clockwork,clockwork_ark,campaign,collect_precision_mechanisms,3,8,12000,perfcards,45,170,170,5,Открывает T2-рецепты и механизмы.
+dev_daily_hunt,devourers,daily,butcher_leviathan,1,3,1200,amber,5,25,35,25,Ежедневка охоты.
+dev_campaign_great_hunt,devourers,campaign,bring_leviathan_sections,3,8,12000,amber,40,170,170,5,Открывает охотничьи товары.

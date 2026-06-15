@@ -1,6 +1,6 @@
-id_leviathan_type,local_name_ru,local_name_en,carcass_item,body_length_m,body_radius_m,mass_kg,max_health,claudium_lift_kg,forward_thrust_kgf,omni_thrust_kgf,cruise_speed_ms,wander_radius_m,turn_torque,head_armor_mm,body_armor_mm,ram_damage_multiplier,carcass_mass_fraction,color_hex
-windminnow,Ветропескарь,Wind Minnow,windminnow_carcass,4.2,0.7,120,32,145,120,86,9,95,850,2,1,0.2,0.18,#B7E6D1
-windcalf,Ветротеленок,Wind Calf,windcalf_carcass,9,1.6,360,80,430,430,310,11,140,1800,8,2,0.45,0.22,#9FD2E0
-mistwhale,Дымный кит,Mist Whale,mistwhale_carcass,34,5.5,6200,360,7100,1220,880,8,260,1800,32,6,1.0,0.52,#5FA6C7
-sky_eel,Небесный угорь,Sky Eel,sky_eel_carcass,22,2.2,2100,170,2600,870,625,13,340,2400,14,3,0.75,0.45,#81C3B4
-stoneback,Камнеспин,Stoneback,stoneback_carcass,46,7.5,11800,520,13200,1630,1175,6,210,1600,58,10,1.35,0.58,#6F8E9D
+﻿id_leviathan_type,local_name_ru,local_name_en,carcass_item,body_length_m,body_radius_m,mass_kg,max_health,claudium_lift_kg,forward_thrust_kgf,omni_thrust_kgf,cruise_speed_ms,wander_radius_m,turn_torque,head_armor_mm,body_armor_mm,ram_damage_multiplier,carcass_mass_fraction,color_hex,composition_id_item,composition_share
+windminnow,Ветропескарь,Wind Minnow,windminnow_carcass,4.2,0.7,120,32,145,120,86,9,95,850,2,1,0.2,0.18,#B7E6D1,"leviathan_meat,leviathan_fat,leviathan_hide,leviathan_sinew,bone_plate","0.45,0.20,0.15,0.10,0.10"
+windcalf,Ветротеленок,Wind Calf,windcalf_carcass,9,1.6,360,80,430,430,310,11,140,1800,8,2,0.45,0.22,#9FD2E0,"leviathan_meat,leviathan_fat,leviathan_hide,claudium,leviathan_sinew,bone_plate","0.35,0.20,0.20,0.08,0.10,0.07"
+mistwhale,Дымный кит,Mist Whale,mistwhale_carcass,34,5.5,6200,360,7100,1220,880,8,260,1800,32,6,1.0,0.52,#5FA6C7,"leviathan_fat,leviathan_ichor,leviathan_meat,claudium,nerve_substrate,leviathan_hide","0.30,0.20,0.25,0.10,0.07,0.08"
+sky_eel,Небесный угорь,Sky Eel,sky_eel_carcass,22,2.2,2100,170,2600,870,625,13,340,2400,14,3,0.75,0.45,#81C3B4,"leviathan_sinew,leviathan_hide,leviathan_ichor,nerve_substrate,bone_plate,claudium","0.26,0.18,0.18,0.18,0.12,0.08"
+stoneback,Камнеспин,Stoneback,stoneback_carcass,46,7.5,11800,520,13200,1630,1175,6,210,1600,58,10,1.35,0.58,#6F8E9D,"mineral_shell,bone_plate,leviathan_hide,claudium,leviathan_meat,leviathan_fat","0.42,0.20,0.14,0.10,0.08,0.06"

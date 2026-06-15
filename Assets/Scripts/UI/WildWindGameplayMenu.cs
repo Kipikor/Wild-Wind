@@ -135,7 +135,6 @@ public sealed class WildWindGameplayMenu : MonoBehaviour
 
         SetStatus("game.menu.status_reset_progress");
         SetOpen(false);
-        Object.FindFirstObjectByType<WildWindGameplayHud>()?.OpenMetaPortScreenForTests();
     }
 
     private void SetPaused(bool paused)

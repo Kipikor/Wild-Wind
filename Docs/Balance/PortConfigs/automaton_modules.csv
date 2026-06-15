@@ -1,0 +1,16 @@
+module_id,class,local_name_ru,typical_weight_kg,yield_precision_spring,yield_microgear_cascade,yield_anchor_escapement,yield_cam_drum,yield_differential_counter,yield_gyropendulum_block,yield_servovalve_unit,perfcards,notes_ru
+armor_shell_latches,cheap,Броневой кожух с затворами,300,0,1,0,0,0,0,1,0,Грубая силовая часть без валюты.
+manipulator_frame,cheap,Манипуляторная рама,400,0,1,0,0,0,0,2,0,Приводы и сервоклапаны.
+walking_strut,cheap,Ходовая стойка,450,1,0,0,0,0,0,1,0,Дешевая ходовая добыча.
+traction_engine,medium,Тяговый двигатель,700,2,1,0,0,0,0,1,0,Главная механическая добыча.
+drive_gearbox,medium,Приводная коробка,520,0,2,1,1,0,0,0,1,Механическая программа и передача.
+spring_accumulator,medium,Пружинный накопитель,650,3,0,1,0,0,0,0,0,Силовые спирали.
+gyroscopic_frame,medium,Гироскопическая рама,600,0,1,1,0,0,2,0,1,Навигационная механика.
+weapon_module,medium,Орудийный модуль,850,0,1,1,0,1,0,1,1,Боевой модуль.
+service_carriage,medium,Сервисная каретка,500,0,1,0,1,0,0,2,1,Ремонтная автоматика.
+sensor_head,valuable,Сенсорная голова,480,0,0,0,1,1,1,0,3,Думающий узел.
+toothed_relay_rack,valuable,Зубчатая релейная стойка,430,0,1,1,2,0,0,0,3,Много программных механизмов.
+navigation_pendulum,valuable,Навигационный маятник,560,0,0,1,0,1,2,0,2,Курс и стабилизация.
+command_core,expensive,Командное ядро,700,0,0,1,2,2,0,0,12,Много перфокарт.
+memory_archive,expensive,Памятный архив,620,0,1,0,3,2,0,0,18,Информационный трофей.
+main_synchronizer,expensive,Главный синхронизатор,900,0,0,2,0,2,1,1,25,Самый дорогой обычный модуль.

@@ -1,0 +1,8 @@
+event_id,milestone_solid_spent,reward_id,reward_amount,value_fe,notes_ru
+ship_event_seeker,100,event_sail,250,6250,Ранний кэшбэк.
+ship_event_seeker,250,event_ticket,5,4500,Дает прокруты.
+ship_event_seeker,500,seeker_r8_fragment,15,63000,Ускоряет корабль.
+ship_event_seeker,900,repair_rare_pack,1,90000,Полезный портовый ресурс.
+ship_event_seeker,1400,seeker_recipe_fragment,4,100000,Движение к рецепту.
+ship_event_seeker,2200,seeker_r10_fragment,20,240000,Глубокая награда.
+ship_event_seeker,3500,seeker_t2_one_time_recipe,1,800000,Не считается обязательным закрытием.

@@ -1,5 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using UnityEngine;
 
 [Serializable]
@@ -15,12 +17,61 @@ public class MetaGameAccountData
     public GameplaySessionAccountData gameplaySession;
 }
 
+[Serializable]
+public class MetaGameProgressSaveData
+{
+    public const int CurrentVersion = 1;
+
+    public int version = CurrentVersion;
+    public string runtimeAccountId = GameplaySessionAccountData.DefaultAccountId;
+    public long savedUtcTicks;
+    public PlayerProgress progress = new PlayerProgress();
+}
+
 public partial class MetaGameState : MonoBehaviour
 {
     private const float ExtractionRunupOutwardDotThreshold = 0.9659258f;
     private const float SortieEntryApproachSeconds = 20f;
     private const float SortieEntryDefaultMaxSpeedMS = 120f;
     private const string Cruiser203HullId = "cruiser203_hull";
+    private const string PersistentProgressSaveFileName = "wildwind_meta_progress_v1.json";
+    private const string PersistentProgressBigTestSaveFileName = "wildwind_meta_progress_bigtest_v1.json";
+    private const float PersistentProgressAutosaveIntervalSeconds = 1f;
+    private const int BaseCascadeQueueSlotCount = 5;
+    public const int CourierOrderSlotCount = 8;
+    public const int CourierCancelCooldownSeconds = 15 * 60;
+    private const int KnowledgeMaxLevel = 5;
+    private const float BaseArchiveKnowledgeSpPerMinute = 3f;
+    private const string CourierFreightRewardItemId = "freight";
+    private const string CourierExperienceRewardItemId = SessionExtractionConstants.DesignExperienceItemId;
+    private static readonly string[] CourierClientNames =
+    {
+        "Маяк Северный",
+        "Караванная пристань",
+        "Дом Вихря",
+        "Лоцманский двор",
+        "Бирюзовый причал",
+        "Штормовая почта",
+        "Станция Гребня",
+        "Южный буй"
+    };
+    private static readonly CourierResourceSpec[] CourierResourceCatalog =
+    {
+        new CourierResourceSpec("windshale_ore", 18, 34, 3),
+        new CourierResourceSpec("dawnspar_ore", 12, 24, 4),
+        new CourierResourceSpec("cloud_condensate", 18, 36, 4),
+        new CourierResourceSpec(SessionExtractionConstants.BrokenAutomatonItemId, 8, 18, 7),
+        new CourierResourceSpec("windcalf_carcass", 10, 22, 6),
+        new CourierResourceSpec(SessionExtractionConstants.RockInfoItemId, 8, 16, 9),
+        new CourierResourceSpec("ferron", 6, 14, 12),
+        new CourierResourceSpec("silvate", 4, 10, 18),
+        new CourierResourceSpec("cloth", 8, 18, 10),
+        new CourierResourceSpec("tools", 3, 8, 26),
+        new CourierResourceSpec("charcoal", 12, 28, 4),
+        new CourierResourceSpec("claudium", 6, 14, 16),
+        new CourierResourceSpec("metal", 6, 16, 12),
+        new CourierResourceSpec("mechanisms", 3, 8, 30)
+    };
 
     [Header("Связи")]
     [InspectorName("Каталог кораблей")]
@@ -36,7 +87,7 @@ public partial class MetaGameState : MonoBehaviour
     [InspectorName("Стартовый док")]
     public string startingDockId = "capital";
     [InspectorName("Runtime Account Id")]
-    [Tooltip("Single runtime account identifier. The session build does not read or write save files.")]
+    [Tooltip("Single runtime account identifier saved with the persistent meta progress file.")]
     public string runtimeAccountId = GameplaySessionAccountData.DefaultAccountId;
 
     [Header("Стартовые ресурсы")]
@@ -94,11 +145,410 @@ public partial class MetaGameState : MonoBehaviour
     private float pendingFuelConsumedKg;
     private float pendingClaudiumConsumedKg;
     private string activeSortieExtractionRunupStatus = "";
+    private string lastPersistentProgressFingerprint = "";
+    private float nextPersistentProgressAutosaveTime;
+    private bool persistentProgressLoadAttempted;
+    private bool persistentProgressLoadedThisSession;
+    private bool useBigTestPersistentProgressFile;
 
     private ShipCatalogSO ActiveCatalog => catalog != null ? catalog : shipLoader != null ? shipLoader.catalog : null;
     public SessionConfigDatabase SessionConfig => sessionConfig;
     public ShipCatalogSO CurrentCatalog => ActiveCatalog;
     public int SpawnedConfiguredPortCount => spawnedConfigPortRoot != null ? spawnedConfigPortRoot.childCount : 0;
+    public string PersistentProgressSavePathForTests => ResolvePersistentProgressSavePath();
+    public bool HasPersistentProgressSaveForTests => File.Exists(ResolvePersistentProgressSavePath());
+    public bool PersistentProgressLoadedThisSessionForTests => persistentProgressLoadedThisSession;
+    public bool IsUsingBigTestPersistentProgressForTests => IsUsingBigTestPersistentProgress();
+    public static bool IsBigTestProgressSandboxActiveForTests => ShouldUseBigTestProgressSaveFile();
+
+    public IReadOnlyList<QuestDefinitionConfig> GetQuestDefinitions()
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        return sessionConfig != null ? sessionConfig.questDefinitions : null;
+    }
+
+    public IReadOnlyList<QuestState> GetQuestStates()
+    {
+        EnsureProgressInitialized();
+        RefreshQuestProgress(false);
+        return progress.questStates;
+    }
+
+    public QuestState GetQuestState(string questId)
+    {
+        EnsureProgressInitialized();
+        RefreshQuestProgress(false);
+        return progress.GetQuestState(questId, false);
+    }
+
+    public int GetQuestCompletedCountForTests()
+    {
+        EnsureProgressInitialized();
+        RefreshQuestProgress(false);
+        int count = 0;
+        if (progress.questStates == null) return 0;
+        for (int i = 0; i < progress.questStates.Count; i++)
+        {
+            QuestState state = progress.questStates[i];
+            if (state != null && state.completed) count++;
+        }
+
+        return count;
+    }
+
+    public int GetQuestClaimedCountForTests()
+    {
+        EnsureProgressInitialized();
+        RefreshQuestProgress(false);
+        int count = 0;
+        if (progress.questStates == null) return 0;
+        for (int i = 0; i < progress.questStates.Count; i++)
+        {
+            QuestState state = progress.questStates[i];
+            if (state != null && state.claimed) count++;
+        }
+
+        return count;
+    }
+
+    public bool RecordQuestEventForTests(string objectiveType, string targetId, int amount = 1)
+    {
+        return RecordQuestEvent(objectiveType, targetId, amount);
+    }
+
+    public int RefreshQuestProgressForTests(bool allowAutoClaim = true)
+    {
+        EnsureProgressInitialized();
+        return RefreshQuestProgress(allowAutoClaim);
+    }
+
+    public bool TryClaimQuestReward(string questId, out string message)
+    {
+        message = "";
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        RefreshQuestProgress(false);
+
+        QuestDefinitionConfig quest = sessionConfig != null ? sessionConfig.GetQuestDefinition(questId) : null;
+        QuestState state = progress.GetQuestState(questId, false);
+        if (quest == null || state == null || !state.completed)
+        {
+            message = "Квест не готов к награде.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (state.claimed)
+        {
+            message = "Награда уже получена.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        ClaimQuestReward(quest, state, false);
+        message = "Награда за квест получена: " + quest.DisplayNameRu + ".";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    private bool RecordQuestEvent(string objectiveType, string targetId, int amount = 1)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        if (progress == null || amount <= 0 || string.IsNullOrWhiteSpace(objectiveType))
+        {
+            return false;
+        }
+
+        AddQuestEventMetric(objectiveType, targetId, amount);
+        int changed = RefreshQuestProgress(true);
+        MarkPersistentProgressDirty();
+        return changed > 0;
+    }
+
+    private void AddQuestEventMetric(string objectiveType, string targetId, int amount)
+    {
+        if (progress == null || amount <= 0 || string.IsNullOrWhiteSpace(objectiveType))
+        {
+            return;
+        }
+
+        string metricType = NormalizeQuestKey(objectiveType);
+        string metricTarget = NormalizeQuestKey(targetId);
+        progress.AddQuestMetric(metricType, metricTarget, amount);
+        if (metricTarget != "any")
+        {
+            progress.AddQuestMetric(metricType, "any", amount);
+        }
+    }
+
+    private PortStorageState GetCapitalStorageStateForQuestRuntime()
+    {
+        progress ??= new PlayerProgress();
+        progress.Normalize();
+        return progress.GetPortStorageState(GetCapitalPortId(), true);
+    }
+
+    private int RefreshQuestProgress(bool allowAutoClaim)
+    {
+        if (progress == null)
+        {
+            return 0;
+        }
+
+        EnsureSessionConfigLoaded();
+        if (sessionConfig == null || sessionConfig.questDefinitions == null || sessionConfig.questDefinitions.Count == 0)
+        {
+            return 0;
+        }
+
+        progress.Normalize();
+        int changed = 0;
+        for (int pass = 0; pass < 4; pass++)
+        {
+            bool changedThisPass = false;
+            for (int i = 0; i < sessionConfig.questDefinitions.Count; i++)
+            {
+                QuestDefinitionConfig quest = sessionConfig.questDefinitions[i];
+                if (quest == null || string.IsNullOrWhiteSpace(quest.id) || !IsQuestAvailable(quest))
+                {
+                    continue;
+                }
+
+                QuestState state = progress.GetQuestState(quest.id, true);
+                state.targetAmount = Mathf.Max(1, quest.targetAmount);
+                if (!state.accepted)
+                {
+                    state.accepted = true;
+                    state.acceptedUtcTicks = DateTime.UtcNow.Ticks;
+                    state.baselineAmount = quest.IsRetroactive ? 0 : GetQuestObjectiveRawAmount(quest);
+                    changed++;
+                    changedThisPass = true;
+                }
+
+                int rawAmount = GetQuestObjectiveRawAmount(quest);
+                int amount = Mathf.Max(0, rawAmount - state.baselineAmount);
+                int clamped = Mathf.Min(state.targetAmount, amount);
+                if (state.currentAmount != clamped)
+                {
+                    state.currentAmount = clamped;
+                    changed++;
+                    changedThisPass = true;
+                }
+
+                if (!state.completed && state.currentAmount >= state.targetAmount)
+                {
+                    state.completed = true;
+                    state.completedUtcTicks = DateTime.UtcNow.Ticks;
+                    changed++;
+                    changedThisPass = true;
+                }
+
+                if (allowAutoClaim && state.completed && !state.claimed && quest.IsAutoClaim)
+                {
+                    ClaimQuestReward(quest, state, true);
+                    changed++;
+                    changedThisPass = true;
+                }
+            }
+
+            if (!changedThisPass)
+            {
+                break;
+            }
+        }
+
+        if (changed > 0)
+        {
+            MarkPersistentProgressDirty();
+        }
+
+        return changed;
+    }
+
+    private bool IsQuestAvailable(QuestDefinitionConfig quest)
+    {
+        if (quest == null) return false;
+        if (string.IsNullOrWhiteSpace(quest.requiredQuestId)) return true;
+
+        QuestState required = progress.GetQuestState(quest.requiredQuestId, false);
+        return required != null && required.completed;
+    }
+
+    private void ClaimQuestReward(QuestDefinitionConfig quest, QuestState state, bool automatic)
+    {
+        if (quest == null || state == null || state.claimed)
+        {
+            return;
+        }
+
+        state.claimed = true;
+        state.completed = true;
+        state.claimedUtcTicks = DateTime.UtcNow.Ticks;
+
+        if (!string.IsNullOrWhiteSpace(quest.rewardItemId) && quest.rewardAmount > 0)
+        {
+            PortStorageState storage = GetCapitalStorageStateForQuestRuntime();
+            storage?.AddResource(quest.rewardItemId, quest.rewardAmount);
+            progress.AddQuestMetric("resource_acquired", quest.rewardItemId, quest.rewardAmount);
+            progress.AddQuestMetric("resource_acquired", "any", quest.rewardAmount);
+        }
+
+        lastAccountMessage = (automatic ? "Квест выполнен: " : "Награда получена: ") + quest.DisplayNameRu + ".";
+        MarkPersistentProgressDirty();
+    }
+
+    private int GetQuestObjectiveRawAmount(QuestDefinitionConfig quest)
+    {
+        if (quest == null) return 0;
+
+        string type = NormalizeQuestKey(quest.objectiveType);
+        string target = NormalizeQuestKey(quest.targetId);
+        switch (type)
+        {
+            case "resource_owned":
+                return GetCapitalStorageStateForQuestRuntime()?.GetResourceAmount(target) ?? 0;
+            case "resource_acquired":
+            case "resource_spent":
+            case "courier_sent":
+            case "courier_cancelled":
+            case "technology_started":
+            case "cascade_order_completed":
+            case "sortie_completed":
+            case "event":
+                return GetQuestMetricValue(type, target);
+            case "technology_completed":
+                return GetTechnologyCompletedQuestAmount(target);
+            case "base_processing_level":
+                return GetBaseProcessingQuestLevel(target);
+            case "cascade_line_level":
+                return GetCascadeProductionQuestLevel(target);
+            case "ship_module_installed":
+                return GetInstalledModuleQuestAmount(target);
+            case "ship_hull_selected":
+                return target == "any" || NormalizeQuestKey(progress.selectedHullId) == target ? 1 : 0;
+            default:
+                return GetQuestMetricValue(type, target);
+        }
+    }
+
+    private int GetQuestMetricValue(string objectiveType, string targetId)
+    {
+        if (progress == null) return 0;
+        string type = NormalizeQuestKey(objectiveType);
+        string target = NormalizeQuestKey(targetId);
+        return target == "any"
+            ? progress.GetQuestMetricValue(type, "any")
+            : progress.GetQuestMetricValue(type, target);
+    }
+
+    private int GetTechnologyCompletedQuestAmount(string targetId)
+    {
+        if (progress == null || progress.completedTechnologyIds == null)
+        {
+            return 0;
+        }
+
+        string target = NormalizeQuestKey(targetId);
+        if (target == "any")
+        {
+            return progress.completedTechnologyIds.Count;
+        }
+
+        return progress.IsTechnologyCompleted(targetId) || progress.IsTechnologyCompleted(target) ? 1 : 0;
+    }
+
+    private int GetBaseProcessingQuestLevel(string targetId)
+    {
+        if (progress == null || progress.baseIndustry == null)
+        {
+            return 0;
+        }
+
+        if (!TryParseBaseProcessingBranch(targetId, out BaseProcessingBranch branch))
+        {
+            return 0;
+        }
+
+        BaseProcessingLineState line = progress.baseIndustry.GetProcessing(branch);
+        return line != null ? Mathf.Max(0, line.level) : 0;
+    }
+
+    private int GetCascadeProductionQuestLevel(string targetId)
+    {
+        if (progress == null || progress.baseIndustry == null)
+        {
+            return 0;
+        }
+
+        if (!TryParseCascadeProductionType(targetId, out CascadeProductionType type))
+        {
+            return 0;
+        }
+
+        CascadeProductionLineState line = progress.baseIndustry.GetProduction(type);
+        return line != null ? Mathf.Max(0, line.level) : 0;
+    }
+
+    private int GetInstalledModuleQuestAmount(string targetId)
+    {
+        if (progress == null || progress.installedModules == null)
+        {
+            return 0;
+        }
+
+        string target = NormalizeQuestKey(targetId);
+        int count = 0;
+        for (int i = 0; i < progress.installedModules.Count; i++)
+        {
+            InstalledModuleState module = progress.installedModules[i];
+            if (module == null || string.IsNullOrWhiteSpace(module.moduleId)) continue;
+            if (target == "any" || NormalizeQuestKey(module.moduleId) == target)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool TryParseBaseProcessingBranch(string targetId, out BaseProcessingBranch branch)
+    {
+        string normalized = NormalizeQuestKey(targetId).Replace("_", "");
+        foreach (BaseProcessingBranch value in Enum.GetValues(typeof(BaseProcessingBranch)))
+        {
+            if (NormalizeQuestKey(value.ToString()).Replace("_", "") == normalized)
+            {
+                branch = value;
+                return true;
+            }
+        }
+
+        branch = default;
+        return false;
+    }
+
+    private static bool TryParseCascadeProductionType(string targetId, out CascadeProductionType type)
+    {
+        string normalized = NormalizeQuestKey(targetId).Replace("_", "");
+        foreach (CascadeProductionType value in Enum.GetValues(typeof(CascadeProductionType)))
+        {
+            if (NormalizeQuestKey(value.ToString()).Replace("_", "") == normalized)
+            {
+                type = value;
+                return true;
+            }
+        }
+
+        type = default;
+        return false;
+    }
+
+    private static string NormalizeQuestKey(string value)
+    {
+        return PlayerProgress.NormalizeQuestMetricPart(value);
+    }
 
     private void EnsureEconomyRuntimeStates()
     {
@@ -121,10 +571,22 @@ public partial class MetaGameState : MonoBehaviour
         public float fuelTankCapacityKg;
         public float claudiumTankCapacityKg;
         public float allowedTakeoffMassKg;
-        public float engineLiftKg;
+        public float liftCapacityKg;
         public float claudiumMaxLiftKg;
         public float hullLimitKg;
         public List<CargoCompartmentDefinition> cargoCompartments;
+    }
+
+    private readonly struct ProcessingOutputShare
+    {
+        public readonly string itemId;
+        public readonly float share;
+
+        public ProcessingOutputShare(string itemId, float share)
+        {
+            this.itemId = itemId ?? "";
+            this.share = Mathf.Max(0f, share);
+        }
     }
 
     private void EnsureSessionConfigLoaded()
@@ -260,6 +722,8 @@ public partial class MetaGameState : MonoBehaviour
         CacheUnityTimeSettings();
         ResetProcessRealtimeClock();
         ReloadSessionConfigs();
+        useBigTestPersistentProgressFile = ShouldUseBigTestProgressSaveFile();
+        TryLoadPersistentProgressOnAwake();
 
         if (shipLoader == null)
         {
@@ -292,6 +756,7 @@ public partial class MetaGameState : MonoBehaviour
         ApplyUnityTimeScale();
         if (sessionPaused)
         {
+            AutoSavePersistentProgressIfNeeded();
             return;
         }
 
@@ -303,15 +768,26 @@ public partial class MetaGameState : MonoBehaviour
 
         SyncShipConsumablesWithCargo(false);
         UpdateActiveSortieExtractionRunupFromActiveShip();
+        AutoSavePersistentProgressIfNeeded();
+    }
+
+    private void OnApplicationPause(bool paused)
+    {
+        if (paused)
+        {
+            SavePersistentProgressNow();
+        }
     }
 
     private void OnApplicationQuit()
     {
+        SavePersistentProgressNow();
         RestoreUnityTimeSettings();
     }
 
     private void OnDisable()
     {
+        SavePersistentProgressNow();
         RestoreUnityTimeSettings();
     }
 
@@ -321,6 +797,11 @@ public partial class MetaGameState : MonoBehaviour
         progress.Normalize();
         EnsureSessionConfigLoaded();
         EnsureEconomyRuntimeStates();
+
+        if (EnsureStartingCourierSuppliesGranted())
+        {
+            MarkPersistentProgressDirty();
+        }
 
         if (initialized) return;
 
@@ -362,14 +843,28 @@ public partial class MetaGameState : MonoBehaviour
             progress.receivedStartingInventory = true;
         }
 
+        if (!progress.receivedStartingProcessingSamples)
+        {
+            AddStartingBaseProcessingSamples();
+            progress.receivedStartingProcessingSamples = true;
+        }
+
+        if (!progress.receivedStartingExpansionCurrency)
+        {
+            AddStartingBaseExpansionCurrency();
+            progress.receivedStartingExpansionCurrency = true;
+        }
+
         long nowTicks = DateTime.UtcNow.Ticks;
         if (progress.lastProcessUtcTicks == 0)
         {
             progress.lastProcessUtcTicks = nowTicks;
         }
 
+        EnsureCourierServiceReady(progress.lastProcessUtcTicks > 0 ? progress.lastProcessUtcTicks : nowTicks);
         ApplyStartingTechnologies();
         ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, progress, out _);
+        RefreshQuestProgress(true);
         initialized = true;
     }
 
@@ -385,6 +880,264 @@ public partial class MetaGameState : MonoBehaviour
         initialized = false;
         EnsureProgressInitialized();
         ApplySelectedShip();
+        MarkPersistentProgressDirty();
+    }
+
+    private bool EnsureStartingCourierSuppliesGranted()
+    {
+        if (progress == null || progress.receivedStartingCourierSupplies)
+        {
+            return false;
+        }
+
+        PortStorageState storage = progress.GetPortStorageState(GetCapitalPortId(), true);
+        if (storage == null)
+        {
+            return false;
+        }
+
+        storage.AddResource("windshale_ore", 260);
+        storage.AddResource("dawnspar_ore", 160);
+        storage.AddResource("cloud_condensate", 260);
+        storage.AddResource(SessionExtractionConstants.BrokenAutomatonItemId, 140);
+        storage.AddResource("windcalf_carcass", 220);
+        storage.AddResource(SessionExtractionConstants.RockInfoItemId, 140);
+        storage.AddResource("ferron", 140);
+        storage.AddResource("silvate", 90);
+        storage.AddResource("cloth", 90);
+        storage.AddResource("tools", 56);
+        storage.AddResource("charcoal", 260);
+        storage.AddResource("claudium", 180);
+        storage.AddResource("metal", 120);
+        storage.AddResource("mechanisms", 56);
+        storage.AddResource("weapon", 32);
+        progress.receivedStartingCourierSupplies = true;
+        return true;
+    }
+
+    public bool SavePersistentProgressNow()
+    {
+        return TrySavePersistentProgress(true);
+    }
+
+    public bool SavePersistentProgressNowForTests()
+    {
+        return SavePersistentProgressNow();
+    }
+
+    public bool ResetPersistentProgressFromSettings(out string message)
+    {
+        return ResetAccountProgressForCheat(out message);
+    }
+
+    public static string GetPersistentProgressSavePathForTests(bool bigTestPath)
+    {
+        string fileName = bigTestPath ? PersistentProgressBigTestSaveFileName : PersistentProgressSaveFileName;
+        return Path.Combine(Application.persistentDataPath, fileName);
+    }
+
+    public static bool DeletePersistentProgressSaveForTests(bool bigTestPath)
+    {
+        return DeletePersistentProgressSaveFile(GetPersistentProgressSavePathForTests(bigTestPath), out _);
+    }
+
+    private void TryLoadPersistentProgressOnAwake()
+    {
+        if (persistentProgressLoadAttempted || !Application.isPlaying)
+        {
+            return;
+        }
+
+        persistentProgressLoadAttempted = true;
+        string path = ResolvePersistentProgressSavePath();
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(path, Encoding.UTF8);
+            MetaGameProgressSaveData data = JsonUtility.FromJson<MetaGameProgressSaveData>(json);
+            if (data == null || data.progress == null || data.version <= 0 || data.version > MetaGameProgressSaveData.CurrentVersion)
+            {
+                Debug.LogWarning("[MetaGameState] Ignoring unsupported progress save: " + path, this);
+                return;
+            }
+
+            progress = data.progress.Clone();
+            if (!string.IsNullOrWhiteSpace(data.runtimeAccountId))
+            {
+                runtimeAccountId = data.runtimeAccountId.Trim();
+            }
+
+            initialized = false;
+            persistentProgressLoadedThisSession = true;
+            lastPersistentProgressFingerprint = BuildPersistentProgressFingerprint();
+            nextPersistentProgressAutosaveTime = Time.unscaledTime + PersistentProgressAutosaveIntervalSeconds;
+            Debug.Log("[MetaGameState] Loaded persistent progress: " + path, this);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("[MetaGameState] Could not load persistent progress from " + path + ": " + exception.Message, this);
+        }
+    }
+
+    private void AutoSavePersistentProgressIfNeeded()
+    {
+        if (!Application.isPlaying || !initialized || progress == null)
+        {
+            return;
+        }
+
+        if (Time.unscaledTime < nextPersistentProgressAutosaveTime)
+        {
+            return;
+        }
+
+        nextPersistentProgressAutosaveTime = Time.unscaledTime + PersistentProgressAutosaveIntervalSeconds;
+        TrySavePersistentProgress(false);
+    }
+
+    private bool TrySavePersistentProgress(bool force)
+    {
+        if (!Application.isPlaying || progress == null)
+        {
+            return false;
+        }
+
+        PreparePersistentProgressForSave();
+        string fingerprint = BuildPersistentProgressFingerprint();
+        if (!force && fingerprint == lastPersistentProgressFingerprint)
+        {
+            return true;
+        }
+
+        MetaGameProgressSaveData data = BuildPersistentProgressSaveData(DateTime.UtcNow.Ticks);
+        string json = JsonUtility.ToJson(data, true);
+        string path = ResolvePersistentProgressSavePath();
+        try
+        {
+            string folder = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(folder))
+            {
+                Directory.CreateDirectory(folder);
+            }
+
+            string tempPath = path + ".tmp";
+            File.WriteAllText(tempPath, json, Encoding.UTF8);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            File.Move(tempPath, path);
+            lastPersistentProgressFingerprint = fingerprint;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("[MetaGameState] Could not save persistent progress to " + path + ": " + exception.Message, this);
+            return false;
+        }
+    }
+
+    private void PreparePersistentProgressForSave()
+    {
+        if (progress == null)
+        {
+            return;
+        }
+
+        if (initialized)
+        {
+            SyncShipConsumablesWithCargo(false);
+            if (IsDocked)
+            {
+                RememberCurrentDockPosition();
+            }
+            else
+            {
+                RememberCurrentFlightPose();
+            }
+        }
+
+        if (progress.lastProcessUtcTicks <= 0)
+        {
+            progress.lastProcessUtcTicks = DateTime.UtcNow.Ticks;
+        }
+
+        RefreshQuestProgress(true);
+        progress.Normalize();
+    }
+
+    private MetaGameProgressSaveData BuildPersistentProgressSaveData(long savedUtcTicks)
+    {
+        return new MetaGameProgressSaveData
+        {
+            version = MetaGameProgressSaveData.CurrentVersion,
+            runtimeAccountId = RuntimeAccountId,
+            savedUtcTicks = savedUtcTicks,
+            progress = progress != null ? progress.Clone() : new PlayerProgress()
+        };
+    }
+
+    private string BuildPersistentProgressFingerprint()
+    {
+        MetaGameProgressSaveData data = BuildPersistentProgressSaveData(0);
+        return JsonUtility.ToJson(data, false);
+    }
+
+    private void MarkPersistentProgressDirty()
+    {
+        lastPersistentProgressFingerprint = "";
+        nextPersistentProgressAutosaveTime = 0f;
+    }
+
+    private string ResolvePersistentProgressSavePath()
+    {
+        return GetPersistentProgressSavePathForTests(IsUsingBigTestPersistentProgress());
+    }
+
+    private bool IsUsingBigTestPersistentProgress()
+    {
+        return useBigTestPersistentProgressFile || ShouldUseBigTestProgressSaveFile();
+    }
+
+    private static bool ShouldUseBigTestProgressSaveFile()
+    {
+        return WildWindBigTestRunner.IsProgressSandboxActive;
+    }
+
+    private static bool DeletePersistentProgressSaveFile(string path, out string error)
+    {
+        error = "";
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            error = "Progress save path is empty.";
+            return false;
+        }
+
+        try
+        {
+            string tempPath = path + ".tmp";
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            return false;
+        }
     }
 
     public bool ApplySelectedShip()
@@ -520,6 +1273,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         RefreshRuntimeAccountIfDocked();
+        RecordQuestEvent("ship_hull_selected", hull.partId, 1);
         message = "Selected session hull: " + GetPartName(hull) + ". " + autoInstallMessage;
         lastAccountMessage = message;
         return true;
@@ -538,6 +1292,11 @@ public partial class MetaGameState : MonoBehaviour
         progress.InstallModule(slotId, moduleId);
         ApplySelectedShip();
         RefreshRuntimeAccountIfDocked();
+        if (!string.IsNullOrWhiteSpace(moduleId))
+        {
+            RecordQuestEvent("ship_module_installed", moduleId, 1);
+        }
+
         return true;
     }
 
@@ -627,10 +1386,435 @@ public partial class MetaGameState : MonoBehaviour
         return sessionConfig != null ? sessionConfig.technologies : null;
     }
 
+    public IReadOnlyList<ShipTreeEntryConfig> GetShipTreeEntryConfigs()
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        return sessionConfig != null ? sessionConfig.shipTreeEntries : null;
+    }
+
+    public string GetDevelopmentShipRosterSummaryText(int maxRows = 8)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        if (sessionConfig == null || sessionConfig.shipTreeEntries == null || sessionConfig.shipTreeEntries.Count == 0)
+        {
+            return "Корабельный каталог не загружен.";
+        }
+
+        Dictionary<string, int> factionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> classCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        int developmentCount = 0;
+        int placeholderModels = 0;
+        int runtimeReadyHulls = 0;
+
+        for (int i = 0; i < sessionConfig.shipTreeEntries.Count; i++)
+        {
+            ShipTreeEntryConfig entry = sessionConfig.shipTreeEntries[i];
+            if (entry == null || !entry.IsDevelopmentRosterShip)
+            {
+                continue;
+            }
+
+            developmentCount++;
+            IncrementCount(factionCounts, entry.factionId);
+            IncrementCount(classCounts, entry.shipClassId);
+            if (entry.visualShapeId == "square" || entry.visualModelId == "placeholder_square")
+            {
+                placeholderModels++;
+            }
+
+            if (entry.HasRuntimeHull)
+            {
+                runtimeReadyHulls++;
+            }
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.AppendLine("Корабли развития: " + developmentCount + " корпусов.");
+        builder.AppendLine("Фракции: " + FormatCounts(factionCounts));
+        builder.AppendLine("Классы: " + FormatCounts(classCounts));
+        builder.AppendLine("Модели: square placeholders " + placeholderModels + ", летные hull " + runtimeReadyHulls + ".");
+        builder.AppendLine();
+        builder.AppendLine("Первые позиции:");
+
+        int shown = 0;
+        maxRows = Mathf.Clamp(maxRows, 1, 20);
+        for (int i = 0; i < sessionConfig.shipTreeEntries.Count && shown < maxRows; i++)
+        {
+            ShipTreeEntryConfig entry = sessionConfig.shipTreeEntries[i];
+            if (entry == null || !entry.IsDevelopmentRosterShip)
+            {
+                continue;
+            }
+
+            builder.Append("- ");
+            builder.Append(entry.DisplayNameRu);
+            builder.Append(" | ");
+            builder.Append(string.IsNullOrWhiteSpace(entry.FactionDisplayNameRu) ? "no faction" : entry.FactionDisplayNameRu);
+            builder.Append(" | ");
+            builder.Append(string.IsNullOrWhiteSpace(entry.ClassDisplayNameRu) ? "no class" : entry.ClassDisplayNameRu);
+            builder.Append(" | ");
+            builder.Append(entry.costAmount);
+            builder.Append(" ");
+            builder.Append(string.IsNullOrWhiteSpace(entry.costCurrencyItemId) ? "cost" : entry.costCurrencyItemId);
+            builder.Append(" | ");
+            builder.Append(string.IsNullOrWhiteSpace(entry.visualModelId) ? "no model" : entry.visualModelId);
+            if (entry.HasRuntimeHull)
+            {
+                builder.Append(" | runtime hull");
+            }
+
+            builder.AppendLine();
+            shown++;
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private static void IncrementCount(Dictionary<string, int> counts, string key)
+    {
+        if (counts == null || string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        counts.TryGetValue(key, out int current);
+        counts[key] = current + 1;
+    }
+
+    private static string FormatCounts(Dictionary<string, int> counts)
+    {
+        if (counts == null || counts.Count == 0)
+        {
+            return "-";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        foreach (KeyValuePair<string, int> pair in counts)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append(" | ");
+            }
+
+            builder.Append(pair.Key);
+            builder.Append(" ");
+            builder.Append(pair.Value);
+        }
+
+        return builder.ToString();
+    }
+
     public PortStorageState GetCapitalStorageState()
     {
         EnsureProgressInitialized();
         return progress.GetPortStorageState(GetCapitalPortId(), true);
+    }
+
+    public IReadOnlyList<CourierOrderSlotState> GetCourierOrderSlots()
+    {
+        EnsureProgressInitialized();
+        int changed = EnsureCourierServiceReady(GetProcessUtcNow().Ticks);
+        if (changed > 0)
+        {
+            MarkPersistentProgressDirty();
+        }
+
+        return progress.courierService.slots;
+    }
+
+    public CourierOrderSlotState GetCourierOrderSlot(int slotIndex)
+    {
+        EnsureProgressInitialized();
+        int changed = EnsureCourierServiceReady(GetProcessUtcNow().Ticks);
+        if (changed > 0)
+        {
+            MarkPersistentProgressDirty();
+        }
+
+        return progress.courierService.GetSlot(Mathf.Clamp(slotIndex, 0, CourierOrderSlotCount - 1), false);
+    }
+
+    public bool CanSendCourierOrder(int slotIndex, out string reason)
+    {
+        EnsureProgressInitialized();
+        EnsureCourierServiceReady(GetProcessUtcNow().Ticks);
+        CourierOrderSlotState slot = progress.courierService.GetSlot(Mathf.Clamp(slotIndex, 0, CourierOrderSlotCount - 1), false);
+        PortStorageState storage = GetCapitalStorageState();
+        return CanSendCourierOrder(slot, storage, out reason);
+    }
+
+    public bool TrySendCourierOrder(int slotIndex, out string message)
+    {
+        EnsureProgressInitialized();
+        long nowTicks = GetProcessUtcNow().Ticks;
+        EnsureCourierServiceReady(nowTicks);
+        int normalizedSlotIndex = Mathf.Clamp(slotIndex, 0, CourierOrderSlotCount - 1);
+        CourierOrderSlotState slot = progress.courierService.GetSlot(normalizedSlotIndex, false);
+        PortStorageState storage = GetCapitalStorageState();
+        if (!CanSendCourierOrder(slot, storage, out message))
+        {
+            lastAccountMessage = message;
+            return false;
+        }
+
+        for (int i = 0; i < slot.inputs.Count; i++)
+        {
+            CascadeItemAmount input = slot.inputs[i];
+            if (input == null) continue;
+            storage.TrySpendResource(input.itemId, input.amount);
+            AddQuestEventMetric("resource_spent", input.itemId, input.amount);
+        }
+
+        storage.AddResource(CourierFreightRewardItemId, slot.freightReward);
+        storage.AddResource(CourierExperienceRewardItemId, slot.designExperienceReward);
+        AddQuestEventMetric("resource_acquired", CourierFreightRewardItemId, slot.freightReward);
+        AddQuestEventMetric("resource_acquired", CourierExperienceRewardItemId, slot.designExperienceReward);
+        AddQuestEventMetric("courier_sent", "any", 1);
+        string completedClient = slot.clientName;
+        int freightReward = slot.freightReward;
+        int experienceReward = slot.designExperienceReward;
+        GenerateCourierOrder(slot, nowTicks);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+
+        message = "Курьер отправлен: " + completedClient
+            + ". Награда: фрахт x" + freightReward
+            + ", очки освоения x" + experienceReward + ".";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public bool TryCancelCourierOrder(int slotIndex, out string message)
+    {
+        EnsureProgressInitialized();
+        long nowTicks = GetProcessUtcNow().Ticks;
+        EnsureCourierServiceReady(nowTicks);
+        int normalizedSlotIndex = Mathf.Clamp(slotIndex, 0, CourierOrderSlotCount - 1);
+        CourierOrderSlotState slot = progress.courierService.GetSlot(normalizedSlotIndex, false);
+        if (slot == null || !slot.HasActiveOrder)
+        {
+            message = "На площадке нет активной курьерской заявки.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        string cancelledClient = slot.clientName;
+        slot.ClearOrder();
+        slot.cooldownCompleteUtcTicks = nowTicks + TimeSpan.FromSeconds(CourierCancelCooldownSeconds).Ticks;
+        AddQuestEventMetric("courier_cancelled", "any", 1);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+
+        message = "Заявка отменена: " + cancelledClient + ". Новая появится через 15 минут.";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public bool TryCancelAllCourierOrders(out string message)
+    {
+        EnsureProgressInitialized();
+        long nowTicks = GetProcessUtcNow().Ticks;
+        EnsureCourierServiceReady(nowTicks);
+
+        int cancelled = 0;
+        for (int i = 0; i < CourierOrderSlotCount; i++)
+        {
+            CourierOrderSlotState slot = progress.courierService.GetSlot(i, false);
+            if (slot == null || !slot.HasActiveOrder)
+            {
+                continue;
+            }
+
+            slot.ClearOrder();
+            slot.cooldownCompleteUtcTicks = nowTicks + TimeSpan.FromSeconds(CourierCancelCooldownSeconds).Ticks;
+            cancelled++;
+        }
+
+        if (cancelled <= 0)
+        {
+            message = "Нет активных курьерских заявок для отмены.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        AddQuestEventMetric("courier_cancelled", "any", cancelled);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+        message = "Отменено курьерских заявок: " + cancelled + ". Обновление через 15 минут.";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public int GetCourierOrderCooldownRemainingSeconds(int slotIndex)
+    {
+        EnsureProgressInitialized();
+        long nowTicks = GetProcessUtcNow().Ticks;
+        EnsureCourierServiceReady(nowTicks);
+        CourierOrderSlotState slot = progress.courierService.GetSlot(Mathf.Clamp(slotIndex, 0, CourierOrderSlotCount - 1), false);
+        if (slot == null || slot.cooldownCompleteUtcTicks <= nowTicks)
+        {
+            return 0;
+        }
+
+        return Mathf.CeilToInt((float)((slot.cooldownCompleteUtcTicks - nowTicks) / (double)TimeSpan.TicksPerSecond));
+    }
+
+    private int AdvanceCourierServiceOrders(long utcTicks)
+    {
+        return EnsureCourierServiceReady(utcTicks);
+    }
+
+    private int EnsureCourierServiceReady(long utcTicks)
+    {
+        if (progress == null)
+        {
+            return 0;
+        }
+
+        progress.courierService ??= new CourierServiceState();
+        progress.courierService.Normalize();
+
+        int changed = 0;
+        for (int i = 0; i < CourierOrderSlotCount; i++)
+        {
+            CourierOrderSlotState slot = progress.courierService.GetSlot(i, true);
+            slot.slotIndex = i;
+            slot.Normalize();
+            if (slot.IsCoolingDownAt(utcTicks))
+            {
+                continue;
+            }
+
+            if (slot.cooldownCompleteUtcTicks > 0L || !slot.HasActiveOrder)
+            {
+                GenerateCourierOrder(slot, utcTicks);
+                changed++;
+            }
+        }
+
+        return changed;
+    }
+
+    private void GenerateCourierOrder(CourierOrderSlotState slot, long utcTicks)
+    {
+        if (slot == null)
+        {
+            return;
+        }
+
+        slot.inputs ??= new List<CascadeItemAmount>();
+        slot.inputs.Clear();
+        slot.cooldownCompleteUtcTicks = 0L;
+        slot.generation = Mathf.Max(0, slot.generation) + 1;
+        slot.orderId = "wind_houses_courier_" + (slot.slotIndex + 1) + "_" + slot.generation;
+
+        int seed = BuildCourierOrderSeed(slot.slotIndex, slot.generation);
+        slot.clientName = CourierClientNames[PositiveMod(seed, CourierClientNames.Length)];
+        int inputCount = 1 + PositiveMod(seed / 7, 3);
+        int totalValue = 0;
+        for (int i = 0; i < inputCount; i++)
+        {
+            CourierResourceSpec spec = CourierResourceCatalog[PositiveMod(seed + i * 13, CourierResourceCatalog.Length)];
+            int amountRange = Mathf.Max(1, spec.maxAmount - spec.minAmount + 1);
+            int amount = spec.minAmount + PositiveMod(seed / (i + 3) + i * 17 + slot.slotIndex, amountRange);
+            AddCourierInput(slot.inputs, spec.itemId, amount);
+            totalValue += amount * spec.freightValue;
+        }
+
+        float payoutMultiplier = 1.18f + 0.03f * PositiveMod(seed / 11, 7);
+        slot.freightReward = Mathf.Max(100, Mathf.RoundToInt(totalValue * payoutMultiplier / 10f) * 10);
+        slot.designExperienceReward = Mathf.Max(2, Mathf.RoundToInt(slot.freightReward / 90f) + inputCount);
+        slot.Normalize();
+    }
+
+    private bool CanSendCourierOrder(CourierOrderSlotState slot, PortStorageState storage, out string reason)
+    {
+        reason = "";
+        if (slot == null)
+        {
+            reason = "Курьерская площадка не найдена.";
+            return false;
+        }
+
+        if (slot.cooldownCompleteUtcTicks > GetProcessUtcNow().Ticks)
+        {
+            reason = "Заявка обновляется после отмены.";
+            return false;
+        }
+
+        if (!slot.HasActiveOrder)
+        {
+            reason = "На площадке нет активной курьерской заявки.";
+            return false;
+        }
+
+        if (storage == null)
+        {
+            reason = "Склад столицы не найден.";
+            return false;
+        }
+
+        for (int i = 0; i < slot.inputs.Count; i++)
+        {
+            CascadeItemAmount input = slot.inputs[i];
+            if (input == null) continue;
+            int available = storage.GetResourceAmount(input.itemId);
+            if (available < input.amount)
+            {
+                string itemName = sessionConfig != null ? sessionConfig.GetItemNameRu(input.itemId) : input.itemId;
+                reason = "Не хватает: " + itemName + " x" + (input.amount - available) + ".";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void AddCourierInput(List<CascadeItemAmount> inputs, string itemId, int amount)
+    {
+        if (inputs == null || string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < inputs.Count; i++)
+        {
+            CascadeItemAmount input = inputs[i];
+            if (input != null && input.itemId == itemId)
+            {
+                input.amount += amount;
+                return;
+            }
+        }
+
+        inputs.Add(new CascadeItemAmount { itemId = itemId, amount = amount });
+    }
+
+    private static int BuildCourierOrderSeed(int slotIndex, int generation)
+    {
+        unchecked
+        {
+            int seed = 17;
+            seed = seed * 31 + slotIndex * 73856093;
+            seed = seed * 31 + generation * 19349663;
+            return seed;
+        }
+    }
+
+    private static int PositiveMod(int value, int divisor)
+    {
+        if (divisor <= 0)
+        {
+            return 0;
+        }
+
+        int mod = value % divisor;
+        return mod < 0 ? mod + divisor : mod;
     }
 
     public TechnologyResearchProgress GetTechnologyResearchProgress(string technologyId)
@@ -671,11 +1855,26 @@ public partial class MetaGameState : MonoBehaviour
 
         progress.activeResearchTechnologyId = technology.id;
         TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
-        state.completedCycles = Mathf.Clamp(state.completedCycles, 0, Mathf.Max(1, technology.requiredCycles));
+        state.completedCycles = Mathf.Clamp(state.completedCycles, 0, GetTechnologyMaxLevel(technology));
+        state.activeCycleStartUtcTicks = 0;
+        state.activeCycleEndUtcTicks = 0;
 
-        TryStartOrContinueResearchCycle(technology, state, GetProcessUtcNow().Ticks, out reason);
-        lastAccountMessage = string.IsNullOrWhiteSpace(reason) ? "Исследование выбрано: " + GetTechnologyDisplayName(technology) : reason;
+        if (!EnsureTechnologyLevelRequirementsPaid(technology, state, out reason))
+        {
+            progress.activeResearchTechnologyId = "";
+            lastAccountMessage = reason;
+            return false;
+        }
+
+        MarkPersistentProgressDirty();
+        string researchMessage = "Архивы вливают SP в знание: " + GetTechnologyDisplayName(technology)
+            + " L" + GetTechnologyNextLevel(technology).ToString()
+            + " (" + GetArchiveKnowledgeSpPerMinute(technology.categoryId).ToString("0.##") + " SP/мин).";
+        lastAccountMessage = researchMessage;
         RefreshRuntimeAccountIfDocked();
+        AddQuestEventMetric("technology_started", technology.id, 1);
+        RefreshQuestProgress(true);
+        lastAccountMessage = researchMessage;
         return true;
     }
 
@@ -696,7 +1895,13 @@ public partial class MetaGameState : MonoBehaviour
 
         if (progress.IsTechnologyCompleted(technology.id))
         {
-            reason = "Технология уже завершена.";
+            reason = "Знание уже изучено.";
+            return false;
+        }
+
+        if (!IsKnowledgeAvailableForResearch(technology))
+        {
+            reason = "Сначала нужно открыть книгу/право на знание: " + GetTechnologyDisplayName(technology) + ".";
             return false;
         }
 
@@ -709,9 +1914,9 @@ public partial class MetaGameState : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(activeId) && activeId != technology.id)
         {
             TechnologyResearchProgress activeState = progress.GetTechnologyProgress(activeId, false);
-            if (activeState != null && activeState.HasActiveCycle)
+            if (activeState != null && activeState.currentLevelSpProgress > 0.001f)
             {
-                reason = "Сначала завершится текущий цикл исследования.";
+                reason = "Архивы уже вливают SP в другое знание; свободное перекладывание после старта запрещено.";
                 return false;
             }
         }
@@ -724,6 +1929,101 @@ public partial class MetaGameState : MonoBehaviour
         if (technology == null) return false;
         PortStorageState storage = GetCapitalStorageState();
         return HasTechnologyCycleCost(storage, technology);
+    }
+
+    public bool IsKnowledgeAvailableForResearch(TechnologyConfig technology)
+    {
+        EnsureProgressInitialized();
+        if (technology == null) return false;
+        if (technology.id == "basic_airship") return true;
+        if (technology.rank <= 1) return true;
+        if (progress.IsKnowledgeUnlocked(technology.id)) return true;
+
+        return AreTechnologyPrerequisitesCompleted(technology, out _);
+    }
+
+    public bool UnlockKnowledgeFromBook(string technologyId, out string reason)
+    {
+        reason = "";
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+
+        TechnologyConfig technology = sessionConfig != null ? sessionConfig.GetTechnology(technologyId) : null;
+        if (technology == null)
+        {
+            reason = "Знание не найдено.";
+            return false;
+        }
+
+        bool changed = progress.UnlockKnowledge(technology.id);
+        MarkPersistentProgressDirty();
+        reason = changed
+            ? "Книга открыла знание: " + GetTechnologyDisplayName(technology) + "."
+            : "Знание уже открыто книгой: " + GetTechnologyDisplayName(technology) + ".";
+        RefreshRuntimeAccountIfDocked();
+        return true;
+    }
+
+    public void GrantKnowledgeSpPackage(string packageId, string scopeKind, string scopeId, int amountSp)
+    {
+        EnsureProgressInitialized();
+        progress.AddKnowledgeSpPackage(packageId, scopeKind, scopeId, amountSp);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+    }
+
+    public bool TryApplyKnowledgeSpPackage(string packageId, string technologyId, out int appliedSp, out int burnedSp, out string reason)
+    {
+        appliedSp = 0;
+        burnedSp = 0;
+        reason = "";
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+
+        KnowledgeSpPackageState package = progress.GetKnowledgeSpPackage(packageId);
+        TechnologyConfig technology = sessionConfig != null ? sessionConfig.GetTechnology(technologyId) : null;
+        if (package == null)
+        {
+            reason = "SP-пакет не найден.";
+            return false;
+        }
+
+        if (technology == null)
+        {
+            reason = "Знание не найдено.";
+            return false;
+        }
+
+        if (!CanApplyKnowledgeSpPackage(package, technology, out reason))
+        {
+            return false;
+        }
+
+        TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
+        if (!EnsureTechnologyLevelRequirementsPaid(technology, state, out reason))
+        {
+            return false;
+        }
+
+        int levelCost = GetTechnologyLevelSpCost(technology, GetTechnologyNextLevel(technology));
+        float remaining = Mathf.Max(0f, levelCost - state.currentLevelSpProgress);
+        appliedSp = Mathf.Min(package.amountSp, Mathf.CeilToInt(remaining));
+        burnedSp = Mathf.Max(0, package.amountSp - appliedSp);
+        state.currentLevelSpProgress = Mathf.Min(levelCost, state.currentLevelSpProgress + appliedSp);
+        progress.RemoveKnowledgeSpPackage(package.packageId);
+
+        if (state.currentLevelSpProgress + 0.001f >= levelCost)
+        {
+            CompleteTechnologyLevel(technology, state);
+        }
+
+        MarkPersistentProgressDirty();
+        lastAccountMessage = "SP-пакет вложен в " + GetTechnologyDisplayName(technology)
+            + ": +" + appliedSp.ToString() + " SP"
+            + (burnedSp > 0 ? ", перелив сгорел " + burnedSp.ToString() + " SP." : ".");
+        reason = lastAccountMessage;
+        RefreshRuntimeAccountIfDocked();
+        return true;
     }
 
     public string GetTechnologyDisplayName(TechnologyConfig technology)
@@ -750,6 +2050,11 @@ public partial class MetaGameState : MonoBehaviour
         return parts.Count > 0 ? string.Join(", ", parts) : "без ресурсов";
     }
 
+    public string FormatTechnologyLevelCost(TechnologyConfig technology)
+    {
+        return FormatTechnologyCycleCost(technology);
+    }
+
     public string GetTechnologyStatusText(TechnologyConfig technology)
     {
         if (technology == null) return "";
@@ -761,22 +2066,399 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, false);
-        int completedCycles = state != null ? state.completedCycles : 0;
-        string cycleText = completedCycles + "/" + Mathf.Max(1, technology.requiredCycles);
+        int completedLevels = state != null ? state.completedCycles : 0;
+        int nextLevel = Mathf.Clamp(completedLevels + 1, 1, GetTechnologyMaxLevel(technology));
+        int levelCost = GetTechnologyLevelSpCost(technology, nextLevel);
+        float spProgress = state != null ? state.currentLevelSpProgress : 0f;
+        string levelText = completedLevels + "/" + GetTechnologyMaxLevel(technology);
+        string spText = Mathf.FloorToInt(spProgress).ToString() + "/" + levelCost.ToString() + " SP";
 
         if (progress.activeResearchTechnologyId != technology.id)
         {
-            return "не выбрана, циклы " + cycleText;
-        }
-
-        if (state != null && state.HasActiveCycle)
-        {
-            return "идет цикл, осталось " + FormatRemaining(state.activeCycleEndUtcTicks) + ", циклы " + cycleText;
+            return IsKnowledgeAvailableForResearch(technology)
+                ? "доступно, уровни " + levelText + ", текущий " + spText
+                : "нужна книга/право, уровни " + levelText;
         }
 
         return HasCapitalResourcesForCycle(technology)
-            ? "ждет запуска цикла, циклы " + cycleText
-            : "ждет ресурсы, циклы " + cycleText;
+            ? "активно, Архив +" + GetArchiveKnowledgeSpPerMinute(technology.categoryId).ToString("0.##") + " SP/мин, " + spText
+            : state != null && state.currentLevelRequirementsPaid
+            ? "активно, Архив +" + GetArchiveKnowledgeSpPerMinute(technology.categoryId).ToString("0.##") + " SP/мин, " + spText
+            : "активно, но ждёт ресурсы уровня, " + spText;
+    }
+
+    public int GetTechnologyLevelSpCost(TechnologyConfig technology, int level)
+    {
+        if (technology == null) return 0;
+        if (technology.id == "basic_airship") return 0;
+
+        int normalizedLevel = Mathf.Clamp(level, 1, GetTechnologyMaxLevel(technology));
+        if (technology.spCostByLevel != null && normalizedLevel - 1 < technology.spCostByLevel.Count)
+        {
+            return Mathf.Max(1, technology.spCostByLevel[normalizedLevel - 1]);
+        }
+
+        return normalizedLevel switch
+        {
+            1 => 1000,
+            2 => 5000,
+            3 => 20000,
+            4 => 80000,
+            _ => 250000
+        };
+    }
+
+    public float GetTechnologyCurrentLevelSpProgress(TechnologyConfig technology)
+    {
+        if (technology == null) return 0f;
+        EnsureProgressInitialized();
+        TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, false);
+        return state != null ? Mathf.Max(0f, state.currentLevelSpProgress) : 0f;
+    }
+
+    public float GetArchiveKnowledgeSpPerMinute(string categoryId = "")
+    {
+        float multiplier = 1f + Mathf.Max(0f, GetTechnologyModifierValue("research_speed"));
+        return Mathf.Max(0f, BaseArchiveKnowledgeSpPerMinute * multiplier);
+    }
+
+    public int GetTechnologyCompletedLevel(TechnologyConfig technology)
+    {
+        if (technology == null) return 0;
+        EnsureProgressInitialized();
+
+        int maxLevel = Mathf.Max(1, technology.requiredCycles);
+        TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, false);
+        if (state != null)
+        {
+            return Mathf.Clamp(state.completedCycles, 0, maxLevel);
+        }
+
+        return progress.IsTechnologyCompleted(technology.id) ? maxLevel : 0;
+    }
+
+    public float GetTechnologyModifierValue(string modifierId)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        if (sessionConfig == null || sessionConfig.technologies == null || string.IsNullOrWhiteSpace(modifierId))
+        {
+            return 0f;
+        }
+
+        float total = 0f;
+        for (int i = 0; i < sessionConfig.technologies.Count; i++)
+        {
+            TechnologyConfig technology = sessionConfig.technologies[i];
+            int level = GetTechnologyCompletedLevel(technology);
+            if (technology == null || level <= 0 || technology.modifierGrants == null)
+            {
+                continue;
+            }
+
+            for (int grantIndex = 0; grantIndex < technology.modifierGrants.Count; grantIndex++)
+            {
+                TechnologyModifierGrantConfig grant = technology.modifierGrants[grantIndex];
+                if (grant == null || grant.modifierId != modifierId)
+                {
+                    continue;
+                }
+
+                if (grant.operation == "unlock")
+                {
+                    total = Mathf.Max(total, 1f);
+                }
+                else
+                {
+                    total += grant.valuePerLevel * level;
+                }
+            }
+        }
+
+        return total;
+    }
+
+    public string GetTechnologyBoardOverviewText(string selectedCategoryId, int maxRows = 8)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        if (sessionConfig == null || sessionConfig.technologies == null || sessionConfig.technologies.Count == 0)
+        {
+            return "Технологии не загружены.";
+        }
+
+        string categoryId = string.IsNullOrWhiteSpace(selectedCategoryId)
+            ? GetFirstTechnologyCategoryId()
+            : selectedCategoryId;
+        StringBuilder builder = new StringBuilder();
+        builder.AppendLine("Рубрикаторы: " + GetTechnologyCategoryStripText(categoryId));
+        builder.AppendLine("Дерево: " + GetTechnologyCategoryName(categoryId) + " | узлы: " + CountTechnologiesInCategory(categoryId));
+        builder.AppendLine("Колонки: I-V | знание: 5 уровней, SP-стоимость, ресурсы уровня, книги/locks, modifier");
+        builder.AppendLine("Архивы: " + GetArchiveKnowledgeSpPerMinute(categoryId).ToString("0.##") + " SP/мин в выбранное активное знание");
+
+        List<TechnologyConfig> technologies = GetTechnologiesInCategory(categoryId);
+        technologies.Sort(CompareTechnologyTreePosition);
+        int shown = 0;
+        maxRows = Mathf.Clamp(maxRows, 1, 24);
+        for (int i = 0; i < technologies.Count && shown < maxRows; i++)
+        {
+            TechnologyConfig technology = technologies[i];
+            if (technology == null) continue;
+
+            int level = GetTechnologyCompletedLevel(technology);
+            int nextLevel = Mathf.Clamp(level + 1, 1, GetTechnologyMaxLevel(technology));
+            int levelSpCost = GetTechnologyLevelSpCost(technology, nextLevel);
+            float levelSpProgress = GetTechnologyCurrentLevelSpProgress(technology);
+            builder.Append("[").Append(technology.treeColumn).Append(":").Append(technology.treeRow).Append("] ");
+            builder.Append(GetTechnologyDisplayName(technology));
+            builder.Append(" ");
+            builder.Append(level).Append("/").Append(GetTechnologyMaxLevel(technology));
+            builder.Append(" | SP L").Append(nextLevel).Append(" ");
+            builder.Append(Mathf.FloorToInt(levelSpProgress)).Append("/").Append(levelSpCost);
+            builder.Append(" | resources ").Append(FormatTechnologyLevelCost(technology));
+            builder.Append(" | ").Append(FormatTechnologyModifierGrants(technology));
+            if (!IsKnowledgeAvailableForResearch(technology))
+            {
+                builder.Append(" | нужна книга/право");
+            }
+
+            if (technology.prerequisiteTechnologyIds != null && technology.prerequisiteTechnologyIds.Count > 0)
+            {
+                builder.Append(" | req ").Append(string.Join("+", technology.prerequisiteTechnologyIds));
+            }
+
+            builder.AppendLine();
+            shown++;
+        }
+
+        builder.AppendLine("Активные модификаторы: " + GetTechnologyModifierSummaryText(6));
+        return builder.ToString().TrimEnd();
+    }
+
+    public string GetFirstTechnologyCategoryId()
+    {
+        EnsureSessionConfigLoaded();
+        if (sessionConfig == null || sessionConfig.technologies == null)
+        {
+            return "";
+        }
+
+        for (int i = 0; i < sessionConfig.technologies.Count; i++)
+        {
+            TechnologyConfig technology = sessionConfig.technologies[i];
+            if (technology != null && !string.IsNullOrWhiteSpace(technology.categoryId) && technology.categoryId != "starter")
+            {
+                return technology.categoryId;
+            }
+        }
+
+        return "";
+    }
+
+    public string GetNextTechnologyCategoryId(string currentCategoryId)
+    {
+        EnsureSessionConfigLoaded();
+        List<string> categories = GetTechnologyCategoryIds();
+        if (categories.Count == 0)
+        {
+            return "";
+        }
+
+        int currentIndex = 0;
+        for (int i = 0; i < categories.Count; i++)
+        {
+            if (string.Equals(categories[i], currentCategoryId, StringComparison.OrdinalIgnoreCase))
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        return categories[(currentIndex + 1) % categories.Count];
+    }
+
+    public IReadOnlyList<string> GetTechnologyCategoryIdsForUi()
+    {
+        EnsureSessionConfigLoaded();
+        return GetTechnologyCategoryIds();
+    }
+
+    public string GetTechnologyModifierSummaryText(int maxRows = 8)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        if (sessionConfig == null || sessionConfig.modifierDefinitions == null || sessionConfig.modifierDefinitions.Count == 0)
+        {
+            return "нет каталога модификаторов";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int shown = 0;
+        maxRows = Mathf.Clamp(maxRows, 1, 32);
+        for (int i = 0; i < sessionConfig.modifierDefinitions.Count && shown < maxRows; i++)
+        {
+            ModifierDefinitionConfig modifier = sessionConfig.modifierDefinitions[i];
+            if (modifier == null || string.IsNullOrWhiteSpace(modifier.id)) continue;
+
+            float value = GetTechnologyModifierValue(modifier.id);
+            if (Mathf.Abs(value) <= 0.0001f && modifier.id != "starter_airship_unlock")
+            {
+                continue;
+            }
+
+            if (shown > 0) builder.Append("; ");
+            builder.Append(sessionConfig.GetModifierNameRu(modifier.id));
+            builder.Append(" ");
+            builder.Append(FormatModifierValue(value, modifier.valueKind));
+            shown++;
+        }
+
+        return shown > 0 ? builder.ToString() : "пока нет активных бонусов";
+    }
+
+    private List<string> GetTechnologyCategoryIds()
+    {
+        List<string> categories = new List<string>();
+        if (sessionConfig == null || sessionConfig.technologies == null)
+        {
+            return categories;
+        }
+
+        for (int i = 0; i < sessionConfig.technologies.Count; i++)
+        {
+            TechnologyConfig technology = sessionConfig.technologies[i];
+            if (technology == null || string.IsNullOrWhiteSpace(technology.categoryId) || technology.categoryId == "starter")
+            {
+                continue;
+            }
+
+            bool exists = false;
+            for (int categoryIndex = 0; categoryIndex < categories.Count; categoryIndex++)
+            {
+                if (string.Equals(categories[categoryIndex], technology.categoryId, StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists)
+            {
+                categories.Add(technology.categoryId);
+            }
+        }
+
+        return categories;
+    }
+
+    private string GetTechnologyCategoryStripText(string selectedCategoryId)
+    {
+        List<string> categories = GetTechnologyCategoryIds();
+        if (categories.Count == 0)
+        {
+            return "нет рубрик";
+        }
+
+        List<string> parts = new List<string>();
+        for (int i = 0; i < categories.Count; i++)
+        {
+            string categoryId = categories[i];
+            string label = GetTechnologyCategoryName(categoryId) + " " + CountTechnologiesInCategory(categoryId);
+            parts.Add(string.Equals(categoryId, selectedCategoryId, StringComparison.OrdinalIgnoreCase) ? "[" + label + "]" : label);
+        }
+
+        return string.Join(" | ", parts);
+    }
+
+    private string GetTechnologyCategoryName(string categoryId)
+    {
+        if (sessionConfig == null || sessionConfig.technologies == null)
+        {
+            return categoryId ?? "";
+        }
+
+        for (int i = 0; i < sessionConfig.technologies.Count; i++)
+        {
+            TechnologyConfig technology = sessionConfig.technologies[i];
+            if (technology != null && string.Equals(technology.categoryId, categoryId, StringComparison.OrdinalIgnoreCase))
+            {
+                return technology.CategoryDisplayNameRu;
+            }
+        }
+
+        return categoryId ?? "";
+    }
+
+    private int CountTechnologiesInCategory(string categoryId)
+    {
+        return GetTechnologiesInCategory(categoryId).Count;
+    }
+
+    private List<TechnologyConfig> GetTechnologiesInCategory(string categoryId)
+    {
+        List<TechnologyConfig> result = new List<TechnologyConfig>();
+        if (sessionConfig == null || sessionConfig.technologies == null || string.IsNullOrWhiteSpace(categoryId))
+        {
+            return result;
+        }
+
+        for (int i = 0; i < sessionConfig.technologies.Count; i++)
+        {
+            TechnologyConfig technology = sessionConfig.technologies[i];
+            if (technology != null && string.Equals(technology.categoryId, categoryId, StringComparison.OrdinalIgnoreCase))
+            {
+                result.Add(technology);
+            }
+        }
+
+        return result;
+    }
+
+    private static int CompareTechnologyTreePosition(TechnologyConfig left, TechnologyConfig right)
+    {
+        if (left == null && right == null) return 0;
+        if (left == null) return -1;
+        if (right == null) return 1;
+        int columnComparison = left.treeColumn.CompareTo(right.treeColumn);
+        if (columnComparison != 0) return columnComparison;
+        int rowComparison = left.treeRow.CompareTo(right.treeRow);
+        return rowComparison != 0 ? rowComparison : string.Compare(left.id, right.id, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string FormatTechnologyModifierGrants(TechnologyConfig technology)
+    {
+        if (technology == null || technology.modifierGrants == null || technology.modifierGrants.Count == 0)
+        {
+            return "modifier -";
+        }
+
+        List<string> parts = new List<string>();
+        for (int i = 0; i < technology.modifierGrants.Count; i++)
+        {
+            TechnologyModifierGrantConfig grant = technology.modifierGrants[i];
+            if (grant == null || string.IsNullOrWhiteSpace(grant.modifierId)) continue;
+
+            ModifierDefinitionConfig modifier = sessionConfig != null ? sessionConfig.GetModifierDefinition(grant.modifierId) : null;
+            string valueKind = modifier != null ? modifier.valueKind : "percent";
+            parts.Add(sessionConfig.GetModifierNameRu(grant.modifierId) + " " + FormatModifierValue(grant.valuePerLevel, valueKind) + "/ур.");
+        }
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "modifier -";
+    }
+
+    private static string FormatModifierValue(float value, string valueKind)
+    {
+        if (valueKind == "unlock")
+        {
+            return value > 0.5f ? "открыто" : "закрыто";
+        }
+
+        if (valueKind == "percent" || valueKind == "multiplier")
+        {
+            return (value >= 0f ? "+" : "") + (value * 100f).ToString("0.#") + "%";
+        }
+
+        return (value >= 0f ? "+" : "") + value.ToString("0.##");
     }
 
     private bool TryEnterFlightForSessionSortie()
@@ -839,7 +2521,7 @@ public partial class MetaGameState : MonoBehaviour
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 150f,
-            distanceToBaseKm = 220f,
+            distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
             returnPowerLever = 0.7f,
             returnReserveMultiplier = 1.15f
@@ -886,7 +2568,7 @@ public partial class MetaGameState : MonoBehaviour
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 150f,
-            distanceToBaseKm = 220f,
+            distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
             returnPowerLever = 0.7f,
             returnReserveMultiplier = 1.15f
@@ -914,7 +2596,7 @@ public partial class MetaGameState : MonoBehaviour
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 150f,
-            distanceToBaseKm = 220f,
+            distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
             returnPowerLever = 0.7f,
             returnReserveMultiplier = 1.15f
@@ -942,7 +2624,7 @@ public partial class MetaGameState : MonoBehaviour
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 160f,
-            distanceToBaseKm = 220f,
+            distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
             returnPowerLever = 0.7f,
             returnReserveMultiplier = 1.15f
@@ -970,7 +2652,7 @@ public partial class MetaGameState : MonoBehaviour
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 140f,
-            distanceToBaseKm = 220f,
+            distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
             returnPowerLever = 0.7f,
             returnReserveMultiplier = 1.15f
@@ -1442,9 +3124,9 @@ public partial class MetaGameState : MonoBehaviour
             return false;
         }
 
-        string fuelId = string.IsNullOrWhiteSpace(profile.coalResourceId) ? GetStartingEngineFuelId() : profile.coalResourceId;
+        string fuelId = string.IsNullOrWhiteSpace(profile.coalResourceId) ? GetStartingFuelId() : profile.coalResourceId;
         string claudiumId = string.IsNullOrWhiteSpace(profile.claudiumResourceId) ? "claudium" : profile.claudiumResourceId;
-        if (progress.shipEngineFuelTank.GetAmount(fuelId) + 0.001f < estimate.requiredCoalKg
+        if (progress.shipFuelTank.GetAmount(fuelId) + 0.001f < estimate.requiredCoalKg
             || progress.shipClaudiumTank.GetAmount(claudiumId) + 0.001f < estimate.requiredClaudiumKg)
         {
             message = estimate.status;
@@ -1452,8 +3134,11 @@ public partial class MetaGameState : MonoBehaviour
             return false;
         }
 
-        progress.shipEngineFuelTank.TrySpend(fuelId, estimate.requiredCoalKg);
+        progress.shipFuelTank.TrySpend(fuelId, estimate.requiredCoalKg);
         progress.shipClaudiumTank.TrySpend(claudiumId, estimate.requiredClaudiumKg);
+        string completedSortieId = progress.activeSortie != null && progress.activeSortie.zone != null
+            ? progress.activeSortie.zone.sortieId
+            : "any";
         int transferred = TransferShipCargoToCapital();
         progress.ClearShipCargo();
 
@@ -1461,6 +3146,8 @@ public partial class MetaGameState : MonoBehaviour
         progress.SetDocked(baseDockId, GetDockPositionOrFallback(baseDockId));
         SyncShipConsumablesWithCargo(true);
         ApplySessionModeToShip();
+        AddQuestEventMetric("sortie_completed", completedSortieId, 1);
+        RefreshQuestProgress(true);
 
         message = "Extraction complete: transferred " + transferred
             + " cargo units to base. Return cost: "
@@ -1488,7 +3175,7 @@ public partial class MetaGameState : MonoBehaviour
 
         int fuelStored = storage != null ? storage.GetResourceAmount(fuelId) : 0;
         int claudiumStored = storage != null ? storage.GetResourceAmount(claudiumId) : 0;
-        return fuelId + " " + progress.shipEngineFuelTank.GetAmount(fuelId).ToString("F0")
+        return fuelId + " " + progress.shipFuelTank.GetAmount(fuelId).ToString("F0")
             + "/" + capacity.fuelTankCapacityKg.ToString("F0")
             + " base " + fuelStored
             + ", " + claudiumId + " " + progress.shipClaudiumTank.GetAmount(claudiumId).ToString("F0")
@@ -1574,7 +3261,9 @@ public partial class MetaGameState : MonoBehaviour
                 + " load " + line.totalLoadApplied.ToString("F0"));
         }
 
-        return "Cascade " + SessionExtractionIndustry.CascadeProductionTypes.Length + ": " + string.Join(" | ", parts);
+        return "Cascade " + SessionExtractionIndustry.CascadeProductionTypes.Length
+            + " queue " + progress.baseIndustry.ActiveCascadeQueueCount + "/" + BaseCascadeQueueSlotCount
+            + ": " + string.Join(" | ", parts);
     }
 
     public string GetNextBaseCascadeOrderOverviewText()
@@ -1692,12 +3381,20 @@ public partial class MetaGameState : MonoBehaviour
             lastAccountMessage = message;
             return false;
         }
+        for (int i = 0; cost != null && i < cost.Count; i++)
+        {
+            CascadeItemAmount item = cost[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.itemId) || item.amount <= 0) continue;
+            AddQuestEventMetric("resource_spent", item.itemId, item.amount);
+        }
 
         int oldLevel = line.level;
         float oldCapacity = line.capacityUnitsPerMinute;
         line.level = oldLevel + 1;
         line.capacityUnitsPerMinute = GetUpgradedProcessingCapacity(branch, line.level, oldCapacity);
         RefreshRuntimeAccountIfDocked();
+        AddQuestEventMetric("base_processing_level", branch.ToString(), line.level);
+        RefreshQuestProgress(true);
 
         message = "Upgraded processing " + SessionExtractionIndustry.GetProcessingDisplayName(branch)
             + " to L" + line.level
@@ -1731,12 +3428,20 @@ public partial class MetaGameState : MonoBehaviour
             lastAccountMessage = message;
             return false;
         }
+        for (int i = 0; cost != null && i < cost.Count; i++)
+        {
+            CascadeItemAmount item = cost[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.itemId) || item.amount <= 0) continue;
+            AddQuestEventMetric("resource_spent", item.itemId, item.amount);
+        }
 
         int oldLevel = line.level;
         float oldCapacity = line.capacityUnitsPerMinute;
         line.level = oldLevel + 1;
         line.capacityUnitsPerMinute = GetUpgradedCascadeCapacity(type, line.level, oldCapacity);
         RefreshRuntimeAccountIfDocked();
+        AddQuestEventMetric("cascade_line_level", type.ToString(), line.level);
+        RefreshQuestProgress(true);
 
         message = "Upgraded cascade " + SessionExtractionIndustry.GetProductionDisplayName(type)
             + " to L" + line.level
@@ -1779,7 +3484,7 @@ public partial class MetaGameState : MonoBehaviour
 
         ResolveCurrentTankResourceIds(out string fuelId, out string claudiumId);
         bool canFuel = storage.GetResourceAmount(fuelId) > 0
-            && progress.shipEngineFuelTank.GetAmount(fuelId) < capacity.fuelTankCapacityKg - 0.001f;
+            && progress.shipFuelTank.GetAmount(fuelId) < capacity.fuelTankCapacityKg - 0.001f;
         bool canClaudium = storage.GetResourceAmount(claudiumId) > 0
             && progress.shipClaudiumTank.GetAmount(claudiumId) < capacity.claudiumTankCapacityKg - 0.001f;
         bool canFreePioneerRefuel = CanFreeRefuelStarterPioneerRecovery(fuelId, claudiumId, capacity);
@@ -1812,7 +3517,7 @@ public partial class MetaGameState : MonoBehaviour
         CargoCapacityInfo capacity = CalculateCargoCapacity();
         ResolveCurrentTankResourceIds(out string fuelId, out string claudiumId);
 
-        int fuelMoved = RefillTankFromStorage(progress.shipEngineFuelTank, fuelId, capacity.fuelTankCapacityKg, storage);
+        int fuelMoved = RefillTankFromStorage(progress.shipFuelTank, fuelId, capacity.fuelTankCapacityKg, storage);
         int claudiumMoved = RefillTankFromStorage(progress.shipClaudiumTank, claudiumId, capacity.claudiumTankCapacityKg, storage);
         FreeRefuelStarterPioneerRecovery(fuelId, claudiumId, capacity, out float freeFuelKg, out float freeClaudiumKg);
         if (fuelMoved <= 0 && claudiumMoved <= 0 && freeFuelKg <= 0f && freeClaudiumKg <= 0f)
@@ -1864,7 +3569,7 @@ public partial class MetaGameState : MonoBehaviour
         float fuelTargetKg = Mathf.Max(0f, startingFuelKg);
         float claudiumTargetKg = Mathf.Max(0f, startingClaudiumKg);
         bool needsFuel = fuelTargetKg > 0f
-            && progress.shipEngineFuelTank.GetAmount(fuelId) < fuelTargetKg - 0.001f;
+            && progress.shipFuelTank.GetAmount(fuelId) < fuelTargetKg - 0.001f;
         bool needsClaudium = claudiumTargetKg > 0f
             && progress.shipClaudiumTank.GetAmount(claudiumId) < claudiumTargetKg - 0.001f;
         return capacity.assemblyValid && (needsFuel || needsClaudium);
@@ -1884,8 +3589,8 @@ public partial class MetaGameState : MonoBehaviour
         float fuelTargetKg = Mathf.Max(0f, startingFuelKg);
         if (fuelTargetKg > 0f)
         {
-            float currentFuelKg = progress.shipEngineFuelTank.GetAmount(fuelId);
-            fuelAddedKg = progress.shipEngineFuelTank.Add(
+            float currentFuelKg = progress.shipFuelTank.GetAmount(fuelId);
+            fuelAddedKg = progress.shipFuelTank.Add(
                 fuelId,
                 Mathf.Max(0f, fuelTargetKg - currentFuelKg),
                 Mathf.Max(fuelTargetKg, capacity.fuelTankCapacityKg));
@@ -1980,15 +3685,50 @@ public partial class MetaGameState : MonoBehaviour
         progress.baseIndustry ??= new BaseExtractionIndustryState();
         progress.baseIndustry.Normalize();
 
-        return branch switch
+        if (!TryGetAvailableBaseProcessingInput(branch, storage, out string inputItemId, out int available) || available <= 0)
         {
-            BaseProcessingBranch.Ore => TryProcessOreBaseBatch(storage, out message),
-            BaseProcessingBranch.Gas => TryProcessGasBaseBatch(storage, out message),
-            BaseProcessingBranch.AutomatonDismantling => TryProcessAutomatonBaseBatch(storage, out message),
-            BaseProcessingBranch.LeviathanProcessing => TryProcessLeviathanBaseBatch(storage, out message),
-            BaseProcessingBranch.CyberneticDeciphering => TryProcessCyberInfoBaseBatch(storage, out message),
-            _ => FailBaseProcessing("Unknown processing branch: " + branch + ".", out message)
-        };
+            return FailBaseProcessing("No processable input for " + SessionExtractionIndustry.GetProcessingDisplayName(branch) + ".", out message);
+        }
+
+        BaseProcessingLineState line = progress.baseIndustry.GetProcessing(branch);
+        BaseProcessingFacilityState facility = GetBaseProcessingFacilityState("legacy_batch_" + branch, branch, line.level);
+        int neededForCycle = Mathf.Max(0, facility.cycleInputUnits - facility.BunkerLoadUnits);
+        int moved = 0;
+        if (neededForCycle > 0)
+        {
+            moved = Mathf.Min(Mathf.Min(neededForCycle, available), facility.BunkerFreeUnits);
+            if (moved > 0 && storage.TrySpendResource(inputItemId, moved))
+            {
+                AddQuestEventMetric("resource_spent", inputItemId, moved);
+                int loaded = facility.AddBunker(inputItemId, moved);
+                if (loaded < moved)
+                {
+                    storage.AddResource(inputItemId, moved - loaded);
+                }
+
+                moved = loaded;
+            }
+        }
+
+        if (facility.BunkerLoadUnits < facility.cycleInputUnits)
+        {
+            message = "Loaded " + moved + " input units, waiting for " + facility.cycleInputUnits + " units in the bunker.";
+            lastAccountMessage = message;
+            RefreshRuntimeAccountIfDocked();
+            RefreshQuestProgress(true);
+            return moved > 0;
+        }
+
+        int processed = CompleteBaseProcessingFacilityCycle(facility);
+        int collected = CollectBaseProcessingOutputsToStorage(facility, storage);
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+
+        message = "Processed " + processed + " units in "
+            + SessionExtractionIndustry.GetProcessingDisplayName(branch)
+            + ". Collected whole outputs: " + collected + ".";
+        lastAccountMessage = message;
+        return processed > 0;
     }
 
     public bool TryProcessBaseOreBatch(out string message)
@@ -2045,6 +3785,626 @@ public partial class MetaGameState : MonoBehaviour
         return false;
     }
 
+    public BaseProcessingFacilityState GetBaseProcessingFacilityState(string facilityId, BaseProcessingBranch branch, int buildingLevel)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        return progress.baseIndustry.GetProcessingFacility(facilityId, branch, buildingLevel);
+    }
+
+    public List<string> GetBaseProcessingInputItemIds(BaseProcessingBranch branch)
+    {
+        EnsureSessionConfigLoaded();
+        List<string> itemIds = new List<string>();
+
+        switch (branch)
+        {
+            case BaseProcessingBranch.Ore:
+                if (sessionConfig != null && sessionConfig.oreTypes != null)
+                {
+                    for (int i = 0; i < sessionConfig.oreTypes.Count; i++)
+                    {
+                        AddUniqueItemId(itemIds, sessionConfig.oreTypes[i]?.oreItemId);
+                    }
+                }
+                break;
+            case BaseProcessingBranch.Gas:
+                if (sessionConfig != null && sessionConfig.gasCondensateTypes != null)
+                {
+                    for (int i = 0; i < sessionConfig.gasCondensateTypes.Count; i++)
+                    {
+                        AddUniqueItemId(itemIds, sessionConfig.gasCondensateTypes[i]?.condensateItemId);
+                    }
+                }
+                break;
+            case BaseProcessingBranch.AutomatonDismantling:
+                AddUniqueItemId(itemIds, SessionExtractionConstants.BrokenAutomatonItemId);
+                break;
+            case BaseProcessingBranch.LeviathanProcessing:
+                if (sessionConfig != null && sessionConfig.leviathanTypes != null)
+                {
+                    for (int i = 0; i < sessionConfig.leviathanTypes.Count; i++)
+                    {
+                        AddUniqueItemId(itemIds, sessionConfig.leviathanTypes[i]?.carcassItemId);
+                    }
+                }
+                break;
+            case BaseProcessingBranch.CyberneticDeciphering:
+                AddUniqueItemId(itemIds, SessionExtractionConstants.RockInfoItemId);
+                break;
+        }
+
+        return itemIds;
+    }
+
+    public List<string> GetBaseProcessingOutputItemIds(BaseProcessingBranch branch)
+    {
+        List<string> outputs = new List<string>();
+        List<string> inputs = GetBaseProcessingInputItemIds(branch);
+        for (int i = 0; i < inputs.Count; i++)
+        {
+            List<ProcessingOutputShare> composition = GetProcessingComposition(branch, inputs[i]);
+            for (int outputIndex = 0; outputIndex < composition.Count; outputIndex++)
+            {
+                AddUniqueItemId(outputs, composition[outputIndex].itemId);
+            }
+        }
+
+        return outputs;
+    }
+
+    public bool TryLoadBaseProcessingInput(
+        string facilityId,
+        BaseProcessingBranch branch,
+        int buildingLevel,
+        string itemId,
+        int amount,
+        out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        message = "";
+
+        if (!IsDockedAtCapital())
+        {
+            message = "Переработка доступна только в городе.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0 || GetProcessingComposition(branch, itemId).Count == 0)
+        {
+            message = "Этот ресурс не подходит для выбранной переработки.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        PortStorageState storage = GetCapitalStorageState();
+        BaseProcessingFacilityState facility = GetBaseProcessingFacilityState(facilityId, branch, buildingLevel);
+        if (storage == null || facility == null)
+        {
+            message = "Нет склада или здания переработки.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        int available = storage.GetResourceAmount(itemId);
+        int moved = Mathf.Min(Mathf.Min(Mathf.Max(0, amount), available), facility.BunkerFreeUnits);
+        if (moved <= 0)
+        {
+            message = facility.BunkerFreeUnits <= 0 ? "Бункер заполнен." : "На складе нет выбранного сырья.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (!storage.TrySpendResource(itemId, moved))
+        {
+            message = "Не удалось забрать сырье со склада.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        int loaded = facility.AddBunker(itemId, moved);
+        AddQuestEventMetric("resource_spent", itemId, loaded);
+        if (loaded < moved)
+        {
+            storage.AddResource(itemId, moved - loaded);
+        }
+
+        message = "Загружено в бункер: " + (sessionConfig != null ? sessionConfig.GetItemNameRu(itemId) : itemId) + " x" + loaded + ".";
+        lastAccountMessage = message;
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+        return loaded > 0;
+    }
+
+    public bool TryLoadAllBaseProcessingInputs(
+        string facilityId,
+        BaseProcessingBranch branch,
+        int buildingLevel,
+        out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        message = "";
+
+        PortStorageState storage = GetCapitalStorageState();
+        BaseProcessingFacilityState facility = GetBaseProcessingFacilityState(facilityId, branch, buildingLevel);
+        if (!IsDockedAtCapital() || storage == null || facility == null)
+        {
+            message = "Нет доступа к складу города.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        int totalMoved = 0;
+        List<string> inputs = GetBaseProcessingInputItemIds(branch);
+        for (int i = 0; i < inputs.Count && facility.BunkerFreeUnits > 0; i++)
+        {
+            string itemId = inputs[i];
+            int available = storage.GetResourceAmount(itemId);
+            int moved = Mathf.Min(available, facility.BunkerFreeUnits);
+            if (moved <= 0 || !storage.TrySpendResource(itemId, moved)) continue;
+
+            int loaded = facility.AddBunker(itemId, moved);
+            AddQuestEventMetric("resource_spent", itemId, loaded);
+            totalMoved += loaded;
+            if (loaded < moved)
+            {
+                storage.AddResource(itemId, moved - loaded);
+            }
+        }
+
+        message = totalMoved > 0
+            ? "Загружено сырья: " + totalMoved + "."
+            : facility.BunkerFreeUnits <= 0 ? "Бункер заполнен." : "На складе нет подходящего сырья.";
+        lastAccountMessage = message;
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+        return totalMoved > 0;
+    }
+
+    public bool TryClearBaseProcessingBunker(
+        string facilityId,
+        BaseProcessingBranch branch,
+        int buildingLevel,
+        out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+
+        PortStorageState storage = GetCapitalStorageState();
+        BaseProcessingFacilityState facility = GetBaseProcessingFacilityState(facilityId, branch, buildingLevel);
+        if (!IsDockedAtCapital() || storage == null || facility == null)
+        {
+            message = "Нет доступа к складу города.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        int returned = 0;
+        facility.bunker ??= new List<ResourceStack>();
+        for (int i = facility.bunker.Count - 1; i >= 0; i--)
+        {
+            ResourceStack stack = facility.bunker[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0)
+            {
+                facility.bunker.RemoveAt(i);
+                continue;
+            }
+
+            returned += storage.AddResource(stack.resourceId, stack.amount);
+            facility.bunker.RemoveAt(i);
+        }
+
+        facility.cycleElapsedSeconds = 0f;
+        message = returned > 0 ? "Бункер очищен, возвращено: " + returned + "." : "Бункер пуст.";
+        lastAccountMessage = message;
+        RefreshRuntimeAccountIfDocked();
+        return returned > 0;
+    }
+
+    public bool TryCollectBaseProcessingOutputs(
+        string facilityId,
+        BaseProcessingBranch branch,
+        int buildingLevel,
+        out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+
+        PortStorageState storage = GetCapitalStorageState();
+        BaseProcessingFacilityState facility = GetBaseProcessingFacilityState(facilityId, branch, buildingLevel);
+        if (!IsDockedAtCapital() || storage == null || facility == null)
+        {
+            message = "Нет доступа к складу города.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        int collected = 0;
+        facility.outputBuffers ??= new List<BaseProcessingOutputBufferState>();
+        for (int i = 0; i < facility.outputBuffers.Count; i++)
+        {
+            BaseProcessingOutputBufferState buffer = facility.outputBuffers[i];
+            if (buffer == null || string.IsNullOrWhiteSpace(buffer.itemId) || buffer.readyAmount <= 0) continue;
+
+            int readyAmount = buffer.readyAmount;
+            collected += storage.AddResource(buffer.itemId, readyAmount);
+            AddQuestEventMetric("resource_acquired", buffer.itemId, readyAmount);
+            buffer.readyAmount = 0;
+            buffer.Normalize();
+        }
+
+        message = collected > 0 ? "Забрано готовых выходов: " + collected + "." : "Готовых целых единиц пока нет.";
+        lastAccountMessage = message;
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+        return collected > 0;
+    }
+
+    private static void AddUniqueItemId(List<string> itemIds, string itemId)
+    {
+        if (itemIds == null || string.IsNullOrWhiteSpace(itemId)) return;
+        itemId = itemId.Trim();
+        if (!itemIds.Contains(itemId))
+        {
+            itemIds.Add(itemId);
+        }
+    }
+
+    private List<ProcessingOutputShare> GetProcessingComposition(BaseProcessingBranch branch, string inputItemId)
+    {
+        List<ProcessingOutputShare> outputs = new List<ProcessingOutputShare>();
+        if (string.IsNullOrWhiteSpace(inputItemId)) return outputs;
+        EnsureSessionConfigLoaded();
+
+        switch (branch)
+        {
+            case BaseProcessingBranch.Ore:
+            {
+                OreTypeConfig oreType = FindOreTypeByItemId(inputItemId);
+                if (oreType != null && oreType.composition != null)
+                {
+                    for (int i = 0; i < oreType.composition.Count; i++)
+                    {
+                        OreMineralCompositionConfig composition = oreType.composition[i];
+                        if (composition == null) continue;
+                        outputs.Add(new ProcessingOutputShare(composition.mineralItemId, composition.share));
+                    }
+                }
+                break;
+            }
+            case BaseProcessingBranch.Gas:
+            {
+                GasCondensateTypeConfig gasType = FindGasCondensateTypeByItemId(inputItemId);
+                if (gasType != null && gasType.composition != null)
+                {
+                    for (int i = 0; i < gasType.composition.Count; i++)
+                    {
+                        GasCondensateCompositionConfig composition = gasType.composition[i];
+                        if (composition == null) continue;
+                        outputs.Add(new ProcessingOutputShare(composition.itemId, composition.share));
+                    }
+                }
+                break;
+            }
+            case BaseProcessingBranch.AutomatonDismantling:
+                if (inputItemId == SessionExtractionConstants.BrokenAutomatonItemId)
+                {
+                    outputs.Add(new ProcessingOutputShare(SessionExtractionConstants.MechanismsItemId, 0.40f));
+                    outputs.Add(new ProcessingOutputShare(SessionExtractionConstants.ToolsItemId, 0.20f));
+                    outputs.Add(new ProcessingOutputShare(SessionExtractionConstants.AutomatonCoreItemId, 0.20f));
+                    outputs.Add(new ProcessingOutputShare(SessionExtractionConstants.DesignExperienceItemId, 0.10f));
+                }
+                break;
+            case BaseProcessingBranch.LeviathanProcessing:
+            {
+                LeviathanTypeConfig leviathanType = FindLeviathanTypeByCarcassItemId(inputItemId);
+                if (leviathanType != null && leviathanType.composition != null)
+                {
+                    for (int i = 0; i < leviathanType.composition.Count; i++)
+                    {
+                        LeviathanButcheryCompositionConfig composition = leviathanType.composition[i];
+                        if (composition == null) continue;
+                        outputs.Add(new ProcessingOutputShare(composition.itemId, composition.share));
+                    }
+                }
+                break;
+            }
+            case BaseProcessingBranch.CyberneticDeciphering:
+                if (inputItemId == SessionExtractionConstants.RockInfoItemId)
+                {
+                    outputs.Add(new ProcessingOutputShare(SessionExtractionConstants.FundamentalExperienceItemId, 0.85f));
+                    outputs.Add(new ProcessingOutputShare(SessionExtractionConstants.DesignExperienceItemId, 0.15f));
+                }
+                break;
+        }
+
+        for (int i = outputs.Count - 1; i >= 0; i--)
+        {
+            ProcessingOutputShare output = outputs[i];
+            if (string.IsNullOrWhiteSpace(output.itemId) || output.share <= 0f)
+            {
+                outputs.RemoveAt(i);
+            }
+        }
+
+        return outputs;
+    }
+
+    private OreTypeConfig FindOreTypeByItemId(string oreItemId)
+    {
+        if (string.IsNullOrWhiteSpace(oreItemId) || sessionConfig == null || sessionConfig.oreTypes == null) return null;
+        for (int i = 0; i < sessionConfig.oreTypes.Count; i++)
+        {
+            OreTypeConfig oreType = sessionConfig.oreTypes[i];
+            if (oreType != null && oreType.oreItemId == oreItemId)
+            {
+                return oreType;
+            }
+        }
+
+        return null;
+    }
+
+    private GasCondensateTypeConfig FindGasCondensateTypeByItemId(string condensateItemId)
+    {
+        if (string.IsNullOrWhiteSpace(condensateItemId) || sessionConfig == null || sessionConfig.gasCondensateTypes == null) return null;
+        for (int i = 0; i < sessionConfig.gasCondensateTypes.Count; i++)
+        {
+            GasCondensateTypeConfig gasType = sessionConfig.gasCondensateTypes[i];
+            if (gasType != null && gasType.condensateItemId == condensateItemId)
+            {
+                return gasType;
+            }
+        }
+
+        return null;
+    }
+
+    private LeviathanTypeConfig FindLeviathanTypeByCarcassItemId(string carcassItemId)
+    {
+        if (string.IsNullOrWhiteSpace(carcassItemId) || sessionConfig == null || sessionConfig.leviathanTypes == null) return null;
+        for (int i = 0; i < sessionConfig.leviathanTypes.Count; i++)
+        {
+            LeviathanTypeConfig leviathanType = sessionConfig.leviathanTypes[i];
+            if (leviathanType != null && leviathanType.carcassItemId == carcassItemId)
+            {
+                return leviathanType;
+            }
+        }
+
+        return null;
+    }
+
+    private int AdvanceBaseProcessingFacilities(float elapsedSeconds)
+    {
+        if (progress == null || progress.baseIndustry == null || elapsedSeconds <= 0f) return 0;
+        progress.baseIndustry.Normalize();
+
+        int completedCycles = 0;
+        List<BaseProcessingFacilityState> facilities = progress.baseIndustry.processingFacilities;
+        if (facilities == null || facilities.Count == 0) return 0;
+
+        for (int i = 0; i < facilities.Count; i++)
+        {
+            completedCycles += AdvanceBaseProcessingFacility(facilities[i], elapsedSeconds);
+        }
+
+        return completedCycles;
+    }
+
+    private int AdvanceBaseCascadeProduction(DateTime utcNow)
+    {
+        if (progress == null || progress.baseIndustry == null) return 0;
+        progress.baseIndustry.Normalize();
+
+        List<CascadeProductionQueueItemState> queue = progress.baseIndustry.cascadeQueue;
+        if (queue == null || queue.Count == 0) return 0;
+
+        PortStorageState storage = GetCapitalStorageState();
+        if (storage == null) return 0;
+
+        int completed = 0;
+        long nowTicks = utcNow.Ticks;
+        for (int i = queue.Count - 1; i >= 0; i--)
+        {
+            CascadeProductionQueueItemState item = queue[i];
+            if (item == null)
+            {
+                queue.RemoveAt(i);
+                continue;
+            }
+
+            item.Normalize();
+            if (!item.IsCompleteAt(nowTicks)) continue;
+
+            CompleteBaseCascadeQueueItem(item, storage);
+            queue.RemoveAt(i);
+            completed++;
+        }
+
+        if (completed > 0)
+        {
+            RefreshRuntimeAccountIfDocked();
+        }
+
+        return completed;
+    }
+
+    private void CompleteBaseCascadeQueueItem(CascadeProductionQueueItemState item, PortStorageState storage)
+    {
+        if (item == null || storage == null) return;
+        item.Normalize();
+
+        for (int i = 0; i < item.outputs.Count; i++)
+        {
+            CascadeItemAmount output = item.outputs[i];
+            if (output == null || string.IsNullOrWhiteSpace(output.itemId) || output.amount <= 0) continue;
+            storage.AddResource(output.itemId, output.amount);
+            AddQuestEventMetric("resource_acquired", output.itemId, output.amount);
+        }
+
+        AddQuestEventMetric("cascade_order_completed", item.orderId, item.quantity);
+        ApplyCascadeProductionLoad(item.loads);
+        RefreshQuestProgress(true);
+        lastAccountMessage = "Cascade complete: " + BuildCascadeOutputsText(item.outputs) + ".";
+    }
+
+    private int AdvanceBaseProcessingFacility(BaseProcessingFacilityState facility, float elapsedSeconds)
+    {
+        if (facility == null || elapsedSeconds <= 0f) return 0;
+        facility.Normalize();
+        if (facility.BunkerLoadUnits < facility.cycleInputUnits)
+        {
+            facility.cycleElapsedSeconds = 0f;
+            return 0;
+        }
+
+        facility.cycleElapsedSeconds += elapsedSeconds;
+        int completedCycles = 0;
+        int guard = 0;
+        while (guard < 1000
+            && facility.cycleElapsedSeconds >= facility.cycleDurationSeconds
+            && facility.BunkerLoadUnits >= facility.cycleInputUnits)
+        {
+            guard++;
+            facility.cycleElapsedSeconds -= facility.cycleDurationSeconds;
+            if (CompleteBaseProcessingFacilityCycle(facility) <= 0)
+            {
+                break;
+            }
+
+            completedCycles++;
+        }
+
+        if (facility.BunkerLoadUnits < facility.cycleInputUnits)
+        {
+            facility.cycleElapsedSeconds = 0f;
+        }
+
+        return completedCycles;
+    }
+
+    private int CompleteBaseProcessingFacilityCycle(BaseProcessingFacilityState facility)
+    {
+        if (facility == null) return 0;
+        facility.Normalize();
+        int batch = Mathf.Min(facility.cycleInputUnits, facility.BunkerLoadUnits);
+        if (batch <= 0 || facility.BunkerLoadUnits < facility.cycleInputUnits) return 0;
+
+        int seed = CreateProcessingSeed(facility);
+        System.Random random = new System.Random(seed);
+        int processed = 0;
+        for (int i = 0; i < batch; i++)
+        {
+            string inputItemId = PickRandomBunkerItem(facility, random);
+            if (string.IsNullOrWhiteSpace(inputItemId) || !facility.TrySpendBunker(inputItemId, 1))
+            {
+                continue;
+            }
+
+            AddProcessingOutputFractions(facility, inputItemId, 1);
+            processed++;
+        }
+
+        if (processed > 0)
+        {
+            BaseProcessingLineState line = progress?.baseIndustry?.GetProcessing(facility.branch);
+            if (line != null)
+            {
+                line.totalProcessedUnits += processed;
+            }
+
+            facility.totalProcessedUnits += processed;
+        }
+
+        return processed;
+    }
+
+    private int CreateProcessingSeed(BaseProcessingFacilityState facility)
+    {
+        int seed = 17;
+        string id = facility != null ? facility.facilityId ?? "" : "";
+        for (int i = 0; i < id.Length; i++)
+        {
+            seed = unchecked(seed * 31 + id[i]);
+        }
+
+        seed = unchecked(seed * 31 + Mathf.RoundToInt((facility != null ? facility.totalProcessedUnits : 0f) * 10f));
+        return seed == int.MinValue ? 17 : Mathf.Abs(seed);
+    }
+
+    private static string PickRandomBunkerItem(BaseProcessingFacilityState facility, System.Random random)
+    {
+        if (facility == null || random == null || facility.BunkerLoadUnits <= 0) return "";
+        int target = random.Next(facility.BunkerLoadUnits);
+        facility.bunker ??= new List<ResourceStack>();
+        for (int i = 0; i < facility.bunker.Count; i++)
+        {
+            ResourceStack stack = facility.bunker[i];
+            if (stack == null || stack.amount <= 0) continue;
+
+            if (target < stack.amount)
+            {
+                return stack.resourceId;
+            }
+
+            target -= stack.amount;
+        }
+
+        return "";
+    }
+
+    private void AddProcessingOutputFractions(BaseProcessingFacilityState facility, string inputItemId, int inputAmount)
+    {
+        if (facility == null || string.IsNullOrWhiteSpace(inputItemId) || inputAmount <= 0) return;
+
+        List<ProcessingOutputShare> composition = GetProcessingComposition(facility.branch, inputItemId);
+        for (int i = 0; i < composition.Count; i++)
+        {
+            ProcessingOutputShare output = composition[i];
+            if (string.IsNullOrWhiteSpace(output.itemId) || output.share <= 0f) continue;
+
+            float produced = inputAmount * output.share * Mathf.Clamp01(facility.efficiency);
+            if (produced <= 0f) continue;
+
+            BaseProcessingOutputBufferState buffer = facility.GetOutputBuffer(output.itemId, true);
+            if (buffer == null) continue;
+
+            buffer.fractionalAmount += produced;
+            int whole = Mathf.FloorToInt(buffer.fractionalAmount + 0.0001f);
+            if (whole > 0)
+            {
+                buffer.readyAmount += whole;
+                buffer.fractionalAmount -= whole;
+            }
+
+            buffer.Normalize();
+        }
+    }
+
+    private int CollectBaseProcessingOutputsToStorage(BaseProcessingFacilityState facility, PortStorageState storage)
+    {
+        if (facility == null || storage == null) return 0;
+        int collected = 0;
+        facility.outputBuffers ??= new List<BaseProcessingOutputBufferState>();
+        for (int i = 0; i < facility.outputBuffers.Count; i++)
+        {
+            BaseProcessingOutputBufferState buffer = facility.outputBuffers[i];
+            if (buffer == null || string.IsNullOrWhiteSpace(buffer.itemId) || buffer.readyAmount <= 0) continue;
+
+            collected += storage.AddResource(buffer.itemId, buffer.readyAmount);
+            buffer.readyAmount = 0;
+            buffer.Normalize();
+        }
+
+        return collected;
+    }
+
     private bool TryProcessOreBaseBatch(PortStorageState storage, out string message)
     {
         OreTypeConfig oreType = FindFirstStoredOreType(storage, out int availableOre);
@@ -2059,10 +4419,13 @@ public partial class MetaGameState : MonoBehaviour
         {
             return FailBaseProcessing("Could not spend ore from base storage.", out message);
         }
+        AddQuestEventMetric("resource_spent", oreType.oreItemId, batchKg);
 
         int outputTotal = AddOreProcessingOutputs(storage, oreType, batchKg);
+        AddQuestEventMetric("resource_acquired", "any", outputTotal);
         line.totalProcessedUnits += batchKg;
         RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
 
         message = "Processed " + batchKg + " kg " + oreType.oreItemId + " into " + outputTotal + " kg minerals.";
         lastAccountMessage = message;
@@ -2083,10 +4446,13 @@ public partial class MetaGameState : MonoBehaviour
         {
             return FailBaseProcessing("Could not spend gas condensate from base storage.", out message);
         }
+        AddQuestEventMetric("resource_spent", gasType.condensateItemId, batch);
 
         int outputTotal = AddGasProcessingOutputs(storage, gasType, batch);
+        AddQuestEventMetric("resource_acquired", "any", outputTotal);
         line.totalProcessedUnits += batch;
         RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
 
         message = "Processed " + batch + " units " + gasType.condensateItemId + " into " + outputTotal + " gas materials.";
         lastAccountMessage = message;
@@ -2107,15 +4473,18 @@ public partial class MetaGameState : MonoBehaviour
         {
             return FailBaseProcessing("Could not spend automaton wrecks from base storage.", out message);
         }
+        AddQuestEventMetric("resource_spent", inputItemId, batch);
 
         int outputTotal = 0;
         outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.MechanismsItemId, batch, 0.40f);
         outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.ToolsItemId, batch, 0.20f);
         outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.AutomatonCoreItemId, batch, 0.20f);
         outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.DesignExperienceItemId, batch, 0.10f);
+        AddQuestEventMetric("resource_acquired", "any", outputTotal);
 
         line.totalProcessedUnits += batch;
         RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
 
         message = "Dismantled " + batch + " units " + inputItemId + " into " + outputTotal + " automaton outputs.";
         lastAccountMessage = message;
@@ -2136,19 +4505,43 @@ public partial class MetaGameState : MonoBehaviour
         {
             return FailBaseProcessing("Could not spend leviathan carcass from base storage.", out message);
         }
+        AddQuestEventMetric("resource_spent", leviathanType.carcassItemId, batch);
 
-        int outputTotal = 0;
-        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanFatItemId, batch, 0.30f);
-        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanHideItemId, batch, 0.25f);
-        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.MineralShellItemId, batch, 0.25f);
-        outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.ClaudiumGlandItemId, batch, 0.08f);
+        int outputTotal = AddLeviathanProcessingOutputs(storage, leviathanType, batch);
+        AddQuestEventMetric("resource_acquired", "any", outputTotal);
 
         line.totalProcessedUnits += batch;
         RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
 
         message = "Processed " + batch + " kg " + leviathanType.carcassItemId + " into " + outputTotal + " leviathan materials.";
         lastAccountMessage = message;
         return true;
+    }
+
+    private int AddLeviathanProcessingOutputs(PortStorageState storage, LeviathanTypeConfig leviathanType, int batch)
+    {
+        if (leviathanType != null && leviathanType.composition != null && leviathanType.composition.Count > 0)
+        {
+            int outputTotal = 0;
+            for (int i = 0; i < leviathanType.composition.Count; i++)
+            {
+                LeviathanButcheryCompositionConfig output = leviathanType.composition[i];
+                if (output == null || string.IsNullOrWhiteSpace(output.itemId) || output.share <= 0f) continue;
+                outputTotal += AddScaledProcessingOutput(storage, output.itemId, batch, output.share);
+            }
+
+            return outputTotal;
+        }
+
+        int fallbackTotal = 0;
+        fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanMeatItemId, batch, 0.35f);
+        fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanFatItemId, batch, 0.20f);
+        fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanHideItemId, batch, 0.20f);
+        fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.ClaudiumItemId, batch, 0.08f);
+        fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanSinewItemId, batch, 0.10f);
+        fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.BonePlateItemId, batch, 0.07f);
+        return fallbackTotal;
     }
 
     private bool TryProcessCyberInfoBaseBatch(PortStorageState storage, out string message)
@@ -2165,13 +4558,16 @@ public partial class MetaGameState : MonoBehaviour
         {
             return FailBaseProcessing("Could not spend survey information from base storage.", out message);
         }
+        AddQuestEventMetric("resource_spent", infoItemId, batch);
 
         int outputTotal = 0;
         outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.FundamentalExperienceItemId, batch, 0.85f);
         outputTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.DesignExperienceItemId, batch, 0.15f);
+        AddQuestEventMetric("resource_acquired", "any", outputTotal);
 
         line.totalProcessedUnits += batch;
         RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
 
         message = "Deciphered " + batch + " units " + infoItemId + " into " + outputTotal + " research outputs.";
         lastAccountMessage = message;
@@ -2232,7 +4628,7 @@ public partial class MetaGameState : MonoBehaviour
                 firstRunnableEstimate ??= estimate;
                 firstRunnableOrder ??= order;
 
-                if (StarterCascadeOrderNeedsOutput(order, storage))
+                if (StarterCascadeOrderNeedsOutput(order, storage, GetPendingCascadeOutputAmount(order)))
                 {
                     selectedOrder = order;
                     return estimate;
@@ -2260,7 +4656,7 @@ public partial class MetaGameState : MonoBehaviour
         };
     }
 
-    private static bool StarterCascadeOrderNeedsOutput(CascadeProductionOrderDefinition order, PortStorageState storage)
+    private static bool StarterCascadeOrderNeedsOutput(CascadeProductionOrderDefinition order, PortStorageState storage, int pendingOutputAmount)
     {
         if (order == null || storage == null)
         {
@@ -2278,7 +4674,7 @@ public partial class MetaGameState : MonoBehaviour
         {
             CascadeItemAmount output = order.outputs[i];
             if (output == null || string.IsNullOrWhiteSpace(output.itemId) || output.amount <= 0) continue;
-            if (storage.GetResourceAmount(output.itemId) < targetStock)
+            if (storage.GetResourceAmount(output.itemId) + Mathf.Max(0, pendingOutputAmount) < targetStock)
             {
                 return true;
             }
@@ -2298,6 +4694,40 @@ public partial class MetaGameState : MonoBehaviour
         };
     }
 
+    private int GetPendingCascadeOutputAmount(CascadeProductionOrderDefinition order)
+    {
+        if (progress == null || progress.baseIndustry == null || order == null || order.outputs == null)
+        {
+            return 0;
+        }
+
+        int total = 0;
+        progress.baseIndustry.Normalize();
+        List<CascadeProductionQueueItemState> queue = progress.baseIndustry.cascadeQueue;
+        if (queue == null || queue.Count == 0) return 0;
+
+        for (int i = 0; i < queue.Count; i++)
+        {
+            CascadeProductionQueueItemState queued = queue[i];
+            if (queued == null || queued.outputs == null) continue;
+            for (int outputIndex = 0; outputIndex < order.outputs.Count; outputIndex++)
+            {
+                CascadeItemAmount expectedOutput = order.outputs[outputIndex];
+                if (expectedOutput == null || string.IsNullOrWhiteSpace(expectedOutput.itemId)) continue;
+                for (int queuedOutputIndex = 0; queuedOutputIndex < queued.outputs.Count; queuedOutputIndex++)
+                {
+                    CascadeItemAmount queuedOutput = queued.outputs[queuedOutputIndex];
+                    if (queuedOutput != null && queuedOutput.itemId == expectedOutput.itemId)
+                    {
+                        total += Mathf.Max(0, queuedOutput.amount);
+                    }
+                }
+            }
+        }
+
+        return total;
+    }
+
     public bool TryRunNextBaseCascadeOrder(out string message)
     {
         CascadeProductionEstimate estimate = EstimateNextBaseCascadeOrder(out CascadeProductionOrderDefinition order);
@@ -2315,8 +4745,14 @@ public partial class MetaGameState : MonoBehaviour
 
     public CascadeProductionEstimate EstimateBaseCascadeOrder(CascadeProductionOrderDefinition order)
     {
+        return EstimateBaseCascadeOrder(order, 1);
+    }
+
+    public CascadeProductionEstimate EstimateBaseCascadeOrder(CascadeProductionOrderDefinition order, int quantity)
+    {
         EnsureProgressInitialized();
         EnsureSessionConfigLoaded();
+        quantity = Mathf.Max(1, quantity);
 
         CascadeProductionEstimate estimate = new CascadeProductionEstimate
         {
@@ -2371,14 +4807,15 @@ public partial class MetaGameState : MonoBehaviour
             if (input == null || string.IsNullOrWhiteSpace(input.itemId) || input.amount <= 0) continue;
 
             int available = storage.GetResourceAmount(input.itemId);
-            if (available >= input.amount) continue;
+            int required = MultiplyCascadeAmount(input.amount, quantity);
+            if (available >= required) continue;
 
             estimate.missingInputs.Add(new CascadeResourceGap
             {
                 itemId = input.itemId,
-                required = input.amount,
+                required = required,
                 available = available,
-                missing = Mathf.Max(0, input.amount - available)
+                missing = Mathf.Max(0, required - available)
             });
         }
 
@@ -2388,8 +4825,9 @@ public partial class MetaGameState : MonoBehaviour
             if (load == null || load.loadUnits <= 0f) continue;
 
             CascadeProductionLineState line = progress.baseIndustry.GetProduction(load.type);
-            float minutes = load.loadUnits / Mathf.Max(0.1f, line.capacityUnitsPerMinute);
-            estimate.totalLoadUnits += load.loadUnits;
+            float totalLoad = load.loadUnits * quantity;
+            float minutes = totalLoad / Mathf.Max(0.1f, line.capacityUnitsPerMinute);
+            estimate.totalLoadUnits += totalLoad;
             if (minutes > estimate.bottleneckMinutes)
             {
                 estimate.bottleneck = load.type;
@@ -2412,13 +4850,28 @@ public partial class MetaGameState : MonoBehaviour
 
     public bool TryRunBaseCascadeOrder(CascadeProductionOrderDefinition order, out string message)
     {
+        return TryQueueBaseCascadeOrder(order, 1, out message);
+    }
+
+    public bool TryQueueBaseCascadeOrder(CascadeProductionOrderDefinition order, int quantity, out string message)
+    {
         message = "";
-        CascadeProductionEstimate estimate = EstimateBaseCascadeOrder(order);
+        quantity = Mathf.Max(1, quantity);
+        CascadeProductionEstimate estimate = EstimateBaseCascadeOrder(order, quantity);
         if (order == null || !estimate.canRun)
         {
             message = string.IsNullOrWhiteSpace(estimate.blockedReason)
                 ? "Cascade order is blocked."
                 : estimate.blockedReason;
+            lastAccountMessage = message;
+            return false;
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        if (progress.baseIndustry.ActiveCascadeQueueCount >= BaseCascadeQueueSlotCount)
+        {
+            message = "Cascade queue is full.";
             lastAccountMessage = message;
             return false;
         }
@@ -2437,29 +4890,106 @@ public partial class MetaGameState : MonoBehaviour
             CascadeItemAmount input = order.inputs[i];
             if (input == null || string.IsNullOrWhiteSpace(input.itemId) || input.amount <= 0) continue;
 
-            if (!storage.TrySpendResource(input.itemId, input.amount))
+            int amount = MultiplyCascadeAmount(input.amount, quantity);
+            if (!storage.TrySpendResource(input.itemId, amount))
             {
-                message = "Cascade blocked: could not spend " + input.amount + " " + input.itemId + ".";
+                message = "Cascade blocked: could not spend " + amount + " " + input.itemId + ".";
                 lastAccountMessage = message;
                 return false;
             }
+
+            AddQuestEventMetric("resource_spent", input.itemId, amount);
         }
 
-        for (int i = 0; i < order.outputs.Count; i++)
+        DateTime startUtc = GetProcessUtcNow();
+        if (progress.lastProcessUtcTicks <= 0L)
         {
-            CascadeItemAmount output = order.outputs[i];
-            if (output == null || string.IsNullOrWhiteSpace(output.itemId) || output.amount <= 0) continue;
-            storage.AddResource(output.itemId, output.amount);
+            progress.lastProcessUtcTicks = startUtc.Ticks;
         }
 
-        ApplyCascadeOrderLoad(order);
+        float durationSeconds = Mathf.Max(1f, estimate.bottleneckMinutes * 60f);
+        long durationTicks = TimeSpan.FromSeconds(durationSeconds).Ticks;
+        CascadeProductionQueueItemState queued = CreateCascadeQueueItem(order, quantity, startUtc.Ticks, startUtc.Ticks + durationTicks);
+        progress.baseIndustry.cascadeQueue.Add(queued);
         RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
 
-        message = "Cascade complete: " + BuildCascadeOutputsText(order)
+        message = "Cascade queued: " + BuildCascadeOutputsText(queued.outputs)
             + ". Bottleneck: " + SessionExtractionIndustry.GetProductionDisplayName(estimate.bottleneck)
             + " ~" + estimate.bottleneckMinutes.ToString("F1") + " min.";
         lastAccountMessage = message;
         return true;
+    }
+
+    private CascadeProductionQueueItemState CreateCascadeQueueItem(
+        CascadeProductionOrderDefinition order,
+        int quantity,
+        long startedUtcTicks,
+        long completeUtcTicks)
+    {
+        quantity = Mathf.Max(1, quantity);
+        CascadeProductionQueueItemState item = new CascadeProductionQueueItemState
+        {
+            queueId = order.orderId + "_" + startedUtcTicks + "_" + progress.baseIndustry.ActiveCascadeQueueCount,
+            orderId = order.orderId,
+            displayName = order.displayName,
+            quantity = quantity,
+            startedUtcTicks = Math.Max(0L, startedUtcTicks),
+            completeUtcTicks = Math.Max(startedUtcTicks + TimeSpan.TicksPerSecond, completeUtcTicks),
+            inputs = CloneCascadeItems(order.inputs, quantity),
+            outputs = CloneCascadeItems(order.outputs, quantity),
+            loads = CloneCascadeLoads(order.loads, quantity)
+        };
+        item.Normalize();
+        return item;
+    }
+
+    private static List<CascadeItemAmount> CloneCascadeItems(List<CascadeItemAmount> source, int quantity)
+    {
+        List<CascadeItemAmount> result = new List<CascadeItemAmount>();
+        if (source == null) return result;
+
+        quantity = Mathf.Max(1, quantity);
+        for (int i = 0; i < source.Count; i++)
+        {
+            CascadeItemAmount item = source[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.itemId) || item.amount <= 0) continue;
+            result.Add(new CascadeItemAmount
+            {
+                itemId = item.itemId,
+                amount = MultiplyCascadeAmount(item.amount, quantity)
+            });
+        }
+
+        return result;
+    }
+
+    private static List<CascadeProductionLoad> CloneCascadeLoads(List<CascadeProductionLoad> source, int quantity)
+    {
+        List<CascadeProductionLoad> result = new List<CascadeProductionLoad>();
+        if (source == null) return result;
+
+        quantity = Mathf.Max(1, quantity);
+        for (int i = 0; i < source.Count; i++)
+        {
+            CascadeProductionLoad load = source[i];
+            if (load == null || load.loadUnits <= 0f) continue;
+            result.Add(new CascadeProductionLoad
+            {
+                type = load.type,
+                loadUnits = load.loadUnits * quantity
+            });
+        }
+
+        return result;
+    }
+
+    private static int MultiplyCascadeAmount(int amount, int quantity)
+    {
+        amount = Mathf.Max(0, amount);
+        quantity = Mathf.Max(1, quantity);
+        if (amount == 0) return 0;
+        return amount > int.MaxValue / quantity ? int.MaxValue : amount * quantity;
     }
 
     public bool CanLoadStarterMunitionsAtBase(out string message)
@@ -3230,6 +5760,10 @@ public partial class MetaGameState : MonoBehaviour
             }
 
             completedCycles += AdvanceTechnologyResearch(utcNow);
+            float elapsedSeconds = (float)Math.Min(86400d, (utcNow.Ticks - previousProcessTicks) / (double)TimeSpan.TicksPerSecond);
+            completedCycles += AdvanceBaseProcessingFacilities(elapsedSeconds);
+            completedCycles += AdvanceBaseCascadeProduction(utcNow);
+            completedCycles += AdvanceCourierServiceOrders(utcNow.Ticks);
 
             progress.lastProcessUtcTicks = utcNow.Ticks;
         }
@@ -3300,6 +5834,8 @@ public partial class MetaGameState : MonoBehaviour
 
     public bool ResetAccountProgressForCheat(out string message)
     {
+        string savePath = ResolvePersistentProgressSavePath();
+        bool saveDeleted = DeletePersistentProgressSaveFile(savePath, out string deleteError);
         progress = new PlayerProgress();
         initialized = false;
         EnsureProgressInitialized();
@@ -3313,7 +5849,12 @@ public partial class MetaGameState : MonoBehaviour
             gameplaySession.ApplyAccountData(GameplaySessionAccountData.CreateInitial(RuntimeAccountId, progress));
         }
 
-        lastAccountMessage = "Account progress reset.";
+        MarkPersistentProgressDirty();
+        SavePersistentProgressNow();
+
+        lastAccountMessage = saveDeleted
+            ? "Account progress reset and save cleared."
+            : "Account progress reset, but save cleanup reported: " + deleteError;
         message = lastAccountMessage;
         return true;
     }
@@ -3341,59 +5882,38 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
-        PortStorageState storage = progress.GetPortStorageState(GetCapitalPortId(), true);
-        int changedCycles = 0;
-        int guard = 0;
-
-        while (guard < 10000)
+        if (!EnsureTechnologyLevelRequirementsPaid(technology, state, out _))
         {
-            guard++;
-
-            if (state.completedCycles >= Mathf.Max(1, technology.requiredCycles))
-            {
-                CompleteTechnologyResearch(technology);
-                changedCycles++;
-                break;
-            }
-
-            if (!state.HasActiveCycle)
-            {
-                if (!TryStartTechnologyCycle(technology, state, storage, utcNow.Ticks, out _))
-                {
-                    break;
-                }
-
-                changedCycles++;
-                if (state.activeCycleEndUtcTicks > utcNow.Ticks)
-                {
-                    break;
-                }
-            }
-
-            if (!state.HasActiveCycle || utcNow.Ticks < state.activeCycleEndUtcTicks)
-            {
-                break;
-            }
-
-            long nextStartTicks = state.activeCycleEndUtcTicks;
-            state.completedCycles++;
-            state.activeCycleStartUtcTicks = 0;
-            state.activeCycleEndUtcTicks = 0;
-            changedCycles++;
-
-            if (state.completedCycles >= Mathf.Max(1, technology.requiredCycles))
-            {
-                CompleteTechnologyResearch(technology);
-                break;
-            }
-
-            if (!TryStartTechnologyCycle(technology, state, storage, nextStartTicks, out _))
-            {
-                break;
-            }
+            return 0;
         }
 
-        return changedCycles;
+        if (progress.lastProcessUtcTicks <= 0 || utcNow.Ticks <= progress.lastProcessUtcTicks)
+        {
+            return 0;
+        }
+
+        float elapsedSeconds = (float)Math.Min(86400d, (utcNow.Ticks - progress.lastProcessUtcTicks) / (double)TimeSpan.TicksPerSecond);
+        float generatedSp = GetArchiveKnowledgeSpPerMinute(technology.categoryId) * elapsedSeconds / 60f;
+        if (generatedSp <= 0f)
+        {
+            return 0;
+        }
+
+        int nextLevel = GetTechnologyNextLevel(technology);
+        int levelCost = GetTechnologyLevelSpCost(technology, nextLevel);
+        state.currentLevelSpProgress = Mathf.Min(levelCost, state.currentLevelSpProgress + generatedSp);
+        state.activeCycleStartUtcTicks = 0;
+        state.activeCycleEndUtcTicks = 0;
+        MarkPersistentProgressDirty();
+
+        if (state.currentLevelSpProgress + 0.001f >= levelCost)
+        {
+            CompleteTechnologyLevel(technology, state);
+            return 1;
+        }
+
+        lastAccountMessage = "Архивы добавили " + generatedSp.ToString("0.#") + " SP в " + GetTechnologyDisplayName(technology) + ".";
+        return 1;
     }
 
     private void CompleteTechnologyResearch(TechnologyConfig technology)
@@ -3402,7 +5922,9 @@ public partial class MetaGameState : MonoBehaviour
 
         progress.CompleteTechnology(technology.id);
         TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
-        state.completedCycles = Mathf.Max(state.completedCycles, Mathf.Max(1, technology.requiredCycles));
+        state.completedCycles = Mathf.Max(state.completedCycles, GetTechnologyMaxLevel(technology));
+        state.currentLevelSpProgress = 0f;
+        state.currentLevelRequirementsPaid = false;
         state.activeCycleStartUtcTicks = 0;
         state.activeCycleEndUtcTicks = 0;
 
@@ -3413,38 +5935,137 @@ public partial class MetaGameState : MonoBehaviour
 
         ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, progress, out _);
         ApplySelectedShip();
-        lastAccountMessage = "Технология завершена: " + GetTechnologyDisplayName(technology);
+        string completionMessage = "Технология завершена: " + GetTechnologyDisplayName(technology);
+        AddQuestEventMetric("technology_completed", technology.id, 1);
+        RefreshQuestProgress(true);
+        lastAccountMessage = completionMessage;
     }
 
-    private bool TryStartOrContinueResearchCycle(TechnologyConfig technology, TechnologyResearchProgress state, long startTicks, out string reason)
+    private void CompleteTechnologyLevel(TechnologyConfig technology, TechnologyResearchProgress state)
     {
-        reason = "";
-        if (technology == null || state == null) return false;
-        if (state.HasActiveCycle) return true;
+        if (technology == null || state == null || progress == null) return;
 
-        PortStorageState storage = progress.GetPortStorageState(GetCapitalPortId(), true);
-        return TryStartTechnologyCycle(technology, state, storage, startTicks, out reason);
-    }
+        state.completedCycles = Mathf.Clamp(state.completedCycles + 1, 0, GetTechnologyMaxLevel(technology));
+        state.currentLevelSpProgress = 0f;
+        state.currentLevelRequirementsPaid = false;
+        state.activeCycleStartUtcTicks = 0;
+        state.activeCycleEndUtcTicks = 0;
 
-    private bool TryStartTechnologyCycle(TechnologyConfig technology, TechnologyResearchProgress state, PortStorageState storage, long startTicks, out string reason)
-    {
-        reason = "";
-        if (technology == null || state == null || storage == null)
+        if (state.completedCycles >= GetTechnologyMaxLevel(technology))
         {
-            reason = "Нет склада столицы для исследования.";
+            CompleteTechnologyResearch(technology);
+            return;
+        }
+
+        if (progress.activeResearchTechnologyId == technology.id)
+        {
+            progress.activeResearchTechnologyId = "";
+        }
+
+        MarkPersistentProgressDirty();
+        lastAccountMessage = "Уровень знания изучен: " + GetTechnologyDisplayName(technology)
+            + " L" + state.completedCycles.ToString() + ".";
+    }
+
+    private bool EnsureTechnologyLevelRequirementsPaid(TechnologyConfig technology, TechnologyResearchProgress state, out string reason)
+    {
+        reason = "";
+        if (technology == null || state == null)
+        {
+            reason = "Знание не найдено.";
             return false;
         }
 
+        if (state.completedCycles >= GetTechnologyMaxLevel(technology))
+        {
+            return true;
+        }
+
+        if (state.currentLevelRequirementsPaid)
+        {
+            return true;
+        }
+
+        PortStorageState storage = progress.GetPortStorageState(GetCapitalPortId(), true);
         if (!TrySpendTechnologyCycleCost(storage, technology, out reason))
         {
             return false;
         }
 
-        int durationSeconds = Mathf.Max(0, technology.cycleTimeSeconds);
-        state.activeCycleStartUtcTicks = startTicks;
-        state.activeCycleEndUtcTicks = startTicks + TimeSpan.FromSeconds(durationSeconds).Ticks;
-        reason = "Цикл исследования начат.";
+        state.currentLevelRequirementsPaid = true;
+        MarkPersistentProgressDirty();
         return true;
+    }
+
+    private int GetTechnologyMaxLevel(TechnologyConfig technology)
+    {
+        return technology == null
+            ? 1
+            : Mathf.Clamp(Mathf.Max(1, technology.requiredCycles), 1, KnowledgeMaxLevel);
+    }
+
+    private int GetTechnologyNextLevel(TechnologyConfig technology)
+    {
+        if (technology == null) return 1;
+        TechnologyResearchProgress state = progress != null ? progress.GetTechnologyProgress(technology.id, false) : null;
+        int completedLevels = state != null ? state.completedCycles : 0;
+        return Mathf.Clamp(completedLevels + 1, 1, GetTechnologyMaxLevel(technology));
+    }
+
+    private bool CanApplyKnowledgeSpPackage(KnowledgeSpPackageState package, TechnologyConfig technology, out string reason)
+    {
+        reason = "";
+        if (package == null || package.amountSp <= 0)
+        {
+            reason = "SP-пакет пуст.";
+            return false;
+        }
+
+        if (technology == null)
+        {
+            reason = "Знание не найдено.";
+            return false;
+        }
+
+        if (progress.IsTechnologyCompleted(technology.id))
+        {
+            reason = "Знание уже изучено.";
+            return false;
+        }
+
+        if (!IsKnowledgeAvailableForResearch(technology))
+        {
+            reason = "Сначала нужна книга/право на знание.";
+            return false;
+        }
+
+        if (!AreTechnologyPrerequisitesCompleted(technology, out reason))
+        {
+            return false;
+        }
+
+        string scope = string.IsNullOrWhiteSpace(package.scopeKind) ? "universal" : package.scopeKind.Trim().ToLowerInvariant();
+        if (scope == "universal")
+        {
+            return true;
+        }
+
+        if (scope == "category")
+        {
+            bool matches = string.Equals(package.scopeId, technology.categoryId, StringComparison.OrdinalIgnoreCase);
+            if (!matches) reason = "SP-пакет не подходит к рубрике знания.";
+            return matches;
+        }
+
+        if (scope == "tree" || scope == "branch")
+        {
+            bool matches = string.Equals(package.scopeId, technology.branch, StringComparison.OrdinalIgnoreCase);
+            if (!matches) reason = "SP-пакет не подходит к древу знания.";
+            return matches;
+        }
+
+        reason = "Неизвестный тип SP-пакета.";
+        return false;
     }
 
     private bool AreTechnologyPrerequisitesCompleted(TechnologyConfig technology, out string reason)
@@ -3494,7 +6115,7 @@ public partial class MetaGameState : MonoBehaviour
 
         if (!HasTechnologyCycleCost(storage, technology))
         {
-            reason = "На складе столицы не хватает ресурсов для цикла.";
+            reason = "На складе столицы не хватает ресурсов для уровня знания.";
             return false;
         }
 
@@ -3505,6 +6126,7 @@ public partial class MetaGameState : MonoBehaviour
             TechnologyCostConfig cost = technology.cycleCost[i];
             if (cost == null || string.IsNullOrWhiteSpace(cost.itemId) || cost.amount <= 0) continue;
             storage.TrySpendResource(cost.itemId, cost.amount);
+            AddQuestEventMetric("resource_spent", cost.itemId, cost.amount);
         }
 
         return true;
@@ -3735,10 +6357,9 @@ public partial class MetaGameState : MonoBehaviour
             ship.targetHeading = HeadingFromSortieVector(zone.centerPosition - entryState.position);
             ship.cruiseControl = false;
             ship.thrustInput = 1f;
-            ship.propellerPitch = 1f;
+            ship.hullThrustOutput = 1f;
             ship.sideInput = 0f;
             ship.turnInput = 0f;
-            ship.enginePowerLever = ship.CalculateEnginePowerLeverForPropellerEngagement(1f);
             ship.claudiumSlipstreamEnabled = true;
             ship.claudiumSlipstreamCharge01 = 1f;
         }
@@ -3768,16 +6389,10 @@ public partial class MetaGameState : MonoBehaviour
         SortieZoneDefinition zone = progress.activeSortie != null ? progress.activeSortie.zone : null;
         bool activeSortieReturn = zone != null;
         float returnPowerLever = activeSortieReturn ? zone.returnPowerLever : 0.7f;
-        string fuelId = ship != null && !string.IsNullOrWhiteSpace(ship.engineFuelId)
-            ? ship.engineFuelId
-            : GetStartingEngineFuelId();
+        string fuelId = ship != null && !string.IsNullOrWhiteSpace(ship.fuelResourceId)
+            ? ship.fuelResourceId
+            : GetStartingFuelId();
         string claudiumId = GetClaudiumResourceId(ship);
-        float fuelEnergyKwhPerKg = ship != null ? ship.engineFuelEnergyKwhPerKg : 4f;
-        ItemConfig fuel = sessionConfig != null ? sessionConfig.GetItem(fuelId) : null;
-        if (fuel != null && fuel.energyKwhPerKg > 0f)
-        {
-            fuelEnergyKwhPerKg = fuel.energyKwhPerKg;
-        }
 
         float emptyMassKg = capacity.emptyMassKg > 0f
             ? capacity.emptyMassKg
@@ -3785,25 +6400,18 @@ public partial class MetaGameState : MonoBehaviour
         float cruiseSpeedMS = activeSortieReturn && zone.returnCruiseSpeedMS > 0f
             ? zone.returnCruiseSpeedMS
             : 35f * Mathf.Clamp(returnPowerLever, 0.1f, 1f);
-        float enginePowerKw = ship != null ? ship.enginePowerKwAt100 : 0f;
-        float cruisePowerKw = activeSortieReturn
-            ? 0f
-            : enginePowerKw * Mathf.Clamp(returnPowerLever, 0.05f, 1.2f);
-        float claudiumConsumptionPerTonSecond = activeSortieReturn
-            ? 0f
-            : ship != null ? ship.claudiumConsumptionPerTonSecond : 0f;
+        float coalBurnKgPerSecond = ship != null
+            ? Mathf.Max(0f, ship.fuelConsumptionKgPerMinute) * ship.CurrentFuelConsumptionMultiplier / 60f
+            : 0f;
 
         return new SortieReturnProfile
         {
             emptyMassKg = emptyMassKg,
             cargoMassKg = progress.GetShipPayloadMassKg(sessionConfig),
             cruiseSpeedMS = cruiseSpeedMS,
-            enginePowerKw = enginePowerKw,
-            cruisePowerKw = cruisePowerKw,
-            engineFuelEfficiency = ship != null ? ship.engineFuelEfficiency : 0.32f,
-            fuelEnergyKwhPerKg = fuelEnergyKwhPerKg,
-            claudiumConsumptionPerTonSecond = claudiumConsumptionPerTonSecond,
-            currentCoalKg = progress.shipEngineFuelTank.GetAmount(fuelId),
+            coalBurnKgPerSecond = coalBurnKgPerSecond,
+            claudiumBurnKgPerSecond = 0f,
+            currentCoalKg = progress.shipFuelTank.GetAmount(fuelId),
             currentClaudiumKg = progress.shipClaudiumTank.GetAmount(claudiumId),
             coalResourceId = fuelId,
             claudiumResourceId = claudiumId
@@ -3858,6 +6466,7 @@ public partial class MetaGameState : MonoBehaviour
             if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0) continue;
 
             transferred += capitalStorage.AddResource(stack.resourceId, stack.amount);
+            AddQuestEventMetric("resource_acquired", stack.resourceId, stack.amount);
         }
 
         return transferred;
@@ -4054,10 +6663,19 @@ public partial class MetaGameState : MonoBehaviour
         progress.baseIndustry ??= new BaseExtractionIndustryState();
         progress.baseIndustry.Normalize();
         order.Normalize();
+        ApplyCascadeProductionLoad(order.loads);
+    }
 
-        for (int i = 0; i < order.loads.Count; i++)
+    private void ApplyCascadeProductionLoad(List<CascadeProductionLoad> loads)
+    {
+        if (progress == null || loads == null) return;
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+
+        for (int i = 0; i < loads.Count; i++)
         {
-            CascadeProductionLoad load = order.loads[i];
+            CascadeProductionLoad load = loads[i];
             if (load == null || load.loadUnits <= 0f) continue;
 
             CascadeProductionLineState line = progress.baseIndustry.GetProduction(load.type);
@@ -4065,17 +6683,38 @@ public partial class MetaGameState : MonoBehaviour
         }
     }
 
+    private readonly struct CourierResourceSpec
+    {
+        public readonly string itemId;
+        public readonly int minAmount;
+        public readonly int maxAmount;
+        public readonly int freightValue;
+
+        public CourierResourceSpec(string itemId, int minAmount, int maxAmount, int freightValue)
+        {
+            this.itemId = itemId ?? "";
+            this.minAmount = Mathf.Max(1, minAmount);
+            this.maxAmount = Mathf.Max(this.minAmount, maxAmount);
+            this.freightValue = Mathf.Max(1, freightValue);
+        }
+    }
+
     private static string BuildCascadeOutputsText(CascadeProductionOrderDefinition order)
     {
-        if (order == null || order.outputs == null || order.outputs.Count == 0)
+        return order != null ? BuildCascadeOutputsText(order.outputs) : "nothing";
+    }
+
+    private static string BuildCascadeOutputsText(List<CascadeItemAmount> outputs)
+    {
+        if (outputs == null || outputs.Count == 0)
         {
             return "nothing";
         }
 
         List<string> parts = new List<string>();
-        for (int i = 0; i < order.outputs.Count; i++)
+        for (int i = 0; i < outputs.Count; i++)
         {
-            CascadeItemAmount output = order.outputs[i];
+            CascadeItemAmount output = outputs[i];
             if (output == null || string.IsNullOrWhiteSpace(output.itemId) || output.amount <= 0) continue;
 
             parts.Add(output.itemId + " x" + output.amount);
@@ -4118,10 +6757,13 @@ public partial class MetaGameState : MonoBehaviour
             lastAccountMessage = message;
             return false;
         }
+        AddQuestEventMetric("resource_spent", kitItemId, 1);
 
         progress.InstallModule(slot.slotId, module.partId);
         ApplySelectedShip();
         RefreshRuntimeAccountIfDocked();
+        AddQuestEventMetric("ship_module_installed", module.partId, 1);
+        RefreshQuestProgress(true);
 
         message = successMessagePrefix + ": " + GetPartName(module) + ".";
         lastAccountMessage = message;
@@ -4323,7 +6965,7 @@ public partial class MetaGameState : MonoBehaviour
 
             info.assemblyValid = true;
             info.emptyMassKg = ship.baseMass;
-            info.engineLiftKg = CalculateEngineLiftKg(ship.enginePowerKwAt100, ship.claudiumLiftEfficiency);
+            info.liftCapacityKg = ship.claudiumMaxLiftKg;
             info.claudiumMaxLiftKg = ship.claudiumMaxLiftKg;
             info.hullLimitKg = ship.hullMaxTakeoffMassKg;
             return CompleteCargoCapacity(info);
@@ -4342,14 +6984,14 @@ public partial class MetaGameState : MonoBehaviour
         if (activeShip != null)
         {
             info.emptyMassKg = activeShip.baseMass;
-            info.engineLiftKg = CalculateEngineLiftKg(activeShip.enginePowerKwAt100, activeShip.claudiumLiftEfficiency);
+            info.liftCapacityKg = activeShip.claudiumMaxLiftKg;
             info.claudiumMaxLiftKg = activeShip.claudiumMaxLiftKg;
             info.hullLimitKg = activeShip.hullMaxTakeoffMassKg;
         }
         else
         {
             info.emptyMassKg = stats.Get(ShipStatId.BaseMass, 0f);
-            info.engineLiftKg = CalculateEngineLiftKg(stats.Get(ShipStatId.EngineMaxPower, 0f), stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f));
+            info.liftCapacityKg = stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f);
             info.claudiumMaxLiftKg = stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f);
             info.hullLimitKg = stats.Get(ShipStatId.HullMaxTakeoffMassKg, 2000f);
         }
@@ -4357,14 +6999,9 @@ public partial class MetaGameState : MonoBehaviour
         return CompleteCargoCapacity(info);
     }
 
-    private static float CalculateEngineLiftKg(float enginePowerKw, float liftKgPerKw)
-    {
-        return Mathf.Max(0f, enginePowerKw) * Mathf.Max(0f, liftKgPerKw);
-    }
-
     private CargoCapacityInfo CompleteCargoCapacity(CargoCapacityInfo info)
     {
-        info.allowedTakeoffMassKg = Mathf.Min(info.engineLiftKg, Mathf.Min(info.claudiumMaxLiftKg, info.hullLimitKg));
+        info.allowedTakeoffMassKg = Mathf.Min(info.liftCapacityKg, Mathf.Min(info.claudiumMaxLiftKg, info.hullLimitKg));
         info.maxCargoKg = Mathf.Max(0f, info.allowedTakeoffMassKg - info.emptyMassKg);
         info.fuelTankCapacityKg = ShipConsumableTankMath.CalculateFuelTankCapacityKg(info.maxCargoKg);
         info.claudiumTankCapacityKg = ShipConsumableTankMath.CalculateClaudiumTankCapacityKg(info.maxCargoKg);
@@ -4376,9 +7013,9 @@ public partial class MetaGameState : MonoBehaviour
 
         ClampPlayerConsumableTanks(ref info);
 
-        if (info.engineLiftKg <= 0f)
+        if (info.liftCapacityKg <= 0f)
         {
-            info.reason = "двигатель и контур не дают подъемной силы.";
+            info.reason = "клавдиевый контур не дает подъемной силы.";
             return info;
         }
 
@@ -4422,9 +7059,9 @@ public partial class MetaGameState : MonoBehaviour
     {
         if (progress == null) return;
 
-        progress.shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
+        progress.shipFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
         progress.shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
-        progress.shipEngineFuelTank.amountKg = Mathf.Min(progress.shipEngineFuelTank.amountKg, info.fuelTankCapacityKg);
+        progress.shipFuelTank.amountKg = Mathf.Min(progress.shipFuelTank.amountKg, info.fuelTankCapacityKg);
         progress.shipClaudiumTank.amountKg = Mathf.Min(progress.shipClaudiumTank.amountKg, info.claudiumTankCapacityKg);
         info.currentTankKg = progress.GetShipConsumableTankMassKg();
     }
@@ -4434,7 +7071,7 @@ public partial class MetaGameState : MonoBehaviour
         if (ship == null || progress == null) return;
 
         ApplyFuelConfigToShip(ship);
-        SyncTankResourceFromRuntime(progress.shipEngineFuelTank, ship.engineFuelId, ref syncedFuelResourceId, ref ship.engineFuelStockKg);
+        SyncTankResourceFromRuntime(progress.shipFuelTank, ship.fuelResourceId, ref syncedFuelResourceId, ref ship.fuelStockKg);
         string claudiumResourceId = GetClaudiumResourceId(ship);
         SyncTankResourceFromRuntime(progress.shipClaudiumTank, claudiumResourceId, ref syncedClaudiumResourceId, ref ship.claudiumStock);
         ship.cargoMassKg = Mathf.Max(0f, progress.GetShipPayloadMassKg(sessionConfig));
@@ -4445,15 +7082,14 @@ public partial class MetaGameState : MonoBehaviour
     {
         if (ship == null || progress == null) return;
 
-        ApplyFuelConfigToShip(ship);
         string claudiumResourceId = GetClaudiumResourceId(ship);
-        progress.shipEngineFuelTank.SetResource(ship.engineFuelId);
+        progress.shipFuelTank.SetResource(ship.fuelResourceId);
         progress.shipClaudiumTank.SetResource(claudiumResourceId);
 
-        if (resetRuntimeStock || syncedFuelResourceId != ship.engineFuelId)
+        if (resetRuntimeStock || syncedFuelResourceId != ship.fuelResourceId)
         {
-            syncedFuelResourceId = ship.engineFuelId;
-            ship.engineFuelStockKg = progress.shipEngineFuelTank.GetAmount(ship.engineFuelId);
+            syncedFuelResourceId = ship.fuelResourceId;
+            ship.fuelStockKg = progress.shipFuelTank.GetAmount(ship.fuelResourceId);
         }
 
         if (resetRuntimeStock || syncedClaudiumResourceId != claudiumResourceId)
@@ -4477,7 +7113,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         ApplyFuelConfigToShip(ship);
-        SyncTankResourceFromRuntime(progress.shipEngineFuelTank, ship.engineFuelId, ref syncedFuelResourceId, ref ship.engineFuelStockKg);
+        SyncTankResourceFromRuntime(progress.shipFuelTank, ship.fuelResourceId, ref syncedFuelResourceId, ref ship.fuelStockKg);
         string claudiumResourceId = GetClaudiumResourceId(ship);
         SyncTankResourceFromRuntime(progress.shipClaudiumTank, claudiumResourceId, ref syncedClaudiumResourceId, ref ship.claudiumStock);
 
@@ -4526,22 +7162,15 @@ public partial class MetaGameState : MonoBehaviour
             ApplyFuelConfigToShip(ship);
         }
 
-        fuelId = ship != null && !string.IsNullOrWhiteSpace(ship.engineFuelId)
-            ? ship.engineFuelId
-            : GetStartingEngineFuelId();
+        fuelId = ship != null && !string.IsNullOrWhiteSpace(ship.fuelResourceId)
+            ? ship.fuelResourceId
+            : GetStartingFuelId();
         claudiumId = GetClaudiumResourceId(ship);
     }
 
     private void ApplyFuelConfigToShip(ShipPhysics ship)
     {
-        if (ship == null || string.IsNullOrWhiteSpace(ship.engineFuelId)) return;
-
-        EnsureSessionConfigLoaded();
-        ItemConfig fuel = sessionConfig != null ? sessionConfig.GetItem(ship.engineFuelId) : null;
-        if (fuel != null)
-        {
-            ship.engineFuelEnergyKwhPerKg = Mathf.Max(0f, fuel.energyKwhPerKg);
-        }
+        if (ship == null || string.IsNullOrWhiteSpace(ship.fuelResourceId)) return;
     }
 
     private void ApplyStartingTechnologies()
@@ -4571,7 +7200,7 @@ public partial class MetaGameState : MonoBehaviour
         CargoCapacityInfo capacity = CalculateCargoCapacity();
         if (startingFuelKg > 0)
         {
-            progress.shipEngineFuelTank.Add(GetStartingEngineFuelId(), startingFuelKg, Mathf.Max(startingFuelKg, capacity.fuelTankCapacityKg));
+            progress.shipFuelTank.Add(GetStartingFuelId(), startingFuelKg, Mathf.Max(startingFuelKg, capacity.fuelTankCapacityKg));
         }
 
         if (startingClaudiumKg > 0)
@@ -4580,9 +7209,34 @@ public partial class MetaGameState : MonoBehaviour
         }
     }
 
-    private string GetStartingEngineFuelId()
+    private void AddStartingBaseProcessingSamples()
     {
-        string fuelId = shipLoader != null && shipLoader.targetShip != null ? shipLoader.targetShip.engineFuelId : "";
+        if (progress == null) return;
+
+        PortStorageState storage = progress.GetPortStorageState(GetCapitalPortId(), true);
+        if (storage == null) return;
+
+        storage.AddResource("windshale_ore", 90);
+        storage.AddResource("dawnspar_ore", 45);
+        storage.AddResource("cloud_condensate", 90);
+        storage.AddResource(SessionExtractionConstants.BrokenAutomatonItemId, 45);
+        storage.AddResource("windcalf_carcass", 75);
+        storage.AddResource(SessionExtractionConstants.RockInfoItemId, 45);
+    }
+
+    private void AddStartingBaseExpansionCurrency()
+    {
+        if (progress == null) return;
+
+        PortStorageState storage = progress.GetPortStorageState(GetCapitalPortId(), true);
+        if (storage == null) return;
+
+        storage.AddResource("freight", 125480);
+    }
+
+    private string GetStartingFuelId()
+    {
+        string fuelId = shipLoader != null && shipLoader.targetShip != null ? shipLoader.targetShip.fuelResourceId : "";
         return string.IsNullOrWhiteSpace(fuelId) ? "charcoal" : fuelId;
     }
 

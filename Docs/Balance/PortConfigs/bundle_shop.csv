@@ -1,0 +1,8 @@
+bundle_id,rotation,cost_solid,value_fe,value_ratio,contents_tags,limit_per_rotation,recharge_points,notes_ru
+daily_repair_small,daily,80,86000,1.34,repair;common_materials;freight,1,80,Менее выгодный ежедневный пакет.
+daily_field_small,daily,120,132000,1.38,field_consumables;water;fuel;tools,1,120,Закрывает текущие дефициты.
+daily_archive_small,daily,150,168000,1.40,sp_package;paper;relic,1,150,Малый исследовательский пакет.
+weekly_dock_stock,weekly,450,612000,1.70,repair;plates;mechanical;coupon,1,450,Еженедельный пакет заметно выгоднее daily.
+weekly_industry_stock,weekly,650,936000,1.80,industry;processed;speedup;sp_package,1,650,Большой промышленный пакет.
+weekly_event_boost,weekly,750,1125000,1.88,event_ticket;event_sail;resources,1,750,Когда идет корабельный ивент.
+rare_ship_crate,weekly_rare,1500,3000000,2.50,ship_instance;fragments;rare_materials,1,1500,Редкий крупный бандл; не всегда в ротации.

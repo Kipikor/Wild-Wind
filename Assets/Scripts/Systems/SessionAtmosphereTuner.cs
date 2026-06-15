@@ -1,10 +1,14 @@
+using System;
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.SceneManagement;
 public sealed class SessionAtmosphereTuner : MonoBehaviour
 {
     private const int DefaultRendererIndex = 0;
     private const int AeroRendererIndex = 1;
+    private const string DeadlyStormSurfaceObjectName = "Deadly Storm Surface Local Bubble";
+    private const string LegacyCloudSeaObjectName = "Cloud Sea";
 
     [Header("Ссылки")]
     [SerializeField, InspectorName("Камера")] private Camera visualCamera;
@@ -90,6 +94,51 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
     private int cachedRendererIndex = -1;
     private Material runtimeSkyboxFallbackMaterial;
     private int lastRuntimeApplyFrame = -1;
+
+    public bool IsLeanRuntimeAtmosphereActiveForTests => ShouldUseLeanRuntimeAtmosphere();
+    public int EnabledTrueCloudsBehaviourCountForTests
+    {
+        get
+        {
+            ResolvePerformanceReferences();
+            int count = 0;
+            if (cachedCameraBehaviours == null)
+            {
+                return count;
+            }
+
+            for (int i = 0; i < cachedCameraBehaviours.Length; i++)
+            {
+                Behaviour behaviour = cachedCameraBehaviours[i];
+                if (IsTrueCloudsBehaviour(behaviour) && behaviour.enabled)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+    }
+    public bool IsAeroFogControllerEnabledForTests
+    {
+        get
+        {
+            ResolvePerformanceReferences();
+            return cachedAeroFogController != null && cachedAeroFogController.enabled;
+        }
+    }
+    public bool IsCameraPostProcessingEnabledForTests
+    {
+        get
+        {
+            UniversalAdditionalCameraData cameraData = visualCamera != null
+                ? visualCamera.GetComponent<UniversalAdditionalCameraData>()
+                : null;
+            return cameraData != null && cameraData.renderPostProcessing;
+        }
+    }
+    public bool IsCameraUsingLeanRendererForTests => IsCameraUsingRenderer2D(visualCamera);
+    public string CameraRendererNameForTests => GetCameraRendererName(visualCamera);
 
     public void ConfigureReferences(
         Camera camera,
@@ -206,8 +255,11 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
 
         if (cloudSeaRoot == null)
         {
-            GameObject cloudSea = GameObject.Find("Cloud Sea");
-            cloudSeaRoot = cloudSea != null ? cloudSea.transform : null;
+            cloudSeaRoot = FindSceneTransformByName(DeadlyStormSurfaceObjectName);
+            if (cloudSeaRoot == null)
+            {
+                cloudSeaRoot = FindSceneTransformByName(LegacyCloudSeaObjectName);
+            }
         }
 
         if (cloudSeaMaterial == null && cloudSeaRoot != null)
@@ -421,6 +473,38 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
         SetFloat(cloudSeaMaterial, "_OffsetStrength", cloudSeaOffsetStrength);
     }
 
+    private static Transform FindSceneTransformByName(string objectName)
+    {
+        if (string.IsNullOrWhiteSpace(objectName))
+        {
+            return null;
+        }
+
+        GameObject activeObject = GameObject.Find(objectName);
+        if (activeObject != null)
+        {
+            return activeObject.transform;
+        }
+
+        Transform[] transforms = Resources.FindObjectsOfTypeAll<Transform>();
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform candidate = transforms[i];
+            if (candidate == null || candidate.name != objectName)
+            {
+                continue;
+            }
+
+            Scene scene = candidate.gameObject.scene;
+            if (scene.IsValid() && scene.isLoaded)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     private AltitudeAtmosphere BuildAltitudeAtmosphere()
     {
         float altitude = Mathf.Max(0f, GetWorldAltitude() - deadlyStormY);
@@ -556,20 +640,54 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
         return Application.isPlaying && leanRuntimeAtmosphere;
     }
 
+    private static bool IsCameraUsingRenderer2D(Camera camera)
+    {
+        string rendererName = GetCameraRendererName(camera);
+        return rendererName.IndexOf("Renderer2D", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static string GetCameraRendererName(Camera camera)
+    {
+        if (camera == null)
+        {
+            return "";
+        }
+
+        UniversalAdditionalCameraData cameraData = camera.GetComponent<UniversalAdditionalCameraData>();
+        if (cameraData == null || cameraData.scriptableRenderer == null)
+        {
+            return "";
+        }
+
+        return cameraData.scriptableRenderer.GetType().Name;
+    }
+
     private void ApplyExpensiveAtmosphereState()
     {
         bool leanRuntime = ShouldUseLeanRuntimeAtmosphere();
         ResolvePerformanceReferences();
+
+        UniversalAdditionalCameraData cameraData = visualCamera != null
+            ? visualCamera.GetComponent<UniversalAdditionalCameraData>()
+            : null;
+        if (cameraData != null)
+        {
+            cameraData.renderPostProcessing = !leanRuntime;
+            if (leanRuntime)
+            {
+                cameraData.requiresDepthTexture = false;
+                cameraData.requiresColorTexture = false;
+                cameraData.SetRenderer(DefaultRendererIndex);
+                cachedRendererIndex = DefaultRendererIndex;
+            }
+        }
 
         if (cachedCameraBehaviours != null && disableTrueCloudsInLeanRuntime)
         {
             for (int i = 0; i < cachedCameraBehaviours.Length; i++)
             {
                 Behaviour behaviour = cachedCameraBehaviours[i];
-                if (behaviour == null) continue;
-
-                System.Type type = behaviour.GetType();
-                if (type != null && type.FullName != null && type.FullName.StartsWith("TrueClouds."))
+                if (IsTrueCloudsBehaviour(behaviour))
                 {
                     behaviour.enabled = !leanRuntime && showClouds;
                 }
@@ -614,6 +732,17 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
                 return;
             }
         }
+    }
+
+    private static bool IsTrueCloudsBehaviour(Behaviour behaviour)
+    {
+        if (behaviour == null)
+        {
+            return false;
+        }
+
+        System.Type type = behaviour.GetType();
+        return type != null && type.FullName != null && type.FullName.StartsWith("TrueClouds.");
     }
 
     private static void SetFloat(Material material, string property, float value)

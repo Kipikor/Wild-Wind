@@ -5,14 +5,10 @@ using UnityEngine;
 public partial class SessionConfigDatabase
 {
     private readonly Dictionary<string, HullConfig> hullsById = new Dictionary<string, HullConfig>();
-    private readonly Dictionary<string, EngineConfig> enginesById = new Dictionary<string, EngineConfig>();
-    private readonly Dictionary<string, PropellerConfig> propellersById = new Dictionary<string, PropellerConfig>();
     private readonly Dictionary<string, ClaudiumLoopConfig> claudiumLoopsById = new Dictionary<string, ClaudiumLoopConfig>();
     private readonly Dictionary<string, ShipTreeEntryConfig> shipTreeEntriesById = new Dictionary<string, ShipTreeEntryConfig>();
 
     public List<HullConfig> hulls = new List<HullConfig>();
-    public List<EngineConfig> engines = new List<EngineConfig>();
-    public List<PropellerConfig> propellers = new List<PropellerConfig>();
     public List<ClaudiumLoopConfig> claudiumLoops = new List<ClaudiumLoopConfig>();
     public List<ShipTreeEntryConfig> shipTreeEntries = new List<ShipTreeEntryConfig>();
 
@@ -21,20 +17,6 @@ public partial class SessionConfigDatabase
         if (string.IsNullOrWhiteSpace(hullId)) return null;
         hullsById.TryGetValue(hullId, out HullConfig hull);
         return hull;
-    }
-
-    public EngineConfig GetEngine(string engineId)
-    {
-        if (string.IsNullOrWhiteSpace(engineId)) return null;
-        enginesById.TryGetValue(engineId, out EngineConfig engine);
-        return engine;
-    }
-
-    public PropellerConfig GetPropeller(string propellerId)
-    {
-        if (string.IsNullOrWhiteSpace(propellerId)) return null;
-        propellersById.TryGetValue(propellerId, out PropellerConfig propeller);
-        return propeller;
     }
 
     public ClaudiumLoopConfig GetClaudiumLoop(string loopId)
@@ -54,13 +36,9 @@ public partial class SessionConfigDatabase
     private void ClearShipPartConfigs()
     {
         hulls.Clear();
-        engines.Clear();
-        propellers.Clear();
         claudiumLoops.Clear();
         shipTreeEntries.Clear();
         hullsById.Clear();
-        enginesById.Clear();
-        propellersById.Clear();
         claudiumLoopsById.Clear();
         shipTreeEntriesById.Clear();
     }
@@ -95,55 +73,16 @@ public partial class SessionConfigDatabase
                 headingDamping = Mathf.Max(0f, ParseFloat(Get(row, "heading_damping"))),
                 speedStiffness = Mathf.Max(0f, ParseFloat(Get(row, "speed_stiffness"))),
                 speedDamping = Mathf.Max(0f, ParseFloat(Get(row, "speed_damping"))),
-                structureHp = Mathf.Max(0f, ParseFloat(Get(row, "structure_hp")))
+                structureHp = Mathf.Max(0f, ParseFloat(Get(row, "structure_hp"))),
+                hullForwardThrustKgf = Mathf.Max(0f, ParseFloat(Get(row, "hull_forward_thrust_kgf"), 1200f)),
+                hullCruiseReferenceSpeedMS = Mathf.Max(1f, ParseFloat(Get(row, "hull_cruise_reference_speed_ms"), 30f)),
+                fuelConsumptionKgPerMinute = Mathf.Max(0f, ParseFloat(Get(row, "fuel_consumption_kg_per_minute"), 1.2f)),
+                fuelResourceId = string.IsNullOrWhiteSpace(Get(row, "fuel_resource_id")) ? "charcoal" : Get(row, "fuel_resource_id")
             };
 
             if (string.IsNullOrWhiteSpace(hull.id)) continue;
             hulls.Add(hull);
             hullsById[hull.id] = hull;
-        }
-    }
-
-    private void LoadEngines(string path)
-    {
-        foreach (Dictionary<string, string> row in ReadCsv(path))
-        {
-            EngineConfig engine = new EngineConfig
-            {
-                id = Get(row, "id_engine"),
-                localNameRu = Get(row, "local_name_ru"),
-                localNameEn = Get(row, "local_name_en"),
-                completedTechId = Get(row, "complited_tech"),
-                baseMassKg = Mathf.Max(0f, ParseFloat(Get(row, "base_mass_kg"))),
-                fuelId = Get(row, "fuel_id"),
-                maxPowerKw = Mathf.Max(0f, ParseFloat(Get(row, "max_power_kw"))),
-                fuelEfficiency = Mathf.Clamp01(ParseFloat(Get(row, "fuel_efficiency")))
-            };
-
-            if (string.IsNullOrWhiteSpace(engine.id)) continue;
-            engines.Add(engine);
-            enginesById[engine.id] = engine;
-        }
-    }
-
-    private void LoadPropellers(string path)
-    {
-        foreach (Dictionary<string, string> row in ReadCsv(path))
-        {
-            PropellerConfig propeller = new PropellerConfig
-            {
-                id = Get(row, "id_propeller"),
-                localNameRu = Get(row, "local_name_ru"),
-                localNameEn = Get(row, "local_name_en"),
-                completedTechId = Get(row, "complited_tech"),
-                baseMassKg = Mathf.Max(0f, ParseFloat(Get(row, "base_mass_kg"))),
-                maxSpeedMS = Mathf.Max(0f, ParseFloat(Get(row, "max_speed_ms"))),
-                efficiency = Mathf.Clamp01(ParseFloat(Get(row, "efficiency")))
-            };
-
-            if (string.IsNullOrWhiteSpace(propeller.id)) continue;
-            propellers.Add(propeller);
-            propellersById[propeller.id] = propeller;
         }
     }
 
@@ -158,10 +97,7 @@ public partial class SessionConfigDatabase
                 localNameEn = Get(row, "local_name_en"),
                 completedTechId = Get(row, "complited_tech"),
                 baseMassKg = Mathf.Max(0f, ParseFloat(Get(row, "base_mass_kg"))),
-                claudiumConsumptionPerTonSecond = Mathf.Max(0f, ParseFloat(Get(row, "claudium_consumption_per_ton_second"))),
-                liftKgPerKw = Mathf.Max(0f, ParseFloat(Get(row, "lift_kg_per_kw"))),
-                maxLiftKg = Mathf.Max(0f, ParseFloat(Get(row, "max_lift_kg"))),
-                liftSmoothing = Mathf.Max(0f, ParseFloat(Get(row, "lift_smoothing")))
+                maxLiftKg = Mathf.Max(0f, ParseFloat(Get(row, "max_lift_kg")))
             };
 
             if (string.IsNullOrWhiteSpace(loop.id)) continue;
@@ -180,22 +116,69 @@ public partial class SessionConfigDatabase
                 localNameRu = Get(row, "local_name_ru"),
                 localNameEn = Get(row, "local_name_en"),
                 rank = Mathf.Max(0, ParseInt(Get(row, "rank"), 0)),
+                factionId = Get(row, "faction_id"),
+                factionNameRu = Get(row, "faction_name_ru"),
+                shipClassId = Get(row, "ship_class_id"),
+                shipClassNameRu = Get(row, "ship_class_name_ru"),
                 classNameRu = Get(row, "class_name_ru"),
                 roleId = Get(row, "role_id"),
                 roleNameRu = Get(row, "role_name_ru"),
+                catalogScope = Get(row, "catalog_scope"),
+                branchId = Get(row, "branch_id"),
+                branchNameRu = Get(row, "branch_name_ru"),
+                treeTier = Mathf.Clamp(ParseInt(Get(row, "tree_tier"), 0), 0, 10),
+                treeRow = Mathf.Max(0, ParseInt(Get(row, "tree_row"), 0)),
                 requiredTechnologyId = Get(row, "required_technology"),
                 hullId = Get(row, "hull_id"),
-                engineId = Get(row, "engine_id"),
-                propellerId = Get(row, "propeller_id"),
                 claudiumLoopId = Get(row, "claudium_loop_id"),
                 specialModuleId = Get(row, "special_module_id"),
+                visualModelId = Get(row, "visual_model_id"),
+                visualShapeId = Get(row, "visual_shape_id"),
+                visualColor = ParseColor(Get(row, "visual_color_hex"), new Color(0.42f, 0.62f, 0.78f, 1f)),
+                costCurrencyItemId = Get(row, "cost_currency_item"),
+                costAmount = Mathf.Max(0, ParseInt(Get(row, "cost_amount"), 0)),
+                firepower = Mathf.Max(0, ParseInt(Get(row, "firepower"), 0)),
+                armor = Mathf.Max(0, ParseInt(Get(row, "armor"), 0)),
+                durability = Mathf.Max(0, ParseInt(Get(row, "durability"), 0)),
+                speed = Mathf.Max(0, ParseInt(Get(row, "speed"), 0)),
+                maneuverability = Mathf.Max(0, ParseInt(Get(row, "maneuverability"), 0)),
+                cargo = Mathf.Max(0, ParseInt(Get(row, "cargo"), 0)),
+                utility = Mathf.Max(0, ParseInt(Get(row, "utility"), 0)),
                 summaryRu = Get(row, "summary_ru")
             };
 
+            if (string.IsNullOrWhiteSpace(entry.shipClassNameRu))
+            {
+                entry.shipClassNameRu = entry.classNameRu;
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.classNameRu))
+            {
+                entry.classNameRu = entry.shipClassNameRu;
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.visualShapeId) && !string.IsNullOrWhiteSpace(entry.visualModelId))
+            {
+                entry.visualShapeId = "square";
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.branchId) && entry.IsDevelopmentRosterShip)
+            {
+                entry.branchId = string.IsNullOrWhiteSpace(entry.shipClassId) ? "ship_line" : entry.shipClassId + "_line";
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.branchNameRu))
+            {
+                entry.branchNameRu = entry.ClassDisplayNameRu;
+            }
+
+            if (entry.treeTier <= 0)
+            {
+                entry.treeTier = entry.rank > 0 ? Mathf.Clamp(entry.rank, 1, 10) : 1;
+            }
+
             entry.parentShipIds.AddRange(SplitInlineList(Get(row, "parent_ship_id")));
             entry.upgradeHullIds.AddRange(SplitInlineList(Get(row, "upgrade_hull_id")));
-            entry.upgradeEngineIds.AddRange(SplitInlineList(Get(row, "upgrade_engine_id")));
-            entry.upgradePropellerIds.AddRange(SplitInlineList(Get(row, "upgrade_propeller_id")));
             entry.upgradeClaudiumLoopIds.AddRange(SplitInlineList(Get(row, "upgrade_claudium_loop_id")));
             entry.upgradeSpecialModuleIds.AddRange(SplitInlineList(Get(row, "upgrade_special_module_id")));
 
@@ -233,33 +216,10 @@ public class HullConfig
     public float speedStiffness;
     public float speedDamping;
     public float structureHp;
-
-    public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
-}
-
-public class EngineConfig
-{
-    public string id = "";
-    public string localNameRu = "";
-    public string localNameEn = "";
-    public string completedTechId = "";
-    public float baseMassKg;
-    public string fuelId = "";
-    public float maxPowerKw;
-    public float fuelEfficiency;
-
-    public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
-}
-
-public class PropellerConfig
-{
-    public string id = "";
-    public string localNameRu = "";
-    public string localNameEn = "";
-    public string completedTechId = "";
-    public float baseMassKg;
-    public float maxSpeedMS;
-    public float efficiency;
+    public float hullForwardThrustKgf = 1200f;
+    public float hullCruiseReferenceSpeedMS = 30f;
+    public float fuelConsumptionKgPerMinute = 1.2f;
+    public string fuelResourceId = "charcoal";
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }
@@ -271,10 +231,7 @@ public class ClaudiumLoopConfig
     public string localNameEn = "";
     public string completedTechId = "";
     public float baseMassKg;
-    public float claudiumConsumptionPerTonSecond;
-    public float liftKgPerKw;
     public float maxLiftKg;
-    public float liftSmoothing;
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
 }
@@ -285,22 +242,45 @@ public class ShipTreeEntryConfig
     public string localNameRu = "";
     public string localNameEn = "";
     public int rank;
+    public string factionId = "";
+    public string factionNameRu = "";
+    public string shipClassId = "";
+    public string shipClassNameRu = "";
     public string classNameRu = "";
     public string roleId = "";
     public string roleNameRu = "";
+    public string catalogScope = "";
+    public string branchId = "";
+    public string branchNameRu = "";
+    public int treeTier;
+    public int treeRow;
     public List<string> parentShipIds = new List<string>();
     public string requiredTechnologyId = "";
     public string hullId = "";
-    public string engineId = "";
-    public string propellerId = "";
     public string claudiumLoopId = "";
     public string specialModuleId = "";
     public List<string> upgradeHullIds = new List<string>();
-    public List<string> upgradeEngineIds = new List<string>();
-    public List<string> upgradePropellerIds = new List<string>();
     public List<string> upgradeClaudiumLoopIds = new List<string>();
     public List<string> upgradeSpecialModuleIds = new List<string>();
+    public string visualModelId = "";
+    public string visualShapeId = "";
+    public Color visualColor = Color.white;
+    public string costCurrencyItemId = "";
+    public int costAmount;
+    public int firepower;
+    public int armor;
+    public int durability;
+    public int speed;
+    public int maneuverability;
+    public int cargo;
+    public int utility;
     public string summaryRu = "";
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? shipId : localNameRu;
+    public string FactionDisplayNameRu => string.IsNullOrWhiteSpace(factionNameRu) ? factionId : factionNameRu;
+    public string ClassDisplayNameRu => string.IsNullOrWhiteSpace(shipClassNameRu) ? classNameRu : shipClassNameRu;
+    public string BranchDisplayNameRu => string.IsNullOrWhiteSpace(branchNameRu) ? ClassDisplayNameRu : branchNameRu;
+    public bool IsDevelopmentRosterShip => !string.IsNullOrWhiteSpace(factionId) || catalogScope == "development";
+    public bool HasRuntimeHull => !string.IsNullOrWhiteSpace(hullId);
+    public int TotalStatScore => firepower + armor + durability + speed + maneuverability + cargo + utility;
 }

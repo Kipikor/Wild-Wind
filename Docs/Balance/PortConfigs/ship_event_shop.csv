@@ -1,0 +1,9 @@
+offer_id,event_id,cost_currency,cost_amount,limit,reward_id,reward_amount,value_fe,notes_ru
+seeker_shop_frag_r4,ship_event_seeker,event_sail,40,60,seeker_r4_fragment,1,1200,Полный ранний корабль за активное участие.
+seeker_shop_frag_r8,ship_event_seeker,event_sail,95,120,seeker_r8_fragment,1,4200,Большая цель почти полного закрытия.
+seeker_shop_ticket_pack,ship_event_seeker,event_sail,250,6,event_ticket,3,2700,Обмен валюты на рулетку.
+seeker_shop_repair_pack,ship_event_seeker,event_sail,300,4,repair_common_pack,1,30000,Портовые материалы.
+seeker_shop_sp_pack,ship_event_seeker,event_sail,500,3,sp_5000_any,1,2100,SP-награда; ценность не только FE.
+seeker_shop_coupon,ship_event_seeker,event_sail,650,1,coupon_event_25,1,0,Планирование дорогой покупки.
+seeker_shop_recipe_frag,ship_event_seeker,event_sail,1200,10,seeker_recipe_fragment,1,25000,Дорога к повторяемому рецепту.
+seeker_shop_solid_offer,ship_event_seeker,solid,300,3,event_ticket,12,10800,Платная внутриигровая поддержка события.

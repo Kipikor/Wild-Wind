@@ -1,0 +1,17 @@
+relic_id,class,local_name_ru,typical_weight_kg,knowledge_books,book_fragments,archive_scraps,sp_500,sp_2000,sp_5000,blueprint_fragments,full_blueprints,one_time_recipes,coupons,charts,dossiers,cipher_keys,collection_sheets,trade_licenses,notes_ru
+cracked_tablet,cheap,Треснувшая табличка,35,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,Ранний малый носитель.
+sealed_tube,cheap,Запечатанная туба,45,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,Лоция и фрагмент.
+ore_case,cheap,Рудный футляр,80,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,Может выпадать из глыб.
+counting_plank,medium,Счетная планка,90,0,0,0,2,0,0,0,0,0,1,0,0,0,0,0,SP и купон.
+cipher_cassette,medium,Шифровальная кассета,160,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,Ключ шифра.
+archive_suitcase,medium,Архивный чемодан,180,0,0,0,0,0,0,0,0,0,2,0,1,0,1,0,Досье и коллекция.
+stone_codex,medium,Каменный кодекс,220,1,2,0,0,1,0,0,0,0,0,0,0,0,0,0,Книга знания.
+blueprint_tube,medium,Чертежный тубус,240,0,0,0,0,0,0,3,0,1,0,0,0,0,0,0,Чертежи.
+brass_catalog,medium,Латунная картотека,300,0,0,0,0,0,0,2,0,0,0,0,1,0,0,1,Торговая лицензия.
+precursor_logbook,medium,Бортовой журнал предтеч,320,1,0,0,0,0,0,0,0,0,0,1,2,0,0,0,Сюжетная ценность.
+pilot_globe,valuable,Лоцийный глобус,420,0,0,0,0,1,0,0,0,0,1,2,0,0,0,0,Маршруты.
+chronograph_cabinet,valuable,Хронографический шкаф,650,1,0,0,0,0,1,0,0,0,2,0,0,0,0,0,Книга и SP.
+library_slab,valuable,Библиотечная плита,900,2,3,0,0,0,0,0,0,0,0,0,0,0,2,0,Тяжелая но мощная.
+captain_protocol,expensive,Капитанский протокол,700,0,0,0,0,0,0,0,1,0,0,0,3,1,0,1,Полный чертеж и лицензия.
+archive_sarcophagus,expensive,Архивный саркофаг,1800,3,0,0,0,0,0,4,0,0,3,0,0,2,0,0,Очень тяжелый.
+machine_library,expensive,Машинная библиотека,2500,2,0,0,0,0,2,0,1,2,0,0,0,0,0,2,Дорогая верхняя находка.

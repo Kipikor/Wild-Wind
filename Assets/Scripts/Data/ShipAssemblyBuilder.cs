@@ -224,51 +224,11 @@ public static class ShipAssemblyBuilder
                 part.displayName = hullConfig.DisplayNameRu;
                 part.description = "CSV hull config.";
                 part.completedTechId = hullConfig.completedTechId ?? "";
-                part.engineFuelId = "";
+                part.fuelResourceId = string.IsNullOrWhiteSpace(hullConfig.fuelResourceId) ? "charcoal" : hullConfig.fuelResourceId;
                 part.compatibleSlotTypeIds = new List<string>();
                 part.grantedSlots = new List<ShipSlotDefinition>();
                 part.slots = BuildHullSlots(hullConfig, config);
                 part.statModifiers = BuildHullStatModifiers(hullConfig);
-                applied++;
-            }
-        }
-
-        if (config.engines != null)
-        {
-            for (int i = 0; i < config.engines.Count; i++)
-            {
-                EngineConfig engineConfig = config.engines[i];
-                if (engineConfig == null || string.IsNullOrWhiteSpace(engineConfig.id)) continue;
-
-                ShipPartDefinitionSO part = GetOrCreateCatalogPart(catalog, engineConfig.id, ShipPartKind.Module);
-                part.displayName = engineConfig.DisplayNameRu;
-                part.description = "CSV engine config.";
-                part.completedTechId = engineConfig.completedTechId ?? "";
-                part.engineFuelId = engineConfig.fuelId ?? "";
-                part.slots = new List<ShipSlotDefinition>();
-                part.compatibleSlotTypeIds = new List<string> { "engine_main" };
-                part.grantedSlots = new List<ShipSlotDefinition>();
-                part.statModifiers = BuildEngineStatModifiers(engineConfig);
-                applied++;
-            }
-        }
-
-        if (config.propellers != null)
-        {
-            for (int i = 0; i < config.propellers.Count; i++)
-            {
-                PropellerConfig propellerConfig = config.propellers[i];
-                if (propellerConfig == null || string.IsNullOrWhiteSpace(propellerConfig.id)) continue;
-
-                ShipPartDefinitionSO part = GetOrCreateCatalogPart(catalog, propellerConfig.id, ShipPartKind.Module);
-                part.displayName = propellerConfig.DisplayNameRu;
-                part.description = "CSV propeller config.";
-                part.completedTechId = propellerConfig.completedTechId ?? "";
-                part.engineFuelId = "";
-                part.slots = new List<ShipSlotDefinition>();
-                part.compatibleSlotTypeIds = new List<string> { "propeller_main" };
-                part.grantedSlots = new List<ShipSlotDefinition>();
-                part.statModifiers = BuildPropellerStatModifiers(propellerConfig);
                 applied++;
             }
         }
@@ -284,7 +244,7 @@ public static class ShipAssemblyBuilder
                 part.displayName = loopConfig.DisplayNameRu;
                 part.description = "CSV claudium loop config.";
                 part.completedTechId = loopConfig.completedTechId ?? "";
-                part.engineFuelId = "";
+                part.fuelResourceId = "";
                 part.slots = new List<ShipSlotDefinition>();
                 part.compatibleSlotTypeIds = new List<string> { "claudium_loop" };
                 part.grantedSlots = new List<ShipSlotDefinition>();
@@ -325,7 +285,7 @@ public static class ShipAssemblyBuilder
             }
 
             part.completedTechId = moduleConfig.completedTechId ?? "";
-            part.engineFuelId = "";
+            part.fuelResourceId = "";
             part.slots = new List<ShipSlotDefinition>();
             part.compatibleSlotTypeIds = new List<string>();
             if (moduleConfig.compatibleSlotTypeIds != null)
@@ -370,11 +330,7 @@ public static class ShipAssemblyBuilder
         List<ShipSlotDefinition> slots = new List<ShipSlotDefinition>();
         if (hullConfig == null) return slots;
 
-        string engineId = hullConfig.id == "starter_hull" ? "starter_engine" : "";
-        string propellerId = hullConfig.id == "starter_hull" ? "starter_propeller" : "";
         string claudiumLoopId = hullConfig.id == "starter_hull" ? "starter_claudium_loop" : "";
-        slots.Add(CreateRequiredSlot("engine_main", "Main engine", "engine_main", engineId));
-        slots.Add(CreateRequiredSlot("propeller_main", "Propeller", "propeller_main", propellerId));
         slots.Add(CreateRequiredSlot("claudium_loop", "Claudium loop", "claudium_loop", claudiumLoopId));
         AddSessionExtractionSlots(slots);
         return slots;
@@ -459,6 +415,9 @@ public static class ShipAssemblyBuilder
 
         AddStat(modifiers, ShipStatId.BaseMass, ShipStatOperation.Set, hullConfig.baseMassKg);
         AddStat(modifiers, ShipStatId.HullMaxTakeoffMassKg, ShipStatOperation.Set, hullConfig.hullMaxTakeoffMassKg);
+        AddStat(modifiers, ShipStatId.HullForwardThrustKgf, ShipStatOperation.Set, hullConfig.hullForwardThrustKgf);
+        AddStat(modifiers, ShipStatId.HullCruiseReferenceSpeedMS, ShipStatOperation.Set, hullConfig.hullCruiseReferenceSpeedMS);
+        AddStat(modifiers, ShipStatId.FuelConsumptionKgPerMinute, ShipStatOperation.Set, hullConfig.fuelConsumptionKgPerMinute);
         AddStat(modifiers, ShipStatId.AirDensity, ShipStatOperation.Set, hullConfig.airDensity);
         AddStat(modifiers, ShipStatId.DragCoefficient, ShipStatOperation.Set, hullConfig.dragCoefficient);
         AddStat(modifiers, ShipStatId.FrontalArea, ShipStatOperation.Set, hullConfig.frontalAreaM2);
@@ -481,38 +440,13 @@ public static class ShipAssemblyBuilder
         return modifiers;
     }
 
-    private static List<ShipStatModifier> BuildEngineStatModifiers(EngineConfig engineConfig)
-    {
-        List<ShipStatModifier> modifiers = new List<ShipStatModifier>();
-        if (engineConfig == null) return modifiers;
-
-        AddStat(modifiers, ShipStatId.BaseMass, ShipStatOperation.Add, engineConfig.baseMassKg);
-        AddStat(modifiers, ShipStatId.EngineMaxPower, ShipStatOperation.Set, engineConfig.maxPowerKw);
-        AddStat(modifiers, ShipStatId.EngineFuelEfficiency, ShipStatOperation.Set, engineConfig.fuelEfficiency);
-        return modifiers;
-    }
-
-    private static List<ShipStatModifier> BuildPropellerStatModifiers(PropellerConfig propellerConfig)
-    {
-        List<ShipStatModifier> modifiers = new List<ShipStatModifier>();
-        if (propellerConfig == null) return modifiers;
-
-        AddStat(modifiers, ShipStatId.BaseMass, ShipStatOperation.Add, propellerConfig.baseMassKg);
-        AddStat(modifiers, ShipStatId.PropellerMaxSpeedMS, ShipStatOperation.Set, propellerConfig.maxSpeedMS);
-        AddStat(modifiers, ShipStatId.PropellerEfficiency, ShipStatOperation.Set, propellerConfig.efficiency);
-        return modifiers;
-    }
-
     private static List<ShipStatModifier> BuildClaudiumLoopStatModifiers(ClaudiumLoopConfig loopConfig)
     {
         List<ShipStatModifier> modifiers = new List<ShipStatModifier>();
         if (loopConfig == null) return modifiers;
 
         AddStat(modifiers, ShipStatId.BaseMass, ShipStatOperation.Add, loopConfig.baseMassKg);
-        AddStat(modifiers, ShipStatId.ClaudiumConsumptionPerTonSecond, ShipStatOperation.Set, loopConfig.claudiumConsumptionPerTonSecond);
-        AddStat(modifiers, ShipStatId.ClaudiumLiftEfficiency, ShipStatOperation.Set, loopConfig.liftKgPerKw);
         AddStat(modifiers, ShipStatId.ClaudiumMaxLiftKg, ShipStatOperation.Set, loopConfig.maxLiftKg);
-        AddStat(modifiers, ShipStatId.ClaudiumLiftSmoothing, ShipStatOperation.Set, loopConfig.liftSmoothing);
         return modifiers;
     }
 
@@ -601,24 +535,24 @@ public class ShipStatBlock
     private readonly Dictionary<ShipStatId, float> addValues = new Dictionary<ShipStatId, float>();
     private readonly Dictionary<ShipStatId, float> multiplyValues = new Dictionary<ShipStatId, float>();
     private readonly HashSet<ShipStatId> setStats = new HashSet<ShipStatId>();
-    private string engineFuelId = "";
+    private string fuelResourceId = "";
 
-    public string EngineFuelId => engineFuelId;
+    public string FuelResourceId => fuelResourceId;
 
     public bool ApplyPart(ShipPartDefinitionSO part, out string error)
     {
         error = "";
         if (part == null) return true;
 
-        if (!string.IsNullOrWhiteSpace(part.engineFuelId))
+        if (!string.IsNullOrWhiteSpace(part.fuelResourceId))
         {
-            if (!string.IsNullOrWhiteSpace(engineFuelId) && engineFuelId != part.engineFuelId)
+            if (!string.IsNullOrWhiteSpace(fuelResourceId) && fuelResourceId != part.fuelResourceId)
             {
-                error = "Тип топлива двигателя задан несколькими деталями: " + engineFuelId + " и " + part.engineFuelId;
+                error = "Топливо корпуса задано несколькими деталями: " + fuelResourceId + " и " + part.fuelResourceId;
                 return false;
             }
 
-            engineFuelId = part.engineFuelId;
+            fuelResourceId = part.fuelResourceId;
         }
 
         if (part.statModifiers == null) return true;
@@ -677,8 +611,8 @@ public class ShipStatBlock
         ship.baseMass = Mathf.Max(1f, Get(ShipStatId.BaseMass, ship.baseMass));
         ship.hullMaxTakeoffMassKg = Mathf.Max(1f, Get(ShipStatId.HullMaxTakeoffMassKg, ship.hullMaxTakeoffMassKg));
         ship.targetTrimMass = Mathf.Max(1f, Get(ShipStatId.TargetTrimMass, ship.baseMass));
-        ship.propellerMaxSpeedMS = Mathf.Max(0f, Get(ShipStatId.PropellerMaxSpeedMS, ship.propellerMaxSpeedMS));
-        ship.propellerEfficiency = Mathf.Max(0f, Get(ShipStatId.PropellerEfficiency, 0f));
+        ship.hullCruiseReferenceSpeedMS = Mathf.Max(1f, Get(ShipStatId.HullCruiseReferenceSpeedMS, ship.hullCruiseReferenceSpeedMS));
+        ship.baseMaxSpeedMS = ship.hullCruiseReferenceSpeedMS;
         ship.airDensity = Mathf.Max(0.01f, Get(ShipStatId.AirDensity, 1.225f));
         ship.dragCoefficient = Mathf.Max(0f, Get(ShipStatId.DragCoefficient, 0f));
         ship.frontalArea = Mathf.Max(0f, Get(ShipStatId.FrontalArea, 0f));
@@ -697,18 +631,15 @@ public class ShipStatBlock
         ship.headingDamping = Mathf.Max(0f, Get(ShipStatId.HeadingDamping, ship.headingDamping));
         ship.speedStiffness = Mathf.Max(0f, Get(ShipStatId.SpeedStiffness, ship.speedStiffness));
         ship.speedDamping = Mathf.Max(0f, Get(ShipStatId.SpeedDamping, ship.speedDamping));
-        ship.claudiumConsumptionPerTonSecond = Mathf.Max(0f, Get(ShipStatId.ClaudiumConsumptionPerTonSecond, 0f));
-        ship.claudiumLiftEfficiency = Mathf.Max(0f, Get(ShipStatId.ClaudiumLiftEfficiency, 0f));
         ship.claudiumMaxLiftKg = Mathf.Max(0f, Get(ShipStatId.ClaudiumMaxLiftKg, 0f));
-        ship.claudiumLiftSmoothing = Mathf.Max(0f, Get(ShipStatId.ClaudiumLiftSmoothing, 0f));
 
-        if (!string.IsNullOrWhiteSpace(engineFuelId))
+        if (!string.IsNullOrWhiteSpace(fuelResourceId))
         {
-            ship.engineFuelId = engineFuelId;
+            ship.fuelResourceId = fuelResourceId;
         }
 
-        ship.enginePowerKwAt100 = Mathf.Max(0f, Get(ShipStatId.EngineMaxPower, ship.enginePowerKwAt100));
-        ship.engineFuelEfficiency = Mathf.Clamp(Get(ShipStatId.EngineFuelEfficiency, ship.engineFuelEfficiency), 0.01f, 0.95f);
+        ship.hullForwardThrustKgf = Mathf.Max(0f, Get(ShipStatId.HullForwardThrustKgf, ship.hullForwardThrustKgf));
+        ship.fuelConsumptionKgPerMinute = Mathf.Max(0f, Get(ShipStatId.FuelConsumptionKgPerMinute, ship.fuelConsumptionKgPerMinute));
         ship.miningImpactHoldCapacityKg = Mathf.Max(0f, Get(ShipStatId.MiningImpactHoldCapacityKg, 0f));
         ship.miningImpactDamageTakenMultiplier = Mathf.Max(0f, Get(ShipStatId.MiningImpactDamageTakenMultiplier, ship.miningImpactDamageTakenMultiplier));
         DamageableShip damageableShip = ship.GetComponentInParent<DamageableShip>();

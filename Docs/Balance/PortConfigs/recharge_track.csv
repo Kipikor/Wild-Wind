@@ -1,0 +1,8 @@
+track_id,milestone_points,reward_item,reward_amount,value_fe,notes_ru
+weekly_repair,100,repair_common_pack,1,30000,Ранний кэшбэк.
+weekly_repair,250,freight,35000,35000,Немного прямой валюты.
+weekly_repair,500,repair_rare_pack,1,90000,Средняя ступень.
+weekly_repair,900,sp_5000_any,1,2100,SP как дополнительная польза; FE низкий намеренно.
+weekly_repair,1400,coupon_solid_10,1,0,Купон экономит будущий солид.
+weekly_repair,2200,ship_fragment_event,25,180000,Глубокая награда без обязательности.
+weekly_repair,3200,one_time_t2_recipe,1,500000,Очень глубокий редкий приз.

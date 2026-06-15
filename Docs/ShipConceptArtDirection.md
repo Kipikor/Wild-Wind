@@ -28,7 +28,7 @@ Full lore and doctrine notes live in `Docs/SupplierShipDoctrinesDraft.md`. This 
 
 | Supplier | Visual read |
 |---|---|
-| Kilvater Chamber | Sturdy port-service hulls, tug frames, searchlights, rescue markings, thick keels, emergency hatches, cranes and service doors. |
+| Kilvater Chamber | Classic flying naval ships: large armored hulls, broad decks, visible armor belts, gun turrets, casemates, heavy keels, readable standard artillery lines. |
 | Vysotniki | Long light hulls, exposed structural frames, extended claudium rails, altitude marks, worn leading edges, warning stripes, low spare volume. |
 | Rudnye Arteli | Top crushers, ore mouths, reinforced work decks, ore chutes, heavy noses, replaceable teeth, dust, chips, conveyors, tool-guns. |
 | Kaptazh Workshops | Condensers, smoke combs, nozzles, side tanks, chemical stains, soot, drone lockers, cloud machinery as the main silhouette. |

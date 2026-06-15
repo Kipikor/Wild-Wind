@@ -1,4 +1,4 @@
-id_gas_condensate_type,local_name_ru,local_name_en,condensate_item,condensate_l_per_m3,color_hex,composition_id_item,composition_share
+﻿id_gas_condensate_type,local_name_ru,local_name_en,condensate_item,condensate_l_per_m3,color_hex,composition_id_item,composition_share
 dry_mist,Сухая дымка,Dry Mist,mist_condensate,0.001,#C8D8E8,"water,aer_silt","0.70,0.30"
 common_cloud,Обычное облако,Common Cloud,cloud_condensate,0.005,#D8E6FF,"water,aer_silt,vespar","0.78,0.14,0.08"
 wet_cloud,Влажное облако,Wet Cloud,wet_condensate,0.010,#BFE5FF,"water,vespar","0.86,0.14"

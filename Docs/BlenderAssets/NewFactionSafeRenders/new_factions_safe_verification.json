@@ -1,0 +1,152 @@
+{
+  "Devourer": {
+    "starter_exists": true,
+    "starter_feature_hits": [
+      "ULP_Devourer_StarterHarpoonSkiff_ForwardHarpoonsAndTeeth",
+      "ULP_Devourer_StarterHarpoonSkiff_MainToothedHull",
+      "ULP_Devourer_StarterHarpoonSkiff_ShortGunsAndFins"
+    ],
+    "class_branch_counts": {
+      "frigate": 3,
+      "cruiser": 3,
+      "battleship": 2
+    },
+    "branch_rank_status": {
+      "HarpoonFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "BrawlerFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "ButcherFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "HarpoonCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "CannonCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "RipperCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "LeviathanHunterBattleship": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "LeviathanProcessorBattleship": {
+        "roots": 9,
+        "missing_ranks": []
+      }
+    },
+    "feature_missing_roots": [],
+    "root_total": 73,
+    "ok": true
+  },
+  "ClockworkArk": {
+    "starter_exists": true,
+    "starter_feature_hits": [
+      "ULP_ClockworkArk_StarterXRayPod_FactionXRayModules",
+      "ULP_ClockworkArk_StarterXRayPod_MainModularHull"
+    ],
+    "class_branch_counts": {
+      "frigate": 3,
+      "cruiser": 3,
+      "battleship": 2
+    },
+    "branch_rank_status": {
+      "XRayScoutFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "AutomatonTenderFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "EscortFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "ModularSurveyCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "AutomatonRecoveryCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "CombatArkCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "MechanizedCitadelBattleship": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "AutomatonFactoryBattleship": {
+        "roots": 9,
+        "missing_ranks": []
+      }
+    },
+    "feature_missing_roots": [],
+    "root_total": 73,
+    "ok": true
+  },
+  "StoneVault": {
+    "starter_exists": true,
+    "starter_feature_hits": [
+      "ULP_StoneVault_StarterMagnetDigger_FactionMagnets",
+      "ULP_StoneVault_StarterMagnetDigger_MainArmoredHull",
+      "ULP_StoneVault_StarterMagnetDigger_MiningGunsAndUndersideGear"
+    ],
+    "class_branch_counts": {
+      "frigate": 3,
+      "cruiser": 3,
+      "battleship": 2
+    },
+    "branch_rank_status": {
+      "MagnetScoutFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "SingleGunDiggerFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "OreTugFrigate": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "ArmoredGunCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "MagnetHaulerCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "RefineryCruiser": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "SiegeDiggerBattleship": {
+        "roots": 9,
+        "missing_ranks": []
+      },
+      "OreFoundryBattleship": {
+        "roots": 9,
+        "missing_ranks": []
+      }
+    },
+    "feature_missing_roots": [],
+    "root_total": 73,
+    "ok": true
+  },
+  "all_ok": true
+}

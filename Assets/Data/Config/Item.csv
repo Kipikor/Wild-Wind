@@ -1,87 +1,116 @@
-id_item,local_name_ru,local_name_en,energy_kwh_per_kg,cargo_unit_kind,cargo_storage_kind,mass_kg_per_unit
-broken_automaton,Broken Automaton,Broken Automaton,0,Piece,Van,1
-automaton_core,Automaton Core,Automaton Core,0,Piece,Van,1
-charcoal,РЈРіРѕР»СЊ,Charcoal,8,Piece,Van,1
-metal,РњРµС‚Р°Р»Р»,Metal,0,Piece,Van,1
-aerolite,РђСЌСЂРѕР»РёС‚,Aerolite,0,Piece,Van,1
-tools,РРЅСЃС‚СЂСѓРјРµРЅС‚С‹,Tools,0,Piece,Van,1
-weapon,РћСЂСѓР¶РёРµ,Weapons,0,Piece,Van,1
-paper,Р‘СѓРјР°РіР°,Paper,0,Piece,Van,1
-design_experience,РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂСЃРєРёР№ РѕРїС‹С‚,Design Experience,0,Piece,Van,1
-fundamental_experience,Р¤СѓРЅРґР°РјРµРЅС‚Р°Р»СЊРЅС‹Р№ РѕРїС‹С‚,Fundamental Experience,0,Piece,Van,1
-rock_info,РРЅС„РѕСЂРјР°С†РёСЏ Рѕ РіР»С‹Р±Р°С…,Rock Survey Data,0,Piece,Van,1
-claudium,РљР»Р°РІРґРёР№,Claudium,0,Piece,Van,1
-medicines,РњРµРґРёРєР°РјРµРЅС‚С‹,Medicines,0,Piece,Van,1
-alcohol,РЎРїРёСЂС‚,Alcohol,7.5,Piece,Van,0.79
-gunpowder,Р’Р·СЂС‹РІС‡Р°С‚РєР°,Explosives,0,Piece,Van,1
-mechanisms,РњРµС…Р°РЅРёР·РјС‹,Mechanisms,0,Piece,Van,1
-fat,Р–РёСЂ,Fat,12.1,Piece,Van,0.92
-water,Р’РѕРґР°,Water,0,Piece,Van,1
-cloth,РўРєР°РЅСЊ,Cloth,0,Piece,Van,1
-aer_silt,РђСЌСЂРЅР°СЏ РІР·РІРµСЃСЊ,Aer Silt,0,Piece,Van,1
-vespar,Р’РµСЃРїР°СЂ,Vespar,0,Piece,Van,1
-fulgur,Р¤СѓР»СЊРіСѓСЂ,Fulgur,0,Piece,Van,1
-azurite_gas,Р›Р°Р·СѓСЂРёС‚РѕРІС‹Р№ РіР°Р·,Azurite Gas,0,Piece,Van,1
-amberon,РђРјР±РµСЂРѕРЅ,Amberon,0,Piece,Van,1
-viridine,Р’РёСЂРёРґРёРЅ,Viridine,0,Piece,Van,1
-ionite,РРѕРЅРёС‚,Ionite,0,Piece,Van,1
-calorine,РљР°Р»РѕСЂРёРЅ,Calorine,0,Piece,Van,1
-crystane,РљСЂРёСЃС‚Р°РЅ,Crystane,0,Piece,Van,1
-claudine,РљР»Р°РІРґРёРЅ,Claudine,0,Piece,Van,1
-nulgas,РќСѓР»СЊРіР°Р·,Nulgas,0,Piece,Van,1
-mist_condensate,РљРѕРЅС†РµРЅС‚СЂР°С‚ СЃСѓС…РѕР№ РґС‹РјРєРё,Dry Mist Condensate,0,Piece,Van,1
-cloud_condensate,РћР±Р»Р°С‡РЅС‹Р№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Cloud Condensate,0,Piece,Van,1
-wet_condensate,Р’Р»Р°Р¶РЅС‹Р№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Wet Cloud Condensate,0,Piece,Van,1
-storm_condensate,Р“СЂРѕР·РѕРІРѕР№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Storm Condensate,0,Piece,Van,1
-azure_condensate,Р›Р°Р·СѓСЂРЅС‹Р№ РіР°Р·РѕРІС‹Р№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Azure Gas Condensate,0,Piece,Van,1
-amber_condensate,РЇРЅС‚Р°СЂРЅС‹Р№ РіР°Р·РѕРІС‹Р№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Amber Gas Condensate,0,Piece,Van,1
-green_condensate,Р—РµР»РµРЅС‹Р№ РіР°Р·РѕРІС‹Р№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Green Gas Condensate,0,Piece,Van,1
-ion_condensate,РРѕРЅРЅС‹Р№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Ion Condensate,0,Piece,Van,1
-thermal_condensate,РўРµРїР»РѕРІРѕР№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Thermal Condensate,0,Piece,Van,1
-crystal_condensate,РљСЂРёСЃС‚Р°Р»Р»РёС‡РµСЃРєРёР№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Crystal Condensate,0,Piece,Van,1
-claudic_condensate,РљР»Р°РІРґРёРµРІС‹Р№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Claudic Condensate,0,Piece,Van,1
-void_condensate,РџСѓСЃС‚РѕС‚РЅС‹Р№ РєРѕРЅС†РµРЅС‚СЂР°С‚,Void Condensate,0,Piece,Van,1
-windshale_ore,Р’РµС‚СЂРѕРІРѕР№ СЃР»Р°РЅРµС†,Wind Shale Ore,0,Piece,Van,1
-dawnspar_ore,Р—РѕСЂРµРІРёРє,Dawn Spar Ore,0,Piece,Van,1
-bluebrass_ore,РЎРёРЅРµР»Р°С‚СѓРЅСЊ,Bluebrass Ore,0,Piece,Van,1
-needlechalk_ore,РРіР»РѕРјРµР»,Needle Chalk Ore,0,Piece,Van,1
-rainroot_ore,Р”РѕР¶РґРµРєРѕСЂРµРЅСЊ,Rainroot Ore,0,Piece,Van,1
-emberloam_ore,Р–Р°СЂРѕР·РµРј,Emberloam Ore,0,Piece,Van,1
-glassmire_ore,РЎС‚РµРєР»РѕС‚РёРЅР°,Glassmire Ore,0,Piece,Van,1
-stormcrust_ore,Р“СЂРѕР·РѕРІР°СЏ РєРѕСЂРєР°,Storm Crust Ore,0,Piece,Van,1
-ashpearl_ore,РџРµРїР»РѕР¶РµРјС‡СѓРі,Ash Pearl Ore,0,Piece,Van,1
-liftmarrow_ore,РџРѕРґСЉРµРјРЅР°СЏ Р¶РёР»Р°,Lift Marrow Ore,0,Piece,Van,1
-duskclay_ore,РЎСѓРјРµСЂРµС‡РЅР°СЏ РіР»РёРЅР°,Dusk Clay Ore,0,Piece,Van,1
-thundergrit_ore,Р“СЂРѕРјРѕРІР°СЏ РєСЂРѕС€РєР°,Thunder Grit Ore,0,Piece,Van,1
-mirrorbasalt_ore,Р—РµСЂРєР°Р»СЊРЅС‹Р№ Р±Р°Р·Р°Р»СЊС‚,Mirror Basalt Ore,0,Piece,Van,1
-hollowchalk_ore,РџРѕР»С‹Р№ РјРµР»,Hollow Chalk Ore,0,Piece,Van,1
-crownstone_ore,Р’РµРЅРµС‡РЅРёРє,Crownstone Ore,0,Piece,Van,1
-blackhoneycomb_ore,Р§РµСЂРЅС‹Рµ СЃРѕС‚С‹,Black Honeycomb Ore,0,Piece,Van,1
-silverdrift_ore,РЎСЂРµР±СЂРѕРґСЂРµР№С„,Silver Drift Ore,0,Piece,Van,1
-embervein_ore,Р–Р°СЂРѕР¶РёР»Р°,Ember Vein Ore,0,Piece,Van,1
-claudreef_ore,РљР»Р°РІРґРёРµРІС‹Р№ СЂРёС„,Claudium Reef Ore,0,Piece,Van,1
-nullcrust_ore,РќСѓР»РµРІР°СЏ РєРѕСЂРєР°,Null Crust Ore,0,Piece,Van,1
-ferron,Р¤РµСЂСЂРѕРЅ,Ferron,0,Piece,Van,1
-silvate,РЎРёР»СЊРІР°С‚,Silvate,0,Piece,Van,1
-cupryl,РљСѓРїСЂРёР»,Cupryl,0,Piece,Van,1
-aerin,РђСЌСЂРёРЅ,Aerin,0,Piece,Van,1
-fulgrin,Р¤СѓР»СЊРіСЂРёРЅ,Fulgrin,0,Piece,Van,1
-lumite,Р›СЋРјРёС‚,Lumite,0,Piece,Van,1
-gravinol,Р“СЂР°РІРёРЅРѕР»,Gravinol,0,Piece,Van,1
-myrglass,РњРёСЂСЃС‚РµРєР»Рѕ,Myrglass,0,Piece,Van,1
-claudite,РљР»Р°РІРґРёС‚,Claudite,0,Piece,Van,1
-umbracite,РЈРјР±СЂР°С†РёС‚,Umbracite,0,Piece,Van,1
-nullsalt,РќСѓР»СЊСЃРѕР»СЊ,Nullsalt,0,Piece,Van,1
-windcalf_carcass,РўСѓС€Р° РІРµС‚СЂРѕС‚РµР»РµРЅРєР°,Wind Calf Carcass,0,Piece,Van,1
-windminnow_carcass,РўСѓС€РєР° РІРµС‚СЂРѕРїРµСЃРєР°СЂСЏ,Wind Minnow Carcass,0,Piece,Van,1
-mistwhale_carcass,РўСѓС€Р° РґС‹РјРЅРѕРіРѕ РєРёС‚Р°,Mist Whale Carcass,0,Piece,Van,1
-sky_eel_carcass,РўСѓС€Р° РЅРµР±РµСЃРЅРѕРіРѕ СѓРіСЂСЏ,Sky Eel Carcass,0,Piece,Van,1
-stoneback_carcass,РўСѓС€Р° РєР°РјРЅРµСЃРїРёРЅР°,Stoneback Carcass,0,Piece,Van,1
-leviathan_fat,Р›РµРІРёР°С„Р°РЅРѕРІ Р¶РёСЂ,Leviathan Fat,10,Piece,Van,0.92
-leviathan_hide,РЁРєСѓСЂР° Р»РµРІРёР°С„Р°РЅР°,Leviathan Hide,0,Piece,Van,1
-claudium_gland,РљР»Р°РІРґРёРµРІР°СЏ Р¶РµР»РµР·Р°,Claudium Gland,0,Piece,Van,1
-mineral_shell,РњРёРЅРµСЂР°Р»СЊРЅС‹Р№ РїР°РЅС†РёСЂСЊ,Mineral Shell,0,Piece,Van,1
-airframe_kit,РќР°Р±РѕСЂ РєРѕСЂРїСѓСЃР°,Airframe Kit,0,Piece,Van,1
-module_kit,Module Kit,Module Kit,0,Piece,Van,1
-munition_bundle,Munition Bundle,Munition Bundle,0,Piece,Van,1
-chemical_batch,РҐРёРјРёС‡РµСЃРєР°СЏ РїР°СЂС‚РёСЏ,Chemical Batch,0,Piece,Van,1
+﻿id_item,local_name_ru,local_name_en,mass_kg_per_unit
+freight,Фрахт,Freight,0
+solid,Солид,Solid,0
+resonant_sublikat,Резонансный субликат,Resonant Sublikat,0.1
+null_sublikat,Нулевой субликат,Null Sublikat,0.1
+phase_sublikat,Фазовый субликат,Phase Sublikat,0.1
+vector_sublikat,Векторный субликат,Vector Sublikat,0.1
+gray_sublikat,Серый субликат,Gray Sublikat,0.1
+spectral_sublikat,Спектральный субликат,Spectral Sublikat,0.1
+coronal_sublikat,Коронный субликат,Coronal Sublikat,0.1
+deep_sublikat,Глубинный субликат,Deep Sublikat,0.1
+inertial_sublikat,Инерционный субликат,Inertial Sublikat,0.1
+automaton_relay,Реле автоматона,Automaton Relay,0.4
+automaton_coil,Катушка автоматона,Automaton Coil,1.2
+automaton_contact_comb,Контактная гребенка,Automaton Contact Comb,0.3
+automaton_brass_valve,Латунный клапан автоматона,Automaton Brass Valve,0.8
+automaton_mainspring,Заводная пружина,Automaton Mainspring,0.6
+automaton_calibration_gear,Калибровочная шестерня,Automaton Calibration Gear,0.5
+automaton_gyroscope,Гироскоп автоматона,Automaton Gyroscope,2
+automaton_optic_lens,Оптическая линза автоматона,Automaton Optic Lens,0.4
+automaton_pressure_gauge,Давлениемер автоматона,Automaton Pressure Gauge,1
+automaton_servo_joint,Сервошарнир,Automaton Servo Joint,2.5
+automaton_armor_plate,Броневая пластина автоматона,Automaton Armor Plate,8
+automaton_logic_drum,Памятный барабан,Automaton Memory Drum,1.4
+automaton_command_cylinder,Командный цилиндр,Automaton Command Cylinder,3.5
+automaton_servo_core,Сервоядро,Automaton Servo Core,4
+broken_automaton,Broken Automaton,Broken Automaton,1
+automaton_core,Automaton Core,Automaton Core,1
+charcoal,Уголь,Charcoal,1
+metal,Металл,Metal,1
+aerolite,Аэролит,Aerolite,1
+tools,Инструменты,Tools,1
+weapon,Оружие,Weapons,1
+paper,Бумага,Paper,1
+design_experience,Очки освоения,Mastery Points,1
+fundamental_experience,Архивные фрагменты,Archive Fragments,1
+rock_info,Информация о глыбах,Rock Survey Data,1
+claudium,Клавдий,Claudium,1
+medicines,Медикаменты,Medicines,1
+alcohol,Спирт,Alcohol,0.79
+gunpowder,Взрывчатка,Explosives,1
+mechanisms,Механизмы,Mechanisms,1
+fat,Жир,Fat,0.92
+water,Вода,Water,1
+cloth,Ткань,Cloth,1
+aer_silt,Аэрная взвесь,Aer Silt,1
+vespar,Веспар,Vespar,1
+fulgur,Фульгур,Fulgur,1
+azurite_gas,Лазуритовый газ,Azurite Gas,1
+amberon,Амберон,Amberon,1
+viridine,Виридин,Viridine,1
+ionite,Ионит,Ionite,1
+calorine,Калорин,Calorine,1
+crystane,Кристан,Crystane,1
+claudine,Клавдин,Claudine,1
+nulgas,Нульгаз,Nulgas,1
+mist_condensate,Концентрат сухой дымки,Dry Mist Condensate,1
+cloud_condensate,Облачный концентрат,Cloud Condensate,1
+wet_condensate,Влажный концентрат,Wet Cloud Condensate,1
+storm_condensate,Грозовой концентрат,Storm Condensate,1
+azure_condensate,Лазурный газовый концентрат,Azure Gas Condensate,1
+amber_condensate,Янтарный газовый концентрат,Amber Gas Condensate,1
+green_condensate,Зеленый газовый концентрат,Green Gas Condensate,1
+ion_condensate,Ионный концентрат,Ion Condensate,1
+thermal_condensate,Тепловой концентрат,Thermal Condensate,1
+crystal_condensate,Кристаллический концентрат,Crystal Condensate,1
+claudic_condensate,Клавдиевый концентрат,Claudic Condensate,1
+void_condensate,Пустотный концентрат,Void Condensate,1
+windshale_ore,Ветровой сланец,Wind Shale Ore,1
+dawnspar_ore,Зоревик,Dawn Spar Ore,1
+bluebrass_ore,Синелатунь,Bluebrass Ore,1
+needlechalk_ore,Игломел,Needle Chalk Ore,1
+rainroot_ore,Дождекорень,Rainroot Ore,1
+emberloam_ore,Жарозем,Emberloam Ore,1
+glassmire_ore,Стеклотина,Glassmire Ore,1
+stormcrust_ore,Грозовая корка,Storm Crust Ore,1
+ashpearl_ore,Пепложемчуг,Ash Pearl Ore,1
+liftmarrow_ore,Подъемная жила,Lift Marrow Ore,1
+duskclay_ore,Сумеречная глина,Dusk Clay Ore,1
+thundergrit_ore,Громовая крошка,Thunder Grit Ore,1
+mirrorbasalt_ore,Зеркальный базальт,Mirror Basalt Ore,1
+hollowchalk_ore,Полый мел,Hollow Chalk Ore,1
+crownstone_ore,Венечник,Crownstone Ore,1
+blackhoneycomb_ore,Черные соты,Black Honeycomb Ore,1
+silverdrift_ore,Сребродрейф,Silver Drift Ore,1
+embervein_ore,Жарожила,Ember Vein Ore,1
+claudreef_ore,Клавдиевый риф,Claudium Reef Ore,1
+nullcrust_ore,Нулевая корка,Null Crust Ore,1
+ferron,Феррон,Ferron,1
+silvate,Сильват,Silvate,1
+cupryl,Куприл,Cupryl,1
+aerin,Аэрин,Aerin,1
+fulgrin,Фульгрин,Fulgrin,1
+lumite,Люмит,Lumite,1
+gravinol,Гравинол,Gravinol,1
+myrglass,Мирстекло,Myrglass,1
+claudite,Клавдит,Claudite,1
+umbracite,Умбрацит,Umbracite,1
+nullsalt,Нульсоль,Nullsalt,1
+windcalf_carcass,Туша ветротеленка,Wind Calf Carcass,1
+windminnow_carcass,Тушка ветропескаря,Wind Minnow Carcass,1
+mistwhale_carcass,Туша дымного кита,Mist Whale Carcass,1
+sky_eel_carcass,Туша небесного угря,Sky Eel Carcass,1
+stoneback_carcass,Туша камнеспина,Stoneback Carcass,1
+leviathan_meat,Мясо левиафана,Leviathan Meat,1
+leviathan_fat,Левиафанов жир,Leviathan Fat,0.92
+leviathan_hide,Шкура левиафана,Leviathan Hide,1
+mineral_shell,Минеральный панцирь,Mineral Shell,1
+leviathan_ichor,Ихор левиафана,Leviathan Ichor,1.05
+leviathan_sinew,Левиафановая жила,Leviathan Sinew,1
+nerve_substrate,Нервный субстрат,Nerve Substrate,0.2
+bone_plate,Костяная пластина,Bone Plate,1
+airframe_kit,Набор корпуса,Airframe Kit,1
+module_kit,Module Kit,Module Kit,1
+munition_bundle,Munition Bundle,Munition Bundle,1
+chemical_batch,Химическая партия,Chemical Batch,1

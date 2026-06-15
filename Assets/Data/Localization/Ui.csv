@@ -1,4 +1,4 @@
-key,#name,ru,en
+﻿key,#name,ru,en
 app.title,Game title,Wild Wind,Wild Wind
 game.menu.title,Gameplay menu title,Меню,Menu
 game.menu.resume,Resume game,Продолжить,Resume
@@ -9,17 +9,11 @@ game.hud.city,HUD city mode,ГОРОД,CITY
 game.hud.flight,HUD flight mode,ПОЛЁТ,FLIGHT
 game.hud.session_objective,Session objective title,Сессия: добыча и возврат,Session extraction
 game.hud.session_path,Session path,База -> выбранная сессия,Base -> selected sortie
-game.hud.base_inputs,Base inputs,Входные ресурсы базы,Base inputs
-game.hud.base_materials,Base materials,Материалы базы,Base materials
-game.hud.ship_supplies,Ship supplies,Запасы корабля,Ship supplies
 game.hud.distance,Distance label,До цели,To target
 game.hud.altitude,Altitude label,Высота,Altitude
 game.hud.target_altitude,Target altitude label,Цель,Target
 game.hud.speed,Speed label,Скорость,Speed
-game.hud.process_base,Process base button,Обработать базу,Process
-game.hud.takeoff,Takeoff button,Взлететь,Take Off
 game.hud.dock,Dock button,Стыковка,Dock
-game.hud.run_base_work,Run base work button,Работа базы,Base Work
 game.hud.menu,Menu button,Меню,Menu
 game.hud.completed,Session completed,Сессия завершена,Sortie complete
 game.hud.compass_target,Compass target marker,Цель,Target

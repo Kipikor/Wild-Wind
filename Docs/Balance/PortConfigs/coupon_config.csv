@@ -1,0 +1,10 @@
+coupon_id,currency_id,discount_percent,uses,min_purchase_amount,source_weight,notes_ru
+coupon_freight_10,freight,10,1,1000,35,Частая маленькая скидка.
+coupon_freight_15,freight,15,1,5000,18,Средняя скидка на фрахтовые магазины.
+coupon_solid_10,solid,10,1,50,12,Редкая ценная скидка.
+coupon_solid_15,solid,15,1,200,4,Очень ценная; осторожно выдавать.
+coupon_event_25,event_sail,25,1,200,20,Событийная скидка.
+coupon_profile_15,nobel,15,1,20,10,Профильная валюта Синода; аналоги есть для остальных.
+coupon_profile_15_gems,gems,15,1,20,10,Профильная валюта Свода.
+coupon_profile_15_perfcards,perfcards,15,1,20,10,Профильная валюта Ковчега.
+coupon_profile_15_amber,amber,15,1,20,10,Профильная валюта Пожирателей.

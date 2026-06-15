@@ -1,0 +1,6 @@
+budget_rows,public_rank_range,processing_depth,current_depth_share,previous_depth_share,free_rare_share,min_building_level,notes_ru
+R1-R3,R1-R3,0,0.80,0.00,0.20,1,Сырье простые заготовки прямые материалы.
+R4-R6,R4-R6,1,0.52,0.35,0.13,7,Переработанные версии ранних материалов.
+R7-R9,R7-R9,2,0.52,0.35,0.13,17,Переработка II и развитые bottleneck.
+R10-R12*,R10-R10 public plus T2 low,3,0.52,0.35,0.13,28,Публичный верх и первые виртуальные T2 бюджеты.
+R13*-R15*,T2 high virtual,4,0.50,0.38,0.12,30,Только редкие T2 рецепты и топовые линии C/D.

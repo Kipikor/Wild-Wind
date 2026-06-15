@@ -1,0 +1,45 @@
+building_id,local_name_ru,group,kind,max_level,anchor_unlock_level,build_slot_type,infra_cost_l1,pop_cost_l1,scales_with_level,primary_config,primary_screen,role_ru
+anchor_house,Якорный дом,core,hq,30,1,unique,0,0,yes,port_building_level_curve,IslandMainScreen,Центр острова cap зданий открытие районов и общая база прогресса
+builder_yard,Строительный двор,core,construction_queue,30,1,unique,2,10,yes,builder_queue,BuildingUpgradeRefinery,Очередь строителей скорость строительства и стоимость апгрейдов
+warehouse,Складской узел,core,storage,30,1,unique,2,8,yes,resource_value_reference,InventoryScreen,Лимит хранения ресурсов контейнеров и готовых деталей
+infrastructure_hub,Инфраструктурный узел,core,infrastructure,30,1,repeatable,0,6,yes,port_building_level_curve,IslandMainScreen,Дает инфраструктурный лимит для зданий и систем
+residential_quarters,Жилые кварталы,core,population,30,1,repeatable,1,0,yes,port_building_level_curve,IslandMainScreen,Дает население для зданий специалистов и производства
+road_port_hub,Портовый узел,core,logistics,30,3,repeatable,3,12,yes,port_building_level_curve,IslandMainScreen,Логистика острова скорость загрузок сборов и очередей
+ship_dock,Корабельный док,docks,ship_slot,30,1,shore,4,12,yes,dock_slots,DockShipScreen,Физическое место корабля fitting запуск вылета и списание
+harbor_expansion,Расширение гавани,docks,island_zone,30,2,shore,5,14,yes,island_expansion,IslandMainScreen,Открывает бухты доки и портовые участки на острове
+repair_dock,Ремонтный док,docks,found_ship_repair,30,4,unique,8,20,yes,repair_dock,RepairDockScreen,Восстанавливает случайные найденные корабли через набор работ
+shipyard,Верфь,docks,ship_crafting,30,5,unique,8,24,yes,rank_budget; building_catalog,IndustrialProjectsScreen,Сборка кораблей из изученных рецептов и каскадных заказов
+ship_breaker,Разборочная площадка,docks,scrap,30,6,unique,5,14,yes,rank_budget,DockShipScreen,Списание и разбор лишних кораблей с возвратом опыта и части материалов
+ore_refinery,Рудная рафинерия,processing,ore,30,1,repeatable,4,14,yes,resource_value_reference,Refinery,Перерабатывает руды в минералы металлы и гемы
+gas_separator,Сепаратор облаков,processing,gas,30,2,repeatable,4,12,yes,resource_value_reference,Refinery,Перерабатывает конденсаты в воду газы и нобель
+automaton_scrapyard,Свалка автоматонов,processing,automaton,30,4,repeatable,5,16,yes,automaton_modules,Refinery,Разбирает уцелевшие модули автоматонов в точные механизмы и перфокарты
+leviathan_butchery,Разделочный док,processing,leviathan,30,5,shore,6,18,yes,leviathan_butchery,LeviathanButchery,Разделывает туши и секции левиафанов в субстраты ихор и амбру
+relic_laboratory,Лаборатория реликтов,processing,relic_decode,30,6,unique,5,14,yes,relic_decode,ArchiveKnowledgeScreen,Расшифровывает реликты в книги купоны чертежи и информационные награды
+construction,Конструкционный цех,production,cascade,30,3,industrial,5,18,yes,building_catalog,WorkshopRecipeCatalog,Корпусные детали строительные этапы и ремонтные работы
+metallurgy,Металлургический цех,production,cascade,30,3,industrial,5,18,yes,building_catalog,WorkshopRecipeCatalog,Плиты слитки профиль и металлургические полуфабрикаты
+mechanical,Машинный цех,production,cascade,30,4,industrial,6,20,yes,building_catalog,WorkshopRecipeCatalog,Приводы валы редукторы и машинные узлы
+instrumentation,Приборный цех,production,cascade,30,4,industrial,6,20,yes,building_catalog,WorkshopRecipeCatalog,Приборы навигация калибровка и точные сборки
+chemical_reactor,Реакторный цех,production,cascade,30,5,industrial,7,22,yes,building_catalog,WorkshopRecipeCatalog,Реактивы кислоты ихор газы и химические слои
+automaton,Автоматонный цех,production,cascade,30,5,industrial,7,22,yes,building_catalog,WorkshopRecipeCatalog,Узлы автоматонов счетчики регуляторы и T2 входы
+electrical,Контурный цех,production,cascade,30,6,industrial,8,24,yes,building_catalog,WorkshopRecipeCatalog,Клавдиевые контуры накопители и сигнальные узлы
+assembly,Сборочный док,production,cascade,30,6,industrial,10,28,yes,building_catalog,IndustrialProjectsScreen,Финальная интеграция кораблей модулей и крупных проектов
+archive,Архив знаний,research,knowledge,30,2,unique,3,12,yes,research_curve; research_nodes,ArchiveKnowledgeScreen,Генерирует SP и ведет исследования знаний
+cartography_room,Картографическая палата,research,maps,30,3,unique,3,10,yes,mission_baseline,MissionSelectionScreen,Открывает миссионные профили разведданные и маршруты
+fleet_development_bureau,Бюро корабельного развития,progression,ship_tree,30,2,unique,3,10,yes,rank_budget,DevelopmentTreeScreen,Деревья кораблей опыт веток свободный опыт и открытие рецептов
+captain_journal,Капитанский журнал,progression,achievements,30,1,unique,0,0,no,mastery_curve; achievement_templates,IslandMainScreen,Достижения освоение титулы косметика и одноразовые награды
+quest_board,Доска поручений,progression,daily_tasks,30,3,unique,1,4,yes,faction_quest_templates,IslandMainScreen,Сводка ежедневок кампаний фракций и переход к источнику задания
+courier_service,Курьерская служба,orders,courier,30,3,unique,5,14,yes,courier_orders,CourierServiceScreen,Восемь площадок малых заказов Ветровых Домов с отменой 15 минут
+capital_airdock,Столичный аэродром,orders,capital_order,30,5,unique,7,18,yes,capital_airplane,CapitalOrderScreen,Ежедневный крупный заказ столицы и основной регулярный solid
+trader_pavilion,Торговая площадь,markets,faction_markets,30,4,unique,4,12,yes,faction_markets; faction_quest_templates,TraderWarrior,Павильоны фракций магазины ежедневки репутация и цепочки заданий
+imperial_embassy,Имперское представительство,markets,hard_currency,30,6,unique,5,16,yes,currency_value; faction_markets,TraderWarrior,Магазин имперцев за солиды и задания представителя столицы
+bundle_kiosk,Лавка предложений,markets,bundles,30,4,unique,2,6,no,bundle_shop; recharge_track,StoreScreen,Бандлы за hard currency недельный recharge и история покупок
+event_pavilion,Павильон событий,events,event_router,30,4,unique,3,8,no,ship_event_overview,EventTasks,Вход в тематические события магазины рулетки задания и награды
+container_yard,Склад контейнеров,inventory,containers,30,3,unique,3,8,yes,container_loot,InventoryScreen,Открытие обычных и ключевых контейнеров массовыми пачками
+coal_mine,Угольная штольня,idle,coal,30,2,resource_node,2,10,yes,activity_budget,IdleExtractionScreen,Пассивная добыча угля с лимитом склада и назначением корабля
+water_collector,Водосборник,idle,water,30,2,resource_node,2,8,yes,activity_budget,IdleExtractionScreen,Пассивный сбор воды и простого конденсата
+freight_office,Фрахтовая контора,idle,freight,30,3,unique,3,10,yes,activity_budget,IdleExtractionScreen,Медленный пассивный источник фрахтов и денежный сбор
+cladium_still,Клавдиевый отстойник,idle,cladium,30,5,resource_node,4,12,yes,activity_budget,IdleExtractionScreen,Редкий пассивный сбор клавдиевых следов для поздних рецептов
+clearing_camp,Лагерь расчистки,island,clearing,30,1,unique,2,10,yes,island_expansion,IslandMainScreen,Расчищает участки острова и открывает места здания реликты и доки
+relic_garden,Сад городских реликтов,island,decor_bonus,30,6,decor,1,4,yes,achievement_templates,IslandMainScreen,Декорации и реликты с малыми постоянными бонусами
+specialist_guild,Гильдия специалистов,staff,specialists,30,7,unique,3,8,yes,port_building_level_curve,IslandMainScreen,Назначение специалистов в здания и рост их лимита
+contract_port,Вахтовый порт,logistics,npc_assignment,30,8,shore,5,16,yes,activity_budget,IdleExtractionScreen,Пассивные назначения кораблей вне активного дока и контрактные слоты

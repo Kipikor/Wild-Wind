@@ -1,0 +1,14 @@
+zone_id,local_name_ru,anchor_level_required,clearing_camp_level_required,cost_fe,time_hours,build_slots_added,dock_slots_added,systems_unlocked,notes_ru
+Z00_start,Стартовая бухта,1,1,0,0,8,3,anchor_house; warehouse; ore_refinery; ship_dock,Стартовая зона три дока и первые переработчики.
+Z01_lower_quay,Нижняя набережная,2,2,600,0.5,4,1,courier_service; water_collector,Первое расширение для курьерки и простых idle зданий.
+Z02_workyard,Рабочий двор,3,3,1400,1,5,0,construction; metallurgy; builder_yard,Стартовый промышленный двор.
+Z03_gas_terrace,Газовая терраса,4,4,3200,2,4,0,gas_separator; archive,Газовая переработка и архив знаний.
+Z04_old_harbor,Старая гавань,5,5,7200,4,5,1,capital_airdock; mechanical; instrumentation,Самолет столицы и первые машинные цехи.
+Z05_breaker_shore,Берег разборки,6,6,15500,6,4,0,automaton_scrapyard; repair_dock; ship_breaker,Автоматоны ремонтный док и разбор кораблей.
+Z06_hunter_pier,Промысловый пирс,8,8,32000,10,5,1,leviathan_butchery; trader_pavilion,Левиафаны торговцы и дополнительный док.
+Z07_industrial_ring,Промышленное кольцо,10,10,65000,16,7,0,chemical_reactor; automaton; event_pavilion,Средняя промышленность и события на острове.
+Z08_high_basin,Верхний бассейн,13,13,130000,24,6,1,electrical; assembly; shipyard,Финальная сборка кораблей и верхние цеха.
+Z09_relic_garden,Реликтовый сад,16,16,260000,36,5,0,relic_laboratory; relic_garden; container_yard,Реликты контейнеры и декор с бонусами.
+Z10_trade_quarter,Торговый квартал,20,20,520000,54,6,0,imperial_embassy; bundle_kiosk; specialist_guild,Империя бандлы специалисты и поздняя торговля.
+Z11_outer_moorings,Внешние причалы,24,24,1000000,72,4,2,contract_port; cladium_still,Вахтовый порт клавдиевый отстойник и топовые причалы.
+Z12_crown_works,Коронные мастерские,30,30,1800000,96,6,1,all_top_upgrades,Финальная территория первой версии порта.

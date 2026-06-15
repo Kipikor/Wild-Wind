@@ -6,10 +6,13 @@ public static class WildWindGameplayBootstrap
     private const string ShipLoaderObjectName = "Player Ship Loader";
     private const string PlayerShipProxyName = "Player Ship Proxy";
     private const string PlayerSessionShipName = "Player Session Ship";
+    public const int RuntimeQualityLevelIndex = 0;
+    public const int RuntimeTargetFrameRate = 60;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void InstallGameplayLaunchBootstrap()
     {
+        ApplyRuntimeFramePolicy();
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         SceneManager.sceneLoaded += HandleSceneLoaded;
         BootstrapGameplayLaunch();
@@ -17,11 +20,13 @@ public static class WildWindGameplayBootstrap
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        ApplyRuntimeFramePolicy();
         BootstrapGameplayLaunch();
     }
 
     private static void BootstrapGameplayLaunch()
     {
+        ApplyRuntimeFramePolicy();
         if (WildWindBigTestRunner.IsMainSessionCheckInProgress)
         {
             return;
@@ -103,6 +108,44 @@ public static class WildWindGameplayBootstrap
         {
             meta.shipLoader.spawnPoint = meta.shipLoader.targetShip.transform;
         }
+    }
+
+    public static bool IsRuntimeFramePolicyAppliedForTests()
+    {
+        return QualitySettings.GetQualityLevel() == RuntimeQualityLevelIndex
+            && QualitySettings.vSyncCount == 0
+            && Application.targetFrameRate == RuntimeTargetFrameRate
+            && GetRenderFrameIntervalForTests() == 1;
+    }
+
+    public static int GetRenderFrameIntervalForTests()
+    {
+#if UNITY_2019_3_OR_NEWER
+        return UnityEngine.Rendering.OnDemandRendering.renderFrameInterval;
+#else
+        return 1;
+#endif
+    }
+
+    private static void ApplyRuntimeFramePolicy()
+    {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
+        int qualityCount = QualitySettings.names != null ? QualitySettings.names.Length : 0;
+        if (qualityCount > RuntimeQualityLevelIndex && QualitySettings.GetQualityLevel() != RuntimeQualityLevelIndex)
+        {
+            QualitySettings.SetQualityLevel(RuntimeQualityLevelIndex, true);
+        }
+
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = RuntimeTargetFrameRate;
+
+#if UNITY_2019_3_OR_NEWER
+        UnityEngine.Rendering.OnDemandRendering.renderFrameInterval = 1;
+#endif
     }
 
     private static ShipPhysics EnsurePlayerShipPhysics()

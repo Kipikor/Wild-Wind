@@ -1,0 +1,7 @@
+faction_id,local_name_ru,currency_id,inventory_style,price_multiplier_vs_fe,daily_limit_style,refresh_hours,rep_unlock_rule,notes_ru
+capital,Столица,solid,wide_unlimited,0.90,mostly_unlimited,24,rep_and_campaign,Нормальный курс за редкую валюту; много товаров и хорошие корабли.
+wind_houses,Ветровые Дома,freight,small_daily_lots,1.65,small_limited,24,rep_light,Плохой магазин за фрахт; платим за логистику и срочность.
+mist_synod,Туманный Синод,nobel,gas_and_chemistry,1.05,limited_daily,24,rep_and_campaign,Газовые товары и химия за нобель.
+stone_vault,Каменный Свод,gems,ore_and_metallurgy,1.05,limited_daily,24,rep_and_campaign,Минералы и металлургия и чертежи за геммы.
+clockwork_ark,Заводной Ковчег,perfcards,automaton_and_mechanisms,1.05,limited_daily,24,rep_and_campaign,Точные механизмы и T2-рецепты и автоматонные товары.
+devourers,Пожиратели,amber,leviathan_and_hunting,1.05,limited_daily,24,rep_and_campaign,Материалы левиафанов и гарпуны и охотничьи корабли.

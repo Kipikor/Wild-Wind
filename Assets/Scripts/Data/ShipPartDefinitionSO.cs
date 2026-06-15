@@ -21,9 +21,9 @@ public class ShipPartDefinitionSO : ScriptableObject
     [InspectorName("Префаб")]
     [Tooltip("Для корпуса это основной префаб корабля с физикой, сокетами и коллайдерами. Для модуля это визуальный префаб, который будет вставлен в подходящий сокет.")]
     public GameObject prefab;
-    [InspectorName("Тип топлива двигателя")]
-    [Tooltip("Заполняется только у двигателя. Энергоемкость топлива берется из Item.csv.")]
-    public string engineFuelId = "";
+    [InspectorName("Fuel resource")]
+    [Tooltip("Resource burned by the hull at its fixed fuel consumption rate.")]
+    public string fuelResourceId = "";
 
     [Header("Слоты корпуса")]
     [InspectorName("Слоты")]
@@ -81,7 +81,7 @@ public class ShipSlotDefinition
     [InspectorName("Название")]
     public string displayName = "Слот";
     [InspectorName("Тип слота")]
-    [Tooltip("Произвольный тип слота. Например: engine_main, propeller, claudium_loop.")]
+    [Tooltip("Произвольный тип слота. Например: claudium_loop, high, mid, low, rig.")]
     public string slotTypeId = "module";
     [InspectorName("Обязательный")]
     [Tooltip("Если включено, корабль нельзя собрать без подходящего купленного модуля в этом слоте.")]
@@ -154,14 +154,18 @@ public enum ShipStatId
     BaseMass = 0,
     [InspectorName("Масса триммирования")]
     TargetTrimMass = 1,
-    [InspectorName("Расчетная скорость винта")]
-    PropellerMaxSpeedMS = 2,
-    [InspectorName("КПД винта")]
-    PropellerEfficiency = 3,
-    [InspectorName("Мощность двигателя на 100%, кВт")]
-    EngineMaxPower = 6,
-    [InspectorName("КПД топлива двигателя")]
-    EngineFuelEfficiency = 10,
+    [InspectorName("Hull cruise reference speed")]
+    HullCruiseReferenceSpeedMS = 2,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused3 = 3,
+    [InspectorName("Hull forward thrust, kgf")]
+    HullForwardThrustKgf = 6,
+    [InspectorName("Fuel consumption, kg/min")]
+    FuelConsumptionKgPerMinute = 7,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused9 = 9,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused10 = 10,
     [InspectorName("Плотность воздуха")]
     AirDensity = 11,
     [InspectorName("Коэффициент сопротивления")]
@@ -194,14 +198,14 @@ public enum ShipStatId
     SpeedStiffness = 34,
     [InspectorName("Демпфирование скорости")]
     SpeedDamping = 35,
-    [InspectorName("Расход клавдия на тонну в секунду")]
-    ClaudiumConsumptionPerTonSecond = 37,
-    [InspectorName("КПД клавдиевого контура")]
-    ClaudiumLiftEfficiency = 38,
+    [InspectorName("Legacy unused")]
+    ClaudiumLegacyUnused37 = 37,
+    [InspectorName("Legacy unused")]
+    ClaudiumLegacyUnused38 = 38,
     [InspectorName("Максимальная подъемная сила контура")]
     ClaudiumMaxLiftKg = 39,
-    [InspectorName("Сглаживание подъемной силы")]
-    ClaudiumLiftSmoothing = 40,
+    [InspectorName("Legacy unused")]
+    ClaudiumLegacyUnused40 = 40,
     [InspectorName("Макс. усилие поворота корпуса (Н*м)")]
     GyroTurnTorque = 43,
     [InspectorName("Демпфирование гироповорота")]

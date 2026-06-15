@@ -1,0 +1,26 @@
+id,display_name,prefab_name,width,height,level,max_count,initial_count,origin_x,origin_y,color,visual_kind,category
+anchor_house,Якорный дом,BaseBuilding_AnchorHouse,4,4,3,1,1,2,2,#A3B3C7,hq,core
+refinery,Рефайнери,BaseBuilding_Refinery,3,4,5,2,1,7,2,#9E7554,refinery,processing
+gas_separator,Газоразделитель,BaseBuilding_GasSeparator,4,2,4,2,1,12,2,#80A3AD,separator,processing
+workshop,Мастерская,BaseBuilding_Workshop,3,3,4,5,1,12,7,#A88A61,workshop,production
+scrapyard,Разборочный двор,BaseBuilding_Scrapyard,3,4,3,2,1,7,12,#808076,scrapyard,processing
+butchery,Бойня левиафанов,,3,4,1,2,1,11,12,#8C6A72,butchery,processing
+laboratory,Лаборатория,BaseBuilding_Laboratory,3,3,2,2,1,4,9,#8AADB3,laboratory,processing
+archive,Архивы,BaseBuilding_Archive,4,4,1,2,1,0,13,#6F7FA4,archive,knowledge
+trader_pavilion,Торговый павильон,,3,3,1,1,1,14,12,#C39A53,trader,service
+courier_service,Курьерская служба,,4,3,1,1,1,16,4,#2E8F94,courier,service
+pve_dock,ПВЕ-док,,5,8,1,2,1,-1,-1,#52636B,pve_dock,dock
+relic,Реликт,,2,2,1,1,0,-1,-1,#7E6D9D,relic,special
+capital_building,Столичное здание,,3,3,1,1,0,-1,-1,#B69C6A,capital,special
+pub,Паб,,2,3,1,1,0,-1,-1,#8D5D43,pub,special
+monument,Памятник,,2,2,1,1,0,-1,-1,#AFA78E,monument,special
+beacon,Маяк,,3,3,1,1,0,-1,-1,#D0C88A,beacon,special
+old_mechanism,Старый механизм,,2,2,1,1,0,-1,-1,#6B6A5C,mechanism,special
+construction_yard,Строительный цех,,3,4,1,1,0,-1,-1,#9B8A6D,construction,industry
+metallurgy,Металлургия,,3,3,1,1,0,-1,-1,#8A6D55,metallurgy,industry
+mechanical,Механический цех,,4,2,1,1,0,-1,-1,#7C826C,mechanical,industry
+instrumentation,Приборный цех,,3,3,1,1,0,-1,-1,#667F8E,instrumentation,industry
+chemical_reactor,Химический реактор,,4,3,1,1,0,-1,-1,#7A8A57,reactor,industry
+automaton_workshop,Автоматонный цех,,3,4,1,1,0,-1,-1,#7A6C88,automaton,industry
+electrical_workshop,Электрический цех,,3,4,1,1,0,-1,-1,#6E88A2,electrical,industry
+assembly_hall,Сборочный цех,,4,4,1,1,0,-1,-1,#8F735C,assembly,industry

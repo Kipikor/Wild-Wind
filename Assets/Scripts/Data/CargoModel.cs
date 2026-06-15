@@ -2,12 +2,6 @@ using System;
 using UnityEngine;
 
 [Serializable]
-public enum CargoUnitKind
-{
-    Piece
-}
-
-[Serializable]
 public enum CargoStorageKind
 {
     Van,

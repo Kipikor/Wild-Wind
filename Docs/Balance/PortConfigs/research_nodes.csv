@@ -1,0 +1,25 @@
+knowledge_id,branch,local_name_ru,max_level,unlock_mastery_level,requires_book_from_level,modifier_id,modifier_per_level,resource_tag,notes_ru
+know_base_storage_ledgers,base,Складские ведомости,5,1,0,warehouse_capacity_percent,0.04,common,Ранний обязательный комфорт.
+know_base_project_queue,base,Диспетчерская очередь,5,3,0,base_project_speed_percent,0.03,common,Ускоряет стройку и ремонтные проекты.
+know_base_dock_crews,base,Доковые бригады,5,4,0,dock_loading_speed_percent,0.03,common,Скорость погрузки самолета/курьерки/дока.
+know_repair_triage,base,Сортировка ремонтных работ,5,8,2,repair_job_cost_percent,-0.025,repair,Снижает стоимость отдельных работ ремонтного дока.
+know_repair_found_hulls,base,Паспорта найденных корпусов,5,12,3,repair_ship_quality_weight,0.05,repair,Повышает шанс лучших корпусов в доке.
+know_prod_ore_sorting,industry,Рудные сортировочные столы,5,2,0,ore_processing_yield_percent,0.03,ore,Больше выхода из руды.
+know_prod_gas_separation,industry,Сепарация конденсатов,5,6,2,gas_processing_yield_percent,0.03,gas,Больше газа и нобеля из конденсатов.
+know_prod_cascade_jigs,industry,Каскадные кондукторы,5,8,2,cascade_speed_percent,0.03,industry,Быстрее каскад.
+know_prod_material_loss,industry,Потери переработки,5,14,3,processing_input_cost_percent,-0.02,industry,Маленькие проценты складываются в крупную экономию.
+know_auto_careful_cutting,automaton,Аккуратная вырезка модулей,5,10,2,automaton_module_quality_percent,0.04,automaton,Больше шанс ценных модулей.
+know_auto_clockwork_reading,automaton,Чтение заводных схем,5,16,3,perfcards_yield_percent,0.05,automaton,Больше перфокарт и полезной логики.
+know_lev_harpoon_ropes,leviathan,Промысловые гарпуны,5,9,2,leviathan_capture_mass_percent,0.04,leviathan,Лучше удержание туши.
+know_lev_clean_butchery,leviathan,Чистая разделка,5,13,3,leviathan_yield_percent,0.03,leviathan,Выход жира и шкуры и ихора и амбры.
+know_relic_indexing,research,Индексация архивов,5,5,0,research_speed_percent,0.04,relic,Ускоряет накопление SP.
+know_relic_cipher_tables,research,Шифровальные таблицы,5,11,2,relic_decode_quality_percent,0.04,relic,Меньше обрывков и больше книг/чертежей.
+know_relic_blueprint_rebuild,research,Восстановление чертежей,5,18,3,blueprint_fragment_bonus_percent,0.04,relic,Лучше информационный лут.
+know_log_courier_codes,logistics,Коды курьерских манифестов,5,6,0,courier_reward_freight_percent,0.03,logistics,Курьерка платит больше.
+know_log_capital_packing,logistics,Столичная упаковка,5,10,2,capital_airplane_partial_reward_percent,0.03,logistics,Лучше частичная загрузка самолета.
+know_log_route_weather,logistics,Погодные маршрутные журналы,5,12,2,passive_route_yield_percent,0.03,logistics,Будущий портовый маршрутный бонус.
+know_shop_coupon_accounting,commerce,Купонная бухгалтерия,5,8,2,coupon_drop_weight_percent,0.04,commerce,Чуть больше скидочных наград.
+know_shop_bundle_appraisal,commerce,Оценка наборов,5,15,3,bundle_bonus_value_percent,0.02,commerce,Небольшой бонус к содержимому бандлов.
+know_event_field_booths,events,Полевые стойки события,5,7,0,event_currency_gain_percent,0.03,event,Больше валюты события.
+know_event_ticket_ledgers,events,Билетные ведомости,5,12,2,event_ticket_gain_percent,0.025,event,Больше билетов за активность.
+know_ship_teardown,ships,Разбор отслуживших кораблей,5,16,3,ship_sellback_percent,0.03,ships,Повышает выгоду списания и анализа кораблей.

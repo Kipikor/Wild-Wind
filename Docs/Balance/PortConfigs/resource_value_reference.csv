@@ -1,0 +1,46 @@
+item_id,local_name_ru,category,value_fe_per_unit,wind_buyback_percent,notes_ru
+charcoal,Уголь,basic_material,1,0.15,Массовое топливо.
+iron,Железо,basic_material,2,0.15,Базовый металл.
+copper,Медь,basic_material,3,0.15,Приборы и теплообмен.
+magnesium,Магний,basic_material,4,0.15,Легкие рамы.
+quartz,Кварц,basic_material,3,0.15,Оптика и точность.
+water,Вода,service_resource,0.2,0.10,Дешевый массовый ресурс.
+claudium,Клавдий,service_resource,12,0.12,Летный минерал.
+paper,Бумага,crafted_good,12,0.15,Бюро и карты и архив.
+tools,Инструменты,crafted_good,80,0.18,Ремонт и производство.
+calcite,Кальцит,t2_mineral,4,0.15,Флюс и минеральные реакции.
+sylvine,Сильвин,t2_mineral,5,0.15,Соли и химия.
+monazite,Монацит,rare_mineral,45,0.12,Редкий выход руд.
+gems,Геммы,faction_currency,180,0.00,Валюта Каменного Свода; не скупается как сырье.
+nobel,Нобель,faction_currency,150,0.00,Валюта Туманного Синода.
+perfcards,Перфокарты,faction_currency,220,0.00,Валюта Заводного Ковчега.
+amber,Амбра,faction_currency,250,0.00,Валюта Пожирателей.
+meat,Мясо,leviathan_material,1.5,0.12,Еда и биомасса.
+fat,Жир,leviathan_material,8,0.15,Смазка и топливо и герметик.
+hide,Шкура,leviathan_material,60,0.15,Листовой биоматериал; единица тяжелая.
+tendons,Сухожилия,leviathan_material,28,0.15,Тросы и амортизаторы.
+bone_grit,Костная крошка,leviathan_material,3,0.12,Фильтры и удобрения.
+acid,Кислота,leviathan_material,18,0.15,Травление и обработка.
+ichor,Ихор,leviathan_material,45,0.12,Биокатализатор.
+precision_spring,Заводная силовая спираль,automaton_mechanism,1200,0.18,Не крафтится обычным каскадом.
+microgear_cascade,Микрошестеренный каскад,automaton_mechanism,550,0.18,Точная передача движения.
+anchor_escapement,Анкерный спуск,automaton_mechanism,750,0.18,Ритм и импульсы.
+cam_drum,Кулачковый барабан,automaton_mechanism,1100,0.18,Механическая программа.
+differential_counter,Дифференциальный счетчик,automaton_mechanism,1800,0.18,Механический вычислитель.
+gyropendulum_block,Гиромаятниковый блок,automaton_mechanism,1400,0.18,Стабилизация.
+servovalve_unit,Сервоклапанный узел,automaton_mechanism,900,0.18,Точная команда в привод.
+knowledge_book,Книга знания,information,6000,0.05,Открывает знание.
+book_fragment,Фрагмент книги,information,600,0.05,Собирается в книгу.
+archive_scrap,Архивный обрывок,information,100,0.05,Поврежденный текст.
+blueprint_fragment,Фрагмент чертежа,information,800,0.05,Мягкий прогресс чертежа.
+full_blueprint,Полный чертеж,information,50000,0.05,Большой unlock.
+one_time_recipe,Одноразовый рецепт,information,12000,0.05,Один прогон крафта.
+chart,Лоция,information,2000,0.05,Открывает точку интереса.
+dossier,Архивное досье,information,1500,0.05,Репутация и сюжет и магазин.
+cipher_key,Ключ шифра,information,1000,0.05,Открывает закрытые реликты/контейнеры.
+trade_license,Торговая лицензия,information,10000,0.05,Открывает магазинный товар.
+speedup_1h,Ускорение 1 ч,service_item,1000,0.10,Портовое ускорение.
+repair_common_pack,Ремонтный запас,pack,30000,0.10,Пакет материалов.
+repair_rare_pack,Редкий ремонтный запас,pack,90000,0.10,Пакет редких материалов.
+common_material_pack,Полевой набор,pack,900,0.10,Мелкие материалы.
+rare_ship_module,Редкий модуль,ship_item,150000,0.10,Редкая награда.

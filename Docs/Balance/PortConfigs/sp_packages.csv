@@ -1,0 +1,6 @@
+package_id,category,sp_amount,value_fe,source,overflow_rule_ru
+sp_500_any,any,500,250,ранние задания; контейнеры,Перелив сгорает.
+sp_2000_industry,industry,2000,900,реликты; ивенты; магазин фракций,Перелив сгорает.
+sp_2000_research,research,2000,900,реликты; контейнеры,Перелив сгорает.
+sp_5000_any,any,5000,2100,самолет; достижения; ивенты,Перелив сгорает.
+sp_50000_industry,industry,50000,18000,редкие реликты; weekly bundle; deep event,Перелив сгорает.

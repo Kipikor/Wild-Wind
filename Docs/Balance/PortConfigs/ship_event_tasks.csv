@@ -1,0 +1,9 @@
+task_id,event_id,task_type,reset,required_action,target_count,reward_ticket,reward_event_sail,reward_mastery,reward_track_points,notes_ru
+seeker_daily_01,ship_event_seeker,daily,daily,complete_any_mission,2,1,90,20,20,Базовое участие.
+seeker_daily_02,ship_event_seeker,daily,daily,complete_courier_orders,3,1,80,15,15,Связывает ивент с портом.
+seeker_daily_03,ship_event_seeker,daily,daily,process_any_resources,3,1,100,20,20,Поддерживает переработку.
+seeker_daily_04,ship_event_seeker,daily,daily,spend_event_sail_or_open_event,1,1,80,15,15,Мягкий цикл магазина/рулетки.
+seeker_weekly_01,ship_event_seeker,weekly,weekly,complete_missions,10,3,450,100,120,Крупная недельная задача.
+seeker_weekly_02,ship_event_seeker,weekly,weekly,repair_or_build_or_research,5,3,500,120,130,Портовая недельная задача.
+seeker_chain_01,ship_event_seeker,chain,once,earn_event_track_points,500,5,700,250,0,Разовая цепочка.
+seeker_chain_02,ship_event_seeker,chain,once,earn_event_track_points,1200,8,1200,450,0,Глубокое участие.

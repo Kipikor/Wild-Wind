@@ -1,0 +1,12 @@
+loot_id,event_id,rarity,weight,reward_id,reward_amount,value_fe,notes_ru
+roulette_gold,ship_event_seeker,rare,22,freight,2000,2000,Обычная валюта.
+roulette_event_sail,ship_event_seeker,rare,22,event_sail,100,2500,Возврат в магазин.
+roulette_speedup,ship_event_seeker,rare,16,speedup_1h,3,3000,Ускорители.
+roulette_plates,ship_event_seeker,rare,14,steel_plates_pack,1,3500,Материалы.
+roulette_sp,ship_event_seeker,rare,10,sp_2000_research,1,900,SP.
+roulette_frag_small,ship_event_seeker,epic,7,seeker_r8_fragment,10,42000,Существенный прогресс к кораблю.
+roulette_blueprint_frag,ship_event_seeker,epic,4,seeker_recipe_fragment,2,50000,Рецепт как глубокая цель.
+roulette_rare_module,ship_event_seeker,epic,2,rare_ship_module,1,150000,Редкий модуль.
+roulette_ship_frag_legend,ship_event_seeker,legendary,2,seeker_r8_fragment,30,126000,Легендарный фрагментный приз.
+roulette_full_blueprint,ship_event_seeker,legendary,0.7,seeker_full_blueprint,1,500000,Очень редкий полный чертеж.
+roulette_event_ship,ship_event_seeker,legendary,0.3,seeker_r8_ship_instance,1,250000,Готовый корабль может выпасть но не единственный путь.

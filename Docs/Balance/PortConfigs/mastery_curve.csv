@@ -1,0 +1,9 @@
+level_range,xp_start,xp_end,reward_pattern,solid_milestone,major_unlock_ru
+1-5,0,1200,every_level_small_pack,10,Базовый порт и первые курьерские слоты.
+6-10,1200,6000,every_level_resources,20,Самолет столицы; первые исследования; магазин фракций.
+11-15,6000,18000,every_level_resources,30,Ремонтный док; больше зданий; кампании фракций.
+16-20,18000,45000,every_level_resources,50,Основные функции открыты; дальше замедление.
+21-30,45000,160000,every_level_medium_pack,75,Развитая промышленность и редкие знания.
+31-40,160000,420000,every_level_medium_pack,100,Верхняя экономика R8-R10.
+41-50,420000,900000,every_level_late_pack,150,Глубокие рецепты и T2.
+51-70,900000,2500000,every_level_late_pack,250,Длинная наградная дорожка без критичных unlock.

@@ -1,0 +1,16 @@
+container_id,requires_key,key_id,reward_id,reward_type,amount,weight,value_fe,notes_ru
+common_port_crate,false,,freight,currency,600,30,600,Частая фрахтовая награда.
+common_port_crate,false,,common_material_pack,item,1,30,900,Материалы.
+common_port_crate,false,,sp_500_any,item,1,15,250,Малый SP.
+common_port_crate,false,,coupon_freight_10,coupon,1,10,0,Купон.
+common_port_crate,false,,locked_relic_case,container,1,2,0,Вложенный контейнер; не открывается автоматически.
+locked_relic_case,true,key_relic_case,fragment_book,item,2,30,1200,Информационная награда.
+locked_relic_case,true,key_relic_case,knowledge_book,item,1,8,6000,Редкая книга.
+locked_relic_case,true,key_relic_case,blueprint_fragment,item,3,25,2400,Фрагменты.
+locked_relic_case,true,key_relic_case,full_blueprint,item,1,1,50000,Очень редкая строка.
+locked_relic_case,true,key_relic_case,archive_scrap,item,5,36,500,Утешительный текстовый мусор.
+event_ship_crate,false,,event_ticket,currency,3,28,2700,Билеты события.
+event_ship_crate,false,,event_sail,currency,120,30,3000,Валюта события.
+event_ship_crate,false,,ship_fragment_event,item,10,18,72000,Фрагменты корабля.
+event_ship_crate,false,,coupon_event_25,coupon,1,8,0,Событийная скидка.
+event_ship_crate,false,,rare_ship_module,item,1,1,150000,Редкий модуль.

@@ -408,7 +408,7 @@ public sealed class WildWindGameplaySession : MonoBehaviour
         if (existing == null)
         {
             existing = new GameObject(PlayerShipObjectName);
-            BuildFallbackShipVisual(existing.transform);
+            existing.transform.position = GameplaySessionAccountData.ResolveStarterDockPosition(GameplaySessionAccountData.DefaultDockId);
         }
 
         playerShipRoot = existing.transform;
@@ -469,55 +469,6 @@ public sealed class WildWindGameplaySession : MonoBehaviour
         if ((playerShipRoot.position - focus.position).sqrMagnitude > 0.0001f)
         {
             playerShipRoot.position = focus.position;
-        }
-    }
-
-    private static void BuildFallbackShipVisual(Transform root)
-    {
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null)
-        {
-            shader = Shader.Find("Standard");
-        }
-
-        Material material = new Material(shader)
-        {
-            color = new Color(0.52f, 0.42f, 0.29f, 1f),
-            hideFlags = HideFlags.DontSave
-        };
-
-        CreatePrimitive("Session Balloon", PrimitiveType.Capsule, root, Vector3.zero, new Vector3(120f, 240f, 120f), material, new Vector3(0f, 0f, 90f));
-        CreatePrimitive("Session Cabin", PrimitiveType.Cube, root, new Vector3(0f, -115f, 0f), new Vector3(160f, 70f, 95f), material, Vector3.zero);
-    }
-
-    private static void CreatePrimitive(string name, PrimitiveType type, Transform parent, Vector3 localPosition, Vector3 localScale, Material material, Vector3 euler)
-    {
-        GameObject primitive = GameObject.CreatePrimitive(type);
-        primitive.name = name;
-        primitive.transform.SetParent(parent, false);
-        primitive.transform.localPosition = localPosition;
-        primitive.transform.localRotation = Quaternion.Euler(euler);
-        primitive.transform.localScale = localScale;
-
-        MeshRenderer renderer = primitive.GetComponent<MeshRenderer>();
-        if (renderer != null)
-        {
-            renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
-        }
-
-        Collider collider = primitive.GetComponent<Collider>();
-        if (collider != null)
-        {
-            if (Application.isPlaying)
-            {
-                Destroy(collider);
-            }
-            else
-            {
-                DestroyImmediate(collider);
-            }
         }
     }
 

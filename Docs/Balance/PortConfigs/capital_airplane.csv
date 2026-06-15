@@ -1,0 +1,5 @@
+tier_id,unlock_mastery_level,cooldown_hours,crate_count,full_input_fe,solid_full,freight_bonus_full,mastery_full,partial_reward_floor_percent,late_penalty,notes_ru
+capital_plane_early,5,24,6,12000,30,1200,150,0.35,none,Первый главный стабильный источник солида.
+capital_plane_standard,12,24,8,45000,75,4000,360,0.35,none,Основная ежедневная задача.
+capital_plane_developed,22,24,10,160000,160,14000,850,0.40,none,Требует планирования производства.
+capital_plane_high,35,24,12,550000,350,45000,1800,0.40,none,Поздняя большая загрузка; солид все еще ограничен.

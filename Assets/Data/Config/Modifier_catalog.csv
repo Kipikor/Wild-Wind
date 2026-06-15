@@ -1,0 +1,18 @@
+modifier_id,local_name_ru,local_name_en,category_id,value_kind,stacking_rule,default_operation,description_ru
+starter_airship_unlock,Стартовый дирижабль,Starter Airship Unlock,starter,unlock,unique,unlock,Открывает базовые правила стартового корабля.
+warehouse_capacity,Емкость складов,Warehouse Capacity,base,percent,additive,add_percent,Увеличивает объемы складов базы и будущих складских зданий.
+base_project_speed,Скорость базовых проектов,Base Project Speed,base,percent,additive,add_percent,Ускоряет расчистку и строительство базовых проектов.
+dock_loading_speed,Скорость погрузки доков,Dock Loading Speed,base,percent,additive,add_percent,Ускоряет погрузку и разгрузку в доках.
+processing_yield,Выход переработки,Processing Yield,production,percent,additive,add_percent,Увеличивает КПД переработки сырья.
+processing_cycle_speed,Скорость переработки,Processing Cycle Speed,production,percent,additive,add_percent,Ускоряет производственные циклы переработки.
+manufacturing_speed,Скорость сборки,Manufacturing Speed,production,percent,additive,add_percent,Ускоряет каскадную сборку и будущие производственные линии.
+cargo_capacity,Грузовой объем кораблей,Ship Cargo Capacity,ships,percent,additive,add_percent,Увеличивает грузовой объем кораблей.
+claudium_lift_efficiency,Эффективность клавдиевого подъема,Claudium Lift Efficiency,ships,percent,additive,add_percent,Повышает эффективность подъемного контура.
+fuel_use,Расход топлива,Fuel Use,ships,percent,additive,add_percent,Снижает или повышает расход топлива в зависимости от значения.
+route_safety,Безопасность маршрутов,Route Safety,logistics,percent,additive,add_percent,Снижает риски маршрутов и будущих idle-доставок.
+local_pilot_speed,Скорость островных пилотов,Local Pilot Speed,logistics,percent,additive,add_percent,Ускоряет локальные службы островов.
+courier_reward_freight,Фрахт курьерских заявок,Courier Freight Reward,logistics,percent,additive,add_percent,Увеличивает фрахтовую награду курьерской службы.
+research_speed,Выработка SP архивов,Archive SP Output,research,percent,additive,add_percent,Увеличивает выработку SP архивами вместо прямого ускорения таймера.
+observation_gain,Получение наблюдений,Observation Gain,research,percent,additive,add_percent,Увеличивает выход полевых наблюдений.
+recipe_quality_bonus,Качество рецептов,Recipe Quality Bonus,research,percent,additive,add_percent,Повышает качество открываемых рецептов.
+design_experience_gain,Очки освоения,Mastery Points Gain,research,percent,additive,add_percent,Увеличивает получение очков освоения.

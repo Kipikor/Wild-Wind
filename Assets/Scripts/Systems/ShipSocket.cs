@@ -9,7 +9,7 @@ public class ShipSocket : MonoBehaviour
     public string slotId = "slot";
 
     [InspectorName("Тип слота")]
-    [Tooltip("Произвольный тип слота: engine_main, propeller_main, claudium_loop, utility и так далее.")]
+    [Tooltip("Произвольный тип слота: claudium_loop, high, mid, low, rig и так далее.")]
     public string slotTypeId = "module";
 
     [InspectorName("Точка установки")]

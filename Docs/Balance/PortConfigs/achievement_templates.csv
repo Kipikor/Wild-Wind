@@ -1,0 +1,13 @@
+achievement_family,tiers,progression_metric,reward_solid_total,reward_mastery_total,cosmetic_reward,notes_ru
+missions_completed,20,complete_missions,500,5000,title,Большая одноразовая дорожка за вылеты.
+resources_processed,20,process_resources_fe,350,4500,icon,Поддерживает переработку.
+ships_researched,15,research_ship_nodes,450,4000,title,Корабельное дерево.
+ships_crafted,15,craft_ships,500,4500,icon,Каскадное производство.
+repair_dock_completed,12,restore_found_ships,300,3500,title,Ремонтный док.
+courier_completed,20,complete_courier_orders,250,3000,icon,Курьерка.
+capital_planes_sent,15,send_full_capital_planes,600,4500,title,Стабильный источник солида через достижения.
+faction_reputation,6,reach_reputation_levels,500,4000,portrait,По всем фракциям.
+events_participated,12,complete_event_milestones,400,3500,banner,Ивенты.
+relics_decoded,12,decode_relics,350,3500,icon,Исследования и реликты.
+automatons_salvaged,12,disassemble_automaton_modules,300,3000,title,Заводной Ковчег.
+leviathans_butchered,12,butcher_leviathans,300,3000,title,Пожиратели.

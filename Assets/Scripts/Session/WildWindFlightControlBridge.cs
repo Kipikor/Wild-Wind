@@ -37,7 +37,6 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     public bool IsReady => ResolveShip() != null;
     public ShipPhysics ControlledShip => ResolveShip();
     public bool IsConnectedToGameplayShip => IsConnectedToSessionShip();
-    public bool AfterburnerEnabled => ResolveShip() != null && ship.engineAfterburnerEnabled;
     public bool ClaudiumSlipstreamEnabled => ResolveShip() != null && ship.claudiumSlipstreamEnabled;
     public float ClaudiumSlipstreamCharge01 => ResolveShip() != null ? ship.ClaudiumSlipstreamCharge01 : 0f;
     public float ManualThrust => manualThrust;
@@ -168,30 +167,6 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
     {
         manualTurn = Mathf.Clamp(manualTurn + Mathf.Sign(direction) * ManualLeverStep, -1f, 1f);
         statusMessage = "Manual turn lever changed.";
-    }
-
-    public void ToggleAfterburner()
-    {
-        if (ResolveShip() == null)
-        {
-            statusMessage = "Flight controls have no ship.";
-            return;
-        }
-
-        ship.engineAfterburnerEnabled = !ship.engineAfterburnerEnabled;
-        ClampEnginePowerLeverToLimit();
-
-        statusMessage = ship.engineAfterburnerEnabled
-            ? "Afterburner 120% enabled."
-            : "Afterburner disabled.";
-    }
-
-    private void ClampEnginePowerLeverToLimit()
-    {
-        if (ship != null)
-        {
-            ship.enginePowerLever = Mathf.Min(ship.enginePowerLever, ship.EnginePowerLeverLimit);
-        }
     }
 
     public void ToggleClaudiumSlipstream()
@@ -601,7 +576,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         }
 
         syncedSortieEntryKey = key;
-        if (ship.thrustInput < 0.9f && ship.propellerPitch < 0.9f)
+        if (ship.thrustInput < 0.9f && ship.hullThrustOutput < 0.9f)
         {
             return;
         }

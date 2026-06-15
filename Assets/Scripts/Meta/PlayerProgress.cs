@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -15,11 +15,17 @@ public class PlayerProgress
 {
     public string selectedHullId = "";
     public List<string> completedTechnologyIds = new List<string>();
+    public List<string> unlockedKnowledgeIds = new List<string>();
     public string activeResearchTechnologyId = "";
     public List<TechnologyResearchProgress> technologyResearchProgress = new List<TechnologyResearchProgress>();
+    public List<KnowledgeSpPackageState> knowledgeSpPackages = new List<KnowledgeSpPackageState>();
     public List<InstalledModuleState> installedModules = new List<InstalledModuleState>();
     public SortieSessionState activeSortie = new SortieSessionState();
     public BaseExtractionIndustryState baseIndustry = new BaseExtractionIndustryState();
+    public CourierServiceState courierService = new CourierServiceState();
+    public List<QuestState> questStates = new List<QuestState>();
+    public List<QuestMetricState> questMetrics = new List<QuestMetricState>();
+    public List<BaseIslandExpansionRegionState> baseIslandExpansionRegions = new List<BaseIslandExpansionRegionState>();
     public string selectedSortieId = SessionExtractionConstants.DefaultSafeOreSortieId;
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
@@ -31,8 +37,11 @@ public class PlayerProgress
     public Quaternion currentFlightRotation = Quaternion.identity;
     public long lastProcessUtcTicks;
     public bool receivedStartingInventory;
+    public bool receivedStartingProcessingSamples;
+    public bool receivedStartingExpansionCurrency;
+    public bool receivedStartingCourierSupplies;
     public float shipWeaponSpendBufferKg;
-    public ShipConsumableTankState shipEngineFuelTank = new ShipConsumableTankState { resourceId = "charcoal" };
+    public ShipConsumableTankState shipFuelTank = new ShipConsumableTankState { resourceId = "charcoal" };
     public ShipConsumableTankState shipClaudiumTank = new ShipConsumableTankState { resourceId = "claudium" };
 
     public List<ResourceStack> inventory = new List<ResourceStack>();
@@ -56,19 +65,42 @@ public class PlayerProgress
         }
 
         completedTechnologyIds ??= new List<string>();
+        unlockedKnowledgeIds ??= new List<string>();
         technologyResearchProgress ??= new List<TechnologyResearchProgress>();
+        knowledgeSpPackages ??= new List<KnowledgeSpPackageState>();
         installedModules ??= new List<InstalledModuleState>();
         activeSortie ??= new SortieSessionState();
         baseIndustry ??= new BaseExtractionIndustryState();
-        shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
+        courierService ??= new CourierServiceState();
+        questStates ??= new List<QuestState>();
+        questMetrics ??= new List<QuestMetricState>();
+        baseIslandExpansionRegions ??= new List<BaseIslandExpansionRegionState>();
+        shipFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
         shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
         inventory ??= new List<ResourceStack>();
         shipCargo ??= new List<ResourceStack>();
         portStorages ??= new List<PortStorageState>();
         activeSortie.Normalize();
         baseIndustry.Normalize();
-        shipEngineFuelTank.Normalize();
+        courierService.Normalize();
+        shipFuelTank.Normalize();
         shipClaudiumTank.Normalize();
+
+        for (int i = baseIslandExpansionRegions.Count - 1; i >= 0; i--)
+        {
+            BaseIslandExpansionRegionState region = baseIslandExpansionRegions[i];
+            if (region == null)
+            {
+                baseIslandExpansionRegions.RemoveAt(i);
+                continue;
+            }
+
+            region.Normalize();
+            if (string.IsNullOrWhiteSpace(region.regionId))
+            {
+                baseIslandExpansionRegions.RemoveAt(i);
+            }
+        }
 
         for (int i = shipCargo.Count - 1; i >= 0; i--)
         {
@@ -114,6 +146,42 @@ public class PlayerProgress
             }
 
             state.Normalize();
+        }
+
+        for (int i = knowledgeSpPackages.Count - 1; i >= 0; i--)
+        {
+            KnowledgeSpPackageState package = knowledgeSpPackages[i];
+            if (package == null || string.IsNullOrWhiteSpace(package.packageId) || package.amountSp <= 0)
+            {
+                knowledgeSpPackages.RemoveAt(i);
+                continue;
+            }
+
+            package.Normalize();
+        }
+
+        for (int i = questStates.Count - 1; i >= 0; i--)
+        {
+            QuestState quest = questStates[i];
+            if (quest == null || string.IsNullOrWhiteSpace(quest.questId))
+            {
+                questStates.RemoveAt(i);
+                continue;
+            }
+
+            quest.Normalize();
+        }
+
+        for (int i = questMetrics.Count - 1; i >= 0; i--)
+        {
+            QuestMetricState metric = questMetrics[i];
+            if (metric == null || string.IsNullOrWhiteSpace(metric.metricType))
+            {
+                questMetrics.RemoveAt(i);
+                continue;
+            }
+
+            metric.Normalize();
         }
 
         for (int i = portStorages.Count - 1; i >= 0; i--)
@@ -199,9 +267,9 @@ public class PlayerProgress
 
     public void ClearShipConsumableTanks()
     {
-        shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
+        shipFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
         shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
-        shipEngineFuelTank.amountKg = 0f;
+        shipFuelTank.amountKg = 0f;
         shipClaudiumTank.amountKg = 0f;
     }
 
@@ -238,6 +306,64 @@ public class PlayerProgress
         TechnologyResearchProgress newState = new TechnologyResearchProgress { technologyId = technologyId };
         technologyResearchProgress.Add(newState);
         return newState;
+    }
+
+    public bool IsKnowledgeUnlocked(string technologyId)
+    {
+        return !string.IsNullOrWhiteSpace(technologyId) && unlockedKnowledgeIds.Contains(technologyId);
+    }
+
+    public bool UnlockKnowledge(string technologyId)
+    {
+        if (string.IsNullOrWhiteSpace(technologyId)) return false;
+        unlockedKnowledgeIds ??= new List<string>();
+        if (unlockedKnowledgeIds.Contains(technologyId)) return false;
+
+        unlockedKnowledgeIds.Add(technologyId);
+        return true;
+    }
+
+    public KnowledgeSpPackageState GetKnowledgeSpPackage(string packageId)
+    {
+        if (string.IsNullOrWhiteSpace(packageId) || knowledgeSpPackages == null) return null;
+
+        for (int i = 0; i < knowledgeSpPackages.Count; i++)
+        {
+            KnowledgeSpPackageState package = knowledgeSpPackages[i];
+            if (package != null && package.packageId == packageId)
+            {
+                return package;
+            }
+        }
+
+        return null;
+    }
+
+    public void AddKnowledgeSpPackage(string packageId, string scopeKind, string scopeId, int amountSp)
+    {
+        if (string.IsNullOrWhiteSpace(packageId) || amountSp <= 0) return;
+
+        knowledgeSpPackages ??= new List<KnowledgeSpPackageState>();
+        KnowledgeSpPackageState package = GetKnowledgeSpPackage(packageId);
+        if (package == null)
+        {
+            package = new KnowledgeSpPackageState { packageId = packageId };
+            knowledgeSpPackages.Add(package);
+        }
+
+        package.scopeKind = scopeKind ?? "";
+        package.scopeId = scopeId ?? "";
+        package.amountSp += amountSp;
+        package.Normalize();
+    }
+
+    public bool RemoveKnowledgeSpPackage(string packageId)
+    {
+        KnowledgeSpPackageState package = GetKnowledgeSpPackage(packageId);
+        if (package == null) return false;
+
+        knowledgeSpPackages.Remove(package);
+        return true;
     }
 
     public int GetResourceAmount(string resourceId)
@@ -344,9 +470,9 @@ public class PlayerProgress
 
     public float GetShipConsumableTankMassKg()
     {
-        shipEngineFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
+        shipFuelTank ??= new ShipConsumableTankState { resourceId = "charcoal" };
         shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
-        return shipEngineFuelTank.amountKg + shipClaudiumTank.amountKg;
+        return shipFuelTank.amountKg + shipClaudiumTank.amountKg;
     }
 
     public float GetShipPayloadMassKg(SessionConfigDatabase config)
@@ -372,6 +498,28 @@ public class PlayerProgress
 
         PortStorageState newState = new PortStorageState { portId = portId };
         portStorages.Add(newState);
+        return newState;
+    }
+
+    public BaseIslandExpansionRegionState GetBaseIslandExpansionRegionState(string regionId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(regionId)) return null;
+
+        string normalizedId = regionId.Trim();
+        baseIslandExpansionRegions ??= new List<BaseIslandExpansionRegionState>();
+        for (int i = 0; i < baseIslandExpansionRegions.Count; i++)
+        {
+            BaseIslandExpansionRegionState state = baseIslandExpansionRegions[i];
+            if (state != null && state.regionId == normalizedId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        BaseIslandExpansionRegionState newState = new BaseIslandExpansionRegionState { regionId = normalizedId };
+        baseIslandExpansionRegions.Add(newState);
         return newState;
     }
 
@@ -416,6 +564,80 @@ public class PlayerProgress
     {
         activeSortie ??= new SortieSessionState();
         activeSortie.Clear();
+    }
+
+    public QuestState GetQuestState(string questId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(questId)) return null;
+        questStates ??= new List<QuestState>();
+
+        for (int i = 0; i < questStates.Count; i++)
+        {
+            QuestState quest = questStates[i];
+            if (quest != null && quest.questId == questId)
+            {
+                return quest;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        QuestState newQuest = new QuestState { questId = questId };
+        questStates.Add(newQuest);
+        return newQuest;
+    }
+
+    public QuestMetricState GetQuestMetric(string metricType, string targetId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(metricType)) return null;
+        metricType = NormalizeQuestMetricPart(metricType);
+        targetId = NormalizeQuestMetricPart(targetId);
+        questMetrics ??= new List<QuestMetricState>();
+
+        for (int i = 0; i < questMetrics.Count; i++)
+        {
+            QuestMetricState metric = questMetrics[i];
+            if (metric != null && metric.metricType == metricType && metric.targetId == targetId)
+            {
+                return metric;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        QuestMetricState newMetric = new QuestMetricState
+        {
+            metricType = metricType,
+            targetId = targetId
+        };
+        questMetrics.Add(newMetric);
+        return newMetric;
+    }
+
+    public int AddQuestMetric(string metricType, string targetId, int amount)
+    {
+        if (amount <= 0) return GetQuestMetricValue(metricType, targetId);
+        QuestMetricState metric = GetQuestMetric(metricType, targetId, true);
+        metric.value = Mathf.Max(0, metric.value + amount);
+        return metric.value;
+    }
+
+    public int SetQuestMetricAtLeast(string metricType, string targetId, int value)
+    {
+        QuestMetricState metric = GetQuestMetric(metricType, targetId, true);
+        metric.value = Mathf.Max(metric.value, value);
+        return metric.value;
+    }
+
+    public int GetQuestMetricValue(string metricType, string targetId)
+    {
+        QuestMetricState metric = GetQuestMetric(metricType, targetId, false);
+        return metric != null ? Mathf.Max(0, metric.value) : 0;
+    }
+
+    public static string NormalizeQuestMetricPart(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "any" : value.Trim().ToLowerInvariant();
     }
 
     public void RememberSortiePosition(Vector3 position)
@@ -664,6 +886,151 @@ public class PortStorageState
 }
 
 [Serializable]
+public class CourierServiceState
+{
+    public List<CourierOrderSlotState> slots = new List<CourierOrderSlotState>();
+
+    public void Normalize()
+    {
+        slots ??= new List<CourierOrderSlotState>();
+
+        for (int i = slots.Count - 1; i >= 0; i--)
+        {
+            CourierOrderSlotState slot = slots[i];
+            if (slot == null)
+            {
+                slots.RemoveAt(i);
+                continue;
+            }
+
+            slot.Normalize();
+        }
+    }
+
+    public CourierOrderSlotState GetSlot(int slotIndex, bool createIfMissing)
+    {
+        slots ??= new List<CourierOrderSlotState>();
+        for (int i = 0; i < slots.Count; i++)
+        {
+            CourierOrderSlotState slot = slots[i];
+            if (slot != null && slot.slotIndex == slotIndex)
+            {
+                return slot;
+            }
+        }
+
+        if (!createIfMissing)
+        {
+            return null;
+        }
+
+        CourierOrderSlotState newSlot = new CourierOrderSlotState { slotIndex = Mathf.Max(0, slotIndex) };
+        slots.Add(newSlot);
+        return newSlot;
+    }
+}
+
+[Serializable]
+public class CourierOrderSlotState
+{
+    public int slotIndex;
+    public int generation;
+    public string orderId = "";
+    public string clientName = "";
+    public List<CascadeItemAmount> inputs = new List<CascadeItemAmount>();
+    public int freightReward;
+    public int designExperienceReward;
+    public long cooldownCompleteUtcTicks;
+
+    public bool HasActiveOrder => cooldownCompleteUtcTicks <= 0L
+        && !string.IsNullOrWhiteSpace(orderId)
+        && inputs != null
+        && inputs.Count > 0;
+
+    public bool IsCoolingDownAt(long utcTicks)
+    {
+        return cooldownCompleteUtcTicks > utcTicks;
+    }
+
+    public void Normalize()
+    {
+        slotIndex = Mathf.Max(0, slotIndex);
+        generation = Mathf.Max(0, generation);
+        orderId = string.IsNullOrWhiteSpace(orderId) ? "" : orderId.Trim();
+        clientName = string.IsNullOrWhiteSpace(clientName) ? "" : clientName.Trim();
+        inputs ??= new List<CascadeItemAmount>();
+        freightReward = Mathf.Max(0, freightReward);
+        designExperienceReward = Mathf.Max(0, designExperienceReward);
+        cooldownCompleteUtcTicks = Math.Max(0L, cooldownCompleteUtcTicks);
+
+        for (int i = inputs.Count - 1; i >= 0; i--)
+        {
+            CascadeItemAmount input = inputs[i];
+            if (input == null)
+            {
+                inputs.RemoveAt(i);
+                continue;
+            }
+
+            input.Normalize();
+            if (string.IsNullOrWhiteSpace(input.itemId) || input.amount <= 0)
+            {
+                inputs.RemoveAt(i);
+            }
+        }
+
+        if (cooldownCompleteUtcTicks > 0L)
+        {
+            orderId = "";
+            clientName = "";
+            inputs.Clear();
+            freightReward = 0;
+            designExperienceReward = 0;
+        }
+    }
+
+    public void ClearOrder()
+    {
+        orderId = "";
+        clientName = "";
+        inputs ??= new List<CascadeItemAmount>();
+        inputs.Clear();
+        freightReward = 0;
+        designExperienceReward = 0;
+    }
+}
+
+[Serializable]
+public class BaseIslandExpansionRegionState
+{
+    public string regionId = "";
+    public BaseIslandExpansionRegionStatus status = BaseIslandExpansionRegionStatus.Debris;
+    public long clearingCompleteUtcTicks;
+
+    public void Normalize()
+    {
+        regionId = string.IsNullOrWhiteSpace(regionId) ? "" : regionId.Trim();
+        if (!Enum.IsDefined(typeof(BaseIslandExpansionRegionStatus), status))
+        {
+            status = BaseIslandExpansionRegionStatus.Debris;
+        }
+
+        if (status != BaseIslandExpansionRegionStatus.Clearing)
+        {
+            clearingCompleteUtcTicks = 0;
+        }
+    }
+}
+
+public enum BaseIslandExpansionRegionStatus
+{
+    Fog = 0,
+    Debris = 1,
+    Clearing = 2,
+    Open = 3
+}
+
+[Serializable]
 public class InstalledModuleState
 {
     public string slotId = "";
@@ -681,6 +1048,8 @@ public class TechnologyResearchProgress
 {
     public string technologyId = "";
     public int completedCycles;
+    public float currentLevelSpProgress;
+    public bool currentLevelRequirementsPaid;
     public long activeCycleStartUtcTicks;
     public long activeCycleEndUtcTicks;
 
@@ -690,9 +1059,78 @@ public class TechnologyResearchProgress
     {
         technologyId ??= "";
         completedCycles = Mathf.Max(0, completedCycles);
+        currentLevelSpProgress = Mathf.Max(0f, currentLevelSpProgress);
         if (activeCycleEndUtcTicks < 0) activeCycleEndUtcTicks = 0;
         if (activeCycleStartUtcTicks < 0) activeCycleStartUtcTicks = 0;
-        if (activeCycleEndUtcTicks == 0) activeCycleStartUtcTicks = 0;
+        activeCycleStartUtcTicks = 0;
+        activeCycleEndUtcTicks = 0;
+    }
+}
+
+[Serializable]
+public class KnowledgeSpPackageState
+{
+    public string packageId = "";
+    public string scopeKind = "universal";
+    public string scopeId = "";
+    public int amountSp;
+
+    public void Normalize()
+    {
+        packageId ??= "";
+        scopeKind = string.IsNullOrWhiteSpace(scopeKind) ? "universal" : scopeKind.Trim().ToLowerInvariant();
+        scopeId ??= "";
+        amountSp = Mathf.Max(0, amountSp);
+    }
+}
+
+[Serializable]
+public class QuestState
+{
+    public string questId = "";
+    public bool accepted;
+    public bool completed;
+    public bool claimed;
+    public int currentAmount;
+    public int targetAmount = 1;
+    public int baselineAmount;
+    public long acceptedUtcTicks;
+    public long completedUtcTicks;
+    public long claimedUtcTicks;
+
+    public void Normalize()
+    {
+        questId ??= "";
+        currentAmount = Mathf.Max(0, currentAmount);
+        targetAmount = Mathf.Max(1, targetAmount);
+        baselineAmount = Mathf.Max(0, baselineAmount);
+        acceptedUtcTicks = Math.Max(0L, acceptedUtcTicks);
+        completedUtcTicks = Math.Max(0L, completedUtcTicks);
+        claimedUtcTicks = Math.Max(0L, claimedUtcTicks);
+        if (claimed)
+        {
+            completed = true;
+            accepted = true;
+        }
+        else if (completed)
+        {
+            accepted = true;
+        }
+    }
+}
+
+[Serializable]
+public class QuestMetricState
+{
+    public string metricType = "";
+    public string targetId = "any";
+    public int value;
+
+    public void Normalize()
+    {
+        metricType = PlayerProgress.NormalizeQuestMetricPart(metricType);
+        targetId = PlayerProgress.NormalizeQuestMetricPart(targetId);
+        value = Mathf.Max(0, value);
     }
 }
 

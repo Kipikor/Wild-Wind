@@ -1,0 +1,21 @@
+quest_id,local_name_ru,local_name_en,category_id,description_ru,objective_type,target_id,target_amount,activation_mode,claim_mode,required_quest_id,reward_item_id,reward_amount,sort_order
+quest_have_start_freight,Запас фрахтов,Starting Freight,main,Накопите первые фрахты,resource_owned,freight,500,retroactive,auto,,solid,1,10
+quest_spend_first_freight,Первые расходы,First Spend,main,Потратьте фрахты на развитие,resource_spent,freight,100,from_accept,manual,quest_have_start_freight,solid,1,20
+quest_collect_windshale,Сланцевый запас,Windshale Stock,extraction,Получите ветровой сланец,resource_acquired,windshale_ore,50,retroactive,manual,,freight,120,30
+quest_spend_windshale,Сланец в дело,Spend Windshale,production,Потратьте ветровой сланец,resource_spent,windshale_ore,20,from_accept,auto,quest_collect_windshale,freight,80,40
+quest_collect_claudium,Клавдиевый резерв,Claudium Reserve,extraction,Накопите клавдий на базе,resource_owned,claudium,100,retroactive,auto,,freight,100,50
+quest_send_first_courier,Первый курьер,First Courier,courier,Отправьте курьерский корабль,courier_sent,any,1,retroactive,manual,,freight,180,60
+quest_send_three_couriers,Курьерская смена,Courier Shift,courier,Отправьте три курьера,courier_sent,any,3,retroactive,manual,quest_send_first_courier,solid,2,70
+quest_cancel_courier,Перепланировка заявки,Cancel Courier,courier,Отмените курьерскую заявку,courier_cancelled,any,1,from_accept,manual,quest_send_first_courier,freight,80,80
+quest_start_knowledge,Архивы в работе,Archive Started,knowledge,Направьте архивы в любое знание,technology_started,any,1,retroactive,auto,,freight,100,90
+quest_complete_storehouse,Складские ведомости,Storehouse Ledgers,knowledge,Изучите складские ведомости,technology_completed,tech_base_storehouse_ledgers,1,retroactive,manual,quest_start_knowledge,solid,2,100
+quest_ore_processing_l2,Рудная линия II,Ore Processing II,production,Улучшите переработку руды до второго уровня,base_processing_level,ore,2,retroactive,manual,,freight,160,110
+quest_gas_processing_l2,Газовая линия II,Gas Processing II,production,Улучшите переработку газа до второго уровня,base_processing_level,gas,2,retroactive,auto,,freight,160,120
+quest_cascade_assembly_l2,Сборочный каскад II,Assembly Cascade II,production,Улучшите сборочный каскад до второго уровня,cascade_line_level,assembly,2,retroactive,manual,,freight,220,130
+quest_airframe_order,Набор корпуса,Airframe Kit,production,Завершите заказ набора корпуса,cascade_order_completed,airframe_kit,1,retroactive,manual,,freight,200,140
+quest_module_order,Набор модуля,Module Kit,production,Завершите заказ набора модуля,cascade_order_completed,module_kit,1,retroactive,auto,quest_airframe_order,freight,160,150
+quest_safe_ore_sortie,Возвращение с руды,Ore Sortie,sortie,Вернитесь из рудного вылета,sortie_completed,safe_ore_boulders,1,retroactive,manual,,freight,220,160
+quest_install_gas_extractor,Газовый экстрактор,Gas Extractor,fitting,Установите газовый экстрактор,ship_module_installed,starter_gas_extractor,1,retroactive,manual,,freight,180,170
+quest_install_mining_hold,Рудный трюм,Mining Hold,fitting,Установите рудный трюм,ship_module_installed,starter_mining_hold,1,retroactive,manual,quest_install_gas_extractor,freight,180,180
+quest_select_cruiser203,Проект крейсера,Cruiser Project,ships,Выберите корпус крейсера 203,ship_hull_selected,cruiser203_hull,1,retroactive,manual,,solid,3,190
+quest_claim_manual_reward,Ручная награда,Manual Reward,main,Получите награду вручную после прогресса,resource_acquired,design_experience,10,retroactive,manual,,freight,100,200

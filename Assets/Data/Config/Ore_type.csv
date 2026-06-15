@@ -1,4 +1,4 @@
-id_ore_type,local_name_ru,local_name_en,ore_item,base_value,natural_shed_intensity,shot_shed_kg,fragment_fall_speed_ms,color_hex,composition_id_item,composition_share
+﻿id_ore_type,local_name_ru,local_name_en,ore_item,base_value,natural_shed_intensity,shot_shed_kg,fragment_fall_speed_ms,color_hex,composition_id_item,composition_share
 windshale,Ветровой сланец,Wind Shale,windshale_ore,1,0.90,4,4.0,#8A8272,"ferron,silvate","0.80,0.20"
 dawnspar,Зоревик,Dawn Spar,dawnspar_ore,2,0.85,4,4.1,#A58F6B,"ferron,lumite,silvate","0.55,0.30,0.15"
 bluebrass,Синелатунь,Bluebrass,bluebrass_ore,3,0.80,5,4.2,#627C91,"cupryl,ferron,aerin","0.45,0.35,0.20"

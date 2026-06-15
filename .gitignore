@@ -15,6 +15,7 @@
 /Assets/_Recovery/
 /Assets/_Recovery.meta
 /CODEX_CONTEXT.md
+/.codex/
 
 # Memory Dumps
 *.lldmp

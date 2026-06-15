@@ -1,0 +1,14 @@
+leviathan_id,mass_t,combat_profile,meat_percent,fat_percent,hide_percent,tendon_percent,carapace_scrap_percent,bone_grit_percent,acid_percent,ichor_percent,amber_percent,waste_water_percent,notes_ru
+swiftling,5,fast_pack_ram,35,18,8,5,0,0,0,2,0.2,31.8,Ранний быстрый зверь.
+needle_tail,12,tail_spike_charge,28,10,12,8,8,0,3,3,0.3,27.7,Больше жестких тканей.
+acid_spitter,18,acid_spit_skirmish,22,8,8,0,0,0,14,5,0.4,42.6,Кислотная добыча.
+shellback,30,slow_armored_ram,20,8,12,6,24,4,0,2,0.2,23.8,Панцирь и крошка.
+sail_ray,45,broadside_body_sweep,30,14,18,7,0,0,0,3,0.3,27.7,Шкура.
+grabber,70,tentacle_grab_pull,26,12,10,18,0,0,4,4,0.5,25.5,Сухожилия.
+reef_cutter,120,sawing_close_pass,24,10,12,12,15,3,4,3,0.4,16.6,Плотная полезная туша.
+ichor_eel,90,ichor_trail_bite,18,8,8,8,0,0,8,16,0.8,33.2,Ихор.
+fat_whale_calf,180,heavy_push_calls_pack,32,26,10,5,0,0,0,2,1,24,Мясо и жир.
+armored_whale,300,armored_head_ram,22,14,14,8,20,4,0,4,1.2,12.8,Крейсерская добыча.
+storm_bull,600,long_charge_roar,26,18,12,12,8,0,0,5,1.5,17.5,Линкорная опасность.
+sky_whale,1500,giant_wave_tail,30,30,12,6,0,4,0,6,2,10,Большой кит.
+elder_leviathan,4000,landscape_boss,25,25,10,8,8,2,0,8,4,10,Только секции и события.

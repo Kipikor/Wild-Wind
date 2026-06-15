@@ -1,0 +1,14 @@
+system_id,action_id,period_or_cooldown,input_fe,output_fe,solid_delta,mastery_delta,net_fe_without_mastery,role,notes_ru
+mission_assumption,normal_R2,per_sortie,0,380,0,14,380,faucet,Внешний стабильный вход; бой не считается здесь.
+courier,courier_t1_single,instant_plus_15m_reroll,130,166,0,8,36,converter,Монетизирует ресурсы лучше скупки.
+courier,courier_t2_triple,instant_plus_15m_reroll,875,1173,0,35,298,converter,Частая фрахтовая цель.
+capital_airplane,early_full,24h,12000,25200,30,150,13200,faucet_sink,Главный регулярный источник солида.
+capital_airplane,standard_full,24h,45000,64000,75,360,19000,faucet_sink,Большой ежедневный sink ресурсов.
+repair_dock,R5_restore,varies,4800,10500,0,90,5700,converter,Выгодно но входы ограничены добычей и задачами.
+wind_buyback,raw_R5_craft_materials,instant,8000,1200,0,0,-6800,liquidation,Плохая скупка и не маршрут заработка.
+imperial_market,solid_purchase_generic,instant,800,900,-1,0,100,store,Покупка за солид выгоднее прямого перевода солида во фрахт.
+bundle_shop,weekly_industry_stock,weekly,520000,936000,-650,0,416000,store,Выгодный пакет за редкую earned currency.
+ship_event,active_14d_free,event_14d,0,65000,0,1400,65000,overlay,Overlay к обычной игре; не обязательный налог.
+ship_event,moderate_solid_support,event_14d,600000,1125000,-750,0,525000,store_overlay,Углубление события за накопленный солид.
+research,L2_knowledge,archive_time,1000,0,0,0,-1000,sink,SP отдельно ограничивает темп.
+building,level_10_upgrade,one_time,4500,0,0,0,-4500,sink,Одноразовая портовая инвестиция.

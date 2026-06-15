@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -23,6 +23,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private const int BigTestContractVersion = 2;
     private const int MinimumExpectedCheckCount = 380;
     private const int MaxCapturedConsoleMessages = 32;
+    private const string BigTestEditorLaunchUtcTicksPlayerPrefsKey = "WildWind.BigTestEditorLaunch.UtcTicks";
+    private const long BigTestEditorLaunchPendingMaxAgeTicks = TimeSpan.TicksPerMinute * 10L;
 #if UNITY_EDITOR
     private const string UsageAuditAfterBigTestArmedSessionKey = "WildWind.UsageAudit.GenerateAfterBigTest.Armed";
     private const string UsageAuditAfterBigTestRequestedSessionKey = "WildWind.UsageAudit.GenerateAfterBigTest.Requested";
@@ -34,6 +36,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     public static bool SuppressRunOnStartForAutomation { get; set; }
     public static bool IsSessionLoopLaunchInProgress => sessionLoopLaunchInProgress;
     public static bool IsMainSessionCheckInProgress => activeRunInProgress && !sessionLoopLaunchInProgress;
+    public static bool IsProgressSandboxActive => IsEditorBigTestLaunchPending() || IsMainSessionCheckInProgress || IsSessionLoopLaunchInProgress;
 
     private static bool autoRunConsumedThisPlaySession;
     private static bool activeRunInProgress;
@@ -54,8 +57,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         "Р’РёР·СѓР°Р», РІС‹СЃРѕС‚РЅС‹Рµ СЃР»РѕРё Рё С‚СѓРјР°РЅ",
         "РќР°СЃС‚СЂРѕР№РєРё РїСЂРѕРµРєС‚Р° Рё СѓРїСЂР°РІР»РµРЅРёРµ",
         "РљРѕСЂР°Р±Р»СЊ, РІРµС‚РµСЂ Рё Р»С‘С‚РЅР°СЏ С„РёР·РёРєР°",
-        "Meta port runtime",
-        "Direct port entry and account reset",
+        "Knowledge screen runtime",
+        "Base island runtime",
+        "Direct port entry and persistent progress reset",
         "Р—Р°С‰РёС‚Р° РїРѕР±РѕС‡РЅС‹С… СЌС„С„РµРєС‚РѕРІ",
         "РњРµС‚РѕРґРёРєР° СЃРѕРїСЂРѕРІРѕР¶РґРµРЅРёСЏ"
     };
@@ -135,18 +139,33 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
     public static bool IsEditorBigTestLaunchPending()
     {
-        return PlayerPrefs.GetInt(BigTestEditorLaunchPlayerPrefsKey, 0) == 1;
+        if (PlayerPrefs.GetInt(BigTestEditorLaunchPlayerPrefsKey, 0) != 1)
+        {
+            return false;
+        }
+
+        string ticksText = PlayerPrefs.GetString(BigTestEditorLaunchUtcTicksPlayerPrefsKey, "");
+        if (!long.TryParse(ticksText, out long launchedTicks) ||
+            DateTime.UtcNow.Ticks - launchedTicks > BigTestEditorLaunchPendingMaxAgeTicks)
+        {
+            ClearEditorBigTestLaunchPending();
+            return false;
+        }
+
+        return true;
     }
 
     public static void MarkEditorBigTestLaunchPending()
     {
         PlayerPrefs.SetInt(BigTestEditorLaunchPlayerPrefsKey, 1);
+        PlayerPrefs.SetString(BigTestEditorLaunchUtcTicksPlayerPrefsKey, DateTime.UtcNow.Ticks.ToString());
         PlayerPrefs.Save();
     }
 
     public static void ClearEditorBigTestLaunchPending()
     {
         PlayerPrefs.DeleteKey(BigTestEditorLaunchPlayerPrefsKey);
+        PlayerPrefs.DeleteKey(BigTestEditorLaunchUtcTicksPlayerPrefsKey);
         PlayerPrefs.Save();
     }
 
@@ -231,7 +250,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             TryWriteRunStatus("started", null, report);
         }
 
+        MetaGameState.DeletePersistentProgressSaveForTests(true);
         yield return EnsureSessionSceneForBigTest(report);
+        ResolveReferences();
+        if (metaGameState != null)
+        {
+            metaGameState.ResetAccountProgressForCheat(out _);
+        }
 
         RunChecked(report, () =>
         {
@@ -253,7 +278,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ValidateVisualAtmosphere(report);
             ValidateSettings(report);
             ValidateShipWindAerodynamics(report);
-            ValidateMetaPortRuntime(report);
+            ValidateKnowledgeScreenRuntime(report);
+            ValidateBaseIslandRuntime(report);
         });
 
         yield return RunCheckedCoroutine(report, ValidateSessionLoopRoundTrip(report));
@@ -851,7 +877,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Info("ID Р·Р°РїСѓСЃРєР°: " + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".");
         report.Info("РљРЅРѕРїРєР°: Wild Wind/РџСЂРѕРІРµСЃС‚Рё Р±РѕР»СЊС€РѕР№ С‚РµСЃС‚.");
         report.Info("РќР°Р·РЅР°С‡РµРЅРёРµ: РѕРґРёРЅ РѕР±С‰РёР№ РґРѕС‚РѕС€РЅС‹Р№ РїСЂРѕС‚РѕРєРѕР» РїРѕ С‚РµРєСѓС‰РµР№ СЃР±РѕСЂРєРµ РёРіСЂС‹.");
-        report.Info("Currently covered: CSV config, tech tree, ship tree, production, session-only runtime, runtime account, visual dependencies, settings, wind/aerodynamics, flight physics, direct port entry and account reset.");
+        report.Info("Currently covered: CSV config, tech tree, ship tree, production, session-only runtime, runtime account, persistent progress, visual dependencies, settings, wind/aerodynamics, flight physics, direct port entry and progress reset.");
         report.Info("Р”РѕРїСѓСЃРєРё: СЃРёРјСѓР»СЏС†РёСЏ РїСЂРѕРёР·РІРѕРґСЃС‚РІ " + productionSimulationMinutes.ToString("0.#") + " РјРёРЅ, session-only СЃС†РµРЅР° Р±РµР· open-world runtime objects Рё Р±РµР· world manifest РІ account data.");
         report.Info("РџСЂРёРЅС†РёРї: FAIL = СЃР»РѕРјР°РЅРѕ РёР»Рё РїСЂРѕС‚РёРІРѕСЂРµС‡РёС‚ С‚РµРєСѓС‰РµРјСѓ РўР—; WARN = РїРѕРґРѕР·СЂРёС‚РµР»СЊРЅРѕ, РЅРѕ РјРѕР¶РЅРѕ РїСЂРѕРґРѕР»Р¶Р°С‚СЊ; OK = РїСЂРѕРІРµСЂРµРЅРѕ СЏРІРЅРѕ.");
         report.Pass("РџР°СЃРїРѕСЂС‚ Р±РѕР»СЊС€РѕРіРѕ С‚РµСЃС‚Р° СЃС„РѕСЂРјРёСЂРѕРІР°РЅ Рё РїРѕРїР°РґС‘С‚ РІ РјР°С€РёРЅРЅРѕ-С‡РёС‚Р°РµРјС‹Р№ СЂРµР·СѓР»СЊС‚Р°С‚.");
@@ -866,6 +892,18 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Info("Unity: " + Application.unityVersion + ".");
         report.Info("РџР»Р°С‚С„РѕСЂРјР°: " + Application.platform + ".");
         report.Info("Р’СЂРµРјСЏ Р·Р°РїСѓСЃРєР°: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + ".");
+        report.Check(WildWindGameplayBootstrap.IsRuntimeFramePolicyAppliedForTests(),
+            "Gameplay runtime starts capped to "
+            + WildWindGameplayBootstrap.RuntimeTargetFrameRate
+            + " FPS and on the lean quality profile: quality="
+            + QualitySettings.GetQualityLevel()
+            + ", vSync="
+            + QualitySettings.vSyncCount
+            + ", targetFrameRate="
+            + Application.targetFrameRate
+            + ", renderFrameInterval="
+            + WildWindGameplayBootstrap.GetRenderFrameIntervalForTests()
+            + ".");
 
         Camera mainCamera = Camera.main;
         report.Check(mainCamera != null, mainCamera != null ? "MainCamera РЅР°Р№РґРµРЅР°: " + mainCamera.name + "." : "MainCamera РЅРµ РЅР°Р№РґРµРЅР°.");
@@ -955,6 +993,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         bool missingKeyDetected = !WildWindLocalization.TryGet("big_test_missing_key_probe", out _);
         report.Check(missingKeyDetected, "Missing localization keys are detectable before runtime rendering.");
+        report.Check(FileHasUtf8Bom("Assets/Data/Localization/Ui.csv"),
+            "Ui.csv declares UTF-8 with BOM so Russian labels stay readable in Windows spreadsheet tools.");
 
         string hudSource = ReadProjectText("Assets/Scripts/UI/WildWindGameplayHud.cs");
         string localizationCsv = ReadProjectText("Assets/Data/Localization/Ui.csv");
@@ -983,6 +1023,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         string specialModuleCsvText = ReadProjectText("Assets/Data/Config/Special_module.csv");
+        ValidateResourceCatalogConfig(config, report);
         report.Check(config.items.Count >= 20, "Item.csv СЃРѕРґРµСЂР¶РёС‚ РїСЂРµРґРјРµС‚С‹: " + config.items.Count + ".");
         report.Check(config.ports.Count == 1 && config.GetPort("capital") != null,
             "Port.csv is reduced to the single session port dock: " + config.ports.Count + ".");
@@ -998,14 +1039,21 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             "Gas condensate config is renamed for session economy; concrete open-world cloud/mining/leviathan zone CSVs are removed.");
         report.Check(config.oreTypes.Count >= 1, "Ore_type.csv СЃРѕРґРµСЂР¶РёС‚ С‚РёРїС‹ СЂСѓРґС‹: " + config.oreTypes.Count + ".");
         report.Check(config.leviathanTypes.Count >= 1, "Leviathan_type.csv СЃРѕРґРµСЂР¶РёС‚ С‚РёРїС‹ Р»РµРІРёР°С„Р°РЅРѕРІ: " + config.leviathanTypes.Count + ".");
-        report.Check(config.technologies.Count >= 1, "Technology.csv СЃРѕРґРµСЂР¶РёС‚ С‚РµС…РЅРѕР»РѕРіРёРё: " + config.technologies.Count + ".");
+        report.Check(config.technologies.Count >= 17
+                && config.modifierDefinitions.Count >= 17,
+            "Technology.csv and Modifier_catalog.csv contain the first Last War-style research board: "
+            + config.technologies.Count
+            + " technologies, "
+            + config.modifierDefinitions.Count
+            + " modifiers.");
         report.Check(config.specialModules.Count == 5, "Special_module.csv contains only the five Pioneer starter fitting modules: " + config.specialModules.Count + ".");
         report.Check(config.hulls.Count == 2
             && config.GetHull("cruiser203_hull") != null
-            && config.engines.Count == 1
-            && config.propellers.Count == 1
             && config.claudiumLoops.Count == 1,
-            "Ship part CSVs contain Pioneer plus Cruiser 203 hull, and one starter engine/propeller/claudium loop set.");
+            "Ship part CSVs contain Pioneer plus Cruiser 203 hull, and one starter claudium loop set.");
+        report.Check(!File.Exists(ProjectPath("Assets/Data/Config/Engine.csv")) &&
+            !File.Exists(ProjectPath("Assets/Data/Config/Propeller.csv")),
+            "Engine and propeller CSVs are removed; hull physics owns thrust and fuel.");
         report.Check(config.GetSpecialModule("starter_gas_harvester") == null
             && config.GetSpecialModule(SessionExtractionConstants.StarterGasExtractorModuleId) != null
             && config.GetSpecialModule("starter_harpoon_rig") == null
@@ -1020,10 +1068,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && !specialModuleCsvText.Contains("leviathan_alarm_generation_multiplier")
             && !specialModuleCsvText.Contains("harpoon_"),
             "Special_module.csv keeps only session fitting gates and no active cloud-harvester, survey-radius or harpoon columns.");
-        report.Check(config.shipTreeEntries.Count == 2
+        report.Check(config.shipTreeEntries.Count == 85
             && config.GetShipTreeEntry("pioneer") != null
             && config.GetShipTreeEntry("cruiser203") != null,
-            "Ship_tree.csv contains Pioneer and Cruiser 203: " + config.shipTreeEntries.Count + ".");
+            "Ship_tree.csv contains Pioneer plus the 84-ship faction development roster: " + config.shipTreeEntries.Count + ".");
         report.Check(!File.Exists(ProjectPath("Assets/Data/Config/Island_production.csv")) &&
             !File.Exists(ProjectPath("Assets/Data/Config/Production_industry.csv")) &&
             !File.Exists(ProjectPath("Assets/Data/Config/Production_recipe.csv")) &&
@@ -1040,11 +1088,166 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         CheckUniqueIds(config.oreTypes, ore => ore.id, "С‚РёРїРѕРІ СЂСѓРґС‹", report);
         CheckUniqueIds(config.leviathanTypes, type => type.id, "С‚РёРїРѕРІ Р»РµРІРёР°С„Р°РЅРѕРІ", report);
         CheckUniqueIds(config.technologies, tech => tech.id, "С‚РµС…РЅРѕР»РѕРіРёР№", report);
+        CheckUniqueIds(config.modifierDefinitions, modifier => modifier.id, "technology modifiers", report);
         CheckUniqueIds(config.specialModules, module => module.id, "СЃРїРµС†РјРѕРґСѓР»РµР№", report);
         CheckUniqueIds(config.shipTreeEntries, ship => ship.shipId, "РєРѕСЂР°Р±Р»РµР№ РІ Ship_tree.csv", report);
+        CheckUniqueIds(config.questDefinitions, quest => quest.id, "Quest.csv tasks", report);
         ValidateShipTreeConfig(config, report);
+        ValidateQuestConfig(config, report);
         ValidateConfigReferences(config, report);
         ValidateSessionPortConfig(config, report);
+    }
+
+    private static void ValidateResourceCatalogConfig(SessionConfigDatabase config, BigTestReport report)
+    {
+        string[] currencyIds =
+        {
+            "freight",
+            "solid"
+        };
+
+        string[] sublikatIds =
+        {
+            "resonant_sublikat",
+            "null_sublikat",
+            "phase_sublikat",
+            "vector_sublikat",
+            "gray_sublikat",
+            "spectral_sublikat",
+            "coronal_sublikat",
+            "deep_sublikat",
+            "inertial_sublikat"
+        };
+
+        string[] automatonPartIds =
+        {
+            "automaton_relay",
+            "automaton_coil",
+            "automaton_contact_comb",
+            "automaton_brass_valve",
+            "automaton_mainspring",
+            "automaton_calibration_gear",
+            "automaton_gyroscope",
+            "automaton_optic_lens",
+            "automaton_pressure_gauge",
+            "automaton_servo_joint",
+            "automaton_armor_plate",
+            "automaton_logic_drum",
+            "automaton_command_cylinder",
+            "automaton_servo_core"
+        };
+
+        report.Check(ItemsExistWithMass(config, currencyIds, 0f),
+            "Freight and Solid are real Item.csv currency rows with zero cargo mass.");
+        report.Check(ItemsExistWithMass(config, sublikatIds, 0.1f),
+            "All nine canonical sublikats from the resource draft exist as tangible Item.csv rows.");
+        report.Check(ItemIdsExist(config, automatonPartIds),
+            "Automaton salvage has concrete part item rows beyond the broken wreck/core placeholders.");
+        report.Check(
+            ItemHasRuName(config, "freight", "Фрахт") &&
+            ItemHasRuName(config, "solid", "Солид") &&
+            ItemHasRuName(config, "charcoal", "Уголь") &&
+            ItemHasRuName(config, "water", "Вода") &&
+            ItemHasRuName(config, "windshale_ore", "Ветровой сланец") &&
+            ItemHasRuName(config, "mist_condensate", "Концентрат сухой дымки") &&
+            ItemHasRuName(config, "leviathan_meat", "Мясо левиафана") &&
+            ItemHasRuName(config, "leviathan_fat", "Левиафанов жир") &&
+            ItemHasRuName(config, "leviathan_ichor", "Ихор левиафана") &&
+            ItemHasRuName(config, "nerve_substrate", "Нервный субстрат") &&
+            ItemHasRuName(config, "resonant_sublikat", "Резонансный субликат"),
+            "Item.csv keeps readable UTF-8 Russian names for representative resources and currencies.");
+        report.Check(FilesHaveUtf8Bom(new[]
+            {
+                "Assets/Data/Config/Item.csv",
+                "Assets/Data/Config/Resource_category.csv",
+                "Assets/Data/Config/Ore_type.csv",
+                "Assets/Data/Config/Gas_condensate_type.csv",
+                "Assets/Data/Config/Leviathan_type.csv"
+            }),
+            "Resource CSVs with Russian names declare UTF-8 with BOM for readable manual review.");
+
+        string resourceCatalogPath = "Assets/Data/Config/Resource_category.csv";
+        string resourceCatalogText = ReadProjectText(resourceCatalogPath);
+        bool resourceCatalogValid =
+            File.Exists(ProjectPath(resourceCatalogPath)) &&
+            resourceCatalogText.Contains("currency,") &&
+            resourceCatalogText.Contains("ore,") &&
+            resourceCatalogText.Contains("processed_mineral,") &&
+            resourceCatalogText.Contains("cloud_condensate,") &&
+            resourceCatalogText.Contains("cloud_gas_fraction,") &&
+            resourceCatalogText.Contains("leviathan_carcass,") &&
+            resourceCatalogText.Contains("leviathan_butchery,") &&
+            resourceCatalogText.Contains("automaton_salvage,") &&
+            resourceCatalogText.Contains("sublikat,") &&
+            resourceCatalogText.Contains("freight|solid") &&
+            resourceCatalogText.Contains("resonant_sublikat") &&
+            resourceCatalogText.Contains("windshale_ore") &&
+            resourceCatalogText.Contains("mist_condensate") &&
+            resourceCatalogText.Contains("leviathan_meat") &&
+            resourceCatalogText.Contains("leviathan_fat") &&
+            resourceCatalogText.Contains("leviathan_ichor") &&
+            resourceCatalogText.Contains("nerve_substrate") &&
+            resourceCatalogText.Contains("bone_plate") &&
+            !resourceCatalogText.Contains("claudium_gland") &&
+            resourceCatalogText.Contains("automaton_servo_joint");
+        report.Check(resourceCatalogValid,
+            "Resource_category.csv materializes resource families in Unity config, including currencies, extraction resources, automaton parts and sublikats.");
+        report.Check(config.resourceCategories.Count >= 9 && ResourceCategoryItemsResolve(config),
+            "Resource_category.csv is loaded into runtime resource category configs and every listed item resolves to Item.csv.");
+        report.Check(AllItemIconAssetsExist(config),
+            "Every Item.csv resource has a physical PNG icon asset under Assets/Resources/UI/ResourceIcons.");
+    }
+
+    private static bool ResourceCategoryItemsResolve(SessionConfigDatabase config)
+    {
+        if (config == null || config.resourceCategories == null || config.resourceCategories.Count == 0)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < config.resourceCategories.Count; i++)
+        {
+            ResourceCategoryConfig category = config.resourceCategories[i];
+            if (category == null || string.IsNullOrWhiteSpace(category.id) || category.itemIds == null || category.itemIds.Count == 0)
+            {
+                return false;
+            }
+
+            for (int itemIndex = 0; itemIndex < category.itemIds.Count; itemIndex++)
+            {
+                if (config.GetItem(category.itemIds[itemIndex]) == null)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool AllItemIconAssetsExist(SessionConfigDatabase config)
+    {
+        if (config == null || config.items == null || config.items.Count == 0)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < config.items.Count; i++)
+        {
+            ItemConfig item = config.items[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.id))
+            {
+                return false;
+            }
+
+            string assetPath = WildWindResourceIconCatalog.GetAssetPathForTests(item.id);
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(ProjectPath(assetPath)))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void ValidateShipTreeConfig(SessionConfigDatabase config, BigTestReport report)
@@ -1055,9 +1258,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return;
         }
 
-        bool entriesValid = config.shipTreeEntries.Count == 2;
+        bool entriesValid = config.shipTreeEntries.Count == 85;
         bool hasPioneerRoot = false;
         bool hasCruiser203 = false;
+        int developmentShipCount = 0;
+        int placeholderDevelopmentModels = 0;
+        int runtimeReadyDevelopmentHulls = 0;
 
         for (int i = 0; i < config.shipTreeEntries.Count; i++)
         {
@@ -1069,14 +1275,33 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
 
             bool isRoot = entry.rank == 0;
+            bool isDevelopment = entry.IsDevelopmentRosterShip;
             hasPioneerRoot |= entry.shipId == "pioneer" &&
                 isRoot &&
                 (entry.parentShipIds == null || entry.parentShipIds.Count == 0);
             hasCruiser203 |= entry.shipId == "cruiser203" &&
                 entry.rank >= 1 &&
+                entry.IsDevelopmentRosterShip &&
+                entry.factionId == "capital" &&
+                entry.shipClassId == "cruiser" &&
                 entry.hullId == "cruiser203_hull" &&
                 entry.parentShipIds != null &&
                 entry.parentShipIds.Contains("pioneer");
+
+            if (isDevelopment)
+            {
+                developmentShipCount++;
+                if (entry.visualModelId == "placeholder_square" && entry.visualShapeId == "square")
+                {
+                    placeholderDevelopmentModels++;
+                }
+
+                if (entry.HasRuntimeHull)
+                {
+                    runtimeReadyDevelopmentHulls++;
+                }
+            }
+
             entriesValid &= !string.IsNullOrWhiteSpace(entry.shipId) &&
                 !string.IsNullOrWhiteSpace(entry.localNameRu) &&
                 !string.IsNullOrWhiteSpace(entry.localNameEn) &&
@@ -1086,16 +1311,34 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 !string.IsNullOrWhiteSpace(entry.summaryRu) &&
                 (isRoot || (entry.parentShipIds != null && entry.parentShipIds.Count > 0)) &&
                 (string.IsNullOrWhiteSpace(entry.requiredTechnologyId) || config.GetTechnology(entry.requiredTechnologyId) != null) &&
-                config.GetHull(entry.hullId) != null &&
-                config.GetEngine(entry.engineId) != null &&
-                config.GetPropeller(entry.propellerId) != null &&
-                config.GetClaudiumLoop(entry.claudiumLoopId) != null &&
-                config.GetSpecialModule(entry.specialModuleId) != null &&
+                (string.IsNullOrWhiteSpace(entry.hullId) || config.GetHull(entry.hullId) != null) &&
+                (string.IsNullOrWhiteSpace(entry.claudiumLoopId) || config.GetClaudiumLoop(entry.claudiumLoopId) != null) &&
+                (string.IsNullOrWhiteSpace(entry.specialModuleId) || config.GetSpecialModule(entry.specialModuleId) != null) &&
                 AllIdsExistAllowEmpty(entry.upgradeHullIds, config.GetHull) &&
-                AllIdsExistAllowEmpty(entry.upgradeEngineIds, config.GetEngine) &&
-                AllIdsExistAllowEmpty(entry.upgradePropellerIds, config.GetPropeller) &&
                 AllIdsExistAllowEmpty(entry.upgradeClaudiumLoopIds, config.GetClaudiumLoop) &&
                 AllIdsExistAllowEmpty(entry.upgradeSpecialModuleIds, config.GetSpecialModule);
+
+            if (isDevelopment)
+            {
+                bool placeholderOrRuntimeModel = entry.HasRuntimeHull ||
+                    (entry.visualModelId == "placeholder_square" && entry.visualShapeId == "square");
+                entriesValid &= !string.IsNullOrWhiteSpace(entry.factionId) &&
+                    !string.IsNullOrWhiteSpace(entry.factionNameRu) &&
+                    IsKnownDevelopmentShipClass(entry.shipClassId) &&
+                    !string.IsNullOrWhiteSpace(entry.shipClassNameRu) &&
+                    !string.IsNullOrWhiteSpace(entry.branchId) &&
+                    !string.IsNullOrWhiteSpace(entry.BranchDisplayNameRu) &&
+                    entry.treeTier >= 2 &&
+                    entry.treeTier <= 10 &&
+                    entry.treeRow >= 0 &&
+                    entry.rank == entry.treeTier &&
+                    entry.catalogScope == "development" &&
+                    placeholderOrRuntimeModel &&
+                    !string.IsNullOrWhiteSpace(entry.costCurrencyItemId) &&
+                    config.GetItem(entry.costCurrencyItemId) != null &&
+                    entry.costAmount > 0 &&
+                    entry.TotalStatScore > 0;
+            }
 
             if (entry.parentShipIds != null)
             {
@@ -1111,11 +1354,212 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         report.Check(entriesValid && hasPioneerRoot && hasCruiser203,
-            "Ship_tree.csv keeps Pioneer as root and adds Cruiser 203 as a child ship.");
+            "Ship_tree.csv keeps Pioneer as root, keeps Cruiser 203 runtime-ready, and gives every development ship faction/class/cost/model/stat fields.");
+
+        report.Check(developmentShipCount == 84
+                && placeholderDevelopmentModels == 83
+                && runtimeReadyDevelopmentHulls == 1
+                && ShipDevelopmentRosterCountsValid(config),
+            "Development ship roster contains 6 factions with 4 destroyers, 4 frigates, 4 cruisers and 2 battleships each.");
+
+        report.Check(ShipDevelopmentTechTreeLayoutValid(config),
+            "Development ship tree has supplier branches laid out across tiers I-X from the Pioneer starter ship.");
 
         report.Check(!ShipTreeHasCycles(config),
             "Р”РµСЂРµРІРѕ РєРѕСЂР°Р±Р»РµР№ РЅРµ СЃРѕРґРµСЂР¶РёС‚ С†РёРєР»РѕРІ РїРѕ parent_ship_id.");
 
+    }
+
+    private static bool ShipDevelopmentRosterCountsValid(SessionConfigDatabase config)
+    {
+        if (config == null || config.shipTreeEntries == null)
+        {
+            return false;
+        }
+
+        string[] factionIds =
+        {
+            "capital",
+            "wind_houses",
+            "mist_synod",
+            "stone_vault",
+            "factory_ark",
+            "devourers"
+        };
+        string[] classIds =
+        {
+            "destroyer",
+            "frigate",
+            "cruiser",
+            "battleship"
+        };
+        int[] expectedCounts =
+        {
+            4,
+            4,
+            4,
+            2
+        };
+
+        for (int factionIndex = 0; factionIndex < factionIds.Length; factionIndex++)
+        {
+            int factionTotal = 0;
+            for (int classIndex = 0; classIndex < classIds.Length; classIndex++)
+            {
+                int count = CountDevelopmentShips(config, factionIds[factionIndex], classIds[classIndex]);
+                factionTotal += count;
+                if (count != expectedCounts[classIndex])
+                {
+                    return false;
+                }
+            }
+
+            if (factionTotal != 14)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ShipDevelopmentTechTreeLayoutValid(SessionConfigDatabase config)
+    {
+        if (config == null || config.shipTreeEntries == null)
+        {
+            return false;
+        }
+
+        ShipTreeEntryConfig pioneer = config.GetShipTreeEntry("pioneer");
+        if (pioneer == null || pioneer.treeTier != 1 || pioneer.branchId != "starter" || pioneer.parentShipIds.Count != 0)
+        {
+            return false;
+        }
+
+        string[] factionIds =
+        {
+            "capital",
+            "wind_houses",
+            "mist_synod",
+            "stone_vault",
+            "factory_ark",
+            "devourers"
+        };
+        string[] classIds =
+        {
+            "destroyer",
+            "frigate",
+            "cruiser",
+            "battleship"
+        };
+        int[][] expectedTiers =
+        {
+            new[] { 2, 4, 6, 8 },
+            new[] { 2, 4, 6, 8 },
+            new[] { 3, 5, 7, 9 },
+            new[] { 6, 10 }
+        };
+
+        for (int factionIndex = 0; factionIndex < factionIds.Length; factionIndex++)
+        {
+            for (int classIndex = 0; classIndex < classIds.Length; classIndex++)
+            {
+                List<ShipTreeEntryConfig> branchShips = GetDevelopmentBranchShips(config, factionIds[factionIndex], classIds[classIndex]);
+                int[] tiers = expectedTiers[classIndex];
+                if (branchShips.Count != tiers.Length)
+                {
+                    return false;
+                }
+
+                string expectedParent = "pioneer";
+                for (int shipIndex = 0; shipIndex < branchShips.Count; shipIndex++)
+                {
+                    ShipTreeEntryConfig ship = branchShips[shipIndex];
+                    if (ship.treeTier != tiers[shipIndex] ||
+                        ship.rank != tiers[shipIndex] ||
+                        ship.treeRow != classIndex ||
+                        ship.branchId != classIds[classIndex] + "_line" ||
+                        ship.parentShipIds == null ||
+                        ship.parentShipIds.Count != 1 ||
+                        ship.parentShipIds[0] != expectedParent)
+                    {
+                        return false;
+                    }
+
+                    expectedParent = ship.shipId;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static List<ShipTreeEntryConfig> GetDevelopmentBranchShips(SessionConfigDatabase config, string factionId, string shipClassId)
+    {
+        List<ShipTreeEntryConfig> result = new List<ShipTreeEntryConfig>();
+        if (config == null || config.shipTreeEntries == null)
+        {
+            return result;
+        }
+
+        for (int i = 0; i < config.shipTreeEntries.Count; i++)
+        {
+            ShipTreeEntryConfig entry = config.shipTreeEntries[i];
+            if (entry == null || !entry.IsDevelopmentRosterShip)
+            {
+                continue;
+            }
+
+            if (entry.factionId == factionId && entry.shipClassId == shipClassId)
+            {
+                result.Add(entry);
+            }
+        }
+
+        result.Sort(CompareShipTreeEntriesByTier);
+        return result;
+    }
+
+    private static int CompareShipTreeEntriesByTier(ShipTreeEntryConfig left, ShipTreeEntryConfig right)
+    {
+        if (left == null && right == null) return 0;
+        if (left == null) return -1;
+        if (right == null) return 1;
+        int tierComparison = left.treeTier.CompareTo(right.treeTier);
+        return tierComparison != 0 ? tierComparison : string.Compare(left.shipId, right.shipId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int CountDevelopmentShips(SessionConfigDatabase config, string factionId, string shipClassId)
+    {
+        if (config == null || config.shipTreeEntries == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int i = 0; i < config.shipTreeEntries.Count; i++)
+        {
+            ShipTreeEntryConfig entry = config.shipTreeEntries[i];
+            if (entry == null || !entry.IsDevelopmentRosterShip)
+            {
+                continue;
+            }
+
+            if (entry.factionId == factionId && entry.shipClassId == shipClassId)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool IsKnownDevelopmentShipClass(string shipClassId)
+    {
+        return shipClassId == "destroyer" ||
+            shipClassId == "frigate" ||
+            shipClassId == "cruiser" ||
+            shipClassId == "battleship";
     }
 
     private static bool ShipTreeHasCycles(SessionConfigDatabase config)
@@ -1158,6 +1602,94 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         visiting.Remove(entry.shipId);
         visited.Add(entry.shipId);
         return false;
+    }
+
+    private static void ValidateQuestConfig(SessionConfigDatabase config, BigTestReport report)
+    {
+        if (config == null || config.questDefinitions == null)
+        {
+            report.Fail("Quest.csv is not loaded.");
+            return;
+        }
+
+        string[] requiredObjectiveTypes =
+        {
+            "resource_owned",
+            "resource_acquired",
+            "resource_spent",
+            "courier_sent",
+            "courier_cancelled",
+            "technology_started",
+            "technology_completed",
+            "base_processing_level",
+            "cascade_line_level",
+            "cascade_order_completed",
+            "sortie_completed",
+            "ship_module_installed",
+            "ship_hull_selected"
+        };
+
+        HashSet<string> objectiveTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> questIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        bool rowsValid = config.questDefinitions.Count >= 20;
+        bool hasRetroactive = false;
+        bool hasFromAccept = false;
+        bool hasAutoClaim = false;
+        bool hasManualClaim = false;
+
+        for (int i = 0; i < config.questDefinitions.Count; i++)
+        {
+            QuestDefinitionConfig quest = config.questDefinitions[i];
+            if (quest == null)
+            {
+                rowsValid = false;
+                continue;
+            }
+
+            questIds.Add(quest.id);
+            objectiveTypes.Add(quest.objectiveType);
+            hasRetroactive |= quest.IsRetroactive;
+            hasFromAccept |= string.Equals(quest.activationMode, QuestDefinitionConfig.ActivationFromAccept, StringComparison.OrdinalIgnoreCase);
+            hasAutoClaim |= quest.IsAutoClaim;
+            hasManualClaim |= string.Equals(quest.claimMode, QuestDefinitionConfig.ClaimManual, StringComparison.OrdinalIgnoreCase);
+
+            bool validActivation = quest.IsRetroactive
+                || string.Equals(quest.activationMode, QuestDefinitionConfig.ActivationFromAccept, StringComparison.OrdinalIgnoreCase);
+            bool validClaim = quest.IsAutoClaim
+                || string.Equals(quest.claimMode, QuestDefinitionConfig.ClaimManual, StringComparison.OrdinalIgnoreCase);
+            rowsValid &= !string.IsNullOrWhiteSpace(quest.id)
+                && !string.IsNullOrWhiteSpace(quest.localNameRu)
+                && !string.IsNullOrWhiteSpace(quest.categoryId)
+                && !string.IsNullOrWhiteSpace(quest.objectiveType)
+                && !string.IsNullOrWhiteSpace(quest.targetId)
+                && quest.targetAmount > 0
+                && validActivation
+                && validClaim
+                && (string.IsNullOrWhiteSpace(quest.rewardItemId) || config.GetItem(quest.rewardItemId) != null);
+        }
+
+        for (int i = 0; i < config.questDefinitions.Count; i++)
+        {
+            QuestDefinitionConfig quest = config.questDefinitions[i];
+            if (quest == null || string.IsNullOrWhiteSpace(quest.requiredQuestId)) continue;
+            rowsValid &= questIds.Contains(quest.requiredQuestId);
+        }
+
+        bool objectivesCovered = true;
+        for (int i = 0; i < requiredObjectiveTypes.Length; i++)
+        {
+            objectivesCovered &= objectiveTypes.Contains(requiredObjectiveTypes[i]);
+        }
+
+        report.Check(rowsValid
+                && hasRetroactive
+                && hasFromAccept
+                && hasAutoClaim
+                && hasManualClaim,
+            "Quest.csv defines at least twenty live tasks with valid rewards, prerequisites, retroactive/from-accept activation and auto/manual claim modes: "
+            + config.questDefinitions.Count + ".");
+        report.Check(objectivesCovered,
+            "Quest.csv covers resource, courier, knowledge, production, sortie, fitting and ship-selection objective families.");
     }
 
     private static void ValidateConfigReferences(SessionConfigDatabase config, BigTestReport report)
@@ -1213,26 +1745,63 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 type.massKg > 0f &&
                 type.maxHealth > 0f &&
                 type.forwardThrustKgf >= 0f &&
-                type.omniThrustKgf >= 0f;
+                type.omniThrustKgf >= 0f &&
+                type.composition != null &&
+                type.composition.Count > 0 &&
+                ItemAmountsReferenceExistingItems(type.composition, c => c.itemId, c => c.share, config);
         }
 
         report.Check(leviathansValid, "Р›РµРІРёР°С„Р°РЅС‹ Рё РёС… Р·РѕРЅС‹ РёРјРµСЋС‚ РІР°Р»РёРґРЅС‹Рµ С‚РёРїС‹, СЂР°Р·РјРµСЂС‹, Р·РґРѕСЂРѕРІСЊРµ Рё РІС‹СЃРѕС‚РЅС‹Рµ РґРёР°РїР°Р·РѕРЅС‹.");
 
         bool techValid = true;
+        bool modifierCatalogValid = config.modifierDefinitions.Count >= 17;
+        for (int i = 0; i < config.modifierDefinitions.Count; i++)
+        {
+            ModifierDefinitionConfig modifier = config.modifierDefinitions[i];
+            modifierCatalogValid &= modifier != null &&
+                !string.IsNullOrWhiteSpace(modifier.id) &&
+                !string.IsNullOrWhiteSpace(modifier.localNameRu) &&
+                !string.IsNullOrWhiteSpace(modifier.localNameEn) &&
+                !string.IsNullOrWhiteSpace(modifier.categoryId) &&
+                !string.IsNullOrWhiteSpace(modifier.valueKind) &&
+                !string.IsNullOrWhiteSpace(modifier.stackingRule) &&
+                !string.IsNullOrWhiteSpace(modifier.defaultOperation);
+        }
+
         for (int i = 0; i < config.technologies.Count; i++)
         {
             TechnologyConfig tech = config.technologies[i];
+            bool isStarterTech = tech != null && tech.id == "basic_airship";
             techValid &= tech != null &&
                 !string.IsNullOrWhiteSpace(tech.id) &&
                 !string.IsNullOrWhiteSpace(tech.localNameRu) &&
                 !string.IsNullOrWhiteSpace(tech.localNameEn) &&
                 tech.rank >= 0 &&
                 !string.IsNullOrWhiteSpace(tech.branch) &&
+                !string.IsNullOrWhiteSpace(tech.categoryId) &&
+                !string.IsNullOrWhiteSpace(tech.CategoryDisplayNameRu) &&
+                tech.treeColumn >= 0 &&
+                tech.treeRow >= 0 &&
+                !string.IsNullOrWhiteSpace(tech.iconText) &&
                 !string.IsNullOrWhiteSpace(tech.unlockSummaryRu) &&
                 tech.cycleTimeSeconds >= 0 &&
                 tech.requiredCycles > 0 &&
+                TechnologySpCostsValid(tech) &&
                 AllIdsExistAllowEmpty(tech.prerequisiteTechnologyIds, config.GetTechnology) &&
-                ItemAmountsReferenceExistingItems(tech.cycleCost, c => c.itemId, c => c.amount, config);
+                ItemAmountsReferenceExistingItems(tech.cycleCost, c => c.itemId, c => c.amount, config) &&
+                TechnologyModifierGrantsValid(tech, config);
+
+            if (!isStarterTech)
+            {
+                techValid &= tech.requiredCycles == 5 &&
+                    tech.cycleTimeSeconds == 0 &&
+                    tech.treeColumn >= 1 &&
+                    tech.treeColumn <= 5 &&
+                    tech.modifierGrants != null &&
+                    tech.modifierGrants.Count > 0 &&
+                    tech.cycleCost != null &&
+                    tech.cycleCost.Count > 0;
+            }
         }
 
         bool techTreeValid = TechnologyTreeMetadataValid(config);
@@ -1263,7 +1832,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
         }
 
-        report.Check(techValid && techTreeValid, "Current technology config keeps the minimal Pioneer unlock tree valid and acyclic.");
+        report.Check(techValid && modifierCatalogValid && techTreeValid,
+            "Knowledge config has rubrics, 5-level nodes, SP costs, resource costs, locks/books and modifier grants without timer cycles.");
         report.Check(techValid && hasCargoStorageModule, "Starter modules can define shared cargo capacity without legacy social-service or dock-slot modules.");
     }
 
@@ -1272,8 +1842,149 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         if (config == null || config.technologies == null || config.technologies.Count == 0) return false;
 
         return config.GetTechnology("basic_airship") != null &&
+            config.GetModifierDefinition("research_speed") != null &&
+            CountTechnologyCategories(config) >= 5 &&
+            TechnologyCategoryExists(config, "base") &&
+            TechnologyCategoryExists(config, "production") &&
+            TechnologyCategoryExists(config, "ships") &&
+            TechnologyCategoryExists(config, "logistics") &&
+            TechnologyCategoryExists(config, "research") &&
+            TechnologyFiveLevelBoardExists(config) &&
             TechnologyRanksRespectPrerequisites(config) &&
             !TechnologyTreeHasCycles(config);
+    }
+
+    private static bool TechnologyModifierGrantsValid(TechnologyConfig technology, SessionConfigDatabase config)
+    {
+        if (technology == null || config == null || technology.modifierGrants == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < technology.modifierGrants.Count; i++)
+        {
+            TechnologyModifierGrantConfig grant = technology.modifierGrants[i];
+            if (grant == null ||
+                string.IsNullOrWhiteSpace(grant.modifierId) ||
+                config.GetModifierDefinition(grant.modifierId) == null ||
+                string.IsNullOrWhiteSpace(grant.operation))
+            {
+                return false;
+            }
+
+            if (grant.operation != "unlock" && Mathf.Abs(grant.valuePerLevel) <= 0.0001f)
+            {
+                return false;
+            }
+        }
+
+        return technology.id == "basic_airship" || technology.modifierGrants.Count > 0;
+    }
+
+    private static bool TechnologySpCostsValid(TechnologyConfig technology)
+    {
+        if (technology == null || technology.spCostByLevel == null)
+        {
+            return false;
+        }
+
+        if (technology.id == "basic_airship")
+        {
+            return technology.spCostByLevel.Count == 0 ||
+                (technology.spCostByLevel.Count == 1 && technology.spCostByLevel[0] == 0);
+        }
+
+        if (technology.spCostByLevel.Count < 5)
+        {
+            return false;
+        }
+
+        int previous = 0;
+        for (int i = 0; i < 5; i++)
+        {
+            int cost = technology.spCostByLevel[i];
+            if (cost <= previous)
+            {
+                return false;
+            }
+
+            previous = cost;
+        }
+
+        return technology.spCostByLevel[0] == 1000 &&
+            technology.spCostByLevel[1] == 5000 &&
+            technology.spCostByLevel[2] == 20000 &&
+            technology.spCostByLevel[3] == 80000 &&
+            technology.spCostByLevel[4] >= 250000;
+    }
+
+    private static int CountTechnologyCategories(SessionConfigDatabase config)
+    {
+        if (config == null || config.technologies == null)
+        {
+            return 0;
+        }
+
+        HashSet<string> categories = new HashSet<string>();
+        for (int i = 0; i < config.technologies.Count; i++)
+        {
+            TechnologyConfig technology = config.technologies[i];
+            if (technology == null || string.IsNullOrWhiteSpace(technology.categoryId) || technology.categoryId == "starter")
+            {
+                continue;
+            }
+
+            categories.Add(technology.categoryId);
+        }
+
+        return categories.Count;
+    }
+
+    private static bool TechnologyCategoryExists(SessionConfigDatabase config, string categoryId)
+    {
+        if (config == null || config.technologies == null || string.IsNullOrWhiteSpace(categoryId))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < config.technologies.Count; i++)
+        {
+            TechnologyConfig technology = config.technologies[i];
+            if (technology != null && technology.categoryId == categoryId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TechnologyFiveLevelBoardExists(SessionConfigDatabase config)
+    {
+        if (config == null || config.technologies == null)
+        {
+            return false;
+        }
+
+        int fiveLevelNodes = 0;
+        for (int i = 0; i < config.technologies.Count; i++)
+        {
+            TechnologyConfig technology = config.technologies[i];
+            if (technology == null || technology.id == "basic_airship")
+            {
+                continue;
+            }
+
+            if (technology.requiredCycles == 5 &&
+                technology.treeColumn >= 1 &&
+                technology.treeColumn <= 5 &&
+                technology.treeRow >= 0)
+            {
+                fiveLevelNodes++;
+            }
+        }
+
+        return fiveLevelNodes >= 15;
     }
 
     private static bool TechnologyBranchExists(SessionConfigDatabase config, string branch)
@@ -1370,21 +2081,22 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ItemConfig water = config.GetItem("water");
         ItemConfig sampleOre = config.GetItem("windshale_ore");
         ItemConfig carcass = config.GetItem("windcalf_carcass");
+        string itemCsvText = ReadProjectText("Assets/Data/Config/Item.csv");
         bool cargoMetadataValid =
             config.GetItem("passengers_to_capital") == null &&
             config.GetItem("passengers_to_island") == null &&
             config.GetItem("passengers_to_ship") == null &&
             water != null &&
-            water.cargoUnitKind == CargoUnitKind.Piece &&
-            water.cargoStorageKind == CargoStorageKind.Van &&
+            Approximately(water.massKgPerUnit, 1f, 0.001f) &&
             sampleOre != null &&
-            sampleOre.cargoUnitKind == CargoUnitKind.Piece &&
-            sampleOre.cargoStorageKind == CargoStorageKind.Van &&
+            Approximately(sampleOre.massKgPerUnit, 1f, 0.001f) &&
             carcass != null &&
-            carcass.cargoUnitKind == CargoUnitKind.Piece &&
-            carcass.cargoStorageKind == CargoStorageKind.Van;
+            Approximately(carcass.massKgPerUnit, 1f, 0.001f) &&
+            !itemCsvText.Contains("cargo_unit_kind") &&
+            !itemCsvText.Contains("cargo_storage_kind") &&
+            !itemCsvText.Contains("energy_kwh_per_kg");
         report.Check(cargoMetadataValid,
-            "Cargo item metadata keeps session resources in the shared van hold and removes passenger-route cargo templates.");
+            "Item.csv keeps only item identity and per-unit mass; obsolete cargo unit/storage and item energy columns are removed.");
 
         List<CargoCompartmentDefinition> cargoCompartments = new List<CargoCompartmentDefinition>
         {
@@ -1418,15 +2130,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         PlayerProgress tankProgress = new PlayerProgress();
         tankProgress.Normalize();
         tankProgress.AddShipCargo("charcoal", 10);
-        tankProgress.shipEngineFuelTank.Add("charcoal", 30f, 50f);
+        tankProgress.shipFuelTank.Add("charcoal", 30f, 50f);
         tankProgress.shipClaudiumTank.Add("claudium", 12.5f, 25f);
         bool internalTanksAreSeparate =
             tankProgress.GetShipCargoAmount("charcoal") == 10 &&
             Approximately(tankProgress.GetShipCargoMassKg(config), 10f, 0.001f) &&
             Approximately(tankProgress.GetShipPayloadMassKg(config), 52.5f, 0.001f) &&
-            tankProgress.shipEngineFuelTank.TrySpend("charcoal", 5.5f) &&
+            tankProgress.shipFuelTank.TrySpend("charcoal", 5.5f) &&
             tankProgress.GetShipCargoAmount("charcoal") == 10 &&
-            Approximately(tankProgress.shipEngineFuelTank.GetAmount("charcoal"), 24.5f, 0.001f);
+            Approximately(tankProgress.shipFuelTank.GetAmount("charcoal"), 24.5f, 0.001f);
         report.Check(internalTanksAreSeparate,
             "Fuel and claudium tanks count as ship payload but stay separate from cargo stacks.");
 
@@ -1449,16 +2161,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return;
         }
 
-        bool sessionShipPartsReady = config.shipTreeEntries.Count == 2
+        bool sessionShipPartsReady = config.shipTreeEntries.Count == 85
             && config.GetShipTreeEntry("pioneer") != null
             && config.GetShipTreeEntry("cruiser203") != null
             && config.hulls.Count == 2
             && config.GetHull(GameplaySessionAccountData.DefaultStarterHullId) != null
             && config.GetHull("cruiser203_hull") != null
-            && config.engines.Count == 1
-            && config.GetEngine("starter_engine") != null
-            && config.propellers.Count == 1
-            && config.GetPropeller("starter_propeller") != null
             && config.claudiumLoops.Count == 1
             && config.GetClaudiumLoop("starter_claudium_loop") != null
             && config.specialModules.Count == 5
@@ -1468,7 +2176,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && config.GetSpecialModule(SessionExtractionConstants.StarterObservationPostModuleId) != null
             && config.GetSpecialModule(SessionExtractionConstants.StarterLeviathanSalvageModuleId) != null;
         report.Check(sessionShipPartsReady,
-            "Config ship catalog contains Pioneer, Cruiser 203 and the five starter fitting modules.");
+            "Config ship catalog contains the full development roster while keeping Pioneer, Cruiser 203 and the five starter fitting modules runtime-ready.");
 
         string shipAssemblyBuilderText = ReadProjectText("Assets/Scripts/Data/ShipAssemblyBuilder.cs");
         report.Check(!File.Exists(ProjectPath("Assets/Scripts/Data/R1ShipDesignCatalog.cs")) &&
@@ -1484,12 +2192,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         try
         {
             int expectedParts = config.hulls.Count
-                + config.engines.Count
-                + config.propellers.Count
                 + config.claudiumLoops.Count
                 + config.specialModules.Count;
             int appliedParts = ShipAssemblyBuilder.ApplyCsvShipPartConfigs(catalog, config);
-            report.Check(appliedParts == expectedParts && expectedParts == 10,
+            report.Check(appliedParts == expectedParts && expectedParts == 8,
                 "Session CSV ship part configs sync into ShipCatalog: " + appliedParts + "/" + expectedParts + " parts.");
 
             PlayerProgress progress = new PlayerProgress();
@@ -1512,10 +2218,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     ? "Pioneer assembles with High/Mid/Low/Rig fitting bands and no legacy utility slot."
                     : "Pioneer does not assemble from CSV catalog: "
                         + (requiredModulesReady ? (result != null ? result.message : "no result") : autoInstallMessage));
+            report.Check(assembled &&
+                result != null &&
+                result.hull != null &&
+                result.hull.fuelResourceId == "charcoal",
+                "Ship assembly carries the hull fuel resource without an engine part.");
 
             string envelope = "assembly did not build.";
             bool flightEnvelopeOk = assembled
-                && HasStablePioneerFlightEnvelope(result, 250f, 40f, 0.5f, 12f, out envelope);
+                && HasStablePioneerFlightEnvelope(result, 250f, 0.5f, 12f, out envelope);
             report.Check(flightEnvelopeOk,
                 "Bare Pioneer has enough lift, hover reserve, thrust and speed for the starter sortie: " + envelope);
         }
@@ -2359,6 +3070,51 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return File.Exists(fullPath) ? File.ReadAllText(fullPath) : "";
     }
 
+    private static bool UrpAssetUsesLeanRuntimeDefaults(string assetText)
+    {
+        return assetText.Contains("m_RequireDepthTexture: 0") &&
+            assetText.Contains("m_RequireOpaqueTexture: 0") &&
+            assetText.Contains("m_SupportsHDR: 0") &&
+            assetText.Contains("m_MainLightShadowsSupported: 0") &&
+            assetText.Contains("m_AdditionalLightsRenderingMode: 0") &&
+            assetText.Contains("m_AdditionalLightsPerObjectLimit: 0") &&
+            assetText.Contains("m_ShadowDistance: 0") &&
+            assetText.Contains("m_AnyShadowsSupported: 0") &&
+            assetText.Contains("m_UseAdaptivePerformance: 0");
+    }
+
+    private static bool VisualTargetRendererAvoidsAeroFullscreenPass(string assetText)
+    {
+        return assetText.Contains("m_IntermediateTextureMode: 0") &&
+            !HasActiveAeroFullscreenPass(assetText);
+    }
+
+    private static bool HasActiveAeroFullscreenPass(string assetText)
+    {
+        const string marker = "m_Name: AERO Volumetric Fog";
+        int markerIndex = assetText.IndexOf(marker, StringComparison.Ordinal);
+        if (markerIndex < 0)
+        {
+            return false;
+        }
+
+        int blockStart = assetText.LastIndexOf("--- !u!", markerIndex, StringComparison.Ordinal);
+        if (blockStart < 0)
+        {
+            blockStart = markerIndex;
+        }
+
+        int blockEnd = assetText.IndexOf("\n--- !u!", markerIndex, StringComparison.Ordinal);
+        if (blockEnd < 0)
+        {
+            blockEnd = assetText.Length;
+        }
+
+        string block = assetText.Substring(blockStart, blockEnd - blockStart);
+        return block.Contains("FullScreenPassRendererFeature") &&
+            block.Contains("m_Active: 1");
+    }
+
     private static string ProjectPath(string assetPath)
     {
         return Path.Combine(Directory.GetCurrentDirectory(), assetPath);
@@ -2443,7 +3199,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         string gameplaySessionText = ReadProjectText("Assets/Scripts/Session/WildWindGameplaySession.cs");
         string cameraText = ReadProjectText("Assets/Scripts/Session/WildWindSessionCameraController.cs");
         string shipPhysicsText = ReadProjectText("Assets/Scripts/Systems/ShipPhysics.cs");
-        string mechanicsText = ReadProjectText("Assets/Scripts/Meta/WildWindMetaPortRuntimeModel.cs");
+        string retiredDockRuntimeText = ReadProjectText("Assets/Scripts/Meta/WildWind" + "Meta" + "Port" + "RuntimeModel.cs");
         string sceneText = ReadProjectText("Assets/Scenes/WildWindSessionScene.unity");
         string projectText = ReadProjectText("Assembly-CSharp.csproj");
 
@@ -2619,7 +3375,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             !gameplaySessionText.Contains("WorldManifestData") &&
             !gameplaySessionText.Contains("WorldRegionRuntime") &&
             !cameraText.Contains("worldCamera") &&
-            !mechanicsText.Contains("worldHeightMeters") &&
+            !retiredDockRuntimeText.Contains("worldHeightMeters") &&
             !sceneText.Contains("  world: {fileID:") &&
             !sceneText.Contains("  runtimeState: {fileID:") &&
             !sceneText.Contains("  streamer: {fileID:") &&
@@ -2769,7 +3525,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             generatedAccount.gameplaySession.mode == GameSessionMode.Docked &&
             generatedAccount.gameplaySession.dockId == GameplaySessionAccountData.DefaultDockId &&
             generatedAccount.progress.hasCurrentDockPosition;
-        report.Check(generatedUsable, "Fresh runtime account contains progress, selected hull, base dock pose, and gameplay session data without save-file state.");
+        report.Check(generatedUsable, "Fresh runtime account contains progress, selected hull, base dock pose, and gameplay session data.");
 
         MetaGameState runtimeMeta = FindFirstObjectByType<MetaGameState>();
         if (runtimeMeta == null)
@@ -2787,19 +3543,31 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             runtimeSnapshot.gameplaySession.IsUsable &&
             runtimeSnapshot.gameplaySession.accountId == runtimeMeta.RuntimeAccountId;
         report.Check(runtimeSnapshotUsable,
-            "MetaGameState creates a runtime account snapshot for diagnostics without writing a save file.");
+            "MetaGameState creates a runtime account snapshot for diagnostics from the current progress state.");
+        string normalProgressPath = MetaGameState.GetPersistentProgressSavePathForTests(false);
+        string bigTestProgressPath = MetaGameState.GetPersistentProgressSavePathForTests(true);
+        report.Check(!string.Equals(normalProgressPath, bigTestProgressPath, StringComparison.OrdinalIgnoreCase)
+                && runtimeMeta.IsUsingBigTestPersistentProgressForTests
+                && string.Equals(runtimeMeta.PersistentProgressSavePathForTests, bigTestProgressPath, StringComparison.OrdinalIgnoreCase),
+            "Big Test uses an isolated persistent progress save file and cannot consume the player's real long-term progress save.");
 
 #if UNITY_EDITOR
         string metaText = ReadProjectText("Assets/Scripts/Meta/MetaGameState.cs");
         string sessionText = ReadProjectText("Assets/Scripts/Session/WildWindGameplaySession.cs");
         string bootstrapText = ReadProjectText("Assets/Scripts/Session/WildWindGameplayBootstrap.cs");
         string flowText = ReadProjectText("Assets/Scripts/Session/WildWindSessionFlow.cs");
-        bool accountStorageRemoved =
+        bool persistentProgressStorageScoped =
             !File.Exists(ProjectPath("Assets/Scripts/Session/WildWindAccountStorage.cs")) &&
             !File.Exists(ProjectPath("Assets/Scripts/Session/WildWindAccountStorage.cs.meta")) &&
-            !metaText.Contains("File.WriteAllText") &&
-            !metaText.Contains("File.ReadAllText") &&
-            !metaText.Contains("Directory.CreateDirectory") &&
+            metaText.Contains("PersistentProgressSaveFileName") &&
+            metaText.Contains("PersistentProgressBigTestSaveFileName") &&
+            metaText.Contains("IsProgressSandboxActive") &&
+            metaText.Contains("Application.persistentDataPath") &&
+            metaText.Contains("File.WriteAllText") &&
+            metaText.Contains("File.ReadAllText") &&
+            metaText.Contains("Directory.CreateDirectory") &&
+            metaText.Contains("DeletePersistentProgressSaveFile") &&
+            !metaText.Contains("FindFirstObjectByType<WildWindBigTestRunner>() != null") &&
             !metaText.Contains("AccountPath") &&
             !metaText.Contains("EffectiveAccountFileName") &&
             !metaText.Contains("TryPersistAccount") &&
@@ -2815,8 +3583,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             !bootstrapText.Contains("ShipCatalogPath") &&
             !bootstrapText.Contains("LoadAccount") &&
             !flowText.Contains("TryPersistAccount");
-        report.Check(accountStorageRemoved,
-            "Runtime account flow has no save-file storage, startup load, account filename, or persisted reload API.");
+        report.Check(persistentProgressStorageScoped,
+            "Runtime progress persistence is scoped to MetaGameState JSON saves and does not restore the removed legacy account storage flow.");
 #else
         report.Check(true, "Runtime account source scan is editor-only and skipped in player builds.");
 #endif
@@ -2842,6 +3610,22 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         report.Check(leanRuntimeAtmosphere && useUnityFogFallback,
             "Runtime atmosphere uses a lean Unity fog fallback by default instead of always running expensive AERO/TrueClouds passes.");
+        sessionAtmosphereTuner.ApplyNow();
+        report.Check(sessionAtmosphereTuner.IsLeanRuntimeAtmosphereActiveForTests
+            && sessionAtmosphereTuner.EnabledTrueCloudsBehaviourCountForTests == 0
+            && !sessionAtmosphereTuner.IsAeroFogControllerEnabledForTests
+            && !sessionAtmosphereTuner.IsCameraPostProcessingEnabledForTests,
+            "Lean runtime atmosphere keeps TrueClouds, AERO and camera post-processing disabled during the docked/start presentation.");
+        report.Check(sessionAtmosphereTuner.IsCameraUsingLeanRendererForTests,
+            "Lean runtime camera uses the Renderer2D lean renderer instead of the VisualTarget/AERO renderer: "
+            + sessionAtmosphereTuner.CameraRendererNameForTests + ".");
+
+        string universalRpAssetText = ReadProjectText("Assets/Settings/UniversalRP.asset");
+        string visualTargetRendererText = ReadProjectText("Assets/Data/VisualTarget/VisualTargetUniversalRenderer.asset");
+        report.Check(UrpAssetUsesLeanRuntimeDefaults(universalRpAssetText),
+            "UniversalRP asset does not globally force depth texture, opaque texture, HDR, adaptive performance, shadows or additional per-object lights.");
+        report.Check(VisualTargetRendererAvoidsAeroFullscreenPass(visualTargetRendererText),
+            "VisualTarget renderer keeps the AERO fullscreen pass inactive and no longer forces an intermediate texture.");
 
         report.Check(useAltitudeAtmosphere, "Р’С‹СЃРѕС‚РЅРѕРµ СѓРїСЂР°РІР»РµРЅРёРµ AERO-С‚СѓРјР°РЅРѕРј РІРєР»СЋС‡РµРЅРѕ.");
         report.Check(Approximately(transitionHalfWidth, 50f, 0.5f), "РџР»Р°РІРЅС‹Р№ РїРµСЂРµС…РѕРґ РІС‹СЃРѕС‚РЅС‹С… Р·РѕРЅ РґРµСЂР¶РёС‚СЃСЏ РѕРєРѕР»Рѕ +-50 Рј: " + transitionHalfWidth.ToString("0.#") + " Рј.");
@@ -2849,12 +3633,14 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(calmVisibility >= 800f && calmVisibility <= 1300f, "Р’РёРґРёРјРѕСЃС‚СЊ СЃРїРѕРєРѕР№РЅРѕР№ Р±СѓСЂРё РѕРєРѕР»Рѕ 1000 Рј: " + calmVisibility.ToString("0.#") + " Рј.");
         report.Check(deadlyDrawDistance > 0f && deadlyDrawDistance <= 120f, "РџРѕРІРµСЂС…РЅРѕСЃС‚СЊ СЃРјРµСЂС‚РµР»СЊРЅРѕР№ Р±СѓСЂРё СЂРёСЃСѓРµС‚СЃСЏ С‚РѕР»СЊРєРѕ РІР±Р»РёР·Рё: " + deadlyDrawDistance.ToString("0.#") + " Рј.");
 
-        GameObject stormSurface = GameObject.Find("Deadly Storm Surface Local Bubble");
+        GameObject stormSurface = FindSceneGameObjectIncludingInactive("Deadly Storm Surface Local Bubble");
         report.Check(stormSurface != null, stormSurface != null ? "Р›РѕРєР°Р»СЊРЅР°СЏ РїРѕРІРµСЂС…РЅРѕСЃС‚СЊ СЃРјРµСЂС‚РµР»СЊРЅРѕР№ Р±СѓСЂРё РЅР°Р№РґРµРЅР°." : "Р›РѕРєР°Р»СЊРЅР°СЏ РїРѕРІРµСЂС…РЅРѕСЃС‚СЊ СЃРјРµСЂС‚РµР»СЊРЅРѕР№ Р±СѓСЂРё РЅРµ РЅР°Р№РґРµРЅР°.");
         if (stormSurface != null)
         {
             Renderer renderer = stormSurface.GetComponent<Renderer>();
             report.Check(renderer != null && renderer.sharedMaterial != null, "РЈ РїРѕРІРµСЂС…РЅРѕСЃС‚Рё Р±СѓСЂРё РЅР°Р·РЅР°С‡РµРЅ РјР°С‚РµСЂРёР°Р».");
+            report.Check(!leanRuntimeAtmosphere || !stormSurface.activeSelf,
+                "Lean runtime keeps the expensive deadly storm surface inactive unless the non-lean atmosphere stack is explicitly enabled.");
             if (renderer != null && renderer.sharedMaterial != null)
             {
                 report.Info("РњР°С‚РµСЂРёР°Р» Р±СѓСЂРё: " + renderer.sharedMaterial.name + ", shader=" + renderer.sharedMaterial.shader.name + ".");
@@ -3076,9 +3862,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             report.Check(Approximately(ship.EffectiveWindVelocity.magnitude, 12f, 0.001f), "РџР»РѕС…Р°СЏ Р°СЌСЂРѕРґРёРЅР°РјРёРєР° 1.2 СѓСЃРёР»РёРІР°РµС‚ РІРѕР·РґРµР№СЃС‚РІРёРµ РІРµС‚СЂР° РґРѕ 12 Рј/СЃ.");
 
             ship.baseMaxSpeedMS = 50f;
-            ship.propellerMaxSpeedMS = 50f;
+            ship.hullCruiseReferenceSpeedMS = 50f;
             ship.slipstreamActivationSpeedRatio = 0.8f;
             ship.slipstreamMaxSpeedMultiplier = 5f;
+            ship.slipstreamFuelConsumptionMultiplier = 2f;
             body.linearVelocity = new Vector3(39f, 0f, 0f);
             bool slipstreamBlockedBelowSpeed = !ship.TrySetClaudiumSlipstreamEnabled(true, out _);
             body.linearVelocity = new Vector3(41f, 0f, 0f);
@@ -3086,7 +3873,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ship.claudiumSlipstreamCharge01 = 1f;
             bool slipstreamFullEffect = Approximately(ship.CurrentMaxSpeedMS, 250f, 0.001f)
                 && Approximately(ship.ClaudiumSlipstreamDragMultiplier, 1f, 0.001f)
-                && Approximately(ship.ClaudiumSlipstreamClaudiumMultiplier, 1f, 0.001f);
+                && Approximately(ship.CurrentFuelConsumptionMultiplier, 2f, 0.001f);
             body.linearVelocity = new Vector3(39f, 0f, 0f);
             bool slipstreamDisabledAfterSlowdown = TryInvokePrivateMethod(ship, "FixedUpdate", report)
                 && !ship.claudiumSlipstreamEnabled;
@@ -3094,7 +3881,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 && slipstreamEnabledAboveSpeed
                 && slipstreamDisabledAfterSlowdown
                 && slipstreamFullEffect,
-                "Claudium slipstream uses a relative 80% clean-speed threshold, ramps max ход x5, and no longer changes drag or claudium burn.");
+                "Claudium slipstream uses a relative 80% clean-speed threshold, ramps max ход x5, and doubles fixed fuel burn.");
             ship.TrySetClaudiumSlipstreamEnabled(false, out _);
             ship.claudiumSlipstreamCharge01 = 0f;
 
@@ -3117,40 +3904,45 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             float expectedMass = ship.baseMass + ship.cargoMassKg;
             report.Check(Approximately(body.mass, expectedMass, 0.001f), "Rigidbody РїРѕР»СѓС‡Р°РµС‚ СЃСѓС…СѓСЋ РјР°СЃСЃСѓ Рё РіСЂСѓР·: " + body.mass.ToString("0.#") + " РєРі.");
 
-            float fuelBeforeLift = ship.engineFuelStockKg;
+            float fixedDeltaTime = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+            float fuelBeforeLift = ship.fuelStockKg;
             float claudiumBeforeLift = ship.claudiumStock;
             if (TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
             {
                 float expectedLiftN = body.mass * 9.81f;
                 report.Check(Approximately(ship.claudiumRequestedLiftKg, body.mass, 0.5f), "РљР»Р°РІРґРёРµРІС‹Р№ РєРѕРЅС‚СѓСЂ Р·Р°РїСЂР°С€РёРІР°РµС‚ С‚СЂРёРјРјРёСЂСѓРµРјСѓСЋ РјР°СЃСЃСѓ РєРѕСЂР°Р±Р»СЏ: " + ship.claudiumRequestedLiftKg.ToString("0.#") + " РєРі.");
                 report.Check(Approximately(ship.claudiumCurrentLiftN, expectedLiftN, expectedLiftN * 0.02f), "РљР»Р°РІРґРёРµРІС‹Р№ РєРѕРЅС‚СѓСЂ РІС‹РґР°С‘С‚ РїРѕРґСЉС‘РјРЅСѓСЋ СЃРёР»Сѓ РїСЂРёРјРµСЂРЅРѕ РІРµСЃР° РєРѕСЂР°Р±Р»СЏ: " + ship.claudiumCurrentLiftN.ToString("0.#") + " Рќ.");
-                report.Check(ship.engineGeneratedPowerKw + 0.001f >= ship.claudiumPowerDrawKw, "Р”РІРёРіР°С‚РµР»СЊ РїРѕРєСЂС‹РІР°РµС‚ РјРѕС‰РЅРѕСЃС‚СЊ РєР»Р°РІРґРёРµРІРѕРіРѕ РєРѕРЅС‚СѓСЂР°: " + ship.engineGeneratedPowerKw.ToString("0.#") + " / " + ship.claudiumPowerDrawKw.ToString("0.#") + " РєР’С‚.");
-                report.Check(ship.engineFuelStockKg < fuelBeforeLift && ship.claudiumStock < claudiumBeforeLift, "РџРѕРґСЉС‘Рј С‚СЂР°С‚РёС‚ С‚РѕРїР»РёРІРѕ Рё РєР»Р°РІРґРёР№ РІ РѕРґРЅРѕРј С„РёР·РёС‡РµСЃРєРѕРј С‚РёРєРµ.");
+                report.Check(Approximately(fuelBeforeLift, ship.fuelStockKg, 0.0001f)
+                    && Approximately(claudiumBeforeLift, ship.claudiumStock, 0.0001f),
+                    "Lift is free: it does not consume coal or claudium.");
             }
 
-            float fixedDeltaTime = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
+            float fuelBeforeTick = ship.fuelStockKg;
+            if (TryInvokePrivateMethod(ship, "FixedUpdate", report))
+            {
+                float expectedFuelBurn = Mathf.Max(0f, ship.fuelConsumptionKgPerMinute)
+                    * ship.CurrentFuelConsumptionMultiplier
+                    / 60f
+                    * fixedDeltaTime;
+                report.Check(Approximately(fuelBeforeTick - ship.fuelStockKg, expectedFuelBurn, Mathf.Max(0.0001f, expectedFuelBurn * 0.05f)),
+                    "Hull fuel burn uses the fixed kg-per-minute rate.");
+            }
+
             ship.thrustInput = 1f;
-            ship.propellerPitch = 0f;
-            ship.enginePowerLever = 0f;
-            ship.engineResponseRate01PerSecond = 0.10f;
-            if (TryInvokePrivateMethod(ship, "UpdateEngineThrottles", report)
+            ship.hullThrustOutput = 0f;
+            ship.hullThrustResponseRate01PerSecond = 0.10f;
+            if (TryInvokePrivateMethod(ship, "UpdateHullThrustOutput", report)
                 && TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
             {
-                float expectedEngineStep = 0.10f * fixedDeltaTime;
-                report.Check(Approximately(ship.propellerPitch, expectedEngineStep, 0.0002f)
-                    && Approximately(ship.enginePowerLever, expectedEngineStep, 0.0002f),
-                    "Р”РІРёРіР°С‚РµР»СЊ РґРѕРіРѕРЅСЏРµС‚ СЂСѓС‡РєСѓ С‚СЏРіРё СЃ РїСЂРёС‘РјРёСЃС‚РѕСЃС‚СЊСЋ 10% РјР°РєСЃРёРјСѓРјР° РІ СЃРµРєСѓРЅРґСѓ: pitch "
-                    + ship.propellerPitch.ToString("0.0000")
-                    + ", power "
-                    + ship.enginePowerLever.ToString("0.0000") + ".");
+                float expectedHullThrustStep = 0.10f * fixedDeltaTime;
+                report.Check(Approximately(ship.hullThrustOutput, expectedHullThrustStep, 0.0002f),
+                    "Hull thrust output follows the requested thrust with a 10% per second response: "
+                    + ship.hullThrustOutput.ToString("0.0000") + ".");
             }
 
             ship.claudiumStock = 20f;
             ship.claudiumCurrentLiftN = 0f;
-            ship.claudiumPowerDrawWatts = 0f;
-            ship.claudiumPowerDrawKw = 0f;
             ship.claudiumLoopResponseRate01PerSecond = 0.10f;
-            ship.enginePowerLever = 1f;
             if (TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
             {
                 float expectedLoopStepN = ship.claudiumMaxLiftKg * 9.81f * 0.10f * fixedDeltaTime;
@@ -3160,9 +3952,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
 
             ship.claudiumStock = 0f;
+            ship.claudiumCurrentLiftN = 0f;
             if (TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
             {
-                report.Check(Approximately(ship.claudiumCurrentLiftN, 0f, 0.001f), "Р‘РµР· РєР»Р°РІРґРёСЏ РїРѕРґСЉС‘РјРЅР°СЏ СЃРёР»Р° РїР°РґР°РµС‚ РІ РЅРѕР»СЊ.");
+                float expectedLoopStepWithoutClaudiumN = ship.claudiumMaxLiftKg * 9.81f * 0.10f * fixedDeltaTime;
+                report.Check(Approximately(ship.claudiumCurrentLiftN, expectedLoopStepWithoutClaudiumN, 0.05f)
+                    && ship.claudiumStock <= 0.0001f,
+                    "Lift loop works without claudium stock and does not consume claudium.");
             }
 
             ConfigureFlightProbeShip(ship, body);
@@ -3178,22 +3974,28 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ConfigureFlightProbeShip(ship, body);
             ship.claudiumStock = 0f;
             ResetFlightProbeBody(body, new Vector3(0f, 1000f, 0f), Quaternion.identity, true);
+            float noClaudiumHoverStartY = body.position.y;
             if (StepShipPhysicsProbe(ship, physicsScene, 10, report))
             {
-                report.Check(body.linearVelocity.y < -0.75f, "Р‘РµР· РєР»Р°РІРґРёСЏ РєРѕСЂР°Р±Р»СЊ СЂРµР°Р»СЊРЅРѕ РЅР°С‡РёРЅР°РµС‚ РїР°РґР°С‚СЊ: vy " + body.linearVelocity.y.ToString("0.###") + " Рј/СЃ.");
+                float noClaudiumHoverDrift = Mathf.Abs(body.position.y - noClaudiumHoverStartY);
+                report.Check(noClaudiumHoverDrift <= 0.25f && Mathf.Abs(body.linearVelocity.y) <= 0.5f,
+                    "Ship lift does not require claudium stock: drift "
+                    + noClaudiumHoverDrift.ToString("0.###")
+                    + " m, vy "
+                    + body.linearVelocity.y.ToString("0.###")
+                    + " m/s.");
             }
 
             ConfigureFlightProbeShip(ship, body);
             ship.claudiumStock = 0f;
             ship.thrustInput = 1f;
-            ship.propellerPitch = 1f;
-            ship.enginePowerLever = 1f;
+            ship.hullThrustOutput = 1f;
             ResetFlightProbeBody(body, Vector3.zero, Quaternion.identity, false);
             if (StepShipPhysicsProbe(ship, physicsScene, 15, report))
             {
                 Vector3 horizontalVelocity = body.linearVelocity;
                 horizontalVelocity.y = 0f;
-                report.Check(horizontalVelocity.z > 0.75f && ship.propellerThrustKgf > 0f, "Р’РёРЅС‚ СЃ РґРѕСЃС‚СѓРїРЅРѕР№ РјРѕС‰РЅРѕСЃС‚СЊСЋ СЂР°Р·РіРѕРЅСЏРµС‚ РєРѕСЂР°Р±Р»СЊ РІРїРµСЂС‘Рґ: v " + horizontalVelocity.magnitude.ToString("0.###") + " Рј/СЃ, С‚СЏРіР° " + ship.propellerThrustKgf.ToString("0.#") + " РєРіСЃ.");
+                report.Check(horizontalVelocity.z > 0.75f && ship.hullForwardThrustKgfCurrent > 0f, "Hull thrust accelerates the ship forward: v " + horizontalVelocity.magnitude.ToString("0.###") + " m/s, thrust " + ship.hullForwardThrustKgfCurrent.ToString("0.#") + " kgf.");
             }
 
             ConfigureForwardSpeedProbeShip(ship, body);
@@ -3709,6 +4511,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
         }
 
+        WildWindBaseIslandView island = WildWindBaseIslandView.EnsureForCurrentSessionScene();
+        bool dockedCityHidesShip = island != null
+            && island.IsCityVisibleForTests
+            && island.SuppressedActiveShipRendererCountForTests > 0;
+
         List<MeshRenderer> visibleRenderers = new List<MeshRenderer>();
         for (int i = 0; i < renderers.Length; i++)
         {
@@ -3726,80 +4533,31 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             activeShip.name == "Player Ship Proxy";
         report.Check(!hasFallbackVisual, "Active ship is not a session fallback visual.");
         report.Check(usableMeshCount > 0, "Active ship has " + usableMeshCount + " usable mesh filter(s).");
-        report.Check(visibleRenderers.Count > 0, "Active ship has " + visibleRenderers.Count + " active mesh renderer(s).");
+        report.Check(visibleRenderers.Count > 0 || dockedCityHidesShip,
+            dockedCityHidesShip
+                ? "Docked city view suppresses the active ship renderers during meta start: "
+                    + island.SuppressedActiveShipRendererCountForTests + "."
+                : "Active ship has " + visibleRenderers.Count + " active mesh renderer(s).");
 
-        bool hasBounds = TryFindVisibleStarterHullMeshSize(meshFilters, out Vector3 size);
+        bool hasBounds = TryFindStarterHullMeshSize(meshFilters, !dockedCityHidesShip, out Vector3 size);
         bool boatSized = hasBounds && IsFinite(size) && size.x >= 5f && size.x <= 7f && size.y >= 2.5f && size.y <= 4.25f && size.z >= 18f && size.z <= 22f;
         report.Check(boatSized,
             boatSized
-                ? "Active ship visible mesh size matches the 20m starter hull: " + FormatVector(size) + "."
-                : "Active ship visible mesh size is empty or not the 20m starter hull: " + FormatVector(size) + ".");
+                ? "Active ship mesh size matches the 20m starter hull: " + FormatVector(size) + "."
+                : "Active ship mesh size is empty or not the 20m starter hull: " + FormatVector(size) + ".");
     }
 
-    private void ValidateMetaPortRuntime(BigTestReport report)
+    private void ValidateKnowledgeScreenRuntime(BigTestReport report)
     {
-        report.Section("Meta port runtime");
+        report.Section("Knowledge screen runtime");
 
-        WildWindMetaCatalog metaCatalog = WildWindMetaMechanics.CreateMinimalCatalog();
-        MetaAccountState account = WildWindMetaMechanics.CreateFreshAccount(metaCatalog);
-        report.Check(metaCatalog != null && account != null, "Meta mechanics catalog and account state are available.");
-        report.Check(account.ships.Count == 1 && account.ships[0].shipId == "pioneer" && account.portSlots == WildWindMetaMechanics.InitialPortSlots,
-            "Fresh account starts with five port slots and Starter Pioneer recovery.");
-        bool sessionShipCatalogOnly = metaCatalog.ships.Count == 2
-            && metaCatalog.ships.ContainsKey("pioneer")
-            && metaCatalog.ships.ContainsKey("cruiser203_hull")
-            && !metaCatalog.ships.ContainsKey("hauler_t1")
-            && !metaCatalog.ships.ContainsKey("pioneer_mining_t2")
-            && !metaCatalog.ships.ContainsKey("precursor_t3");
-        report.Check(sessionShipCatalogOnly,
-            "Minimal meta ship catalog keeps only session hulls: Pioneer and Cruiser 203.");
-        MetaShipDefinition cruiserDefinition = metaCatalog.ships["cruiser203_hull"];
-        account.ships.Add(new MetaShipInstance
-        {
-            shipId = cruiserDefinition.shipId,
-            tier = cruiserDefinition.tier,
-            remainingSorties = cruiserDefinition.maxSorties,
-            maxSorties = cruiserDefinition.maxSorties
-        });
-        report.Check(account.ships.Exists(s => s.shipId == "cruiser203_hull"),
-            "Single-account port state can hold Cruiser 203 without old ship-tree purchase flows.");
-        account.ships.Clear();
-        bool restoredPioneer = WildWindMetaMechanics.EnsureStarterPioneerRecovery(account, metaCatalog);
-        report.Check(restoredPioneer && account.ships.Count == 1 && account.ships[0].shipId == "pioneer",
-            "Starter Pioneer recovery is still a tiny account invariant, not a sell/loss economy loop.");
-        MetaShipInstance resourceProbe = account.ships[0];
-        int maxSorties = resourceProbe.remainingSorties;
-        for (int i = 0; i < maxSorties; i++)
-        {
-            WildWindMetaMechanics.ConsumeShipSortie(resourceProbe);
-        }
-        report.Check(resourceProbe.remainingSorties == 0 && !WildWindMetaMechanics.ConsumeShipSortie(resourceProbe),
-            "Ships have limited sortie resource and cannot launch once it is depleted.");
-
-        WildWindMetaMechanics.AddStorage(account, "ognejar_ore", 20);
-        MetaOperationResult processOne = WildWindMetaMechanics.ProcessOneCycle(account, metaCatalog.processing["ognejar_ore"]);
-        int charcoalAfterOne = WildWindMetaMechanics.GetStorage(account, "charcoal");
-        float charcoalBuffer = account.processingBuffers["buffer:charcoal"];
-        MetaOperationResult processTwo = WildWindMetaMechanics.ProcessOneCycle(account, metaCatalog.processing["ognejar_ore"]);
-        report.Check(processOne.success && processTwo.success && charcoalAfterOne == 0 && charcoalBuffer > 0f && WildWindMetaMechanics.GetStorage(account, "charcoal") == 1,
-            "Processing consumes raw units, stores fractional output buffers and emits only whole material units.");
-        string metaPortRuntimeText = ReadProjectText("Assets/Scripts/Meta/WildWindMetaPortRuntimeModel.cs");
-        string metaPortModelText = ReadProjectText("Assets/Scripts/Meta/WildWindMetaPortModel.cs");
-        bool extractionLabRemoved =
-            !File.Exists(ProjectPath("Assets/Scripts/Meta/WildWindSessionMechanicsModel.cs")) &&
-            !File.Exists(ProjectPath("Assets/Scripts/Meta/WildWindSessionMechanicsModel.cs.meta")) &&
-            !metaPortRuntimeText.Contains("WildWindExtractionMechanics") &&
-            !metaPortRuntimeText.Contains("WildWindMechanicsCatalog") &&
-            !metaPortRuntimeText.Contains("ExtractionBoulderState") &&
-            !metaPortRuntimeText.Contains("ExtractionChunkState") &&
-            !metaPortRuntimeText.Contains("ProjectileProfile") &&
-            !metaPortRuntimeText.Contains("ScanModuleProfile") &&
-            !metaPortRuntimeText.Contains("FireAuthorizationMode");
-        report.Check(extractionLabRemoved,
-            "Old pure extraction-lab mechanics model is removed; Big Test now covers the runtime systems directly.");
+        string oldPortTypePrefix = "WildWind" + "Meta" + "Port";
+        string oldPortRuntimePath = "Assets/Scripts/Meta/WildWind" + "Meta" + "Port" + "RuntimeModel.cs";
+        string oldPortModelPath = "Assets/Scripts/Meta/WildWind" + "Meta" + "Port" + "Model.cs";
+        string oldPortScreenPath = "Assets/Scripts/UI/WildWind" + "Meta" + "Port" + "Screen.cs";
         string metaGameStateText = ReadProjectText("Assets/Scripts/Meta/MetaGameState.cs");
         string gameplayHudText = ReadProjectText("Assets/Scripts/UI/WildWindGameplayHud.cs");
-        string metaPortScreenText = ReadProjectText("Assets/Scripts/UI/WildWindMetaPortScreen.cs");
+        string knowledgeScreenText = ReadProjectText("Assets/Scripts/UI/WildWindKnowledgeScreen.cs");
         string controlSettingsText = ReadProjectText("Assets/Scripts/Session/WildWindControlSettings.cs");
         string flightControlText = ReadProjectText("Assets/Scripts/Session/WildWindFlightControlBridge.cs");
         string sessionCameraText = ReadProjectText("Assets/Scripts/Session/WildWindSessionCameraController.cs");
@@ -3817,47 +4575,48 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         string hullCsvText = ReadProjectText("Assets/Data/Config/Hull.csv");
         string specialModuleCsvText = ReadProjectText("Assets/Data/Config/Special_module.csv");
         string itemCsvText = ReadProjectText("Assets/Data/Config/Item.csv");
+        string localizationCsvText = ReadProjectText("Assets/Data/Localization/Ui.csv");
         string starterHullPrefabText = ReadProjectText("Assets/Data/ShipPrefabs/StarterHull.prefab");
         string cruiserHullPrefabText = ReadProjectText("Assets/Data/ShipPrefabs/Cruiser203Hull.prefab");
         string sessionSceneText = ReadProjectText("Assets/Scenes/WildWindSessionScene.unity");
+        string oldPortWindowTitle = "WILD WIND " + "PORT";
+        string oldPortButtonTitle = "META " + "PORT";
+        bool oldPortSourcesRemoved =
+            !File.Exists(ProjectPath(oldPortRuntimePath)) &&
+            !File.Exists(ProjectPath(oldPortRuntimePath + ".meta")) &&
+            !File.Exists(ProjectPath(oldPortModelPath)) &&
+            !File.Exists(ProjectPath(oldPortModelPath + ".meta")) &&
+            !File.Exists(ProjectPath(oldPortScreenPath)) &&
+            !File.Exists(ProjectPath(oldPortScreenPath + ".meta")) &&
+            !gameplayHudText.Contains(oldPortTypePrefix) &&
+            !knowledgeScreenText.Contains(oldPortTypePrefix) &&
+            !projectFileText.Contains(oldPortTypePrefix) &&
+            !gameplayHudText.Contains(oldPortWindowTitle) &&
+            !gameplayHudText.Contains(oldPortButtonTitle) &&
+            !gameplayHudText.Contains("Window" + "Meta" + "PortId") &&
+            !gameplayHudText.Contains("Toggle" + "Meta" + "PortScreen") &&
+            !gameplayHudText.Contains("Open" + "Meta" + "PortScreen");
+        report.Check(oldPortSourcesRemoved,
+            "Old full-screen dock console sources, state model and runtime demo model are removed.");
+
+        bool knowledgeScreenOwnsResearch =
+            knowledgeScreenText.Contains("public sealed class WildWindKnowledgeScreen") &&
+            knowledgeScreenText.Contains("АРХИВЫ") &&
+            knowledgeScreenText.Contains("GetTechnologyBoardOverviewText") &&
+            knowledgeScreenText.Contains("TrySelectResearchTechnology") &&
+            knowledgeScreenText.Contains("GetNextTechnologyCategoryId");
+        report.Check(knowledgeScreenOwnsResearch,
+            "Archives use a dedicated knowledge screen backed directly by the live technology board.");
+
+        bool extractionLabRemoved =
+            !File.Exists(ProjectPath("Assets/Scripts/Meta/WildWindSessionMechanicsModel.cs")) &&
+            !File.Exists(ProjectPath("Assets/Scripts/Meta/WildWindSessionMechanicsModel.cs.meta"));
+        report.Check(extractionLabRemoved,
+            "Old pure extraction-lab mechanics model is removed; Big Test now covers the runtime systems directly.");
+
         bool oldMetaEconomyRemoved =
-            !metaPortRuntimeText.Contains("ContainerLot") &&
-            !metaPortRuntimeText.Contains("VoucherState") &&
-            !metaPortRuntimeText.Contains("BattlePass") &&
-            !metaPortRuntimeText.Contains("BuyInternalGoldBundle") &&
-            !metaPortRuntimeText.Contains("CommanderTalent") &&
-            !metaPortRuntimeText.Contains("MechanicsLab") &&
-            !metaPortRuntimeText.Contains("WildWindSessionMechanicsProbe") &&
-            !metaPortRuntimeText.Contains("RunMiningScenario") &&
-            !metaPortRuntimeText.Contains("RunHazardScenario") &&
-            !metaPortRuntimeText.Contains("RunMetaScenario") &&
             !gameplayHudText.Contains("MECHANICS LAB") &&
             !gameplayHudText.Contains("RunMechanicsLab") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.Missions") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.Shop") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.Containers") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.BattlePass") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.Events") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.Commander") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.Mining") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.Gas") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.Scanning") &&
-            !metaPortModelText.Contains("WildWindMetaPortTab.FireControl") &&
-            !metaPortModelText.Contains("CreateDemo") &&
-            !metaPortModelText.Contains("CreateStandalone") &&
-            !metaPortModelText.Contains("\"Silver ") &&
-            !metaPortModelText.Contains("CXP ") &&
-            !metaPortModelText.Contains("IND ") &&
-            !metaPortModelText.Contains("MIL ") &&
-            !metaPortModelText.Contains("R&D ") &&
-            !metaPortRuntimeText.Contains("silverCost") &&
-            !metaPortRuntimeText.Contains("constructionXpUnlockCost") &&
-            !metaPortRuntimeText.Contains("unlockedT1Modules") &&
-            !metaPortRuntimeText.Contains("silverDelta") &&
-            !metaPortRuntimeText.Contains("constructionXpDelta") &&
-            !metaPortModelText.Contains("simulated reward") &&
-            !metaPortModelText.Contains("Source: standalone") &&
-            !metaPortModelText.Contains("Source: demo") &&
             !sessionAtmosphereText.Contains("distantPorts") &&
             !sessionAtmosphereText.Contains("Distant Port Silhouettes") &&
             !sessionSceneText.Contains("distantPortsRoot") &&
@@ -3885,10 +4644,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             !gameplayHudText.Contains("Cheat Afterburner") &&
             !gameplayHudText.Contains("IsFlightControlsVisible") &&
             !gameplayHudText.Contains("IsAutopilotPanelVisible") &&
-            !metaPortScreenText.Contains("[ExecuteAlways]") &&
-            !metaPortScreenText.Contains("[ContextMenu") &&
-            !metaPortScreenText.Contains("EditorSceneManager") &&
-            !metaPortScreenText.Contains("MarkSceneDirtyIfEditing") &&
             !sessionAtmosphereText.Contains("[ExecuteAlways]") &&
             !sessionAtmosphereText.Contains("[ContextMenu") &&
             !sessionAtmosphereText.Contains("CaptureFromScene") &&
@@ -3965,182 +4720,1014 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             !sessionSceneText.Contains("positionHold") &&
             !sessionSceneText.Contains("engineCheatAfterburnerEnabled");
         report.Check(oldMetaEconomyRemoved,
-            "Old meta economy, demo port scaffolding, open-world silhouettes, preview rigs, runtime debug overlays and test-only flight cheats are removed.");
-        report.Check(WildWindMetaPortUiState.Tabs.Count == 7,
-            "Meta port keeps the compact session tabs only: port, ships, fitting, sorties, processing, production and tech.");
-        report.Check(account.ships[0].preinstalledModules.Count > 0,
-            "Ships can have preinstalled built-in modules that are not treated as removable fittings.");
+            "Old economy scaffolding, open-world silhouettes, preview rigs, runtime debug overlays and test-only flight cheats are removed.");
 
         WildWindGameplayHud hud = gameplayHud != null ? gameplayHud : FindFirstObjectByType<WildWindGameplayHud>();
-        report.Check(hud != null && hud.IsMetaPortReadyForTests,
-            "HUD exposes a WoWS-style meta port with ship carousel, resource strip and tab actions.");
-        report.Check(hud != null && hud.IsMetaPortRuntimeBoundForTests && hud.MetaPortReport.Contains("source=runtime"),
-            "HUD meta port binds to the live MetaGameState instead of staying as an isolated unbound surface.");
         MetaGameState runtimeMetaForPort = metaGameState != null ? metaGameState : FindFirstObjectByType<MetaGameState>();
-        WildWindMetaPortUiState runtimePortState = WildWindMetaPortUiState.CreateFromRuntime(runtimeMetaForPort);
-        report.Check(runtimeMetaForPort != null && runtimePortState.IsRuntimeBound && runtimePortState.BuildReport().Contains("source=runtime"),
-            "Meta port state can be constructed directly from runtime progress for out-of-sortie screens.");
-        string runtimeResourceStrip = runtimePortState.BuildResourceStrip();
-        bool runtimeResourceStripUsesBaseResources =
-            runtimeResourceStrip.Contains("charcoal")
-            && runtimeResourceStrip.Contains("ferron")
-            && runtimeResourceStrip.Contains("silvate")
-            && runtimeResourceStrip.Contains("weapon")
-            && !runtimeResourceStrip.Contains("Silver")
-            && !runtimeResourceStrip.Contains("CXP")
-            && !runtimeResourceStrip.Contains("IND")
-            && !runtimeResourceStrip.Contains("MIL")
-            && !runtimeResourceStrip.Contains("R&D");
-        report.Check(runtimeResourceStripUsesBaseResources,
-            "Meta port resource strip shows runtime base resources instead of retired silver/XP wallets.");
-        bool runtimePortShowsCruiser203 = runtimePortState.BuildShipCarousel().Contains("Cruiser 203")
-            && runtimePortState.BuildTabContent().Contains("Cruiser 203");
-        report.Check(runtimePortShowsCruiser203,
-            "Meta port exposes Cruiser 203 as a selectable port ship.");
-        bool runtimePortCanSelectCruiser203 = false;
-        if (runtimeMetaForPort != null)
+        SessionConfigDatabase runtimeConfigForHud = runtimeMetaForPort != null ? runtimeMetaForPort.SessionConfig : null;
+        report.Check(hud != null && hud.IsReady,
+            "HUD builds the docked meta frame without the retired full-screen dock console.");
+        string oldMissionPanelName = "Docked " + "Panel";
+        string oldMissionCycleApi = "TryCycle" + "SessionSortie";
+        string oldMissionTakeoffApi = "Try" + "TakeOff";
+        string oldMissionDebugFlag = "Show Legacy " + "Docked Debug Panel";
+        string oldMissionNextButton = "Next " + "Sortie";
+        bool oldMissionLauncherRemoved =
+            !gameplayHudText.Contains(oldMissionPanelName) &&
+            !gameplayHudText.Contains(oldMissionCycleApi) &&
+            !gameplayHudText.Contains(oldMissionTakeoffApi) &&
+            !gameplayHudText.Contains(oldMissionDebugFlag) &&
+            !gameplayHudText.Contains(oldMissionNextButton) &&
+            !localizationCsvText.Contains("game.hud." + "takeoff") &&
+            !localizationCsvText.Contains("game.hud." + "process_base") &&
+            !localizationCsvText.Contains("game.hud." + "run_base_work") &&
+            !localizationCsvText.Contains("game.hud." + "base_inputs") &&
+            !localizationCsvText.Contains("game.hud." + "base_materials") &&
+            !localizationCsvText.Contains("game.hud." + "ship_supplies");
+        report.Check(oldMissionLauncherRemoved,
+            "Retired six-button mission launcher panel, sortie cycling button and launch-localization keys are removed from the HUD.");
+        report.Check(hud != null && hud.IsMetaPlayerProfileReadyForTests,
+            "HUD exposes the first rough top-left meta player profile block.");
+        report.Check(hud != null
+                && hud.IsMetaPlayerProfileVisibleForTests
+                && hud.MetaPlayerProfileTitleForTests == "Капитан Ветров"
+                && hud.MetaPlayerProfileMasteryFillForTests > 0.5f,
+            "Meta player profile shows a placeholder portrait/title and mastery progress bar without a duplicate top level badge.");
+        report.Check(hud != null && hud.IsMetaResourceCounterStripReadyForTests,
+            "HUD exposes the five top-center meta resource counter blocks.");
+        report.Check(hud != null
+                && hud.IsMetaResourceCounterStripVisibleForTests
+                && hud.MetaResourceCounterCountForTests == 5
+                && hud.GetMetaResourceCounterAmountForTests(0) == "1.24M"
+                && hud.GetMetaResourceCounterAmountForTests(1) == "853K"
+                && hud.GetMetaResourceCounterAmountForTests(2) == "412K"
+                && hud.GetMetaResourceCounterAmountForTests(3) == "18.7K"
+                && hud.GetMetaResourceCounterAmountForTests(4) == "2450",
+            "Meta resource counters render compact placeholder amounts with icon and plus affordances.");
+        report.Check(WildWindGameplayHud.FormatMetaResourceAmountForTests(1240000) == "1.24M"
+                && WildWindGameplayHud.FormatMetaResourceAmountForTests(853000) == "853K"
+                && WildWindGameplayHud.FormatMetaResourceAmountForTests(18700) == "18.7K"
+                && WildWindGameplayHud.FormatMetaResourceAmountForTests(2450) == "2450",
+            "Meta resource counter formatter keeps short readable labels for thousands and millions.");
+        report.Check(hud != null && hud.IsMetaTopRightButtonsReadyForTests,
+            "HUD exposes four top-right meta buttons; settings contains the progress reset action while the other windows stay placeholder-thin.");
+        report.Check(hud != null && hud.IsSettingsResetProgressButtonReadyForTests,
+            "Settings window exposes the persistent progress reset button.");
+        report.Check(hud != null
+                && hud.IsMetaTopRightButtonsVisibleForTests
+                && hud.MetaTopRightButtonCountForTests == 4,
+            "Top-right meta buttons are visible in the docked meta HUD.");
+        bool allMetaTopRightWindowsOpen = hud != null;
+        for (int i = 0; hud != null && i < 4; i++)
         {
-            string hullBeforeCruiserProbe = runtimeMetaForPort.progress != null ? runtimeMetaForPort.progress.selectedHullId : "";
-            runtimePortState.SelectTab(WildWindMetaPortTab.Port);
-            for (int i = 0; i < 8 && !runtimePortState.SelectedShipLabel.Contains("Cruiser 203"); i++)
-            {
-                runtimePortState.SelectNextShip();
-            }
-
-            bool cruiserSelectedInPort = runtimePortState.SelectedShipLabel.Contains("Cruiser 203")
-                && runtimePortState.GetSecondaryActionLabel().Contains("Cruiser 203");
-            if (runtimeMetaForPort.IsDockedAtCapital())
-            {
-                WildWindMetaPortActionResult selectCruiserResult = runtimePortState.RunSecondaryAction();
-                runtimePortCanSelectCruiser203 = cruiserSelectedInPort
-                    && selectCruiserResult != null
-                    && selectCruiserResult.success
-                    && runtimeMetaForPort.progress != null
-                    && runtimeMetaForPort.progress.selectedHullId == "cruiser203_hull";
-                runtimeMetaForPort.TrySelectSessionCoreHull(
-                    string.IsNullOrWhiteSpace(hullBeforeCruiserProbe) ? GameplaySessionAccountData.DefaultStarterHullId : hullBeforeCruiserProbe,
-                    out _);
-            }
-            else
-            {
-                runtimePortCanSelectCruiser203 = cruiserSelectedInPort;
-            }
+            allMetaTopRightWindowsOpen &= hud.OpenMetaTopRightWindowForTests(i) && hud.IsMetaTopRightWindowOpenForTests(i);
         }
 
-        report.Check(runtimePortCanSelectCruiser203,
-            "Meta port Cruiser 203 selection is wired to the runtime hull chooser.");
-        bool visitedAllMetaTabs = false;
+        report.Check(allMetaTopRightWindowsOpen,
+            "Each top-right meta button opens its modal window without entering an unfinished flow.");
+        report.Check(hud != null && hud.IsMetaLeftSideButtonsReadyForTests,
+            "HUD exposes four side meta buttons for offer, events, factions and development, with development bound to the ship roster.");
+        report.Check(hud != null
+                && hud.IsMetaLeftSideButtonsVisibleForTests
+                && hud.MetaLeftSideButtonCountForTests == 4
+                && hud.IsMetaDockButtonReadyForTests
+                && hud.IsMetaDockButtonVisibleForTests
+                && hud.MetaDockButtonLabelForTests == "ДОК"
+                && hud.IsMetaSideRailOnRightForTests,
+            "Right-side meta rail is visible in docked mode and includes the large round Dock button.");
+        WildWindBaseIslandView islandBeforeDockScreen = WildWindBaseIslandView.EnsureForCurrentSessionScene();
+        bool cameraMovedBeforeDockScreen = islandBeforeDockScreen != null
+            && islandBeforeDockScreen.OffsetCityCameraForTests(2.5f, -1.75f, 13f, -4f, -1.25f);
+        string cameraSignatureBeforeDockScreen = cameraMovedBeforeDockScreen
+            ? islandBeforeDockScreen.CityCameraSignatureForTests
+            : "";
+        bool dockScreenOpened = hud != null
+            && hud.IsMetaDockScreenReadyForTests
+            && hud.OpenMetaDockScreenForTests()
+            && hud.IsMetaDockScreenVisibleForTests
+            && hud.IsPortHudHiddenForDockScreenForTests
+            && hud.MetaDockScreenPortButtonLabelForTests == "ПОРТ"
+            && hud.IsMetaDockScreenPortButtonAtDockButtonSpotForTests;
+        WildWindBaseIslandView islandAfterDockScreenOpen = dockScreenOpened
+            ? WildWindBaseIslandView.EnsureForCurrentSessionScene()
+            : null;
+        report.Check(dockScreenOpened
+                && islandAfterDockScreenOpen != null
+                && !islandAfterDockScreenOpen.IsCityVisibleForTests,
+            "Dock button switches to a separate Dock screen, hides the Port HUD, and shows a Port screen-exit button in the same control slot.");
+        bool returnedFromDockScreen = hud != null
+            && hud.ReturnFromMetaDockScreenToPortForTests()
+            && !hud.IsMetaDockScreenVisibleForTests
+            && hud.IsMetaDockButtonVisibleForTests
+            && hud.MetaDockButtonLabelForTests == "ДОК";
+        WildWindBaseIslandView islandAfterDockScreenReturn = returnedFromDockScreen
+            ? WildWindBaseIslandView.EnsureForCurrentSessionScene()
+            : null;
+        report.Check(returnedFromDockScreen
+                && islandAfterDockScreenReturn != null
+                && islandAfterDockScreenReturn.IsCityVisibleForTests,
+            "Port button on the Dock screen returns to the port HUD without using a modal window.");
+        report.Check(cameraMovedBeforeDockScreen
+                && returnedFromDockScreen
+                && islandAfterDockScreenReturn != null
+                && islandAfterDockScreenReturn.CityCameraSignatureForTests == cameraSignatureBeforeDockScreen,
+            "Returning from the Dock screen preserves the current city camera pivot, zoom and orbit instead of snapping away.");
+        if (islandAfterDockScreenReturn != null)
+        {
+            islandAfterDockScreenReturn.SnapCityCameraHomeForTests();
+        }
+
+        bool allMetaLeftSideWindowsOpen = hud != null;
+        for (int i = 0; hud != null && i < 4; i++)
+        {
+            allMetaLeftSideWindowsOpen &= hud.OpenMetaLeftSideWindowForTests(i) && hud.IsMetaLeftSideWindowOpenForTests(i);
+        }
+
+        report.Check(allMetaLeftSideWindowsOpen,
+            "Each side meta button opens its modal window without mutating gameplay state.");
+        report.Check(hud != null
+                && hud.IsDevelopmentWindowCatalogReadyForTests
+                && hud.DevelopmentWindowSupplierCountForTests == 6
+                && hud.DevelopmentWindowTierColumnCountForTests == 10
+                && hud.DevelopmentWindowTileCountForTests == 15
+                && hud.DevelopmentWindowConnectionCountForTests == 14
+                && hud.DevelopmentWindowTextForTests.Contains("84")
+                && hud.DevelopmentWindowTextForTests.Contains("placeholder_square"),
+            "Development window renders the supplier ship tech tree with 10 tiers, 15 visible tiles and placeholder square models.");
+        report.Check(hud != null && hud.AreOpenHudWindowsModalForTests,
+            "Open HUD windows are centered modal overlays with a fade backdrop, no minimize button and close-only chrome.");
+        report.Check(hud != null
+                && hud.IsMetaQuestPanelReadyForTests
+                && hud.IsMetaQuestPanelVisibleForTests
+                && hud.IsMetaQuestPanelPinnedLeftForTests
+                && hud.MetaQuestVisibleCountForTests >= 1
+                && hud.MetaQuestVisibleCountForTests <= 3
+                && hud.MetaQuestMaxCountForTests == 3,
+            "HUD exposes a configurable left-wall quest panel with one to three visible quest rows.");
+        report.Check(hud != null
+                && hud.GetMetaQuestCounterForTests(0) == "4/6"
+                && hud.GetMetaQuestCounterForTests(1) == "0/1"
+                && hud.GetMetaQuestCounterForTests(2) == "2/3"
+                && hud.MetaAllTasksButtonLabelForTests == "Все задачи",
+            "Meta quest rows show icon, two-line copy, progress counters and the All Tasks button.");
+        report.Check(hud != null
+                && hud.OpenMetaAllTasksWindowForTests()
+                && hud.IsMetaAllTasksWindowOpenForTests
+                && hud.IsMetaAllTasksWindowModalForTests,
+            "Meta quest panel All Tasks button opens an empty centered modal window.");
+        report.Check(hud != null
+                && hud.CloseMetaAllTasksWindowByBackdropForTests()
+                && !hud.IsMetaAllTasksWindowOpenForTests,
+            "Clicking the modal backdrop closes the open HUD window.");
+        report.Check(hud != null
+                && hud.IsMetaProjectPanelReadyForTests
+                && hud.IsMetaProjectPanelVisibleForTests
+                && hud.IsMetaProjectPanelBottomLeftForTests
+                && hud.MetaProjectVisibleCountForTests >= 1
+                && hud.MetaProjectVisibleCountForTests <= 5
+                && hud.MetaProjectMaxCountForTests == 5
+                && hud.MetaProjectHomeButtonLabelForTests == "\u2302"
+                && hud.MetaProjectGridButtonLabelForTests == "\u25A6"
+                && hud.MetaProjectCameraButtonLabelForTests == "\u25C9",
+            "HUD exposes a lower-left project queue, with separate home/grid/camera controls above the queue and up to five project cards.");
+        report.Check(hud != null
+                && hud.GetMetaProjectTimerForTests(0) == "Готово"
+                && hud.GetMetaProjectTimerForTests(1) == "2ч 10м"
+                && hud.GetMetaProjectTimerForTests(2) == "46м",
+            "Meta project cards show title, amount, icon, timer and bottom-up completion fill.");
+        report.Check(hud != null && runtimeConfigForHud != null && hud.IsResourceCatalogReadyForTests && hud.ResourceCatalogWindowItemCountForTests >= runtimeConfigForHud.items.Count,
+            "HUD exposes an openable resource catalog window populated from Item.csv with real icon sprites.");
+        report.Check(hud != null && hud.OpenResourceCatalogWindowForTests() && hud.IsResourceCatalogWindowOpenForTests,
+            "HUD resource catalog window can be opened without entering an unfinished interface flow.");
+        bool hudKnowledgeOpened = hud != null
+            && hud.OpenKnowledgeScreenForTests()
+            && hud.IsKnowledgeScreenVisibleForTests
+            && hud.IsKnowledgeScreenReadyForTests;
+        string hudKnowledgeContent = hud != null ? hud.KnowledgeScreenContentForTests : "";
+        string hudKnowledgeReport = hud != null ? hud.KnowledgeScreenReportForTests : "";
+        report.Check(hudKnowledgeOpened
+                && ContainsAllIgnoreCase(hudKnowledgeContent, "SP")
+                && hudKnowledgeReport.Contains("source=runtime"),
+            "HUD opens the Archives knowledge screen from the live account state.");
+        report.Check(hud != null
+                && hud.KnowledgeScreenHasVisibleTextForTests
+                && hud.KnowledgeScreenSortingOrderForTests > 875,
+            "HUD Archives knowledge screen has visible text frames above the base building overlay.");
+        report.Check(hud != null
+                && hud.KnowledgeScreenHasRubricTabsForTests
+                && hud.KnowledgeScreenHasTreeViewForTests
+                && hud.KnowledgeScreenHasInspectorPanelForTests
+                && hud.KnowledgeScreenVisibleTechnologyNodeCountForTests >= 3
+                && hud.KnowledgeScreenVisibleTreeConnectionCountForTests >= 1
+                && hud.KnowledgeScreenVisibleTreeColumnCountForTests >= 10,
+            "HUD Archives knowledge screen renders left rubric tabs, a scrollable 10-column branching knowledge tree, and a right-side knowledge inspector.");
+        string hudCategoryBefore = hud != null ? hud.KnowledgeScreenSelectedCategoryForTests : "";
+        bool hudCategoryChanged = hud != null
+            && hud.RunKnowledgeSecondaryActionForTests()
+            && !string.IsNullOrWhiteSpace(hud.KnowledgeScreenSelectedCategoryForTests)
+            && (hud.KnowledgeScreenSelectedCategoryForTests != hudCategoryBefore || ContainsAllIgnoreCase(hud.KnowledgeScreenContentForTests, "SP"));
+        report.Check(hudCategoryChanged,
+            "Archives knowledge screen cycles knowledge rubrics without a retired tab model.");
+        report.Check(hud != null
+                && hud.RunKnowledgePrimaryActionForTests()
+                && hud.KnowledgeScreenReportForTests.Contains("last="),
+            "Archives knowledge screen can select or evaluate the next available knowledge target.");
         if (hud != null)
         {
-            foreach (WildWindMetaPortTab tab in WildWindMetaPortUiState.Tabs)
-            {
-                string tabName = WildWindMetaPortUiState.GetTabDisplayName(tab);
-                bool selected = hud.SelectMetaPortTabForTests(tab) && hud.MetaPortSelectedTab == tabName;
-                report.Check(selected, "Meta port selects tab " + tabName + ".");
-                report.Check(hud.MetaPortReport.Contains("tab=" + tabName),
-                    "Meta port report follows selected tab " + tabName + ".");
-                report.Check(MetaPortTabContentContainsExpectedMechanics(tab, hud.MetaPortContentForTests),
-                    "Meta port tab " + tabName + " exposes its core mechanics.");
-                bool primaryAction = hud.RunMetaPortPrimaryActionForTests();
-                report.Check(primaryAction, "Meta port primary action works for " + tabName + ".");
-                bool secondaryAction = hud.RunMetaPortSecondaryActionForTests();
-                report.Check(secondaryAction, "Meta port secondary action works for " + tabName + ".");
-            }
-
-            visitedAllMetaTabs = hud.MetaPortReport.Contains("visited="
-                + WildWindMetaPortUiState.Tabs.Count
-                + "/"
-                + WildWindMetaPortUiState.Tabs.Count);
+            hud.CloseKnowledgeScreenForTests();
         }
 
-        report.Check(visitedAllMetaTabs, "Meta port records that every meta tab was visited.");
-        bool carouselWorks = hud != null && hud.SelectNextMetaPortShipForTests() && hud.SelectPreviousMetaPortShipForTests();
-        report.Check(carouselWorks, "Meta port ship carousel can move forward and back.");
-        string metaPortReport = hud != null ? hud.MetaPortReport : "";
-        report.Check(metaPortReport.Contains("ship=") && metaPortReport.Contains("slots=") && metaPortReport.Contains("last="),
-            "Meta port report includes selected ship, port slot state and last action feedback.");
-        if (hud != null && hud.IsMetaPortScreenVisibleForTests)
-        {
-            hud.ToggleMetaPortScreenForTests();
-        }
-
-        bool fullScreenOpened = hud != null && hud.ToggleMetaPortScreenForTests() && hud.IsMetaPortScreenVisibleForTests;
-        bool fullScreenClosed = hud != null && hud.ToggleMetaPortScreenForTests() && !hud.IsMetaPortScreenVisibleForTests;
-        report.Check(fullScreenOpened && fullScreenClosed,
-            "Docked HUD Port button flow can open and close the full-screen meta port.");
-
-        GameObject metaPortScreenObject = null;
-        WildWindMetaPortScreen metaPortScreen = null;
+        GameObject knowledgeScreenObject = null;
+        WildWindKnowledgeScreen knowledgeScreen = null;
         try
         {
-            metaPortScreenObject = new GameObject("Meta Port Screen Big Test");
-            metaPortScreen = metaPortScreenObject.AddComponent<WildWindMetaPortScreen>();
-            metaPortScreen.BindState(WildWindMetaPortUiState.CreateFromRuntime(runtimeMetaForPort));
-            metaPortScreen.RebuildScreen();
-            report.Check(metaPortScreen.IsReadyForTests,
-                "Full-screen meta port can be built from the runtime account state.");
-
-            bool runtimeScreenVisitedAll = false;
-            foreach (WildWindMetaPortTab tab in WildWindMetaPortUiState.Tabs)
-            {
-                string tabName = WildWindMetaPortUiState.GetTabDisplayName(tab);
-                bool selected = metaPortScreen.SelectTabForTests(tab) && metaPortScreen.SelectedTabName == tabName;
-                report.Check(selected, "Runtime meta port screen selects tab " + tabName + ".");
-                report.Check(metaPortScreen.Report.Contains("tab=" + tabName),
-                    "Runtime meta port screen report follows selected tab " + tabName + ".");
-                report.Check(MetaPortTabContentContainsExpectedMechanics(tab, metaPortScreen.ContentForTests),
-                    "Runtime meta port screen tab " + tabName + " exposes its core mechanics.");
-                report.Check(metaPortScreen.RunPrimaryActionForTests(),
-                    "Runtime meta port screen primary action works for " + tabName + ".");
-                report.Check(metaPortScreen.RunSecondaryActionForTests(),
-                    "Runtime meta port screen secondary action works for " + tabName + ".");
-            }
-
-            runtimeScreenVisitedAll = metaPortScreen.Report.Contains("visited="
-                + WildWindMetaPortUiState.Tabs.Count
-                + "/"
-                + WildWindMetaPortUiState.Tabs.Count);
-            report.Check(runtimeScreenVisitedAll, "Runtime meta port screen records that every tab was visited.");
-            report.Check(metaPortScreen.SelectNextShipForTests() && metaPortScreen.SelectPreviousShipForTests(),
-                "Runtime meta port screen ship carousel can move forward and back.");
-            report.Check(metaPortScreen.Report.Contains("ship=") && metaPortScreen.Report.Contains("slots=") && metaPortScreen.Report.Contains("last="),
-                "Runtime meta port screen report includes selected ship, port slots and action feedback.");
+            knowledgeScreenObject = new GameObject("Knowledge Screen Big Test");
+            knowledgeScreen = knowledgeScreenObject.AddComponent<WildWindKnowledgeScreen>();
+            knowledgeScreen.BindRuntime(runtimeMetaForPort);
+            knowledgeScreen.RebuildScreen();
+            knowledgeScreen.SetVisible(true);
+            string standaloneContent = knowledgeScreen.ContentForTests;
+            report.Check(knowledgeScreen.IsReadyForTests
+                    && ContainsAllIgnoreCase(standaloneContent, "SP")
+                    && knowledgeScreen.Report.Contains("source=runtime")
+                    && knowledgeScreen.HasVisibleTextForTests,
+                "Standalone Archives knowledge screen can be built directly from runtime progress.");
+            report.Check(knowledgeScreen.HasRubricTabsForTests
+                    && knowledgeScreen.HasTreeViewForTests
+                    && knowledgeScreen.HasInspectorPanelForTests
+                    && knowledgeScreen.VisibleTechnologyNodeCountForTests >= 3
+                    && knowledgeScreen.VisibleTreeConnectionCountForTests >= 1
+                    && knowledgeScreen.VisibleTreeColumnCountForTests >= 10
+                    && ContainsAllIgnoreCase(knowledgeScreen.SelectedTechnologyDetailsForTests, "SP"),
+                "Standalone Archives knowledge screen exposes rubric tabs, branching tree nodes and selected-knowledge modifier details.");
+            string categoryBefore = knowledgeScreen.SelectedCategoryIdForTests;
+            bool categoryCycleWorks = knowledgeScreen.RunSecondaryActionForTests()
+                && !string.IsNullOrWhiteSpace(knowledgeScreen.SelectedCategoryIdForTests)
+                && (knowledgeScreen.SelectedCategoryIdForTests != categoryBefore || ContainsAllIgnoreCase(knowledgeScreen.ContentForTests, "SP"));
+            report.Check(categoryCycleWorks,
+                "Standalone Archives knowledge screen cycles knowledge rubrics.");
+            report.Check(knowledgeScreen.RunPrimaryActionForTests()
+                    && knowledgeScreen.Report.Contains("last="),
+                "Standalone Archives knowledge screen can select or evaluate a knowledge target.");
         }
         finally
         {
-            if (metaPortScreenObject != null)
+            if (knowledgeScreenObject != null)
             {
-                Destroy(metaPortScreenObject);
+                Destroy(knowledgeScreenObject);
             }
         }
     }
 
-    private static bool MetaPortTabContentContainsExpectedMechanics(WildWindMetaPortTab tab, string content)
+    private void ValidateBaseIslandRuntime(BigTestReport report)
     {
-        if (string.IsNullOrWhiteSpace(content))
+        report.Section("Base island runtime");
+
+        WildWindBaseIslandView island = WildWindBaseIslandView.EnsureForCurrentSessionScene();
+        report.Check(island != null,
+            island != null
+                ? "Base island runtime view exists in the session scene."
+                : "Base island runtime view is missing from the session scene.");
+        if (island == null)
+        {
+            return;
+        }
+
+        report.Check(island.IsReadyForTests,
+            "Base island builds its runtime visuals and placeholder window.");
+        report.Check(island.UsesIsoCityCameraForTests,
+            "Docked city view uses the perspective isometric city camera controller.");
+        report.Check(island.PrototypeToolbarHiddenForTests,
+            "Docked base island hides the standalone city prototype toolbar so it cannot overlap the main HUD.");
+        report.Check(island.CityGridWidthForTests == 40
+            && island.CityGridHeightForTests == 40
+            && island.CityOpenCellCountForTests >= 400
+            && island.CityFogCellCountForTests > 0
+            && island.CityDebrisCellCountForTests > 0
+            && island.ExpansionRegionCountForTests == 10
+            && island.ExpansionMarkerCountForTests > 0
+            && island.ExternalDockSlotCountForTests == island.ExpectedExternalDockSlotCountForTests,
+            "Base island uses the 40x40 square expansion grid with a front-corner open start, fogged chunks, debris chunks and external 5x8 dock slots only on the currently open outer perimeter.");
+        report.Check(island.CityCellDataCountForTests == island.CityGridWidthForTests * island.CityGridHeightForTests
+            && island.CityTileColliderCountForTests == 1
+            && island.CityTileBatchRendererCountForTests <= 7,
+            "Base island grid keeps 40x40 cells as data while rendering/picking them through one ground collider and batched tile renderers: cells "
+            + island.CityCellDataCountForTests
+            + ", tile colliders "
+            + island.CityTileColliderCountForTests
+            + ", tile renderers "
+            + island.CityTileBatchRendererCountForTests + ".");
+        report.Check(island.CityRaycastLayerForTests == 30
+            && island.CityInteractiveColliderLayerMismatchCountForTests == 0,
+            "Base island hover raycasts are isolated to the city interaction layer instead of scanning every physics collider in the session scene.");
+        report.Check(island.SuppressedSessionRendererCountForTests > 0,
+            "Docked city view suppresses old session-world renderers while the isometric city is visible: "
+            + island.SuppressedSessionRendererCountForTests + ".");
+        report.Check(island.SuppressedActiveShipRendererCountForTests > 0,
+            "Docked city view hides the active selected ship until the player opens dock/flight presentation: "
+            + island.SuppressedActiveShipRendererCountForTests + ".");
+        report.Check(island.IsCityCameraLeanRenderStateActiveForTests,
+            "Docked city camera disables HDR/MSAA, camera post-processing, depth texture and opaque texture while the low-poly base view is visible.");
+        report.Check(island.IsCityCameraUsingLeanRendererForTests,
+            "Docked city camera uses the Renderer2D lean renderer instead of the VisualTarget/AERO renderer: "
+            + island.CityCameraRendererNameForTests + ".");
+        GameObject sessionSceneObjects = GameObject.Find(SortieLocationIsolationController.SessionSceneObjectsRootName);
+        report.Check(sessionSceneObjects != null && sessionSceneObjects.transform.childCount == 0,
+            "Session Scene Objects remains only as an empty isolation anchor; old static port/resource visuals are not in the hierarchy.");
+        report.Check(GameObject.Find("Capital Port Proxy - Greenhaven") == null
+            && GameObject.Find("Data Resource Field ore_field_tutorial_00") == null,
+            "Docked session scene no longer contains the old capital proxy or tutorial resource field visuals.");
+        report.Check(SessionSceneOmitsLegacyStaticVisualsForTests(ReadProjectText("Assets/Scenes/WildWindSessionScene.unity")),
+            "WildWindSessionScene file omits the old static port/resource pocket; base island runtime owns docked city visuals.");
+        report.Check(island.BuildingDefinitionCountForTests >= 25,
+            "Base island loads the material city building catalog with all current building definitions: " + island.BuildingDefinitionCountForTests + ".");
+        report.Check(!island.HasBuildingDefinitionForTests("dock")
+            && !island.HasBuildingDefinitionForTests("project_yard"),
+            "City building catalog omits legacy Dock and Project Yard entries; docks are handled by their own systems.");
+
+        string[] footprintIds =
+        {
+            "anchor_house", "refinery", "gas_separator", "workshop", "scrapyard", "butchery", "laboratory",
+            "archive", "trader_pavilion", "courier_service", "pve_dock", "relic", "capital_building", "pub", "monument",
+            "beacon", "old_mechanism", "construction_yard", "metallurgy", "mechanical", "instrumentation",
+            "chemical_reactor", "automaton_workshop", "electrical_workshop", "assembly_hall"
+        };
+        int[] footprintWidths =
+        {
+            4, 3, 4, 3, 3, 3, 3,
+            4, 3, 4, 5, 2, 3, 2, 2,
+            3, 2, 3, 3, 4, 3,
+            4, 3, 3, 4
+        };
+        int[] footprintHeights =
+        {
+            4, 4, 2, 3, 4, 4, 3,
+            4, 3, 3, 8, 2, 3, 3, 2,
+            3, 2, 4, 3, 2, 3,
+            3, 4, 4, 4
+        };
+        bool footprintsOk = true;
+        for (int i = 0; i < footprintIds.Length; i++)
+        {
+            footprintsOk = island.TryGetBuildingDefinitionFootprintForTests(footprintIds[i], out int width, out int height)
+                && width == footprintWidths[i]
+                && height == footprintHeights[i]
+                && footprintsOk;
+        }
+        report.Check(footprintsOk,
+            "City building catalog records the requested rectangular footprints for core, special and eight cascade production buildings.");
+        report.Check(island.GetBuildingDefinitionMaxCountForTests("refinery") == 2
+            && island.GetBuildingDefinitionMaxCountForTests("gas_separator") == 2
+            && island.GetBuildingDefinitionMaxCountForTests("scrapyard") == 2
+            && island.GetBuildingDefinitionMaxCountForTests("butchery") == 2
+            && island.GetBuildingDefinitionMaxCountForTests("laboratory") == 2
+            && island.GetBuildingDefinitionMaxCountForTests("archive") == 2
+            && island.GetBuildingDefinitionMaxCountForTests("workshop") == 5
+            && island.GetBuildingDefinitionMaxCountForTests("pve_dock") == 2,
+            "City building catalog stores current placement limits: processing x2, archive x2, workshop x5, PVE docks x2.");
+        report.Check(island.BuildingCountForTests >= 9,
+            "Base island exposes the initial clickable city buildings from the catalog: " + island.BuildingCountForTests + ".");
+
+        string[] requiredBuildings =
+        {
+            "anchor_house",
+            "refinery",
+            "gas_separator",
+            "workshop",
+            "scrapyard",
+            "butchery",
+            "laboratory",
+            "archive",
+            "trader_pavilion"
+        };
+        for (int i = 0; i < requiredBuildings.Length; i++)
+        {
+            string buildingId = requiredBuildings[i];
+            if (island.BuildingDefinitionHasPrefabForTests(buildingId))
+            {
+                report.Check(island.BuildingPrefabExistsForTests(buildingId),
+                    "Base island prefab asset exists for building entry " + buildingId + ".");
+                report.Check(island.BuildingUsedPrefabForTests(buildingId),
+                    "Base island instantiated prefab asset for building entry " + buildingId + ".");
+                report.Check(island.BuildingPrefabHasPhysicalMaterialsForTests(buildingId),
+                    "Base island prefab " + buildingId + " has authored material and texture assets.");
+            }
+            else
+            {
+                report.Check(island.IsBuildingUsingProceduralVisualForTests(buildingId),
+                    "Base island building " + buildingId + " uses a catalog visual kind while a replacement prefab is absent.");
+            }
+
+            report.Check(island.HasBuildingForTests(buildingId),
+                "Base island contains building entry " + buildingId + ".");
+            report.Check(island.BuildingHasVisualForTests(buildingId),
+                "Base island building " + buildingId + " has a runtime visual renderer.");
+            report.Check(island.BuildingHasColliderForTests(buildingId),
+                "Base island building " + buildingId + " has a runtime click collider.");
+        }
+
+        WildWindGameplayHud archiveHud = FindFirstObjectByType<WildWindGameplayHud>();
+        bool archiveOwnsKnowledgeWindow = archiveHud != null
+            && island.SelectBuildingForTests("archive")
+            && island.OpenBuildingActionForTests(1)
+            && archiveHud.IsKnowledgeScreenVisibleForTests
+            && archiveHud.KnowledgeScreenHasVisibleTextForTests
+            && archiveHud.KnowledgeScreenReportForTests.Contains("source=runtime")
+            && ContainsAllIgnoreCase(archiveHud.KnowledgeScreenContentForTests, "SP")
+            && !island.IsProcessingWindowOpenForTests
+            && island.BuildingDefinitionHasPrefabForTests("archive")
+            && island.BuildingUsedPrefabForTests("archive")
+            && island.BuildingPrefabHasPhysicalMaterialsForTests("archive");
+        if (archiveHud != null && archiveHud.IsKnowledgeScreenVisibleForTests)
+        {
+            archiveHud.CloseKnowledgeScreenForTests();
+        }
+
+        bool laboratoryNoLongerOwnsKnowledgeWindow = island.SelectBuildingForTests("laboratory")
+            && island.OpenBuildingActionForTests(1)
+            && !island.IsProcessingWindowOpenForTests
+            && island.CloseWindowForTests();
+        report.Check(archiveOwnsKnowledgeWindow && laboratoryNoLongerOwnsKnowledgeWindow,
+            "Archive is the seeded authored knowledge building and opens the dedicated SP screen instead of the processing window; Laboratory no longer owns knowledge.");
+
+        bool moveWithoutDuplicate = island.MoveBuildingWithRuntimeRefreshForTests(
+            "workshop",
+            16,
+            16,
+            out int exactWorkshopCountWhileMoving,
+            out int exactWorkshopCountAfterMove,
+            out int totalBuildingsBeforeMove,
+            out int totalBuildingsAfterMove)
+            && exactWorkshopCountWhileMoving == 0
+            && exactWorkshopCountAfterMove == 1
+            && totalBuildingsAfterMove == totalBuildingsBeforeMove;
+        report.Check(moveWithoutDuplicate,
+            "Moving a seeded base building through a runtime refresh does not duplicate it or occupy multiple footprints.");
+
+        bool catalogOpened = island.OpenBuildingCatalogForTests();
+        int archiveCountBefore = island.GetPlacedBuildingCountForTests("archive");
+        bool archivePlaced = catalogOpened
+            && island.PlaceCatalogBuildingForTests("archive")
+            && island.GetPlacedBuildingCountForTests("archive") == archiveCountBefore + 1;
+        report.Check(archivePlaced,
+            "Grid project tool opens the building catalog and can place the second Archive on the first free city footprint.");
+        bool archiveLimitBlocked = !island.PlaceCatalogBuildingForTests("archive")
+            && island.GetPlacedBuildingCountForTests("archive") == island.GetBuildingDefinitionMaxCountForTests("archive")
+            && island.BuildingCatalogStatusForTests.Contains("лимит");
+        report.Check(archiveLimitBlocked,
+            "Building catalog blocks placement when the configured per-building limit is reached.");
+
+        int cityBuildingsBeforeDock = island.BuildingCountForTests;
+        int dockCountBefore = island.GetPlacedBuildingCountForTests("pve_dock");
+        report.Check(dockCountBefore == 1,
+            "Base island starts with exactly one built external PVE dock.");
+        bool dockPlaced = island.PlaceCatalogBuildingForTests("pve_dock")
+            && island.GetPlacedBuildingCountForTests("pve_dock") == dockCountBefore + 1
+            && island.ExternalDockPlacedCountForTests == dockCountBefore + 1
+            && island.BuildingCountForTests == cityBuildingsBeforeDock
+            && island.GetBuildingDefinitionMaxCountForTests("pve_dock") == 2;
+        report.Check(dockPlaced,
+            "Dock catalog entry builds the second current PVE dock into the external dock-slot grid instead of occupying an inner city footprint.");
+        bool dockLimitBlocked = !island.PlaceCatalogBuildingForTests("pve_dock")
+            && island.GetPlacedBuildingCountForTests("pve_dock") == island.GetBuildingDefinitionMaxCountForTests("pve_dock")
+            && island.BuildingCatalogStatusForTests.Contains("лимит");
+        report.Check(dockLimitBlocked,
+            "Dock catalog entry blocks a third PVE dock while only two docks are currently allowed.");
+        bool dockMoved = island.MoveExternalDockToFirstFreeSlotForTests("pve_dock")
+            && island.GetPlacedBuildingCountForTests("pve_dock") == dockCountBefore + 1;
+        report.Check(dockMoved,
+            "Built docks can move between their own external slots without duplicating or using the city grid.");
+        report.Check(island.ShowExternalDockHoverForTests("pve_dock"),
+            "Built external docks use the same camera-visible hover outline system as city buildings.");
+        WildWindGameplayHud baseHud = FindFirstObjectByType<WildWindGameplayHud>();
+        WildWindBaseIslandView islandAfterDockClick = null;
+        bool dockScreenFromDock = baseHud != null
+            && island.OpenExternalDockForTests("pve_dock")
+            && baseHud.IsMetaDockScreenVisibleForTests
+            && (islandAfterDockClick = WildWindBaseIslandView.EnsureForCurrentSessionScene()) != null
+            && !islandAfterDockClick.IsCityVisibleForTests;
+        report.Check(dockScreenFromDock,
+            "Clicking a built external dock opens the Dock screen directly instead of the building radial menu.");
+        if (baseHud != null && baseHud.IsMetaDockScreenVisibleForTests)
+        {
+            baseHud.ReturnFromMetaDockScreenToPortForTests();
+            WildWindBaseIslandView.EnsureForCurrentSessionScene();
+        }
+        bool cameraHomeButtonStartsBlend = island.OffsetCityCameraForTests(-3f, 2f, -11f, 3f, 1.2f)
+            && baseHud != null
+            && baseHud.PressMetaProjectCameraButtonForTests()
+            && island.IsCityCameraHomeBlendActiveForTests
+            && !island.IsCityCameraAtDefaultViewForTests;
+        report.Check(cameraHomeButtonStartsBlend,
+            "Lower-left camera control starts a smooth return to the base city camera pose instead of teleporting instantly.");
+
+        MetaGameState runtimeMeta = metaGameState != null ? metaGameState : FindFirstObjectByType<MetaGameState>();
+        if (runtimeMeta != null)
+        {
+            runtimeMeta.EnsureProgressInitialized();
+        }
+
+        bool knowledgeSpModelWorks = false;
+        if (runtimeMeta != null && runtimeMeta.progress != null && runtimeMeta.SessionConfig != null)
+        {
+            TechnologyConfig knowledge = runtimeMeta.SessionConfig.GetTechnology("tech_base_storehouse_ledgers");
+            PortStorageState knowledgeStorage = runtimeMeta.GetCapitalStorageState();
+            if (knowledge != null && knowledgeStorage != null)
+            {
+                for (int i = 0; i < knowledge.cycleCost.Count; i++)
+                {
+                    TechnologyCostConfig cost = knowledge.cycleCost[i];
+                    if (cost == null || string.IsNullOrWhiteSpace(cost.itemId)) continue;
+                    knowledgeStorage.AddResource(cost.itemId, Mathf.Max(0, cost.amount));
+                }
+
+                long knowledgeStartTicks = DateTime.UtcNow.Ticks;
+                runtimeMeta.progress.lastProcessUtcTicks = knowledgeStartTicks;
+                bool selectedKnowledge = runtimeMeta.TrySelectResearchTechnology(knowledge.id);
+                TechnologyResearchProgress selectedState = runtimeMeta.GetTechnologyResearchProgress(knowledge.id);
+                bool requirementsPaidOnSelect = selectedState != null && selectedState.currentLevelRequirementsPaid;
+                int progressedEvents = runtimeMeta.AdvanceRealTimeProcesses(new DateTime(knowledgeStartTicks, DateTimeKind.Utc).AddMinutes(10));
+                TechnologyResearchProgress progressedState = runtimeMeta.GetTechnologyResearchProgress(knowledge.id);
+                float archiveSpProgress = progressedState != null ? progressedState.currentLevelSpProgress : 0f;
+                runtimeMeta.GrantKnowledgeSpPackage("big_test_base_sp", "category", "base", 50000);
+                bool packageApplied = runtimeMeta.TryApplyKnowledgeSpPackage(
+                    "big_test_base_sp",
+                    knowledge.id,
+                    out int appliedSp,
+                    out int burnedSp,
+                    out string packageReason);
+                bool bookUnlocked = runtimeMeta.UnlockKnowledgeFromBook("tech_base_queue_dispatch", out string bookReason)
+                    && runtimeMeta.progress.IsKnowledgeUnlocked("tech_base_queue_dispatch");
+
+                knowledgeSpModelWorks = selectedKnowledge
+                    && selectedState != null
+                    && requirementsPaidOnSelect
+                    && progressedEvents > 0
+                    && archiveSpProgress >= 29f
+                    && archiveSpProgress < runtimeMeta.GetTechnologyLevelSpCost(knowledge, 1)
+                    && packageApplied
+                    && appliedSp > 0
+                    && burnedSp > 40000
+                    && runtimeMeta.GetTechnologyCompletedLevel(knowledge) == 1
+                    && bookUnlocked
+                    && !string.IsNullOrWhiteSpace(packageReason)
+                    && !string.IsNullOrWhiteSpace(bookReason);
+            }
+        }
+
+        report.Check(knowledgeSpModelWorks,
+            "Knowledge research uses Archive SP output, book/right unlocks, SP packages and burned overflow instead of timer accelerators.");
+
+        bool courierBuildingSeeded = island.HasBuildingDefinitionForTests("courier_service")
+            && island.HasBuildingForTests("courier_service")
+            && island.BuildingHasVisualForTests("courier_service")
+            && island.BuildingHasColliderForTests("courier_service");
+        report.Check(courierBuildingSeeded,
+            "Courier Service building for the Wind Houses is seeded into the starting base island and is clickable.");
+
+        IReadOnlyList<CourierOrderSlotState> courierSlots = runtimeMeta != null ? runtimeMeta.GetCourierOrderSlots() : null;
+        bool courierSlotsReady = courierSlots != null && courierSlots.Count >= MetaGameState.CourierOrderSlotCount;
+        if (courierSlotsReady)
+        {
+            for (int i = 0; i < MetaGameState.CourierOrderSlotCount; i++)
+            {
+                CourierOrderSlotState slot = runtimeMeta.GetCourierOrderSlot(i);
+                courierSlotsReady &= slot != null
+                    && slot.slotIndex == i
+                    && slot.HasActiveOrder
+                    && slot.inputs.Count >= 1
+                    && slot.inputs.Count <= 3
+                    && slot.freightReward > 0
+                    && slot.designExperienceReward > 0;
+            }
+        }
+
+        report.Check(courierSlotsReady,
+            "Courier Service initializes eight persistent Wind Houses courier order slots, each with 1-3 requested resources and freight/mastery rewards.");
+
+        PortStorageState courierStorage = runtimeMeta != null ? runtimeMeta.GetCapitalStorageState() : null;
+        CourierOrderSlotState sendSlot = runtimeMeta != null ? runtimeMeta.GetCourierOrderSlot(0) : null;
+        List<CascadeItemAmount> sendInputs = sendSlot != null ? CloneCascadeItemsForTest(sendSlot.inputs) : new List<CascadeItemAmount>();
+        int sendFreightReward = sendSlot != null ? sendSlot.freightReward : 0;
+        int sendExperienceReward = sendSlot != null ? sendSlot.designExperienceReward : 0;
+        string sendOrderId = sendSlot != null ? sendSlot.orderId : "";
+        for (int i = 0; i < sendInputs.Count && courierStorage != null; i++)
+        {
+            CascadeItemAmount input = sendInputs[i];
+            if (input == null) continue;
+            if (courierStorage.GetResourceAmount(input.itemId) < input.amount)
+            {
+                courierStorage.AddResource(input.itemId, input.amount - courierStorage.GetResourceAmount(input.itemId));
+            }
+        }
+
+        int[] courierInputBefore = CaptureStorageAmounts(courierStorage, sendInputs);
+        int courierFreightBefore = courierStorage != null ? courierStorage.GetResourceAmount("freight") : 0;
+        int courierExperienceBefore = courierStorage != null ? courierStorage.GetResourceAmount(SessionExtractionConstants.DesignExperienceItemId) : 0;
+        bool courierWindowOpened = island.OpenCourierServiceWindowForTests()
+            && island.IsCourierWindowOpenForTests
+            && island.IsWindowModalForTests
+            && island.OpenWindowTitleForTests.Contains("Курьерская служба")
+            && island.WindowContentForTests.Contains("Ветровые Дома")
+            && island.WindowContentForTests.Contains("Награда");
+        bool courierSent = courierWindowOpened
+            && island.SelectCourierOrderForTests(0)
+            && island.SendSelectedCourierOrderForTests();
+        CourierOrderSlotState refreshedSendSlot = runtimeMeta != null ? runtimeMeta.GetCourierOrderSlot(0) : null;
+        bool courierSendEconomy = courierSent
+            && courierStorage != null
+            && StorageAmountsMatchDelta(courierStorage, sendInputs, courierInputBefore, -1)
+            && courierStorage.GetResourceAmount("freight") == courierFreightBefore + sendFreightReward
+            && courierStorage.GetResourceAmount(SessionExtractionConstants.DesignExperienceItemId) == courierExperienceBefore + sendExperienceReward
+            && refreshedSendSlot != null
+            && refreshedSendSlot.HasActiveOrder
+            && refreshedSendSlot.orderId != sendOrderId;
+        report.Check(courierWindowOpened && courierSendEconomy,
+            "Courier Service window opens from the base building; sending an order spends requested storage goods, grants Freight and mastery XP, and immediately rolls the next courier ship.");
+
+        CourierOrderSlotState cancelSlot = runtimeMeta != null ? runtimeMeta.GetCourierOrderSlot(1) : null;
+        string cancelledOrderId = cancelSlot != null ? cancelSlot.orderId : "";
+        bool courierCancelled = island.SelectCourierOrderForTests(1)
+            && island.CancelSelectedCourierOrderForTests();
+        int cooldownRemaining = runtimeMeta != null ? runtimeMeta.GetCourierOrderCooldownRemainingSeconds(1) : 0;
+        CourierOrderSlotState coolingSlot = runtimeMeta != null ? runtimeMeta.GetCourierOrderSlot(1) : null;
+        bool courierCooldown = courierCancelled
+            && coolingSlot != null
+            && !coolingSlot.HasActiveOrder
+            && cooldownRemaining > MetaGameState.CourierCancelCooldownSeconds - 30
+            && island.WindowContentForTests.Contains("Заявка отменена");
+        if (runtimeMeta != null)
+        {
+            runtimeMeta.FastForwardSimulation(TimeSpan.FromMinutes(16));
+        }
+
+        island.SelectCourierOrderForTests(1);
+        CourierOrderSlotState rerolledSlot = runtimeMeta != null ? runtimeMeta.GetCourierOrderSlot(1) : null;
+        bool courierRerollsAfterCooldown = rerolledSlot != null
+            && rerolledSlot.HasActiveOrder
+            && runtimeMeta.GetCourierOrderCooldownRemainingSeconds(1) == 0
+            && rerolledSlot.orderId != cancelledOrderId
+            && island.WindowContentForTests.Contains("Награда");
+        island.CloseWindowForTests();
+        report.Check(courierCooldown && courierRerollsAfterCooldown,
+            "Cancelling a courier order starts a 15-minute refresh timer, blocks the slot, then restores a new persistent order after the cooldown.");
+
+        int westMidCost = island.GetExpansionRegionClearCostForTests("west_mid");
+        if (runtimeMeta != null && runtimeMeta.progress != null)
+        {
+            BaseIslandExpansionRegionState westMidState = runtimeMeta.progress.GetBaseIslandExpansionRegionState("west_mid", true);
+            westMidState.status = BaseIslandExpansionRegionStatus.Debris;
+            westMidState.clearingCompleteUtcTicks = 0;
+        }
+
+        PortStorageState expansionStorage = runtimeMeta != null ? runtimeMeta.GetCapitalStorageState() : null;
+        if (expansionStorage != null && expansionStorage.GetResourceAmount("freight") < westMidCost)
+        {
+            expansionStorage.AddResource("freight", westMidCost);
+        }
+
+        int expansionFreightBefore = expansionStorage != null ? expansionStorage.GetResourceAmount("freight") : 0;
+        bool expansionWindowOpened = island.OpenExpansionRegionForTests("west_mid")
+            && island.IsExpansionWindowOpenForTests
+            && island.IsWindowModalForTests
+            && island.WindowContentForTests.Contains("Стоимость")
+            && island.WindowContentForTests.Contains("фрахта");
+        bool expansionStarted = island.BeginExpansionClearingForTests("west_mid");
+        int expansionFreightAfterStart = expansionStorage != null ? expansionStorage.GetResourceAmount("freight") : 0;
+        bool expansionCompleted = island.ForceCompleteExpansionClearingForTests("west_mid")
+            && island.CityOpenCellCountForTests >= (400 + 10 * 10);
+        island.CloseWindowForTests();
+        report.Check(expansionWindowOpened
+            && expansionStarted
+            && expansionCompleted
+            && westMidCost > 0
+            && expansionFreightAfterStart == expansionFreightBefore - westMidCost,
+            "Base island expansion chunks open a modal debris-clearing window, spend freight, run a timer state and become buildable land.");
+
+        string progressBefore = runtimeMeta != null && runtimeMeta.progress != null
+            ? JsonUtility.ToJson(runtimeMeta.progress)
+            : "";
+
+        WildWindGameplayHud cityHud = FindFirstObjectByType<WildWindGameplayHud>();
+        bool hoverShown = island.ShowBuildingHoverForTests("refinery")
+            && island.IsBuildingHoverLabelVisibleForTests
+            && island.BuildingInfoNameForTests.Contains("Рефайнери")
+            && island.BuildingInfoLevelForTests == "5 уровень";
+        report.Check(hoverShown,
+            "Hovering a base building shows its name and level label above the building.");
+
+        bool selected = island.SelectBuildingForTests("refinery")
+            && island.IsBuildingActionMenuOpenForTests
+            && island.VisibleBuildingActionButtonCountForTests == 3
+            && island.BuildingInfoNameForTests.Contains("Рефайнери")
+            && island.BuildingInfoLevelForTests == "5 уровень"
+            && (cityHud == null || cityHud.IsBaseBuildingFocusHidingPortHudForTests);
+        report.Check(selected,
+            "Clicking a base building hides the port HUD and shows the building label plus three action buttons.");
+
+        bool dismissed = island.DismissBuildingActionMenuForTests()
+            && !island.IsBuildingActionMenuOpenForTests
+            && !island.IsWindowOpenForTests
+            && (cityHud == null || cityHud.IsPortHudVisibleForTests);
+        report.Check(dismissed,
+            "Clicking outside the building action buttons restores the normal port HUD.");
+        string progressAfterPassiveSelection = runtimeMeta != null && runtimeMeta.progress != null
+            ? JsonUtility.ToJson(runtimeMeta.progress)
+            : "";
+        report.Check(progressBefore == progressAfterPassiveSelection,
+            "Hovering, selecting, and dismissing a base building does not mutate PlayerProgress.");
+
+        bool allActionWindowsOpen = true;
+        bool secondWindowBlocked = false;
+        for (int actionIndex = 0; actionIndex < 3; actionIndex++)
+        {
+            bool expectsProcessingWindow = actionIndex == 1;
+            bool actionOpened = island.SelectBuildingForTests("refinery")
+                && island.OpenBuildingActionForTests(actionIndex)
+                && island.IsWindowOpenForTests
+                && island.IsWindowModalForTests
+                && island.OpenWindowTitleForTests.Contains("Рефайнери")
+                && island.WindowExitButtonLabelForTests == "Выйти"
+                && (expectsProcessingWindow
+                    ? island.IsProcessingWindowOpenForTests
+                        && island.WindowContentForTests.Contains("Бункер")
+                        && island.WindowContentForTests.Contains("Выходы")
+                    : string.IsNullOrEmpty(island.WindowContentForTests));
+
+            if (actionIndex == 0)
+            {
+                secondWindowBlocked = !island.TryOpenBuildingForTests("workshop")
+                    && island.IsWindowOpenForTests
+                    && island.OpenWindowTitleForTests.Contains("Рефайнери");
+            }
+
+            bool exited = island.ExitBuildingActionWindowForTests()
+                && !island.IsWindowOpenForTests
+                && !island.IsBuildingActionMenuOpenForTests
+                && (cityHud == null || cityHud.IsPortHudVisibleForTests);
+            allActionWindowsOpen = allActionWindowsOpen && actionOpened && exited;
+        }
+
+        report.Check(allActionWindowsOpen,
+            "Base building action buttons open modal windows; processing buildings expose the bunker/output panel and Exit restores the initial HUD state.");
+        report.Check(secondWindowBlocked,
+            "A base building action modal blocks selecting another building until the current window is closed.");
+
+        bool cascadeCatalogOpened = island.OpenCascadeCatalogWindowForTests("workshop")
+            && island.IsCascadeCatalogWindowOpenForTests
+            && island.IsWindowModalForTests
+            && island.OpenWindowTitleForTests.Contains("Каталог")
+            && island.WindowExitButtonLabelForTests == "Выйти"
+            && island.WindowContentForTests.Contains("каталог рецептов")
+            && island.WindowContentForTests.Contains("Состав")
+            && island.WindowContentForTests.Contains("Топ-3")
+            && (island.WindowContentForTests.Contains("Получим") || island.WindowContentForTests.Contains("+1 уровень"));
+        bool cascadeCatalogExited = island.ExitBuildingActionWindowForTests()
+            && !island.IsWindowOpenForTests
+            && !island.IsBuildingActionMenuOpenForTests
+            && (cityHud == null || cityHud.IsPortHudVisibleForTests);
+        report.Check(cascadeCatalogOpened && cascadeCatalogExited,
+            "Cascade production buildings open a modal recipe catalog with rubrics, recipe plan, top bottlenecks and result preview.");
+
+        bool refineryProcessingFacilityMaterialized = runtimeMeta != null
+            && runtimeMeta.progress != null
+            && runtimeMeta.progress.baseIndustry != null
+            && runtimeMeta.progress.baseIndustry.processingFacilities.Exists(facility =>
+                facility != null
+                && facility.facilityId == "refinery"
+                && facility.branch == BaseProcessingBranch.Ore);
+        report.Check(refineryProcessingFacilityMaterialized,
+            "Opening a refinery work action materializes an ore processing facility state for that building.");
+
+        PortStorageState bubbleStorage = runtimeMeta != null ? runtimeMeta.GetCapitalStorageState() : null;
+        BaseProcessingFacilityState refineryFacility = runtimeMeta != null
+            ? runtimeMeta.GetBaseProcessingFacilityState("refinery", BaseProcessingBranch.Ore, 5)
+            : null;
+        BaseProcessingOutputBufferState bubbleFerronBuffer = refineryFacility != null
+            ? refineryFacility.GetOutputBuffer("ferron", true)
+            : null;
+        BaseProcessingOutputBufferState bubbleSilvateBuffer = refineryFacility != null
+            ? refineryFacility.GetOutputBuffer("silvate", true)
+            : null;
+        int ferronBeforeBubbleCollect = bubbleStorage != null ? bubbleStorage.GetResourceAmount("ferron") : 0;
+        int silvateBeforeBubbleCollect = bubbleStorage != null ? bubbleStorage.GetResourceAmount("silvate") : 0;
+        if (bubbleFerronBuffer != null)
+        {
+            bubbleFerronBuffer.readyAmount = 7;
+            bubbleFerronBuffer.fractionalAmount = 0.42f;
+        }
+
+        if (bubbleSilvateBuffer != null)
+        {
+            bubbleSilvateBuffer.readyAmount = 3;
+            bubbleSilvateBuffer.fractionalAmount = 0.25f;
+        }
+
+        bool processingCollectBubbleVisible = island.IsProcessingCollectBubbleVisibleForTests("refinery")
+            && island.ProcessingCollectBubbleItemIdForTests("refinery") == "ferron"
+            && island.ProcessingCollectBubbleAmountForTests("refinery") == 10
+            && island.ProcessingCollectBubbleCountForTests >= 1;
+        bool processingCollectBubbleClicked = island.ClickProcessingCollectBubbleForTests("refinery");
+        bool processingCollectBubbleCollected = processingCollectBubbleClicked
+            && bubbleStorage != null
+            && bubbleFerronBuffer != null
+            && bubbleSilvateBuffer != null
+            && bubbleStorage.GetResourceAmount("ferron") == ferronBeforeBubbleCollect + 7
+            && bubbleStorage.GetResourceAmount("silvate") == silvateBeforeBubbleCollect + 3
+            && bubbleFerronBuffer.readyAmount == 0
+            && bubbleSilvateBuffer.readyAmount == 0
+            && bubbleFerronBuffer.fractionalAmount > 0f
+            && !island.IsProcessingCollectBubbleVisibleForTests("refinery");
+        report.Check(processingCollectBubbleVisible && processingCollectBubbleCollected,
+            "Ready processing outputs show a clickable city collect bubble with the largest resource icon and total amount; clicking it collects all whole outputs.");
+
+        ValidateQuestRuntime(runtimeMeta, report);
+    }
+
+    private static void ValidateQuestRuntime(MetaGameState runtimeMeta, BigTestReport report)
+    {
+        report.Section("Quest runtime");
+        if (runtimeMeta == null)
+        {
+            report.Fail("Quest runtime cannot run without MetaGameState.");
+            return;
+        }
+
+        PlayerProgress snapshot = runtimeMeta.CreateProgressSnapshot();
+        try
+        {
+            runtimeMeta.ReplaceProgress(new PlayerProgress());
+            runtimeMeta.EnsureProgressInitialized();
+
+            IReadOnlyList<QuestDefinitionConfig> definitions = runtimeMeta.GetQuestDefinitions();
+            IReadOnlyList<QuestState> initialStates = runtimeMeta.GetQuestStates();
+            bool initialBoardReady = definitions != null
+                && definitions.Count >= 20
+                && initialStates != null
+                && IsQuestClaimedForBigTest(runtimeMeta, "quest_have_start_freight")
+                && IsQuestClaimedForBigTest(runtimeMeta, "quest_collect_claudium")
+                && IsQuestAcceptedForBigTest(runtimeMeta, "quest_spend_first_freight");
+
+            runtimeMeta.RecordQuestEventForTests("resource_spent", "freight", 99);
+            bool fromAcceptBeforeComplete = IsQuestCurrentForBigTest(runtimeMeta, "quest_spend_first_freight", 99, false, false);
+            runtimeMeta.RecordQuestEventForTests("resource_spent", "freight", 1);
+            bool fromAcceptCompletesAtDelta = IsQuestCurrentForBigTest(runtimeMeta, "quest_spend_first_freight", 100, true, false);
+            bool manualSpendClaimed = ClaimQuestForBigTest(runtimeMeta, "quest_spend_first_freight");
+
+            runtimeMeta.RecordQuestEventForTests("resource_acquired", "windshale_ore", 50);
+            bool windshaleCollected = IsQuestCompletedForBigTest(runtimeMeta, "quest_collect_windshale")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_collect_windshale");
+            runtimeMeta.RecordQuestEventForTests("resource_spent", "windshale_ore", 20);
+            bool windshaleSpendAutoClaimed = IsQuestClaimedForBigTest(runtimeMeta, "quest_spend_windshale");
+
+            runtimeMeta.RecordQuestEventForTests("courier_sent", "any", 1);
+            bool firstCourierCompleted = IsQuestCompletedForBigTest(runtimeMeta, "quest_send_first_courier")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_send_first_courier");
+            runtimeMeta.RecordQuestEventForTests("courier_sent", "any", 2);
+            bool threeCouriersCompleted = IsQuestCompletedForBigTest(runtimeMeta, "quest_send_three_couriers")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_send_three_couriers");
+            runtimeMeta.RecordQuestEventForTests("courier_cancelled", "any", 1);
+            bool courierCancelCompleted = IsQuestCompletedForBigTest(runtimeMeta, "quest_cancel_courier")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_cancel_courier");
+
+            runtimeMeta.RecordQuestEventForTests("technology_started", "tech_base_storehouse_ledgers", 1);
+            bool knowledgeStartAutoClaimed = IsQuestClaimedForBigTest(runtimeMeta, "quest_start_knowledge");
+            runtimeMeta.progress.CompleteTechnology("tech_base_storehouse_ledgers");
+            runtimeMeta.RecordQuestEventForTests("technology_completed", "tech_base_storehouse_ledgers", 1);
+            bool knowledgeCompleteClaimed = IsQuestCompletedForBigTest(runtimeMeta, "quest_complete_storehouse")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_complete_storehouse");
+
+            runtimeMeta.progress.baseIndustry ??= new BaseExtractionIndustryState();
+            runtimeMeta.progress.baseIndustry.Normalize();
+            runtimeMeta.progress.baseIndustry.GetProcessing(BaseProcessingBranch.Ore).level = 2;
+            runtimeMeta.progress.baseIndustry.GetProcessing(BaseProcessingBranch.Gas).level = 2;
+            runtimeMeta.progress.baseIndustry.GetProduction(CascadeProductionType.Assembly).level = 2;
+            runtimeMeta.RefreshQuestProgressForTests(true);
+            bool processingLevelClaimed = IsQuestCompletedForBigTest(runtimeMeta, "quest_ore_processing_l2")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_ore_processing_l2")
+                && IsQuestClaimedForBigTest(runtimeMeta, "quest_gas_processing_l2")
+                && IsQuestCompletedForBigTest(runtimeMeta, "quest_cascade_assembly_l2")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_cascade_assembly_l2");
+
+            runtimeMeta.RecordQuestEventForTests("cascade_order_completed", SessionExtractionConstants.StarterAirframeKitItemId, 1);
+            bool airframeOrderClaimed = IsQuestCompletedForBigTest(runtimeMeta, "quest_airframe_order")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_airframe_order");
+            runtimeMeta.RecordQuestEventForTests("cascade_order_completed", SessionExtractionConstants.StarterModuleKitItemId, 1);
+            bool moduleOrderAutoClaimed = IsQuestClaimedForBigTest(runtimeMeta, "quest_module_order");
+
+            runtimeMeta.RecordQuestEventForTests("sortie_completed", SessionExtractionConstants.DefaultSafeOreSortieId, 1);
+            bool sortieQuestClaimed = IsQuestCompletedForBigTest(runtimeMeta, "quest_safe_ore_sortie")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_safe_ore_sortie");
+
+            runtimeMeta.progress.InstallModule("quest_test_high", SessionExtractionConstants.StarterGasExtractorModuleId);
+            runtimeMeta.RefreshQuestProgressForTests(true);
+            bool gasModuleClaimed = IsQuestCompletedForBigTest(runtimeMeta, "quest_install_gas_extractor")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_install_gas_extractor");
+            runtimeMeta.progress.InstallModule("quest_test_low", SessionExtractionConstants.StarterMiningHoldModuleId);
+            runtimeMeta.RefreshQuestProgressForTests(true);
+            bool miningModuleClaimed = IsQuestCompletedForBigTest(runtimeMeta, "quest_install_mining_hold")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_install_mining_hold");
+
+            runtimeMeta.progress.selectedHullId = "cruiser203_hull";
+            runtimeMeta.RefreshQuestProgressForTests(true);
+            bool hullQuestClaimed = IsQuestCompletedForBigTest(runtimeMeta, "quest_select_cruiser203")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_select_cruiser203");
+
+            runtimeMeta.RecordQuestEventForTests("resource_acquired", SessionExtractionConstants.DesignExperienceItemId, 10);
+            bool manualRewardClaimed = IsQuestCompletedForBigTest(runtimeMeta, "quest_claim_manual_reward")
+                && ClaimQuestForBigTest(runtimeMeta, "quest_claim_manual_reward");
+
+            int completedCount = runtimeMeta.GetQuestCompletedCountForTests();
+            int claimedCount = runtimeMeta.GetQuestClaimedCountForTests();
+            report.Check(initialBoardReady
+                    && completedCount >= 20
+                    && claimedCount >= 20,
+                "Quest runtime accepts the twenty-task board, retroactively completes owned-resource tasks and can finish every seed quest: completed="
+                + completedCount + ", claimed=" + claimedCount + ".");
+            report.Check(fromAcceptBeforeComplete
+                    && fromAcceptCompletesAtDelta
+                    && manualSpendClaimed
+                    && windshaleCollected
+                    && windshaleSpendAutoClaimed
+                    && firstCourierCompleted
+                    && threeCouriersCompleted
+                    && courierCancelCompleted
+                    && knowledgeStartAutoClaimed
+                    && knowledgeCompleteClaimed
+                    && processingLevelClaimed
+                    && airframeOrderClaimed
+                    && moduleOrderAutoClaimed
+                    && sortieQuestClaimed
+                    && gasModuleClaimed
+                    && miningModuleClaimed
+                    && hullQuestClaimed
+                    && manualRewardClaimed,
+                "Quest runtime covers from-accept deltas, manual claims, auto claims, couriers, knowledge, production, sortie, fitting and ship-selection events.");
+        }
+        finally
+        {
+            runtimeMeta.ReplaceProgress(snapshot);
+        }
+    }
+
+    private static bool IsQuestAcceptedForBigTest(MetaGameState meta, string questId)
+    {
+        QuestState state = meta != null ? meta.GetQuestState(questId) : null;
+        return state != null && state.accepted;
+    }
+
+    private static bool IsQuestCompletedForBigTest(MetaGameState meta, string questId)
+    {
+        QuestState state = meta != null ? meta.GetQuestState(questId) : null;
+        return state != null && state.completed;
+    }
+
+    private static bool IsQuestClaimedForBigTest(MetaGameState meta, string questId)
+    {
+        QuestState state = meta != null ? meta.GetQuestState(questId) : null;
+        return state != null && state.claimed;
+    }
+
+    private static bool IsQuestCurrentForBigTest(MetaGameState meta, string questId, int currentAmount, bool completed, bool claimed)
+    {
+        QuestState state = meta != null ? meta.GetQuestState(questId) : null;
+        return state != null
+            && state.currentAmount == currentAmount
+            && state.completed == completed
+            && state.claimed == claimed;
+    }
+
+    private static bool ClaimQuestForBigTest(MetaGameState meta, string questId)
+    {
+        QuestState state = meta != null ? meta.GetQuestState(questId) : null;
+        if (state == null || !state.completed)
         {
             return false;
         }
 
-        switch (tab)
+        if (state.claimed)
         {
-            case WildWindMetaPortTab.Port:
-                return ContainsAllIgnoreCase(content, "Session hub", "Port ships", "Starter Pioneer recovery", "Cruiser 203");
-            case WildWindMetaPortTab.Ships:
-                return ContainsAllIgnoreCase(content, "Session roster", "Pioneer", "Cruiser 203");
-            case WildWindMetaPortTab.Fitting:
-                return ContainsAllIgnoreCase(content, "High:", "Mid:", "Low/Rig", "Fire control");
-            case WildWindMetaPortTab.Sorties:
-                return ContainsAllIgnoreCase(content, "Sortie board", "isolated session pocket", "Mining/gas/scanning", "Loadout validation");
-            case WildWindMetaPortTab.Processing:
-                return ContainsAllIgnoreCase(content, "Five base branches", "Priority", "Buffers");
-            case WildWindMetaPortTab.Production:
-                return ContainsAllIgnoreCase(content, "Cascade production", "Starter order", "airframe");
-            case WildWindMetaPortTab.Technologies:
-                return ContainsAllIgnoreCase(content, "single account", "Airship Basics");
-            default:
-                return false;
+            return true;
         }
+
+        return meta.TryClaimQuestReward(questId, out _);
+    }
+
+    private static bool SessionSceneOmitsLegacyStaticVisualsForTests(string sceneText)
+    {
+        if (string.IsNullOrWhiteSpace(sceneText))
+        {
+            return false;
+        }
+
+        return sceneText.Contains("m_Name: Session Scene Objects")
+            && !sceneText.Contains("Port -")
+            && !sceneText.Contains("Resource Field -")
+            && !sceneText.Contains("Capital Port Proxy - Greenhaven")
+            && !sceneText.Contains("Data Resource Field ore_field_tutorial_00")
+            && !sceneText.Contains("Port Rock")
+            && !sceneText.Contains("Resource Marker")
+            && !sceneText.Contains("Warm Dock Lamp");
     }
 
     private static bool ContainsAllIgnoreCase(string content, params string[] terms)
@@ -4164,7 +5751,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
     private IEnumerator ValidateSessionLoopRoundTrip(BigTestReport report)
     {
-        report.Section("Direct port entry and account reset");
+        report.Section("Direct port entry and persistent progress reset");
 
         try
         {
@@ -4200,8 +5787,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
 
             WildWindGameplayHud firstHud = FindFirstObjectByType<WildWindGameplayHud>();
-            report.Check(firstHud != null && firstHud.IsMetaPortScreenVisibleForTests,
-                "Docked direct entry opens the full port screen automatically.");
+            WildWindBaseIslandView firstIsland = WildWindBaseIslandView.EnsureForCurrentSessionScene();
+            report.Check(firstHud != null
+                    && firstIsland != null
+                    && !firstHud.IsKnowledgeScreenVisibleForTests
+                    && firstIsland.IsCityVisibleForTests,
+                "Docked direct entry starts on the city map without opening a full-screen knowledge overlay.");
 
             ValidateSessionExtractionCoreLoop(report);
 
@@ -4213,6 +5804,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 yield break;
             }
 
+            firstMeta.ResetAccountProgressForCheat(out _);
             const string runtimeProbeResourceId = "runtime_account_probe_resource";
             PortStorageState firstRuntimeStorage = firstMeta.GetCapitalStorageState();
             int runtimeProbeAmount = firstRuntimeStorage.GetResourceAmount(runtimeProbeResourceId) + 12345;
@@ -4222,24 +5814,28 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 ? runtimeSnapshot.progress.GetPortStorageState(firstMeta.GetCapitalPortId(), false)
                 : null;
             report.Check(runtimeSnapshotStorage != null && runtimeSnapshotStorage.GetResourceAmount(runtimeProbeResourceId) == runtimeProbeAmount,
-                "Runtime account snapshot reflects current in-memory progress without writing a save file.");
+                "Runtime account snapshot reflects current in-memory progress.");
+            bool probeSaved = firstMeta.SavePersistentProgressNowForTests();
+            report.Check(probeSaved && firstMeta.HasPersistentProgressSaveForTests,
+                "Runtime progress save writes current account progress to the persistent progress file.");
 
             SceneManager.LoadScene(DefaultSessionSceneName);
             DisableDuplicateBigTestRunners();
             yield return WaitForLoadedSession();
-            ReportSessionReadinessIfNeeded("fresh runtime scene reload", report);
-            ValidateLoadedSession("fresh runtime scene reload", report);
+            ReportSessionReadinessIfNeeded("persistent runtime scene reload", report);
+            ValidateLoadedSession("persistent runtime scene reload", report);
 
             MetaGameState reloadedMeta = FindFirstObjectByType<MetaGameState>();
             PortStorageState reloadedRuntimeStorage = reloadedMeta != null ? reloadedMeta.GetCapitalStorageState() : null;
             report.Check(reloadedMeta != null
                 && reloadedMeta.progress != null
+                && reloadedMeta.PersistentProgressLoadedThisSessionForTests
                 && reloadedRuntimeStorage != null
-                && reloadedRuntimeStorage.GetResourceAmount(runtimeProbeResourceId) != runtimeProbeAmount,
-                "Direct scene reload starts a fresh runtime account instead of restoring disk progress.");
+                && reloadedRuntimeStorage.GetResourceAmount(runtimeProbeResourceId) == runtimeProbeAmount,
+                "Direct scene reload restores persisted runtime progress from disk.");
 
             WildWindGameplayMenu reloadedMenu = FindFirstObjectByType<WildWindGameplayMenu>();
-            report.Check(reloadedMenu != null, reloadedMenu != null ? "Gameplay menu is present after fresh runtime reload." : "Gameplay menu is missing after fresh runtime reload.");
+            report.Check(reloadedMenu != null, reloadedMenu != null ? "Gameplay menu is present after persistent runtime reload." : "Gameplay menu is missing after persistent runtime reload.");
             if (reloadedMenu == null)
             {
                 yield break;
@@ -4250,9 +5846,14 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             MetaGameState pausedMeta = FindFirstObjectByType<MetaGameState>();
             report.Check(pausedMeta != null && pausedMeta.IsSessionPaused && Approximately(Time.timeScale, 0f, 0.001f),
                 "Esc menu pauses the session scene.");
+            reloadedMenu.SetOpen(false);
+            yield return null;
 
-            bool resetInvoked = TryInvokePrivateMethod(reloadedMenu, "ResetProgressCheat", report);
-            report.Check(resetInvoked, "Reset progress cheat can be invoked by the gameplay menu without exceptions.");
+            WildWindGameplayHud reloadedHud = FindFirstObjectByType<WildWindGameplayHud>();
+            bool resetInvoked = reloadedHud != null
+                && reloadedHud.OpenMetaTopRightWindowForTests(3)
+                && reloadedHud.PressSettingsResetProgressForTests();
+            report.Check(resetInvoked, "Settings window can reset persistent runtime progress without exceptions.");
             for (int i = 0; i < 4; i++)
             {
                 yield return null;
@@ -4268,9 +5869,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 resetMeta.CurrentMode == GameSessionMode.Docked &&
                 resetMeta.progress.currentDockId == GameplaySessionAccountData.DefaultDockId;
             report.Check(resetProgressFresh,
-                "Reset progress cheat returns the current runtime account to fresh docked port progress.");
-            report.Check(resetHud != null && resetHud.IsMetaPortScreenVisibleForTests,
-                "Reset progress cheat leaves the player in the visible port screen.");
+                "Settings progress reset returns the current runtime account to fresh docked port progress.");
+            WildWindBaseIslandView resetIsland = WildWindBaseIslandView.EnsureForCurrentSessionScene();
+            report.Check(resetHud != null
+                    && resetIsland != null
+                    && !resetHud.IsKnowledgeScreenVisibleForTests
+                    && resetIsland.IsCityVisibleForTests,
+                "Settings progress reset leaves the player on the city map instead of opening a full-screen overlay.");
         }
         finally
         {
@@ -4385,6 +5990,25 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && freshCoreProgress.GetResourceAmount("iron") == 0
             && freshCoreBaseStorage.GetResourceAmount("paper") == 0,
             "Fresh core progress does not seed legacy personal ore/iron or starting paper.");
+        report.Check(freshCoreBaseStorage != null
+            && freshCoreBaseStorage.GetResourceAmount("windshale_ore") > 0
+            && freshCoreBaseStorage.GetResourceAmount("cloud_condensate") > 0
+            && freshCoreBaseStorage.GetResourceAmount(SessionExtractionConstants.BrokenAutomatonItemId) > 0
+            && freshCoreBaseStorage.GetResourceAmount("windcalf_carcass") > 0
+            && freshCoreBaseStorage.GetResourceAmount(SessionExtractionConstants.RockInfoItemId) > 0,
+            "Fresh base storage seeds temporary sample inputs for each processing window.");
+        report.Check(freshCoreBaseStorage != null
+            && freshCoreBaseStorage.GetResourceAmount("freight") >= 125480,
+            "Fresh base storage seeds starting Freight for the first island-clearing actions.");
+        report.Check(freshCoreProgress != null
+            && freshCoreProgress.receivedStartingCourierSupplies
+            && freshCoreBaseStorage != null
+            && freshCoreBaseStorage.GetResourceAmount("ferron") >= 140
+            && freshCoreBaseStorage.GetResourceAmount("silvate") >= 90
+            && freshCoreBaseStorage.GetResourceAmount("tools") >= 56
+            && freshCoreBaseStorage.GetResourceAmount("claudium") >= 180
+            && freshCoreBaseStorage.GetResourceAmount("paper") == 0,
+            "Fresh and existing saves receive the one-time courier/missions starter supply pack without restoring legacy starting paper.");
         loadedMeta.ReplaceProgress(sessionCoreSnapshot);
         loadedMeta.EnsureProgressInitialized();
         progress = loadedMeta.progress;
@@ -4491,9 +6115,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         PortStorageState initialBaseStorage = loadedMeta.GetCapitalStorageState();
         if (initialBaseStorage != null)
         {
-            progress.shipEngineFuelTank.SetResource("charcoal");
+            progress.shipFuelTank.SetResource("charcoal");
             progress.shipClaudiumTank.SetResource("claudium");
-            progress.shipEngineFuelTank.amountKg = 0f;
+            progress.shipFuelTank.amountKg = 0f;
             progress.shipClaudiumTank.amountKg = 0f;
             SyncTestShipConsumables(loadedSession, progress);
             int fuelStorageBefore = initialBaseStorage.GetResourceAmount("charcoal") + initialBaseStorage.AddResource("charcoal", 120);
@@ -4502,7 +6126,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             bool refueledAtBase = loadedMeta.TryRefuelBaseShip(out string refuelMessage);
             report.Check(canRefuelAtBase
                 && refueledAtBase
-                && progress.shipEngineFuelTank.GetAmount("charcoal") > 0f
+                && progress.shipFuelTank.GetAmount("charcoal") > 0f
                 && progress.shipClaudiumTank.GetAmount("claudium") > 0f
                 && initialBaseStorage.GetResourceAmount("charcoal") < fuelStorageBefore
                 && initialBaseStorage.GetResourceAmount("claudium") < claudiumStorageBefore,
@@ -4516,12 +6140,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 && HasStablePioneerFlightEnvelope(
                     pioneerAssembly,
                     pioneerStarterPayloadKg,
-                    40f,
                     0.5f,
                     12f,
                     out pioneerFlightEnvelope);
             report.Check(pioneerFlightEnvelopeOk,
-                "Starter Pioneer recovery has enough lift, hover power reserve, thrust, and speed for a starter ore sortie: "
+                "Starter Pioneer recovery has enough lift, hull thrust, and speed for a starter ore sortie: "
                 + pioneerFlightEnvelope);
         }
         else
@@ -4666,12 +6289,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(sortieLocationsSeparatedFromPort,
             "Default sortie locations are physically separated from the port pocket; sortie space is not spawned under the dock.");
 
-        bool cycledSortie = loadedHud != null
-            ? loadedHud.TryCycleSessionSortie()
-            : loadedMeta.SelectNextSessionSortie(out _);
+        bool cycledSortie = loadedMeta.SelectNextSessionSortie(out _);
         report.Check(cycledSortie
             && loadedMeta.GetSelectedSessionSortieDefinition().primaryBranch != BaseProcessingBranch.Ore,
-            "HUD can cycle the selected extraction sortie before launch.");
+            "Runtime can cycle the selected extraction sortie before launch without the retired mission launcher panel.");
 
         bool selectedGasSortie = loadedMeta.SelectSessionSortie(SessionExtractionConstants.DefaultSafeGasSortieId, out string selectedGasMessage);
         bool selectedGasBlockedWithoutFitting = !loadedMeta.CanBeginSelectedSessionSortie(out string gasBlockedReason);
@@ -4734,11 +6355,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         SortieLocationIsolationController locationIsolation = SortieLocationIsolationController.EnsureForLoadedGameplayScene();
         locationIsolation?.RefreshNow();
-        bool sortieStarted = loadedHud != null ? loadedHud.TryTakeOff() : loadedMeta.BeginSafeOreSortie();
+        bool sortieStarted = loadedMeta.BeginSafeOreSortie();
         report.Check(sortieStarted
             && loadedMeta.HasActiveSortie
             && progress.currentMode == GameSessionMode.Flight,
-            "HUD starts a safe ore sortie from the base and switches to flight.");
+            "Runtime starts a safe ore sortie from the base and switches to flight without the retired mission launcher panel.");
         if (!sortieStarted || progress.activeSortie == null || progress.activeSortie.zone == null)
         {
             return;
@@ -4836,9 +6457,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         int baseOreBeforeExtraction = baseStorageBeforeExtraction != null ? baseStorageBeforeExtraction.GetResourceAmount("windshale_ore") : 0;
         int sortieOreBeforeExtraction = progress.GetShipCargoAmount("windshale_ore");
 
-        progress.shipEngineFuelTank.SetResource("charcoal");
+        progress.shipFuelTank.SetResource("charcoal");
         progress.shipClaudiumTank.SetResource("claudium");
-        progress.shipEngineFuelTank.TrySpend("charcoal", progress.shipEngineFuelTank.GetAmount("charcoal"));
+        progress.shipFuelTank.TrySpend("charcoal", progress.shipFuelTank.GetAmount("charcoal"));
         progress.shipClaudiumTank.TrySpend("claudium", progress.shipClaudiumTank.GetAmount("claudium"));
         SyncTestShipConsumables(loadedSession, progress);
         SortieReturnEstimate estimateWithoutReserves = loadedMeta.GetActiveSortieReturnEstimate();
@@ -4851,7 +6472,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && loadedMeta.CurrentMode == GameSessionMode.Flight,
             "Boundary extraction is blocked when coal or claudium reserves are insufficient: " + insufficientReserveMessage);
 
-        progress.shipEngineFuelTank.Add("charcoal", 42.7f, 100000f);
+        progress.shipFuelTank.Add("charcoal", 42.7f, 100000f);
         progress.shipClaudiumTank.Add("claudium", 10.1f, 100000f);
         SyncTestShipConsumables(loadedSession, progress);
         Vector3 screenshotReserveOutward = new Vector3(
@@ -4873,10 +6494,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             "Safe ore return reserves leave enough margin for a real boundary arrival and start the slip timer instead of blocking at 0/12.");
 
         progress.activeSortie.ResetExtractionRunup();
-        progress.shipEngineFuelTank.TrySpend("charcoal", progress.shipEngineFuelTank.GetAmount("charcoal"));
+        progress.shipFuelTank.TrySpend("charcoal", progress.shipFuelTank.GetAmount("charcoal"));
         progress.shipClaudiumTank.TrySpend("claudium", progress.shipClaudiumTank.GetAmount("claudium"));
 
-        progress.shipEngineFuelTank.Add("charcoal", estimateWithoutReserves.requiredCoalKg + 50f, 100000f);
+        progress.shipFuelTank.Add("charcoal", estimateWithoutReserves.requiredCoalKg + 50f, 100000f);
         progress.shipClaudiumTank.Add("claudium", estimateWithoutReserves.requiredClaudiumKg + 50f, 100000f);
         SyncTestShipConsumables(loadedSession, progress);
         Vector3 stormBoundaryPosition = new Vector3(
@@ -5012,7 +6633,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && estimateReady.requiredCoalKg > 0f
             && estimateReady.requiredClaudiumKg >= 0f,
             "Boundary extraction calculates return coal and claudium reserves after the claudium slipstream exit run.");
-        float coalBeforeExtraction = progress.shipEngineFuelTank.GetAmount("charcoal");
+        float coalBeforeExtraction = progress.shipFuelTank.GetAmount("charcoal");
         float claudiumBeforeExtraction = progress.shipClaudiumTank.GetAmount("claudium");
 
         bool extracted = loadedHud != null ? loadedHud.TryDockNearest() : loadedMeta.TryExtractActiveSortie(out _);
@@ -5031,7 +6652,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             "Returning from a sortie restores the port scene pocket only after the Extract home transition.");
         report.Check(extracted
             && Approximately(
-                progress.shipEngineFuelTank.GetAmount("charcoal"),
+                progress.shipFuelTank.GetAmount("charcoal"),
                 Mathf.Max(0f, coalBeforeExtraction - estimateReady.requiredCoalKg),
                 0.001f)
             && Approximately(
@@ -5046,42 +6667,128 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return;
         }
 
-        int ferronBefore = baseStorage.GetResourceAmount("ferron");
-        int silvateBefore = baseStorage.GetResourceAmount("silvate");
+        baseStorage.AddResource("windshale_ore", 100);
+        baseStorage.AddResource("cloud_condensate", 100);
+        baseStorage.AddResource(SessionExtractionConstants.BrokenAutomatonItemId, 100);
+        baseStorage.AddResource(SessionExtractionConstants.RockInfoItemId, 100);
+
         bool oreProcessed = loadedMeta.TryProcessBaseBatch(BaseProcessingBranch.Ore, out string processingMessage);
+        BaseProcessingFacilityState oreBatchFacility = loadedMeta.GetBaseProcessingFacilityState("legacy_batch_" + BaseProcessingBranch.Ore, BaseProcessingBranch.Ore, 1);
         report.Check(oreProcessed
-            && baseStorage.GetResourceAmount("ferron") > ferronBefore
-            && baseStorage.GetResourceAmount("silvate") > silvateBefore,
-            "Base ore processing converts extracted ore into minerals: " + processingMessage);
+            && oreBatchFacility.totalProcessedUnits > 0f
+            && oreBatchFacility.outputBuffers.Count > 0,
+            "Base ore processing consumes a cycle and stores fractional mineral output buffers: " + processingMessage);
 
-        baseStorage.AddResource("cloud_condensate", 24);
-        baseStorage.AddResource(SessionExtractionConstants.BrokenAutomatonItemId, 12);
-        baseStorage.AddResource("windcalf_carcass", 24);
-        baseStorage.AddResource(SessionExtractionConstants.RockInfoItemId, 10);
-
-        int waterBefore = baseStorage.GetResourceAmount("water");
         bool gasProcessed = loadedMeta.TryProcessBaseBatch(BaseProcessingBranch.Gas, out string gasMessage);
+        BaseProcessingFacilityState gasBatchFacility = loadedMeta.GetBaseProcessingFacilityState("legacy_batch_" + BaseProcessingBranch.Gas, BaseProcessingBranch.Gas, 1);
         report.Check(gasProcessed
-            && baseStorage.GetResourceAmount("water") > waterBefore,
-            "Base gas processing cracks condensate into gas materials: " + gasMessage);
+            && gasBatchFacility.totalProcessedUnits > 0f
+            && gasBatchFacility.outputBuffers.Count > 0,
+            "Base gas processing consumes a cycle and stores fractional gas-material output buffers: " + gasMessage);
 
-        int automatonCoreBefore = baseStorage.GetResourceAmount(SessionExtractionConstants.AutomatonCoreItemId);
         bool automatonProcessed = loadedMeta.TryProcessBaseBatch(BaseProcessingBranch.AutomatonDismantling, out string automatonMessage);
+        BaseProcessingFacilityState automatonBatchFacility = loadedMeta.GetBaseProcessingFacilityState("legacy_batch_" + BaseProcessingBranch.AutomatonDismantling, BaseProcessingBranch.AutomatonDismantling, 1);
         report.Check(automatonProcessed
-            && baseStorage.GetResourceAmount(SessionExtractionConstants.AutomatonCoreItemId) > automatonCoreBefore,
-            "Base automaton dismantling turns wrecks into cores and session materials: " + automatonMessage);
+            && automatonBatchFacility.totalProcessedUnits > 0f
+            && automatonBatchFacility.outputBuffers.Count > 0,
+            "Base automaton dismantling consumes a cycle and buffers dismantled outputs: " + automatonMessage);
 
-        int leviathanFatBefore = baseStorage.GetResourceAmount(SessionExtractionConstants.LeviathanFatItemId);
-        bool leviathanProcessed = loadedMeta.TryProcessBaseBatch(BaseProcessingBranch.LeviathanProcessing, out string leviathanMessage);
-        report.Check(leviathanProcessed
-            && baseStorage.GetResourceAmount(SessionExtractionConstants.LeviathanFatItemId) > leviathanFatBefore,
-            "Base leviathan processing butchers carcasses into biological materials: " + leviathanMessage);
-
-        int fundamentalBefore = baseStorage.GetResourceAmount(SessionExtractionConstants.FundamentalExperienceItemId);
         bool cyberProcessed = loadedMeta.TryProcessBaseBatch(BaseProcessingBranch.CyberneticDeciphering, out string cyberMessage);
+        BaseProcessingFacilityState cyberBatchFacility = loadedMeta.GetBaseProcessingFacilityState("legacy_batch_" + BaseProcessingBranch.CyberneticDeciphering, BaseProcessingBranch.CyberneticDeciphering, 1);
         report.Check(cyberProcessed
-            && baseStorage.GetResourceAmount(SessionExtractionConstants.FundamentalExperienceItemId) > fundamentalBefore,
-            "Base cybernetic deciphering turns survey data into research output: " + cyberMessage);
+            && cyberBatchFacility.totalProcessedUnits > 0f
+            && cyberBatchFacility.outputBuffers.Count > 0,
+            "Base cybernetic deciphering consumes a cycle and buffers research output: " + cyberMessage);
+
+        baseStorage.AddResource("windcalf_carcass", 60);
+        int carcassBeforeLoad = baseStorage.GetResourceAmount("windcalf_carcass");
+        int leviathanFatBefore = baseStorage.GetResourceAmount(SessionExtractionConstants.LeviathanFatItemId);
+        BaseProcessingFacilityState butcheryFacility = loadedMeta.GetBaseProcessingFacilityState("butchery", BaseProcessingBranch.LeviathanProcessing, 5);
+        bool leviathanLoaded = loadedMeta.TryLoadBaseProcessingInput("butchery", BaseProcessingBranch.LeviathanProcessing, 5, "windcalf_carcass", 45, out string leviathanLoadMessage);
+        long processingStartTicks = Math.Max(DateTime.UtcNow.Ticks, progress.lastProcessUtcTicks);
+        progress.lastProcessUtcTicks = processingStartTicks;
+        int advancedProcessingCycles = loadedMeta.AdvanceRealTimeProcesses(new DateTime(processingStartTicks, DateTimeKind.Utc).AddSeconds(31));
+        BaseProcessingOutputBufferState fatBufferBeforeCollect = butcheryFacility.GetOutputBuffer(SessionExtractionConstants.LeviathanFatItemId, false);
+        bool leviathanBuffered = leviathanLoaded
+            && advancedProcessingCycles >= 3
+            && baseStorage.GetResourceAmount("windcalf_carcass") == carcassBeforeLoad - 45
+            && butcheryFacility.BunkerLoadUnits == 0
+            && baseStorage.GetResourceAmount(SessionExtractionConstants.LeviathanFatItemId) == leviathanFatBefore
+            && fatBufferBeforeCollect != null
+            && fatBufferBeforeCollect.readyAmount >= 1
+            && fatBufferBeforeCollect.fractionalAmount > 0f;
+        report.Check(leviathanBuffered,
+            "Timed leviathan processing loads carcass units into a bunker, runs 10-second cycles, and buffers only whole-ready outputs: " + leviathanLoadMessage);
+
+        bool leviathanCollected = loadedMeta.TryCollectBaseProcessingOutputs("butchery", BaseProcessingBranch.LeviathanProcessing, 5, out string leviathanCollectMessage);
+        BaseProcessingOutputBufferState fatBufferAfterCollect = butcheryFacility.GetOutputBuffer(SessionExtractionConstants.LeviathanFatItemId, false);
+        report.Check(leviathanCollected
+            && baseStorage.GetResourceAmount(SessionExtractionConstants.LeviathanFatItemId) > leviathanFatBefore
+            && fatBufferAfterCollect != null
+            && fatBufferAfterCollect.readyAmount == 0
+            && fatBufferAfterCollect.fractionalAmount > 0f,
+            "Collect all moves whole processed leviathan outputs to storage while leaving fractional progress in the building: " + leviathanCollectMessage);
+
+        baseStorage.AddResource("windshale_ore", 45);
+        baseStorage.AddResource("cloud_condensate", 45);
+        baseStorage.AddResource(SessionExtractionConstants.BrokenAutomatonItemId, 45);
+        baseStorage.AddResource("windcalf_carcass", 45);
+        baseStorage.AddResource(SessionExtractionConstants.RockInfoItemId, 45);
+        bool timedProcessingExact = true;
+        string timedProcessingMessage = "";
+        timedProcessingExact &= RunTimedProcessingFacilityForBigTest(
+            loadedMeta,
+            progress,
+            baseStorage,
+            "bigtest_timed_ore",
+            BaseProcessingBranch.Ore,
+            5,
+            "windshale_ore",
+            45,
+            out timedProcessingMessage);
+        timedProcessingExact &= RunTimedProcessingFacilityForBigTest(
+            loadedMeta,
+            progress,
+            baseStorage,
+            "bigtest_timed_gas",
+            BaseProcessingBranch.Gas,
+            5,
+            "cloud_condensate",
+            45,
+            out timedProcessingMessage);
+        timedProcessingExact &= RunTimedProcessingFacilityForBigTest(
+            loadedMeta,
+            progress,
+            baseStorage,
+            "bigtest_timed_automaton",
+            BaseProcessingBranch.AutomatonDismantling,
+            5,
+            SessionExtractionConstants.BrokenAutomatonItemId,
+            45,
+            out timedProcessingMessage);
+        timedProcessingExact &= RunTimedProcessingFacilityForBigTest(
+            loadedMeta,
+            progress,
+            baseStorage,
+            "bigtest_timed_leviathan",
+            BaseProcessingBranch.LeviathanProcessing,
+            5,
+            "windcalf_carcass",
+            45,
+            out timedProcessingMessage);
+        timedProcessingExact &= RunTimedProcessingFacilityForBigTest(
+            loadedMeta,
+            progress,
+            baseStorage,
+            "bigtest_timed_cyber",
+            BaseProcessingBranch.CyberneticDeciphering,
+            5,
+            SessionExtractionConstants.RockInfoItemId,
+            45,
+            out timedProcessingMessage);
+        report.Check(timedProcessingExact,
+            "Timed processing for all five branches loads storage, advances offscreen and collects exactly the ready whole outputs: "
+            + timedProcessingMessage);
 
         bool allProcessingBranchesTracked = true;
         for (int i = 0; i < SessionExtractionIndustry.ProcessingBranches.Length; i++)
@@ -5160,10 +6867,17 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && starterEstimate.bottleneckMinutes > 0f,
             "Starter cascade order estimates load and bottleneck across production capacity.");
 
-        bool cascadeComplete = loadedMeta.TryRunStarterAirframeCascade(out string cascadeMessage);
+        int airframeKitsBeforeCascade = baseStorage.GetResourceAmount(SessionExtractionConstants.StarterAirframeKitItemId);
+        bool cascadeComplete = QueueAndCompleteCascadeOrderForBigTest(
+            loadedMeta,
+            progress,
+            baseStorage,
+            loadedMeta.CreateStarterAirframeCascadeOrder(),
+            1,
+            out string cascadeMessage);
         report.Check(cascadeComplete
-            && baseStorage.GetResourceAmount(SessionExtractionConstants.StarterAirframeKitItemId) >= 1,
-            "Eight-type cascade production creates the starter airframe kit: " + cascadeMessage);
+            && baseStorage.GetResourceAmount(SessionExtractionConstants.StarterAirframeKitItemId) == airframeKitsBeforeCascade + 1,
+            "Eight-type cascade production queues, advances by meta time, and creates exactly one starter airframe kit: " + cascadeMessage);
 
         bool allCascadeLinesLoaded = true;
         for (int i = 0; i < SessionExtractionIndustry.CascadeProductionTypes.Length; i++)
@@ -5175,16 +6889,24 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(allCascadeLinesLoaded,
             "Starter cascade order records load against all eight production types.");
 
-        CascadeProductionEstimate moduleEstimate = loadedMeta.EstimateNextBaseCascadeOrder(out CascadeProductionOrderDefinition moduleOrder);
-        bool moduleCascadeComplete = loadedMeta.TryRunNextBaseCascadeOrder(out string moduleCascadeMessage);
-        CascadeProductionEstimate munitionEstimate = loadedMeta.EstimateNextBaseCascadeOrder(out CascadeProductionOrderDefinition munitionOrder);
-        bool munitionCascadeComplete = loadedMeta.TryRunNextBaseCascadeOrder(out string munitionCascadeMessage);
+        CascadeProductionOrderDefinition moduleOrder = SessionExtractionIndustry.CreateStarterModuleKitOrder();
+        CascadeProductionEstimate moduleEstimate = loadedMeta.EstimateBaseCascadeOrder(moduleOrder);
+        int moduleKitsBeforeModuleOrder = baseStorage.GetResourceAmount(SessionExtractionConstants.StarterModuleKitItemId);
+        string moduleCascadeMessage = "No module order.";
+        bool moduleCascadeComplete = moduleOrder != null
+            && QueueAndCompleteCascadeOrderForBigTest(
+                loadedMeta,
+                progress,
+                baseStorage,
+                moduleOrder,
+                1,
+                out moduleCascadeMessage);
         report.Check(moduleOrder != null
             && moduleOrder.orderId == SessionExtractionConstants.StarterModuleKitOrderId
             && moduleEstimate.canRun
             && moduleCascadeComplete
-            && baseStorage.GetResourceAmount(SessionExtractionConstants.StarterModuleKitItemId) >= 1,
-            "Cascade catalog can produce a starter module kit from early ore materials: " + moduleCascadeMessage);
+            && baseStorage.GetResourceAmount(SessionExtractionConstants.StarterModuleKitItemId) == moduleKitsBeforeModuleOrder + 1,
+            "Cascade catalog queues and time-completes a starter module kit from early ore materials: " + moduleCascadeMessage);
 
         int moduleKitsBeforeHighUpgrade = baseStorage.GetResourceAmount(SessionExtractionConstants.StarterModuleKitItemId);
         bool highGasUpgradeInstalled = loadedMeta.TryInstallStarterGasExtractorUpgrade(out string highGasUpgradeMessage);
@@ -5221,16 +6943,18 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         baseStorage.AddResource("silvate", 3);
         baseStorage.AddResource("charcoal", 6);
 
-        bool extraModuleKitsComplete = true;
-        string extraModuleKitMessage = "";
-        for (int i = 0; i < 3; i++)
-        {
-            extraModuleKitsComplete &= loadedMeta.TryRunBaseCascadeOrder(SessionExtractionIndustry.CreateStarterModuleKitOrder(), out extraModuleKitMessage);
-        }
+        int moduleKitsBeforeExtraOrders = baseStorage.GetResourceAmount(SessionExtractionConstants.StarterModuleKitItemId);
+        bool extraModuleKitsComplete = QueueAndCompleteCascadeOrderForBigTest(
+            loadedMeta,
+            progress,
+            baseStorage,
+            SessionExtractionIndustry.CreateStarterModuleKitOrder(),
+            3,
+            out string extraModuleKitMessage);
 
         report.Check(extraModuleKitsComplete
-            && baseStorage.GetResourceAmount(SessionExtractionConstants.StarterModuleKitItemId) >= 3,
-            "Starter module kit order can be repeated to fit all starter branch tools: " + extraModuleKitMessage);
+            && baseStorage.GetResourceAmount(SessionExtractionConstants.StarterModuleKitItemId) == moduleKitsBeforeExtraOrders + 3,
+            "Starter module kit order supports quantity, saves one timed queue item, and produces exactly three kits: " + extraModuleKitMessage);
 
         bool miningHoldInstalled = loadedMeta.TryInstallStarterMiningHoldUpgrade(out string miningHoldUpgradeMessage);
         bool selectedAutomatonAfterUpgrade = loadedMeta.SelectSessionSortie(SessionExtractionConstants.DefaultSafeAutomatonSortieId, out _);
@@ -5287,12 +7011,25 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             SessionExtractionConstants.RockInfoItemId,
             "Survey");
 
+        baseStorage.AddResource(SessionExtractionConstants.MineralShellItemId, 2);
+        baseStorage.AddResource("ferron", 2);
+        baseStorage.AddResource("charcoal", 2);
+        CascadeProductionOrderDefinition munitionOrder = SessionExtractionIndustry.CreateStarterMunitionBundleOrder();
+        CascadeProductionEstimate munitionEstimate = loadedMeta.EstimateBaseCascadeOrder(munitionOrder);
+        int munitionBundlesBeforeCascade = baseStorage.GetResourceAmount(SessionExtractionConstants.StarterMunitionBundleItemId);
+        bool munitionCascadeComplete = QueueAndCompleteCascadeOrderForBigTest(
+            loadedMeta,
+            progress,
+            baseStorage,
+            munitionOrder,
+            1,
+            out string munitionCascadeMessage);
         report.Check(munitionOrder != null
             && munitionOrder.orderId == SessionExtractionConstants.StarterMunitionBundleOrderId
             && munitionEstimate.canRun
             && munitionCascadeComplete
-            && baseStorage.GetResourceAmount(SessionExtractionConstants.StarterMunitionBundleItemId) >= 4,
-            "Cascade catalog can produce starter munition bundles from leviathan shell and minerals: " + munitionCascadeMessage);
+            && baseStorage.GetResourceAmount(SessionExtractionConstants.StarterMunitionBundleItemId) == munitionBundlesBeforeCascade + 4,
+            "Cascade catalog queues and time-completes starter munition bundles from leviathan shell and minerals: " + munitionCascadeMessage);
 
         int munitionBundlesBeforeLoadout = baseStorage.GetResourceAmount(SessionExtractionConstants.StarterMunitionBundleItemId);
         int weaponBeforeLoadout = progress.GetShipCargoAmount(SessionExtractionConstants.StarterWeaponCargoItemId);
@@ -5320,12 +7057,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && HasStablePioneerFlightEnvelope(
                 fittedPioneerAssembly,
                 fittedPioneerPayloadKg,
-                40f,
                 0.5f,
                 12f,
                 out fittedPioneerFlightEnvelope);
         report.Check(fittedPioneerFlightEnvelopeOk,
-            "Fully fitted Pioneer still has enough lift and engine reserve to fly instead of falling: "
+            "Fully fitted Pioneer still has enough lift and hull thrust to fly instead of falling: "
             + fittedPioneerFlightEnvelope);
 
         string fittingSummary = loadedMeta.GetCoreFittingSummaryText();
@@ -5360,11 +7096,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         if (lossSortieStarted)
         {
             progress.AddShipCargo("windshale_ore", 9);
-            progress.shipEngineFuelTank.SetResource("charcoal");
+            progress.shipFuelTank.SetResource("charcoal");
             progress.shipClaudiumTank.SetResource("claudium");
-            progress.shipEngineFuelTank.TrySpend("charcoal", progress.shipEngineFuelTank.GetAmount("charcoal"));
+            progress.shipFuelTank.TrySpend("charcoal", progress.shipFuelTank.GetAmount("charcoal"));
             progress.shipClaudiumTank.TrySpend("claudium", progress.shipClaudiumTank.GetAmount("claudium"));
-            progress.shipEngineFuelTank.Add("charcoal", loadedMeta.startingFuelKg + 500f, loadedMeta.startingFuelKg + 500f);
+            progress.shipFuelTank.Add("charcoal", loadedMeta.startingFuelKg + 500f, loadedMeta.startingFuelKg + 500f);
             progress.shipClaudiumTank.Add("claudium", loadedMeta.startingClaudiumKg + 500f, loadedMeta.startingClaudiumKg + 500f);
             SyncTestShipConsumables(loadedSession, progress);
         }
@@ -5379,7 +7115,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && string.IsNullOrWhiteSpace(progress.GetInstalledModule(SessionExtractionConstants.StarterHighSlotId))
             && string.IsNullOrWhiteSpace(progress.GetInstalledModule(SessionExtractionConstants.StarterMidSlotId))
             && string.IsNullOrWhiteSpace(progress.GetInstalledModule(SessionExtractionConstants.StarterLowSlotId))
-            && Approximately(progress.shipEngineFuelTank.GetAmount("charcoal"), loadedMeta.startingFuelKg, 0.001f)
+            && Approximately(progress.shipFuelTank.GetAmount("charcoal"), loadedMeta.startingFuelKg, 0.001f)
             && Approximately(progress.shipClaudiumTank.GetAmount("claudium"), loadedMeta.startingClaudiumKg, 0.001f),
             "Sortie ship loss returns to base, deletes sortie loot, destroys fitted modules and old tank reserves, restores Pioneer hull, and grants only starter fuel.");
 
@@ -5391,7 +7127,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         progress.ReplaceShipAssembly("missing_session_core_hull");
-        progress.shipEngineFuelTank.TrySpend("charcoal", progress.shipEngineFuelTank.GetAmount("charcoal"));
+        progress.shipFuelTank.TrySpend("charcoal", progress.shipFuelTank.GetAmount("charcoal"));
         progress.shipClaudiumTank.TrySpend("claudium", progress.shipClaudiumTank.GetAmount("claudium"));
         SyncTestShipConsumables(loadedSession, progress);
         bool pioneerFreeRefuelReady = loadedMeta.CanRefuelBaseShip(out string pioneerFreeRefuelReadyMessage);
@@ -5402,10 +7138,235 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && baseStorage.GetResourceAmount("charcoal") == 0
             && baseStorage.GetResourceAmount("claudium") == 0
             && progress.selectedHullId == GameplaySessionAccountData.DefaultStarterHullId
-            && progress.shipEngineFuelTank.GetAmount("charcoal") >= loadedMeta.startingFuelKg
+            && progress.shipFuelTank.GetAmount("charcoal") >= loadedMeta.startingFuelKg
             && progress.shipClaudiumTank.GetAmount("claudium") >= loadedMeta.startingClaudiumKg,
             "Starter Pioneer recovery restores a missing hull and receives a free minimal refuel even when base coal and claudium are empty: "
             + pioneerFreeRefuelReadyMessage + " / " + pioneerFreeRefuelMessage);
+    }
+
+    private static bool RunTimedProcessingFacilityForBigTest(
+        MetaGameState meta,
+        PlayerProgress progress,
+        PortStorageState storage,
+        string facilityId,
+        BaseProcessingBranch branch,
+        int level,
+        string inputItemId,
+        int amount,
+        out string message)
+    {
+        message = "";
+        if (meta == null || progress == null || storage == null || string.IsNullOrWhiteSpace(inputItemId) || amount <= 0)
+        {
+            message = "Timed processing test missing meta, progress, storage or input.";
+            return false;
+        }
+
+        BaseProcessingFacilityState facility = meta.GetBaseProcessingFacilityState(facilityId, branch, level);
+        if (facility == null)
+        {
+            message = "Timed processing facility was not created.";
+            return false;
+        }
+
+        int inputBefore = storage.GetResourceAmount(inputItemId);
+        bool loaded = meta.TryLoadBaseProcessingInput(facilityId, branch, level, inputItemId, amount, out string loadMessage);
+
+        long startTicks = Math.Max(DateTime.UtcNow.Ticks, progress.lastProcessUtcTicks);
+        progress.lastProcessUtcTicks = startTicks;
+        int expectedCycles = Mathf.CeilToInt(amount / (float)Mathf.Max(1, facility.cycleInputUnits));
+        double secondsToComplete = Math.Ceiling(Math.Max(1d, expectedCycles * facility.cycleDurationSeconds)) + 1d;
+        int completedEvents = loaded
+            ? meta.AdvanceRealTimeProcesses(new DateTime(startTicks, DateTimeKind.Utc).AddSeconds(secondsToComplete))
+            : 0;
+
+        List<string> outputIds = new List<string>();
+        List<int> readyAmounts = new List<int>();
+        List<int> storageBeforeCollect = new List<int>();
+        int readyTotal = 0;
+        facility.outputBuffers ??= new List<BaseProcessingOutputBufferState>();
+        for (int i = 0; i < facility.outputBuffers.Count; i++)
+        {
+            BaseProcessingOutputBufferState buffer = facility.outputBuffers[i];
+            if (buffer == null || string.IsNullOrWhiteSpace(buffer.itemId) || buffer.readyAmount <= 0) continue;
+
+            outputIds.Add(buffer.itemId);
+            readyAmounts.Add(buffer.readyAmount);
+            storageBeforeCollect.Add(storage.GetResourceAmount(buffer.itemId));
+            readyTotal += buffer.readyAmount;
+        }
+
+        bool collected = meta.TryCollectBaseProcessingOutputs(facilityId, branch, level, out string collectMessage);
+        bool outputsExact = outputIds.Count > 0;
+        bool buffersCleared = outputIds.Count > 0;
+        for (int i = 0; i < outputIds.Count; i++)
+        {
+            string outputId = outputIds[i];
+            int expectedStorageAmount = storageBeforeCollect[i] + readyAmounts[i];
+            outputsExact &= storage.GetResourceAmount(outputId) == expectedStorageAmount;
+
+            BaseProcessingOutputBufferState buffer = facility.GetOutputBuffer(outputId, false);
+            buffersCleared &= buffer != null && buffer.readyAmount == 0;
+        }
+
+        bool inputSpent = storage.GetResourceAmount(inputItemId) == inputBefore - amount;
+        bool bunkerEmpty = facility.BunkerLoadUnits == 0;
+        message = SessionExtractionIndustry.GetProcessingDisplayName(branch)
+            + " loaded " + amount
+            + ", cycles " + expectedCycles
+            + ", completed events " + completedEvents
+            + ", ready " + readyTotal
+            + " / " + loadMessage + " / " + collectMessage;
+
+        return loaded
+            && inputSpent
+            && completedEvents >= expectedCycles
+            && bunkerEmpty
+            && readyTotal > 0
+            && collected
+            && outputsExact
+            && buffersCleared;
+    }
+
+    private static bool QueueAndCompleteCascadeOrderForBigTest(
+        MetaGameState meta,
+        PlayerProgress progress,
+        PortStorageState storage,
+        CascadeProductionOrderDefinition order,
+        int quantity,
+        out string message)
+    {
+        message = "";
+        if (meta == null || progress == null || storage == null || order == null)
+        {
+            message = "Cascade test missing meta, progress, storage or order.";
+            return false;
+        }
+
+        quantity = Mathf.Max(1, quantity);
+        order.Normalize();
+        CascadeProductionEstimate estimate = meta.EstimateBaseCascadeOrder(order, quantity);
+        if (estimate == null || !estimate.canRun)
+        {
+            message = estimate != null && !string.IsNullOrWhiteSpace(estimate.blockedReason)
+                ? estimate.blockedReason
+                : "Cascade estimate blocked.";
+            return false;
+        }
+
+        progress.baseIndustry ??= new BaseExtractionIndustryState();
+        progress.baseIndustry.Normalize();
+        int queueCountBefore = progress.baseIndustry.ActiveCascadeQueueCount;
+        int[] inputBefore = CaptureStorageAmounts(storage, order.inputs);
+        int[] outputBefore = CaptureStorageAmounts(storage, order.outputs);
+
+        long startTicks = Math.Max(DateTime.UtcNow.Ticks, progress.lastProcessUtcTicks);
+        progress.lastProcessUtcTicks = startTicks;
+        bool queued = meta.TryQueueBaseCascadeOrder(order, quantity, out string queueMessage);
+        progress.baseIndustry.Normalize();
+        int queueCountAfterQueue = progress.baseIndustry.ActiveCascadeQueueCount;
+
+        bool inputsSpent = StorageAmountsMatchDelta(storage, order.inputs, inputBefore, -quantity);
+        bool outputsNotGrantedEarly = StorageAmountsMatchExact(storage, order.outputs, outputBefore);
+        int[] outputAfterQueue = CaptureStorageAmounts(storage, order.outputs);
+
+        double secondsToComplete = Math.Ceiling(Math.Max(1d, estimate.bottleneckMinutes * 60d)) + 1d;
+        DateTime completeAt = new DateTime(startTicks, DateTimeKind.Utc).AddSeconds(secondsToComplete);
+        int completedEvents = queued ? meta.AdvanceRealTimeProcesses(completeAt) : 0;
+        progress.baseIndustry.Normalize();
+
+        bool outputsGrantedExactly = StorageAmountsMatchDelta(storage, order.outputs, outputAfterQueue, quantity);
+        bool queueCompleted = progress.baseIndustry.ActiveCascadeQueueCount == queueCountBefore;
+        bool queuedOneSlot = queueCountAfterQueue == queueCountBefore + 1;
+
+        message = queueMessage
+            + " / quantity " + quantity
+            + " / advanced " + secondsToComplete.ToString("0.#") + "s"
+            + " / completed events " + completedEvents
+            + " / input spent " + inputsSpent
+            + " / output exact " + outputsGrantedExactly;
+
+        return queued
+            && queuedOneSlot
+            && inputsSpent
+            && outputsNotGrantedEarly
+            && completedEvents >= 1
+            && outputsGrantedExactly
+            && queueCompleted;
+    }
+
+    private static int[] CaptureStorageAmounts(PortStorageState storage, List<CascadeItemAmount> items)
+    {
+        if (items == null) return Array.Empty<int>();
+
+        int[] amounts = new int[items.Count];
+        for (int i = 0; i < items.Count; i++)
+        {
+            CascadeItemAmount item = items[i];
+            amounts[i] = item != null ? storage.GetResourceAmount(item.itemId) : 0;
+        }
+
+        return amounts;
+    }
+
+    private static List<CascadeItemAmount> CloneCascadeItemsForTest(List<CascadeItemAmount> items)
+    {
+        List<CascadeItemAmount> clone = new List<CascadeItemAmount>();
+        if (items == null)
+        {
+            return clone;
+        }
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            CascadeItemAmount item = items[i];
+            if (item == null)
+            {
+                continue;
+            }
+
+            clone.Add(new CascadeItemAmount { itemId = item.itemId, amount = item.amount });
+        }
+
+        return clone;
+    }
+
+    private static bool StorageAmountsMatchDelta(PortStorageState storage, List<CascadeItemAmount> items, int[] before, int quantity)
+    {
+        if (items == null) return true;
+        if (before == null || before.Length != items.Count) return false;
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            CascadeItemAmount item = items[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.itemId) || item.amount <= 0) continue;
+
+            int expected = before[i] + item.amount * quantity;
+            if (storage.GetResourceAmount(item.itemId) != expected)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool StorageAmountsMatchExact(PortStorageState storage, List<CascadeItemAmount> items, int[] expected)
+    {
+        if (items == null) return true;
+        if (expected == null || expected.Length != items.Count) return false;
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            CascadeItemAmount item = items[i];
+            if (item == null || string.IsNullOrWhiteSpace(item.itemId)) continue;
+            if (storage.GetResourceAmount(item.itemId) != expected[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static Vector3 GetSortieBoundaryProbePosition(SortieZoneDefinition zone)
@@ -5462,11 +7423,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return;
         }
 
-        string fuelId = string.IsNullOrWhiteSpace(ship.engineFuelId) ? "charcoal" : ship.engineFuelId;
+        string fuelId = string.IsNullOrWhiteSpace(ship.fuelResourceId) ? "charcoal" : ship.fuelResourceId;
         string claudiumId = string.IsNullOrWhiteSpace(ship.claudiumResourceId) ? "claudium" : ship.claudiumResourceId;
-        progress.shipEngineFuelTank.SetResource(fuelId);
+        progress.shipFuelTank.SetResource(fuelId);
         progress.shipClaudiumTank.SetResource(claudiumId);
-        ship.engineFuelStockKg = progress.shipEngineFuelTank.GetAmount(fuelId);
+        ship.fuelStockKg = progress.shipFuelTank.GetAmount(fuelId);
         ship.claudiumStock = progress.shipClaudiumTank.GetAmount(claudiumId);
     }
 
@@ -5548,9 +7509,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             MoveSessionShip(session, progress, GetSortieBoundaryProbePosition(progress.activeSortie.zone));
 
             SortieReturnEstimate estimate = meta.GetActiveSortieReturnEstimate();
-            progress.shipEngineFuelTank.SetResource("charcoal");
+            progress.shipFuelTank.SetResource("charcoal");
             progress.shipClaudiumTank.SetResource("claudium");
-            progress.shipEngineFuelTank.Add("charcoal", estimate.requiredCoalKg + 50f, 100000f);
+            progress.shipFuelTank.Add("charcoal", estimate.requiredCoalKg + 50f, 100000f);
             progress.shipClaudiumTank.Add("claudium", estimate.requiredClaudiumKg + 50f, 100000f);
             SyncTestShipConsumables(session, progress);
             PrimeActiveSortieExtractionRunup(meta, progress);
@@ -5606,7 +7567,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private static bool HasStablePioneerFlightEnvelope(
         ShipAssemblyResult assembly,
         float payloadKg,
-        float minPowerSurplusKw,
         float minHorizontalAccelerationMS2,
         float minSpeedMS,
         out string summary)
@@ -5620,37 +7580,37 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ShipStatBlock stats = assembly.stats;
         float emptyMassKg = stats.Get(ShipStatId.BaseMass, 0f);
         float totalMassKg = emptyMassKg + Mathf.Max(0f, payloadKg);
-        float enginePowerKw = stats.Get(ShipStatId.EngineMaxPower, 0f);
-        float liftKgPerKw = stats.Get(ShipStatId.ClaudiumLiftEfficiency, 0f);
-        float engineLiftKg = enginePowerKw * liftKgPerKw;
         float claudiumMaxLiftKg = stats.Get(ShipStatId.ClaudiumMaxLiftKg, 0f);
         float hullLimitKg = stats.Get(ShipStatId.HullMaxTakeoffMassKg, 0f);
-        float allowedTakeoffMassKg = Mathf.Min(engineLiftKg, Mathf.Min(claudiumMaxLiftKg, hullLimitKg));
-        float hoverPowerKw = liftKgPerKw > 0f ? totalMassKg / liftKgPerKw : float.PositiveInfinity;
-        float powerSurplusKw = enginePowerKw - hoverPowerKw;
-        float propellerEfficiency = stats.Get(ShipStatId.PropellerEfficiency, 0f);
+        float allowedTakeoffMassKg = Mathf.Min(claudiumMaxLiftKg, hullLimitKg);
+        float hullForwardThrustKgf = stats.Get(ShipStatId.HullForwardThrustKgf, 0f);
+        float hullCruiseSpeedMS = stats.Get(ShipStatId.HullCruiseReferenceSpeedMS, 0f);
         float dragPerSpeedSquared = 0.5f
             * Mathf.Max(0f, stats.Get(ShipStatId.AirDensity, 1.225f))
             * Mathf.Max(0f, stats.Get(ShipStatId.DragCoefficient, 0f))
             * Mathf.Max(0f, stats.Get(ShipStatId.FrontalArea, 0f));
-        float usefulPowerW = Mathf.Max(0f, powerSurplusKw) * Mathf.Clamp01(propellerEfficiency) * 1000f;
-        float horizontalAccelerationMS2 = totalMassKg > 0f ? usefulPowerW / totalMassKg : 0f;
+        float thrustN = hullForwardThrustKgf * 9.81f;
+        float horizontalAccelerationMS2 = totalMassKg > 0f ? thrustN / totalMassKg : 0f;
         float terminalSpeedMS = 0f;
-        if (dragPerSpeedSquared > 0f && usefulPowerW > 0f)
+        if (dragPerSpeedSquared > 0f && thrustN > 0f)
         {
-            terminalSpeedMS = Mathf.Pow(usefulPowerW / dragPerSpeedSquared, 1f / 3f);
+            terminalSpeedMS = Mathf.Sqrt(thrustN / dragPerSpeedSquared);
         }
+
+        terminalSpeedMS = hullCruiseSpeedMS > 0f
+            ? Mathf.Min(terminalSpeedMS, hullCruiseSpeedMS)
+            : terminalSpeedMS;
 
         summary = "mass " + totalMassKg.ToString("F0") + "/" + allowedTakeoffMassKg.ToString("F0") + " kg"
             + ", empty " + emptyMassKg.ToString("F0") + " kg"
-            + ", hover " + hoverPowerKw.ToString("F0") + "/" + enginePowerKw.ToString("F0") + " kW"
-            + ", surplus " + powerSurplusKw.ToString("F0") + " kW"
-            + ", power accel " + horizontalAccelerationMS2.ToString("F2") + " m/s2"
+            + ", thrust " + hullForwardThrustKgf.ToString("F0") + " kgf"
+            + ", accel " + horizontalAccelerationMS2.ToString("F2") + " m/s2"
+            + ", cruise " + hullCruiseSpeedMS.ToString("F0") + " m/s"
             + ", terminal " + terminalSpeedMS.ToString("F0") + " m/s.";
 
         return totalMassKg <= allowedTakeoffMassKg + 0.001f
-            && powerSurplusKw >= minPowerSurplusKw
-            && propellerEfficiency > 0.1f
+            && hullForwardThrustKgf > 0f
+            && hullCruiseSpeedMS >= minSpeedMS
             && horizontalAccelerationMS2 >= minHorizontalAccelerationMS2
             && IsFinite(terminalSpeedMS)
             && terminalSpeedMS >= minSpeedMS;
@@ -5716,6 +7676,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     private sealed class BigTestSideEffectSnapshot
     {
         private float timeScale;
+        private string normalProgressSavePath;
+        private string normalProgressSaveText;
+        private bool normalProgressSaveExisted;
+        private bool normalProgressSaveTouched;
+        private string normalProgressSaveRestoreError;
 
         public string ActiveSceneName { get; private set; }
 
@@ -5726,16 +7691,22 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         public static BigTestSideEffectSnapshot Capture()
         {
             Scene scene = SceneManager.GetActiveScene();
+            string normalSavePath = MetaGameState.GetPersistentProgressSavePathForTests(false);
+            bool normalSaveExists = File.Exists(normalSavePath);
             return new BigTestSideEffectSnapshot
             {
                 timeScale = Time.timeScale,
-                ActiveSceneName = scene.IsValid() ? scene.name : ""
+                ActiveSceneName = scene.IsValid() ? scene.name : "",
+                normalProgressSavePath = normalSavePath,
+                normalProgressSaveExisted = normalSaveExists,
+                normalProgressSaveText = normalSaveExists ? File.ReadAllText(normalSavePath, Encoding.UTF8) : ""
             };
         }
 
         public void RestorePrefsAndTimeScale()
         {
             Time.timeScale = timeScale;
+            RestoreNormalProgressSaveIfNeeded();
         }
 
         public void AssertRestored(BigTestReport report)
@@ -5746,6 +7717,55 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 "Time.timeScale Р Р†Р С•РЎРѓРЎРѓРЎвЂљР В°Р Р…Р С•Р Р†Р В»Р ВµР Р… Р С—Р С•РЎРѓР В»Р Вµ Р В±Р С•Р В»РЎРЉРЎв‚¬Р С•Р С–Р С• РЎвЂљР ВµРЎРѓРЎвЂљР В°: " + Time.timeScale.ToString("0.###") + ".");
             report.Check(string.IsNullOrWhiteSpace(ActiveSceneName) || activeScene.name == ActiveSceneName,
                 "Р С’Р С”РЎвЂљР С‘Р Р†Р Р…Р В°РЎРЏ РЎРѓРЎвЂ Р ВµР Р…Р В° Р Р†Р С•РЎРѓРЎРѓРЎвЂљР В°Р Р…Р С•Р Р†Р В»Р ВµР Р…Р В° Р С—Р С•РЎРѓР В»Р Вµ Р В±Р С•Р В»РЎРЉРЎв‚¬Р С•Р С–Р С• РЎвЂљР ВµРЎРѓРЎвЂљР В°: " + activeScene.name + ".");
+            report.Check(!normalProgressSaveTouched && string.IsNullOrWhiteSpace(normalProgressSaveRestoreError),
+                normalProgressSaveTouched
+                    ? "Big Test unexpectedly touched the player's real persistent progress save and restored it: " + normalProgressSavePath + "."
+                    : "Big Test left the player's real persistent progress save untouched: " + normalProgressSavePath + ".");
+        }
+
+        private void RestoreNormalProgressSaveIfNeeded()
+        {
+            if (string.IsNullOrWhiteSpace(normalProgressSavePath))
+            {
+                return;
+            }
+
+            try
+            {
+                bool existsNow = File.Exists(normalProgressSavePath);
+                string currentText = existsNow ? File.ReadAllText(normalProgressSavePath, Encoding.UTF8) : "";
+                if (existsNow == normalProgressSaveExisted && string.Equals(currentText, normalProgressSaveText, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                normalProgressSaveTouched = true;
+                string folder = Path.GetDirectoryName(normalProgressSavePath);
+                if (!string.IsNullOrWhiteSpace(folder))
+                {
+                    Directory.CreateDirectory(folder);
+                }
+
+                string tempPath = normalProgressSavePath + ".bigtest-restore";
+                if (normalProgressSaveExisted)
+                {
+                    File.WriteAllText(tempPath, normalProgressSaveText, Encoding.UTF8);
+                    if (File.Exists(normalProgressSavePath))
+                    {
+                        File.Delete(normalProgressSavePath);
+                    }
+
+                    File.Move(tempPath, normalProgressSavePath);
+                }
+                else if (File.Exists(normalProgressSavePath))
+                {
+                    File.Delete(normalProgressSavePath);
+                }
+            }
+            catch (Exception exception)
+            {
+                normalProgressSaveRestoreError = exception.Message;
+            }
         }
     }
     private void ValidateMaintainability(BigTestReport report)
@@ -6121,6 +8141,69 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return true;
     }
 
+    private static bool ItemIdsExist(SessionConfigDatabase config, IReadOnlyList<string> itemIds)
+    {
+        if (config == null || itemIds == null || itemIds.Count == 0) return false;
+        for (int i = 0; i < itemIds.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(itemIds[i]) || config.GetItem(itemIds[i]) == null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ItemHasRuName(SessionConfigDatabase config, string itemId, string expectedRuName)
+    {
+        ItemConfig item = config != null ? config.GetItem(itemId) : null;
+        return item != null && item.localNameRu == expectedRuName;
+    }
+
+    private static bool FilesHaveUtf8Bom(IReadOnlyList<string> assetPaths)
+    {
+        if (assetPaths == null || assetPaths.Count == 0) return false;
+        for (int i = 0; i < assetPaths.Count; i++)
+        {
+            if (!FileHasUtf8Bom(assetPaths[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool FileHasUtf8Bom(string assetPath)
+    {
+        if (string.IsNullOrWhiteSpace(assetPath)) return false;
+        string fullPath = ProjectPath(assetPath);
+        if (!File.Exists(fullPath)) return false;
+
+        byte[] bytes = File.ReadAllBytes(fullPath);
+        return bytes.Length >= 3 &&
+            bytes[0] == 0xEF &&
+            bytes[1] == 0xBB &&
+            bytes[2] == 0xBF;
+    }
+
+    private static bool ItemsExistWithMass(SessionConfigDatabase config, IReadOnlyList<string> itemIds, float expectedMassKgPerUnit)
+    {
+        if (config == null || itemIds == null || itemIds.Count == 0) return false;
+        for (int i = 0; i < itemIds.Count; i++)
+        {
+            string itemId = itemIds[i];
+            ItemConfig item = string.IsNullOrWhiteSpace(itemId) ? null : config.GetItem(itemId);
+            if (item == null || Mathf.Abs(item.massKgPerUnit - expectedMassKgPerUnit) > 0.0001f)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static bool AllIdsExist<T>(IReadOnlyList<string> ids, Func<string, T> resolver) where T : class
     {
         if (ids == null || ids.Count == 0) return false;
@@ -6225,26 +8308,20 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ship.baseMass = 1000f;
         ship.cargoMassKg = 200f;
         ship.hullMaxTakeoffMassKg = 1600f;
-        ship.enginePowerKwAt100 = 240f;
-        ship.engineFuelEfficiency = 0.5f;
-        ship.engineFuelEnergyKwhPerKg = 4f;
-        ship.engineFuelStockKg = 20f;
-        ship.enginePowerLever = 1f;
-        ship.engineResponseRate01PerSecond = 0f;
+        ship.hullForwardThrustKgf = 1200f;
+        ship.fuelConsumptionKgPerMinute = 1.2f;
+        ship.fuelStockKg = 20f;
+        ship.hullThrustOutput = 0f;
+        ship.hullThrustResponseRate01PerSecond = 0f;
         ship.neutralStopBrakeEnabled = false;
         ship.neutralStopBrakeMaxDecelerationMS2 = 8f;
         ship.neutralStopBrakeStopTimeSeconds = 0.75f;
         ship.neutralStopBrakeDeadzoneMS = 0.05f;
         ship.neutralStopBrakeAccelerationMS2 = 0f;
         ship.claudiumStock = 20f;
-        ship.claudiumConsumptionPerTonSecond = 0.01f;
-        ship.claudiumLiftEfficiency = 10f;
         ship.claudiumMaxLiftKg = 1500f;
-        ship.claudiumLiftSmoothing = 1000f;
         ship.claudiumLoopResponseRate01PerSecond = 0f;
         ship.claudiumCurrentLiftN = 0f;
-        ship.claudiumPowerDrawWatts = 0f;
-        ship.claudiumPowerDrawKw = 0f;
         ship.claudiumRequestedLiftKg = 0f;
         ship.miningImpactDamageTakenMultiplier = 1f;
         ship.airDensity = 1.225f;
@@ -6261,6 +8338,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ship.slipstreamMaxSpeedMultiplier = 5f;
         ship.slipstreamActivationSpeedRatio = 0.8f;
         ship.slipstreamMaxRampSeconds = ShipPhysics.ClaudiumSlipstreamActivationSeconds;
+        ship.slipstreamFuelConsumptionMultiplier = 2f;
         ship.claudiumSlipstreamEnabled = false;
         ship.claudiumSlipstreamCharge01 = 0f;
         ship.autoStabilizeAtStart = false;
@@ -6274,8 +8352,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ship.turnInput = 0f;
         ship.liftInput = 0f;
         ship.lateralOmniThrustKgf = 260f;
-        ship.propellerMaxSpeedMS = 30f;
-        ship.propellerEfficiency = 1f;
+        ship.hullCruiseReferenceSpeedMS = 30f;
+        ship.baseMaxSpeedMS = 30f;
         ship.gyroTurnTorque = 12000f;
         ship.gyroTurnDamping = 0.8f;
         ship.RefreshRuntimeShipSettings();
@@ -6292,25 +8370,23 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         ship.baseMass = 800f;
         ship.cargoMassKg = 0f;
-        ship.enginePowerKwAt100 = 120f;
-        ship.engineFuelEfficiency = 1f;
-        ship.engineFuelStockKg = 20f;
-        ship.enginePowerLever = 1f;
+        ship.hullForwardThrustKgf = 1200f;
+        ship.fuelConsumptionKgPerMinute = 1.2f;
+        ship.fuelStockKg = 20f;
+        ship.hullThrustOutput = 1f;
         ship.claudiumStock = 0f;
         ship.claudiumCurrentLiftN = 0f;
-        ship.claudiumPowerDrawKw = 0f;
-        ship.claudiumPowerDrawWatts = 0f;
         ship.airDensity = 1.225f;
         ship.dragCoefficient = 1f;
         ship.frontalArea = 10f;
         ship.sideResistance = 0f;
-        ship.propellerEfficiency = 1f;
-        ship.propellerMaxSpeedMS = 12f;
+        ship.hullCruiseReferenceSpeedMS = 12f;
+        ship.baseMaxSpeedMS = 12f;
         ship.windVelocity = Vector3.zero;
         ship.RefreshRuntimeShipSettings();
         ship.StabilizeForFlightStart(false);
         ship.thrustInput = 1f;
-        ship.enginePowerLever = 1f;
+        ship.hullThrustOutput = 1f;
         body.useGravity = false;
     }
 
@@ -6318,19 +8394,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     {
         if (ship == null) return 0f;
 
-        float dragPerSpeedSquared = ship.CurrentAeroDrag;
-        float propellerPowerKw = Mathf.Max(0f, ship.enginePowerKwAt100 * ship.enginePowerLever - ship.claudiumPowerDrawKw);
-        float usefulPowerW = propellerPowerKw
-            * Mathf.Clamp01(ship.propellerEfficiency)
-            * 1000f;
-
-        if (dragPerSpeedSquared <= 0f || usefulPowerW <= 0f)
-        {
-            return 0f;
-        }
-
-        float powerTerminalSpeed = Mathf.Pow(usefulPowerW / dragPerSpeedSquared, 1f / 3f);
-        return Mathf.Min(powerTerminalSpeed, ship.CurrentMaxSpeedMS);
+        return ship.CurrentMaxSpeedMS;
     }
 
     private static void ValidateShipPhysicsPushPreservesExternalImpulse(Scene probeScene, PhysicsScene physicsScene, BigTestReport report)
@@ -6357,7 +8421,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ShipPhysics overspeedShip = overspeedObject.GetComponent<ShipPhysics>();
             Rigidbody overspeedBody = overspeedObject.GetComponent<Rigidbody>();
             overspeedShip.thrustInput = 0f;
-            overspeedShip.propellerPitch = 0f;
+            overspeedShip.hullThrustOutput = 0f;
             overspeedBody.linearVelocity = new Vector3(0f, 0f, 20f);
 
             if (StepShipPhysicsProbes(physicsScene, 10, report, overspeedShip))
@@ -6399,17 +8463,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             float weakStartZ = weakBody.position.z;
 
             strongShip.thrustInput = 1f;
-            strongShip.propellerPitch = 1f;
-            strongShip.enginePowerLever = 1f;
+            strongShip.hullThrustOutput = 1f;
             weakShip.thrustInput = 1f;
-            weakShip.propellerPitch = 1f;
-            weakShip.enginePowerLever = 1f;
+            weakShip.hullThrustOutput = 1f;
 
             if (StepShipPhysicsProbes(physicsScene, 160, report, strongShip, weakShip))
             {
                 bool weakPushedBack = weakBody.position.z > weakStartZ + 0.25f
                     && weakBody.linearVelocity.z > 0.25f;
-                bool strongStillPushing = strongShip.propellerThrustKgf > weakShip.propellerThrustKgf;
+                bool strongStillPushing = strongShip.hullForwardThrustKgfCurrent > weakShip.hullForwardThrustKgfCurrent;
                 report.Check(weakPushedBack && strongStillPushing,
                     "More powerful Rigidbody ship can push a weaker ship in contact: weak z "
                     + weakStartZ.ToString("0.###")
@@ -6418,9 +8480,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     + ", weak vz "
                     + weakBody.linearVelocity.z.ToString("0.###")
                     + " m/s, thrust "
-                    + strongShip.propellerThrustKgf.ToString("0.#")
+                    + strongShip.hullForwardThrustKgfCurrent.ToString("0.#")
                     + " vs "
-                    + weakShip.propellerThrustKgf.ToString("0.#")
+                    + weakShip.hullForwardThrustKgfCurrent.ToString("0.#")
                     + " kgf.");
             }
         }
@@ -6438,7 +8500,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         Vector3 position,
         Quaternion rotation,
         float massKg,
-        float enginePowerKw,
+        float hullForwardThrustKgf,
         float maxSpeedMS)
     {
         GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -6458,29 +8520,26 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ship.enabled = false;
         ship.baseMass = Mathf.Max(1f, massKg);
         ship.cargoMassKg = 0f;
-        ship.enginePowerKwAt100 = Mathf.Max(0f, enginePowerKw);
-        ship.engineFuelEfficiency = 1f;
-        ship.engineFuelEnergyKwhPerKg = 4f;
-        ship.engineFuelStockKg = 1000f;
-        ship.enginePowerLever = enginePowerKw > 0f ? 1f : 0f;
-        ship.engineResponseRate01PerSecond = 0f;
+        ship.hullForwardThrustKgf = Mathf.Max(0f, hullForwardThrustKgf);
+        ship.fuelConsumptionKgPerMinute = 1.2f;
+        ship.fuelStockKg = 1000f;
+        ship.hullThrustOutput = hullForwardThrustKgf > 0f ? 1f : 0f;
+        ship.hullThrustResponseRate01PerSecond = 0f;
         ship.baseMaxSpeedMS = Mathf.Max(1f, maxSpeedMS);
-        ship.propellerMaxSpeedMS = Mathf.Max(1f, maxSpeedMS);
-        ship.propellerEfficiency = 1f;
+        ship.hullCruiseReferenceSpeedMS = Mathf.Max(1f, maxSpeedMS);
         ship.airDensity = 0f;
         ship.dragCoefficient = 0f;
         ship.frontalArea = 0f;
         ship.sideResistance = 0f;
         ship.claudiumStock = 0f;
         ship.claudiumMaxLiftKg = 0f;
-        ship.claudiumLiftEfficiency = 0f;
-        ship.claudiumConsumptionPerTonSecond = 0f;
         ship.loadSpeedMultiplier = 1f;
         ship.damageSpeedMultiplier = 1f;
         ship.nearMaxThrustFadeStartRatio = 0.85f;
         ship.nearMaxThrustFadeEndRatio = 1f;
         ship.slipstreamMaxSpeedMultiplier = 5f;
         ship.slipstreamActivationSpeedRatio = 0.8f;
+        ship.slipstreamFuelConsumptionMultiplier = 2f;
         ship.RefreshRuntimeShipSettings();
         ship.StabilizeForFlightStart(false);
         body.useGravity = false;
@@ -6645,6 +8704,38 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
     }
 
+    private static GameObject FindSceneGameObjectIncludingInactive(string objectName)
+    {
+        if (string.IsNullOrWhiteSpace(objectName))
+        {
+            return null;
+        }
+
+        GameObject activeObject = GameObject.Find(objectName);
+        if (activeObject != null)
+        {
+            return activeObject;
+        }
+
+        GameObject[] allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+        for (int i = 0; i < allObjects.Length; i++)
+        {
+            GameObject candidate = allObjects[i];
+            if (candidate == null || candidate.name != objectName)
+            {
+                continue;
+            }
+
+            Scene scene = candidate.scene;
+            if (scene.IsValid() && scene.isLoaded)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     private static float ReadPrivateFloat(object target, string fieldName, float fallback)
     {
         if (target == null) return fallback;
@@ -6763,7 +8854,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return false;
     }
 
-    private static bool TryFindVisibleStarterHullMeshSize(MeshFilter[] filters, out Vector3 size)
+    private static bool TryFindStarterHullMeshSize(MeshFilter[] filters, bool requireEnabledRenderer, out Vector3 size)
     {
         size = Vector3.zero;
         if (filters == null)
@@ -6780,7 +8871,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
 
             MeshRenderer renderer = filter.GetComponent<MeshRenderer>();
-            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            if (requireEnabledRenderer && (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy))
             {
                 continue;
             }

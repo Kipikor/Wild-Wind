@@ -5,6 +5,7 @@ using UnityEngine;
 public static class SessionExtractionConstants
 {
     public const float DefaultSortieRadiusMeters = 1500f;
+    public const float DefaultSafeSortieDistanceToBaseKm = 30f;
     public const float DefaultSortiePocketOriginMeters = 250000f;
     public const float DefaultSortiePocketMinimumDockSeparationMeters = 100000f;
     public const float DefaultSortiePocketSpacingMeters = 12000f;
@@ -44,10 +45,15 @@ public static class SessionExtractionConstants
     public const string StarterMidSlotId = "mid_01";
     public const string BrokenAutomatonItemId = "broken_automaton";
     public const string AutomatonCoreItemId = "automaton_core";
+    public const string ClaudiumItemId = "claudium";
+    public const string LeviathanMeatItemId = "leviathan_meat";
     public const string LeviathanFatItemId = "leviathan_fat";
     public const string LeviathanHideItemId = "leviathan_hide";
-    public const string ClaudiumGlandItemId = "claudium_gland";
     public const string MineralShellItemId = "mineral_shell";
+    public const string LeviathanIchorItemId = "leviathan_ichor";
+    public const string LeviathanSinewItemId = "leviathan_sinew";
+    public const string NerveSubstrateItemId = "nerve_substrate";
+    public const string BonePlateItemId = "bone_plate";
     public const string RockInfoItemId = "rock_info";
     public const string FundamentalExperienceItemId = "fundamental_experience";
     public const string DesignExperienceItemId = "design_experience";
@@ -268,6 +274,175 @@ public class BaseProcessingLineState
 }
 
 [Serializable]
+public class BaseProcessingFacilityState
+{
+    public string facilityId = "";
+    public BaseProcessingBranch branch;
+    public int level = 1;
+    public int cycleInputUnits = 15;
+    public int bunkerCapacityUnits = 1000;
+    public float efficiency = 0.12f;
+    public float cycleDurationSeconds = 10f;
+    public float cycleElapsedSeconds;
+    public float totalProcessedUnits;
+    public List<ResourceStack> bunker = new List<ResourceStack>();
+    public List<BaseProcessingOutputBufferState> outputBuffers = new List<BaseProcessingOutputBufferState>();
+
+    public void Normalize()
+    {
+        facilityId = string.IsNullOrWhiteSpace(facilityId) ? branch.ToString() : facilityId.Trim();
+        level = Mathf.Max(1, level);
+        ConfigureForLevel(level);
+        cycleElapsedSeconds = Mathf.Max(0f, cycleElapsedSeconds);
+        totalProcessedUnits = Mathf.Max(0f, totalProcessedUnits);
+        bunker ??= new List<ResourceStack>();
+        outputBuffers ??= new List<BaseProcessingOutputBufferState>();
+
+        for (int i = bunker.Count - 1; i >= 0; i--)
+        {
+            ResourceStack stack = bunker[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.resourceId) || stack.amount <= 0)
+            {
+                bunker.RemoveAt(i);
+                continue;
+            }
+
+            stack.amount = Mathf.Max(0, stack.amount);
+        }
+
+        for (int i = outputBuffers.Count - 1; i >= 0; i--)
+        {
+            BaseProcessingOutputBufferState buffer = outputBuffers[i];
+            if (buffer == null || string.IsNullOrWhiteSpace(buffer.itemId))
+            {
+                outputBuffers.RemoveAt(i);
+                continue;
+            }
+
+            buffer.Normalize();
+        }
+    }
+
+    public void ConfigureForLevel(int sourceLevel)
+    {
+        level = Mathf.Max(1, sourceLevel);
+        cycleInputUnits = Mathf.Max(1, 5 + level * 2);
+        bunkerCapacityUnits = Mathf.Max(cycleInputUnits, 500 + level * 100);
+        efficiency = Mathf.Clamp01(0.07f + level * 0.01f);
+        cycleDurationSeconds = 10f;
+    }
+
+    public int BunkerLoadUnits
+    {
+        get
+        {
+            int total = 0;
+            bunker ??= new List<ResourceStack>();
+            for (int i = 0; i < bunker.Count; i++)
+            {
+                ResourceStack stack = bunker[i];
+                if (stack != null)
+                {
+                    total += Mathf.Max(0, stack.amount);
+                }
+            }
+
+            return total;
+        }
+    }
+
+    public int BunkerFreeUnits => Mathf.Max(0, bunkerCapacityUnits - BunkerLoadUnits);
+
+    public int GetBunkerAmount(string itemId)
+    {
+        ResourceStack stack = GetBunkerStack(itemId, false);
+        return stack != null ? stack.amount : 0;
+    }
+
+    public int AddBunker(string itemId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0) return 0;
+        int moved = Mathf.Min(amount, BunkerFreeUnits);
+        if (moved <= 0) return 0;
+
+        ResourceStack stack = GetBunkerStack(itemId, true);
+        stack.amount += moved;
+        return moved;
+    }
+
+    public bool TrySpendBunker(string itemId, int amount)
+    {
+        if (amount <= 0) return true;
+        ResourceStack stack = GetBunkerStack(itemId, false);
+        if (stack == null || stack.amount < amount) return false;
+
+        stack.amount -= amount;
+        if (stack.amount <= 0)
+        {
+            bunker.Remove(stack);
+        }
+
+        return true;
+    }
+
+    public BaseProcessingOutputBufferState GetOutputBuffer(string itemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return null;
+        outputBuffers ??= new List<BaseProcessingOutputBufferState>();
+        for (int i = 0; i < outputBuffers.Count; i++)
+        {
+            BaseProcessingOutputBufferState buffer = outputBuffers[i];
+            if (buffer != null && buffer.itemId == itemId)
+            {
+                buffer.Normalize();
+                return buffer;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        BaseProcessingOutputBufferState created = new BaseProcessingOutputBufferState { itemId = itemId };
+        outputBuffers.Add(created);
+        return created;
+    }
+
+    private ResourceStack GetBunkerStack(string itemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return null;
+        bunker ??= new List<ResourceStack>();
+        for (int i = 0; i < bunker.Count; i++)
+        {
+            ResourceStack stack = bunker[i];
+            if (stack != null && stack.resourceId == itemId)
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        ResourceStack created = new ResourceStack { resourceId = itemId };
+        bunker.Add(created);
+        return created;
+    }
+}
+
+[Serializable]
+public class BaseProcessingOutputBufferState
+{
+    public string itemId = "";
+    public int readyAmount;
+    public float fractionalAmount;
+
+    public void Normalize()
+    {
+        itemId = string.IsNullOrWhiteSpace(itemId) ? "" : itemId.Trim();
+        readyAmount = Mathf.Max(0, readyAmount);
+        fractionalAmount = Mathf.Clamp(fractionalAmount, 0f, 0.9999f);
+    }
+}
+
+[Serializable]
 public class CascadeProductionLineState
 {
     public CascadeProductionType type;
@@ -399,15 +574,93 @@ public class CascadeProductionEstimate
 }
 
 [Serializable]
+public class CascadeProductionQueueItemState
+{
+    public string queueId = "";
+    public string orderId = "";
+    public string displayName = "";
+    public int quantity = 1;
+    public long startedUtcTicks;
+    public long completeUtcTicks;
+    public List<CascadeItemAmount> inputs = new List<CascadeItemAmount>();
+    public List<CascadeItemAmount> outputs = new List<CascadeItemAmount>();
+    public List<CascadeProductionLoad> loads = new List<CascadeProductionLoad>();
+
+    public void Normalize()
+    {
+        queueId = string.IsNullOrWhiteSpace(queueId) ? "" : queueId.Trim();
+        orderId = string.IsNullOrWhiteSpace(orderId) ? "cascade_order" : orderId.Trim();
+        displayName = string.IsNullOrWhiteSpace(displayName) ? orderId : displayName.Trim();
+        quantity = Mathf.Max(1, quantity);
+        startedUtcTicks = Math.Max(0L, startedUtcTicks);
+        completeUtcTicks = Math.Max(0L, completeUtcTicks);
+        inputs ??= new List<CascadeItemAmount>();
+        outputs ??= new List<CascadeItemAmount>();
+        loads ??= new List<CascadeProductionLoad>();
+
+        NormalizeItems(inputs);
+        NormalizeItems(outputs);
+        NormalizeLoads(loads);
+    }
+
+    public bool IsCompleteAt(long utcTicks)
+    {
+        return completeUtcTicks > 0L && utcTicks >= completeUtcTicks;
+    }
+
+    private static void NormalizeItems(List<CascadeItemAmount> items)
+    {
+        for (int i = items.Count - 1; i >= 0; i--)
+        {
+            CascadeItemAmount item = items[i];
+            if (item == null)
+            {
+                items.RemoveAt(i);
+                continue;
+            }
+
+            item.Normalize();
+            if (string.IsNullOrWhiteSpace(item.itemId) || item.amount <= 0)
+            {
+                items.RemoveAt(i);
+            }
+        }
+    }
+
+    private static void NormalizeLoads(List<CascadeProductionLoad> loads)
+    {
+        for (int i = loads.Count - 1; i >= 0; i--)
+        {
+            CascadeProductionLoad load = loads[i];
+            if (load == null)
+            {
+                loads.RemoveAt(i);
+                continue;
+            }
+
+            load.Normalize();
+            if (load.loadUnits <= 0f)
+            {
+                loads.RemoveAt(i);
+            }
+        }
+    }
+}
+
+[Serializable]
 public class BaseExtractionIndustryState
 {
     public List<BaseProcessingLineState> processing = new List<BaseProcessingLineState>();
+    public List<BaseProcessingFacilityState> processingFacilities = new List<BaseProcessingFacilityState>();
     public List<CascadeProductionLineState> cascadeProduction = new List<CascadeProductionLineState>();
+    public List<CascadeProductionQueueItemState> cascadeQueue = new List<CascadeProductionQueueItemState>();
 
     public void Normalize()
     {
         processing ??= new List<BaseProcessingLineState>();
+        processingFacilities ??= new List<BaseProcessingFacilityState>();
         cascadeProduction ??= new List<CascadeProductionLineState>();
+        cascadeQueue ??= new List<CascadeProductionQueueItemState>();
 
         EnsureProcessingBranches();
         EnsureCascadeProductionTypes();
@@ -424,6 +677,22 @@ public class BaseExtractionIndustryState
             line.Normalize();
         }
 
+        for (int i = processingFacilities.Count - 1; i >= 0; i--)
+        {
+            BaseProcessingFacilityState facility = processingFacilities[i];
+            if (facility == null)
+            {
+                processingFacilities.RemoveAt(i);
+                continue;
+            }
+
+            facility.Normalize();
+            if (string.IsNullOrWhiteSpace(facility.facilityId))
+            {
+                processingFacilities.RemoveAt(i);
+            }
+        }
+
         for (int i = cascadeProduction.Count - 1; i >= 0; i--)
         {
             CascadeProductionLineState line = cascadeProduction[i];
@@ -435,7 +704,28 @@ public class BaseExtractionIndustryState
 
             line.Normalize();
         }
+
+        for (int i = cascadeQueue.Count - 1; i >= 0; i--)
+        {
+            CascadeProductionQueueItemState item = cascadeQueue[i];
+            if (item == null)
+            {
+                cascadeQueue.RemoveAt(i);
+                continue;
+            }
+
+            item.Normalize();
+            if (string.IsNullOrWhiteSpace(item.orderId)
+                || item.outputs.Count == 0
+                || item.loads.Count == 0
+                || item.completeUtcTicks <= 0L)
+            {
+                cascadeQueue.RemoveAt(i);
+            }
+        }
     }
+
+    public int ActiveCascadeQueueCount => cascadeQueue != null ? cascadeQueue.Count : 0;
 
     public BaseProcessingLineState GetProcessing(BaseProcessingBranch branch)
     {
@@ -457,6 +747,33 @@ public class BaseExtractionIndustryState
         };
         created.Normalize();
         processing.Add(created);
+        return created;
+    }
+
+    public BaseProcessingFacilityState GetProcessingFacility(string facilityId, BaseProcessingBranch branch, int level)
+    {
+        processingFacilities ??= new List<BaseProcessingFacilityState>();
+        string normalizedId = string.IsNullOrWhiteSpace(facilityId) ? branch.ToString() : facilityId.Trim();
+        for (int i = 0; i < processingFacilities.Count; i++)
+        {
+            BaseProcessingFacilityState facility = processingFacilities[i];
+            if (facility != null && facility.facilityId == normalizedId)
+            {
+                facility.branch = branch;
+                facility.ConfigureForLevel(level);
+                facility.Normalize();
+                return facility;
+            }
+        }
+
+        BaseProcessingFacilityState created = new BaseProcessingFacilityState
+        {
+            facilityId = normalizedId,
+            branch = branch
+        };
+        created.ConfigureForLevel(level);
+        created.Normalize();
+        processingFacilities.Add(created);
         return created;
     }
 
@@ -552,7 +869,6 @@ public static class SessionExtractionFitting
 public class SortieZoneDefinition
 {
     public const float DefaultReturnCoalKgPerSecond = 0.0055f;
-    public const float DefaultReturnClaudiumKgPerTonSecond = 0.00045f;
 
     public string sortieId = SessionExtractionConstants.DefaultSafeOreSortieId;
     public string displayName = SessionExtractionConstants.DefaultSafeOreSortieName;
@@ -570,14 +886,13 @@ public class SortieZoneDefinition
     public float radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters;
     public float stormFloorY = 0f;
     public float extractionBoundaryToleranceMeters = 150f;
-    public float distanceToBaseKm = 220f;
+    public float distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm;
     public float returnCruiseSpeedMS = 35f;
     public float returnPowerLever = 0.7f;
     public float returnReserveMultiplier = 1.15f;
     public float extractionRunupRequiredSeconds = 12f;
     public float extractionRunupSpeedRatio = 0.9f;
     public float fallbackCoalKgPerSecond = DefaultReturnCoalKgPerSecond;
-    public float fallbackClaudiumKgPerTonSecond = DefaultReturnClaudiumKgPerTonSecond;
 
     public void Normalize()
     {
@@ -601,9 +916,6 @@ public class SortieZoneDefinition
         fallbackCoalKgPerSecond = fallbackCoalKgPerSecond <= 0f
             ? DefaultReturnCoalKgPerSecond
             : Mathf.Max(0f, fallbackCoalKgPerSecond);
-        fallbackClaudiumKgPerTonSecond = fallbackClaudiumKgPerTonSecond <= 0f
-            ? DefaultReturnClaudiumKgPerTonSecond
-            : Mathf.Max(0f, fallbackClaudiumKgPerTonSecond);
         starterResourceItemId ??= "";
         starterResourceChunkMin = Mathf.Max(1, starterResourceChunkMin);
         starterResourceChunkMax = Mathf.Max(starterResourceChunkMin, starterResourceChunkMax);
@@ -729,11 +1041,8 @@ public struct SortieReturnProfile
     public float emptyMassKg;
     public float cargoMassKg;
     public float cruiseSpeedMS;
-    public float enginePowerKw;
-    public float cruisePowerKw;
-    public float engineFuelEfficiency;
-    public float fuelEnergyKwhPerKg;
-    public float claudiumConsumptionPerTonSecond;
+    public float coalBurnKgPerSecond;
+    public float claudiumBurnKgPerSecond;
     public float currentCoalKg;
     public float currentClaudiumKg;
     public string coalResourceId;
@@ -808,16 +1117,11 @@ public static class SortieExtractionCalculator
         estimate.returnTimeSeconds = Mathf.Max(1f, returnDistanceMeters / speed);
 
         float reserve = Mathf.Max(1f, zone.returnReserveMultiplier);
-        float fuelKg = zone.fallbackCoalKgPerSecond * estimate.returnTimeSeconds;
-        if (profile.cruisePowerKw > 0f && profile.engineFuelEfficiency > 0f && profile.fuelEnergyKwhPerKg > 0f)
-        {
-            fuelKg = profile.cruisePowerKw / profile.engineFuelEfficiency / profile.fuelEnergyKwhPerKg * (estimate.returnTimeSeconds / 3600f);
-        }
-
-        float claudiumRate = profile.claudiumConsumptionPerTonSecond > 0f
-            ? profile.claudiumConsumptionPerTonSecond
-            : zone.fallbackClaudiumKgPerTonSecond;
-        float claudiumKg = claudiumRate * Mathf.Max(0f, profile.TotalMassKg / 1000f) * estimate.returnTimeSeconds;
+        float coalBurnKgPerSecond = profile.coalBurnKgPerSecond > 0f
+            ? profile.coalBurnKgPerSecond
+            : zone.fallbackCoalKgPerSecond;
+        float fuelKg = coalBurnKgPerSecond * estimate.returnTimeSeconds;
+        float claudiumKg = Mathf.Max(0f, profile.claudiumBurnKgPerSecond) * estimate.returnTimeSeconds;
 
         estimate.requiredCoalKg = Mathf.Ceil(fuelKg * reserve);
         estimate.requiredClaudiumKg = Mathf.Ceil(claudiumKg * reserve);

@@ -1,2 +1,2 @@
-id_claudium_loop,local_name_ru,local_name_en,complited_tech,base_mass_kg,claudium_consumption_per_ton_second,lift_kg_per_kw,max_lift_kg,lift_smoothing
-starter_claudium_loop,Pioneer Claudium Loop,Pioneer Claudium Loop,,160,0.005,28,3200,2.5
+id_claudium_loop,local_name_ru,local_name_en,complited_tech,base_mass_kg,max_lift_kg
+starter_claudium_loop,Pioneer Claudium Loop,Pioneer Claudium Loop,,160,3200
