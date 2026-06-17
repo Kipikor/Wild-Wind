@@ -15,6 +15,23 @@ Design update 2026-06-10:
 
 Wild Wind moves from an island logistics simulator toward a session-based extraction game.
 
+Core feeling:
+
+```text
+High gameplay density and depth, not high mandatory complexity.
+```
+
+The sortie should feel like a compressed, event-rich operation. In 10-15 minutes the player can mine, fight automatons, dodge or hunt leviathans, collect wreckage, save someone, search for a rare object, complete the contract objective, and decide whether to stay longer or extract. Most weapons can work automatically, but the screen should still feel alive: constant fire, missed shots, ricochets, armor stops, small real damage, fires, repairs, magnets pulling salvage, internal machines sorting cargo, and the ship shaking under pressure.
+
+The player should not need to solve a hard tactical puzzle every second. The target is abundance of clear opportunities and threats. The mission asks for attention, route choices, priorities, and timing, but the base readability stays simple: do the visible things, collect the visible rewards, leave before the situation collapses.
+
+There are two main tension flavors:
+
+- loud saturation: a battleship or heavy cruiser pushes through a visible brawl, everything shoots, burns, explodes, and the ship survives by mass, armor, repair, and firepower;
+- quiet saturation: a small frigate sneaks between enemies, keeps threat low, picks objectives carefully, and the tension comes from nearly being seen or trapped.
+
+Density reference: `Helldivers 2`. The relevant lesson is not shooter controls or direct stratagem copying. It is the mission texture: a main objective, many points of interest, constant enemy pressure, some non-combat tasks, and simple high-impact tools that visibly change the situation on screen.
+
 The main loop is:
 
 ```text
@@ -273,14 +290,20 @@ On successful extraction:
 
 ## Failure
 
-If the ship is destroyed during a sortie:
+If the ship is defeated or disabled during a sortie:
 
 - the player returns to base;
-- all extracted resources from the sortie are lost;
-- the active ship, its installed rigs, active loadout state, and cargo are destroyed or marked lost;
+- the sortie spends exactly 1 ship wear / operational resource;
+- the active ship instance survives and remains in port;
+- installed rigs and persistent loadout are not destroyed;
+- the player receives a reduced failure result instead of the full successful-extraction result;
+- some cargo, freight, XP, contract payouts, and objective credit can be lost or heavily reduced;
+- missions or quests that require successful extraction may remain incomplete;
 - the player is never soft-locked.
 
-The fallback ship is the Pioneer.
+Failure means the player spent an effective sortie as an inefficient sortie. It should hurt, but it should not delete the ship.
+
+The fallback ship is the Pioneer only when the player has no usable ship because all available ships are worn out, invalid, or otherwise unavailable.
 
 ## Pioneer Fallback
 
@@ -385,7 +408,7 @@ Current runtime rule:
 - legacy personal inventory is migrated into base storage in core mode, and new core starts do not seed the old personal ore/iron inventory or starting paper;
 - legacy shop refresh seed/timer is disabled in core mode;
 - legacy island cargo loading, unloading, and timed cargo-transfer jobs are blocked in core mode; ship cargo enters the loop through sortie collection and returns through extraction;
-- normal docking is restricted to the base in core mode; non-base legacy `DockAt` calls are blocked, and an active sortie can end through boundary extraction or ship loss, not through legacy docking;
+- normal docking is restricted to the base in core mode; non-base legacy `DockAt` calls are blocked, and an active sortie can end through boundary extraction or defeat return, not through legacy docking;
 - the legacy simulators remain available for old tests and experiments when core mode is disabled;
 - the old docked debug HUD that showed base processing inputs, materials, tanks, processing/cascade summaries, Refuel, Next sortie, Start selected sortie, Run cascade, Port, and Menu is quarantined and hidden by default; those runtime actions may remain as internal methods/test hooks until the new island-port UI exposes only the needed actions through buildings, docks, windows, and bubbles;
 - the old HUD dock action is replaced by boundary extraction while a core sortie is active, and is enabled only when sortie completion and exit-state rules allow extraction;
