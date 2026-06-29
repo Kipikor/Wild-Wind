@@ -21,6 +21,22 @@ public class ShipPartDefinitionSO : ScriptableObject
     [InspectorName("Префаб")]
     [Tooltip("Для корпуса это основной префаб корабля с физикой, сокетами и коллайдерами. Для модуля это визуальный префаб, который будет вставлен в подходящий сокет.")]
     public GameObject prefab;
+    [Header("Runtime visual override")]
+    [InspectorName("Visual prefab")]
+    [Tooltip("Optional imported Blender visual that is mounted on top of the gameplay hull prefab.")]
+    public GameObject visualPrefab;
+    [InspectorName("Hide fallback renderers")]
+    [Tooltip("Hide mesh renderers from the gameplay hull prefab when the imported visual is active.")]
+    public bool hidePrefabRenderersWhenVisualPrefabSet = true;
+    [InspectorName("Visual local position")]
+    public Vector3 visualLocalPosition = Vector3.zero;
+    [InspectorName("Visual local euler")]
+    public Vector3 visualLocalEulerAngles = Vector3.zero;
+    [InspectorName("Visual local scale")]
+    public Vector3 visualLocalScale = Vector3.one;
+    [InspectorName("Runtime Ship_tree id")]
+    [Tooltip("Ship_tree.csv id used when this hull needs quick-mission balance.")]
+    public string runtimeShipTreeId = "";
     [InspectorName("Fuel resource")]
     [Tooltip("Resource burned by the hull at its fixed fuel consumption rate.")]
     public string fuelResourceId = "";

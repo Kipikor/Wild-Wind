@@ -16,6 +16,10 @@
 /Assets/_Recovery.meta
 /CODEX_CONTEXT.md
 /.codex/
+/tmp/
+/log.txt
+/Assets/InitTestScene*.unity
+/Assets/InitTestScene*.unity.meta
 
 # Memory Dumps
 *.lldmp

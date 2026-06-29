@@ -28,6 +28,7 @@ public partial class SessionConfigDatabase
     public List<ResourceCategoryConfig> resourceCategories = new List<ResourceCategoryConfig>();
     public List<ModifierDefinitionConfig> modifierDefinitions = new List<ModifierDefinitionConfig>();
     public List<QuestDefinitionConfig> questDefinitions = new List<QuestDefinitionConfig>();
+    public List<QuickSortieRewardSourceConfig> quickSortieRewardSources = new List<QuickSortieRewardSourceConfig>();
 
     public bool isLoaded;
     public string lastError = "";
@@ -51,6 +52,7 @@ public partial class SessionConfigDatabase
             LoadOreTypes(Path.Combine(folder, "Ore_type.csv"));
             LoadPorts(Path.Combine(folder, "Port.csv"));
             LoadLeviathanTypes(Path.Combine(folder, "Leviathan_type.csv"));
+            LoadQuickSortieRewardSources(Path.Combine(folder, "Quick_sortie_reward_source.csv"));
             LoadTechnologies(Path.Combine(folder, "Technology.csv"));
             LoadQuestDefinitions(Path.Combine(folder, "Quest.csv"));
             LoadHulls(Path.Combine(folder, "Hull.csv"));
@@ -192,6 +194,7 @@ public partial class SessionConfigDatabase
         resourceCategories.Clear();
         modifierDefinitions.Clear();
         questDefinitions.Clear();
+        ClearQuickSortieConfigs();
         ClearShipPartConfigs();
         itemsById.Clear();
         portsById.Clear();
@@ -205,6 +208,55 @@ public partial class SessionConfigDatabase
         questDefinitionsById.Clear();
         isLoaded = false;
         lastError = "";
+    }
+
+    private void ClearQuickSortieConfigs()
+    {
+        quickSortieRewardSources.Clear();
+    }
+
+    private void LoadQuickSortieRewardSources(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            QuickSortieRewardSourceConfig source = new QuickSortieRewardSourceConfig
+            {
+                activityId = Get(row, "activity_id"),
+                minRating = Mathf.Clamp(ParseInt(Get(row, "min_rating"), 1), 1, 100),
+                sourceKind = Get(row, "source_kind"),
+                sourceId = Get(row, "source_id"),
+                weight = Mathf.Max(0.01f, ParseFloat(Get(row, "weight"), 1f)),
+                notesRu = Get(row, "notes_ru")
+            };
+
+            source.Normalize();
+            if (string.IsNullOrWhiteSpace(source.activityId)
+                || string.IsNullOrWhiteSpace(source.sourceKind)
+                || string.IsNullOrWhiteSpace(source.sourceId))
+            {
+                continue;
+            }
+
+            quickSortieRewardSources.Add(source);
+        }
+
+        quickSortieRewardSources.Sort(CompareQuickSortieRewardSources);
+    }
+
+    private static int CompareQuickSortieRewardSources(QuickSortieRewardSourceConfig left, QuickSortieRewardSourceConfig right)
+    {
+        if (left == null && right == null) return 0;
+        if (left == null) return -1;
+        if (right == null) return 1;
+        int activity = string.Compare(left.activityId, right.activityId, StringComparison.OrdinalIgnoreCase);
+        if (activity != 0) return activity;
+        int minRating = left.minRating.CompareTo(right.minRating);
+        return minRating != 0 ? minRating : string.Compare(left.sourceId, right.sourceId, StringComparison.OrdinalIgnoreCase);
     }
 
     private void LoadItems(string path)
@@ -550,6 +602,8 @@ public partial class SessionConfigDatabase
                 id = Get(row, "quest_id"),
                 localNameRu = Get(row, "local_name_ru"),
                 localNameEn = Get(row, "local_name_en"),
+                factionId = Get(row, "faction_id"),
+                questKind = Get(row, "quest_kind"),
                 categoryId = Get(row, "category_id"),
                 descriptionRu = Get(row, "description_ru"),
                 objectiveType = Get(row, "objective_type"),
@@ -560,15 +614,26 @@ public partial class SessionConfigDatabase
                 requiredQuestId = Get(row, "required_quest_id"),
                 rewardItemId = Get(row, "reward_item_id"),
                 rewardAmount = Mathf.Max(0, ParseInt(Get(row, "reward_amount"), 0)),
+                rewardItem2Id = Get(row, "reward_item2_id"),
+                rewardItem2Amount = Mathf.Max(0, ParseInt(Get(row, "reward_item2_amount"), 0)),
+                rewardFreightAmount = Mathf.Max(0, ParseInt(Get(row, "reward_freight_amount"), 0)),
+                rewardMasteryAmount = Mathf.Max(0, ParseInt(Get(row, "reward_mastery_amount"), 0)),
+                rewardReputationFactionId = Get(row, "reward_reputation_faction_id"),
+                rewardReputationAmount = Mathf.Max(0, ParseInt(Get(row, "reward_reputation_amount"), 0)),
                 sortOrder = ParseInt(Get(row, "sort_order"), 0)
             };
 
             if (string.IsNullOrWhiteSpace(quest.id)) continue;
+            quest.factionId = string.IsNullOrWhiteSpace(quest.factionId) ? "" : quest.factionId.Trim().ToLowerInvariant();
+            quest.questKind = string.IsNullOrWhiteSpace(quest.questKind) ? "" : quest.questKind.Trim().ToLowerInvariant();
             if (string.IsNullOrWhiteSpace(quest.categoryId)) quest.categoryId = "main";
             if (string.IsNullOrWhiteSpace(quest.objectiveType)) quest.objectiveType = "event";
             if (string.IsNullOrWhiteSpace(quest.targetId)) quest.targetId = "any";
             if (string.IsNullOrWhiteSpace(quest.activationMode)) quest.activationMode = QuestDefinitionConfig.ActivationRetroactive;
             if (string.IsNullOrWhiteSpace(quest.claimMode)) quest.claimMode = QuestDefinitionConfig.ClaimManual;
+            quest.rewardReputationFactionId = string.IsNullOrWhiteSpace(quest.rewardReputationFactionId)
+                ? quest.factionId
+                : quest.rewardReputationFactionId.Trim().ToLowerInvariant();
             questDefinitions.Add(quest);
             questDefinitionsById[quest.id] = quest;
         }
@@ -871,6 +936,8 @@ public class QuestDefinitionConfig
     public string id = "";
     public string localNameRu = "";
     public string localNameEn = "";
+    public string factionId = "";
+    public string questKind = "";
     public string categoryId = "";
     public string descriptionRu = "";
     public string objectiveType = "";
@@ -881,11 +948,37 @@ public class QuestDefinitionConfig
     public string requiredQuestId = "";
     public string rewardItemId = "";
     public int rewardAmount;
+    public string rewardItem2Id = "";
+    public int rewardItem2Amount;
+    public int rewardFreightAmount;
+    public int rewardMasteryAmount;
+    public string rewardReputationFactionId = "";
+    public int rewardReputationAmount;
     public int sortOrder;
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? id : localNameRu;
     public bool IsRetroactive => !string.Equals(activationMode, ActivationFromAccept, StringComparison.OrdinalIgnoreCase);
     public bool IsAutoClaim => string.Equals(claimMode, ClaimAuto, StringComparison.OrdinalIgnoreCase);
+}
+
+public class QuickSortieRewardSourceConfig
+{
+    public string activityId = "";
+    public int minRating = 1;
+    public string sourceKind = "";
+    public string sourceId = "";
+    public float weight = 1f;
+    public string notesRu = "";
+
+    public void Normalize()
+    {
+        activityId = string.IsNullOrWhiteSpace(activityId) ? "" : activityId.Trim().ToLowerInvariant();
+        sourceKind = string.IsNullOrWhiteSpace(sourceKind) ? "" : sourceKind.Trim().ToLowerInvariant();
+        sourceId = string.IsNullOrWhiteSpace(sourceId) ? "" : sourceId.Trim();
+        minRating = Mathf.Clamp(minRating, 1, 100);
+        weight = Mathf.Max(0.01f, weight);
+        notesRu ??= "";
+    }
 }
 
 public class SpecialModuleConfig

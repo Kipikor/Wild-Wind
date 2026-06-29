@@ -1,0 +1,118 @@
+difficulty,mission_archetype,primary_activity,stat_id,required_value,weight,hard_gate,notes_ru
+normal,normal_combat,combat,warfare,45,0.45,yes,Normal combat expects a mid-rank fighting ship.
+normal,normal_combat,combat,defense,30,0.25,no,Survive ordinary return fire.
+normal,normal_combat,combat,mobility,25,0.15,no,Keep angles and distance.
+normal,normal_combat,combat,stealth,20,0.15,no,Avoid being farmed while reloading.
+normal,normal_ore,mining,mining,35,0.45,yes,Normal ore expects a real crusher, not a token scoop.
+normal,normal_ore,mining,cargo,35,0.25,no,Carry enough processed stone to matter.
+normal,normal_ore,mining,defense,20,0.15,no,Handle light harassment.
+normal,normal_ore,mining,mobility,20,0.10,no,Move between deposits.
+normal,normal_ore,mining,stealth,20,0.05,no,Do not draw every patrol at once.
+normal,normal_gas,gas,harvesting,35,0.45,yes,Normal gas expects working siphons and filters.
+normal,normal_gas,gas,cargo,35,0.20,no,Carry condensed gas.
+normal,normal_gas,gas,stealth,25,0.15,no,Operate inside clouds.
+normal,normal_gas,gas,defense,20,0.10,no,Survive cloud-side pressure.
+normal,normal_gas,gas,mobility,20,0.10,no,Stay in moving pockets.
+normal,normal_hunting,hunting,hunting,45,0.45,yes,Normal hunt expects a real capture tool.
+normal,normal_hunting,hunting,warfare,25,0.20,no,Weaken prey.
+normal,normal_hunting,hunting,defense,30,0.15,no,Survive rams.
+normal,normal_hunting,hunting,cargo,30,0.15,no,Carry useful cuts.
+normal,normal_hunting,hunting,mobility,25,0.05,no,Keep contact.
+normal,normal_salvage,salvage,salvage,35,0.45,yes,Normal salvage expects extraction tools.
+normal,normal_salvage,salvage,warfare,25,0.20,no,Open automaton shells.
+normal,normal_salvage,salvage,defense,25,0.15,no,Stay near wrecks.
+normal,normal_salvage,salvage,cargo,25,0.15,no,Carry precise parts.
+normal,normal_salvage,salvage,survey,20,0.05,no,Find valuable modules.
+normal,normal_relic,relic,survey,35,0.35,yes,Normal relics expect solid scanning.
+normal,normal_relic,relic,hacking,20,0.30,yes,Open simple locks.
+normal,normal_relic,relic,stealth,30,0.15,no,Work quietly.
+normal,normal_relic,relic,mobility,25,0.10,no,Reach scattered sites.
+normal,normal_relic,relic,cargo,20,0.10,no,Carry finds.
+normal,normal_courier,courier,cargo,45,0.35,yes,Normal courier needs meaningful cargo.
+normal,normal_courier,courier,mobility,45,0.30,yes,Delivery timing matters.
+normal,normal_courier,courier,stealth,40,0.20,no,Avoid attention.
+normal,normal_courier,courier,defense,20,0.10,no,Survive light pursuit.
+normal,normal_courier,courier,survey,15,0.05,no,Read routes.
+normal,normal_repair,repair,repair,40,0.50,yes,Normal repair expects actual repair beams.
+normal,normal_repair,repair,defense,35,0.20,no,Stay near the protected target.
+normal,normal_repair,repair,mobility,25,0.15,no,Orbit the client.
+normal,normal_repair,repair,stealth,25,0.10,no,Do not draw all fire.
+normal,normal_repair,repair,cargo,15,0.05,no,Carry repair stores.
+danger,danger_combat,combat,warfare,65,0.45,yes,Danger combat expects a strong late ship.
+danger,danger_combat,combat,defense,45,0.25,no,Heavy return fire.
+danger,danger_combat,combat,mobility,35,0.15,no,Positioning under pressure.
+danger,danger_combat,combat,stealth,30,0.15,no,Control exposure.
+danger,danger_ore,mining,mining,55,0.45,yes,Danger ore uses hard deposits.
+danger,danger_ore,mining,cargo,55,0.25,no,Large useful haul.
+danger,danger_ore,mining,defense,30,0.15,no,Light enemies gnaw at miners.
+danger,danger_ore,mining,mobility,25,0.10,no,Move between dense nodes.
+danger,danger_ore,mining,stealth,25,0.05,no,Reduce harassment.
+danger,danger_gas,gas,harvesting,55,0.45,yes,Danger gas uses aggressive clouds.
+danger,danger_gas,gas,cargo,55,0.20,no,Carry dense condensate.
+danger,danger_gas,gas,stealth,35,0.15,no,Stay hidden in cloud layers.
+danger,danger_gas,gas,defense,25,0.10,no,Survive corrosion and patrols.
+danger,danger_gas,gas,mobility,30,0.10,no,Follow shifting fronts.
+danger,danger_hunting,hunting,hunting,60,0.45,yes,Danger hunt expects serious harpoons or cutters.
+danger,danger_hunting,hunting,warfare,35,0.20,no,Bring prey down.
+danger,danger_hunting,hunting,defense,45,0.15,no,Survive larger rams.
+danger,danger_hunting,hunting,cargo,45,0.15,no,Carry heavy cuts.
+danger,danger_hunting,hunting,mobility,30,0.05,no,Stay attached.
+danger,danger_salvage,salvage,salvage,55,0.45,yes,Danger salvage uses active automaton fields.
+danger,danger_salvage,salvage,warfare,40,0.20,no,Break escorts.
+danger,danger_salvage,salvage,defense,35,0.15,no,Work under fire.
+danger,danger_salvage,salvage,cargo,40,0.15,no,Carry precision assemblies.
+danger,danger_salvage,salvage,survey,30,0.05,no,Find expensive modules.
+danger,danger_relic,relic,survey,55,0.35,yes,Danger relics expect strong scanners.
+danger,danger_relic,relic,hacking,35,0.30,yes,Open stubborn locks.
+danger,danger_relic,relic,stealth,45,0.15,no,Avoid waking everything.
+danger,danger_relic,relic,mobility,35,0.10,no,Reach separated ruins.
+danger,danger_relic,relic,cargo,30,0.10,no,Carry bulky finds.
+danger,danger_courier,courier,cargo,60,0.35,yes,Danger courier carries valuable freight.
+danger,danger_courier,courier,mobility,60,0.30,yes,Route timing is tight.
+danger,danger_courier,courier,stealth,55,0.20,no,Avoid interception.
+danger,danger_courier,courier,defense,30,0.10,no,Survive mistakes.
+danger,danger_courier,courier,survey,25,0.05,no,Read dangerous routes.
+danger,danger_repair,repair,repair,65,0.50,yes,Danger repair expects heavy HPS.
+danger,danger_repair,repair,defense,50,0.20,no,Stay in the danger zone.
+danger,danger_repair,repair,mobility,35,0.15,no,Keep line on target.
+danger,danger_repair,repair,stealth,35,0.10,no,Reduce focus fire.
+danger,danger_repair,repair,cargo,25,0.05,no,Carry repair stores.
+elite,elite_combat,combat,warfare,80,0.45,yes,Elite combat is for top fighting ships.
+elite,elite_combat,combat,defense,55,0.25,no,Survive elite volleys.
+elite,elite_combat,combat,mobility,40,0.15,no,Maintain firing geometry.
+elite,elite_combat,combat,stealth,35,0.15,no,Do not stay fully exposed.
+elite,elite_ore,mining,mining,75,0.45,yes,Elite ore is about brutal crusher pressure, not battleship enemies.
+elite,elite_ore,mining,cargo,65,0.25,no,Carry extremely valuable stone.
+elite,elite_ore,mining,defense,35,0.15,no,Small enemies chip away during extraction.
+elite,elite_ore,mining,mobility,30,0.10,no,Shift between hard pockets.
+elite,elite_ore,mining,stealth,25,0.05,no,Keep harassment manageable.
+elite,elite_gas,gas,harvesting,75,0.45,yes,Elite gas needs powerful filters and resistant systems.
+elite,elite_gas,gas,cargo,60,0.20,no,Carry rare condensate.
+elite,elite_gas,gas,stealth,45,0.15,no,Use clouds as cover.
+elite,elite_gas,gas,defense,30,0.10,no,Withstand corrosive pockets.
+elite,elite_gas,gas,mobility,30,0.10,no,Follow dense fronts.
+elite,elite_hunting,hunting,hunting,75,0.45,yes,Elite hunt expects top capture systems.
+elite,elite_hunting,hunting,warfare,45,0.20,no,Open the carcass.
+elite,elite_hunting,hunting,defense,55,0.15,no,Survive giant prey.
+elite,elite_hunting,hunting,cargo,55,0.15,no,Carry elite cuts.
+elite,elite_hunting,hunting,mobility,35,0.05,no,Stay with the beast.
+elite,elite_salvage,salvage,salvage,75,0.45,yes,Elite salvage expects serious dismantling tools.
+elite,elite_salvage,salvage,warfare,50,0.20,no,Suppress defenders.
+elite,elite_salvage,salvage,defense,45,0.15,no,Work under pressure.
+elite,elite_salvage,salvage,cargo,55,0.15,no,Carry rare machine organs.
+elite,elite_salvage,salvage,survey,35,0.05,no,Identify valuable assemblies.
+elite,elite_relic,relic,survey,75,0.35,yes,Elite relics expect top scanners.
+elite,elite_relic,relic,hacking,55,0.30,yes,Open complex locks.
+elite,elite_relic,relic,stealth,55,0.15,no,Stay quiet around ruins.
+elite,elite_relic,relic,mobility,40,0.10,no,Move between sites.
+elite,elite_relic,relic,cargo,35,0.10,no,Carry heavy artifacts.
+elite,elite_courier,courier,cargo,75,0.35,yes,Elite courier is high-value freight under route pressure.
+elite,elite_courier,courier,mobility,75,0.30,yes,Speed is the real defense.
+elite,elite_courier,courier,stealth,65,0.20,no,Avoid interception.
+elite,elite_courier,courier,defense,35,0.10,no,Survive a bad intercept.
+elite,elite_courier,courier,survey,30,0.05,no,Read elite routes.
+elite,elite_repair,repair,repair,80,0.50,yes,Elite repair expects flagship repair output.
+elite,elite_repair,repair,defense,60,0.20,no,Stay alive near the client.
+elite,elite_repair,repair,mobility,40,0.15,no,Keep repair beams connected.
+elite,elite_repair,repair,stealth,35,0.10,no,Do not become the main target.
+elite,elite_repair,repair,cargo,25,0.05,no,Carry support stores.

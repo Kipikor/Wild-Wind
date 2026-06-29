@@ -7,7 +7,7 @@ public class ShipCatalogSO : ScriptableObject
     [Header("Сборка")]
     [InspectorName("Идентификатор стартового корпуса")]
     [Tooltip("Корпус, который выбирается у новой игры, если в сохранении еще нет сборки.")]
-    public string starterHullId = "starter_hull";
+    public string starterHullId = "";
 
     [InspectorName("Детали корабля")]
     [Tooltip("Корпуса и модули, которые можно использовать в сборке корабля.")]

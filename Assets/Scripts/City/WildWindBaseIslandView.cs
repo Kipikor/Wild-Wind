@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Rendering.Universal;
@@ -21,6 +23,8 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private const string BuildingPrefabResourceRoot = "BaseIsland/Buildings/";
     private const string BuildingCatalogResourcePath = "BaseIsland/City_building";
     private const string CourierServiceBuildingId = "courier_service";
+    private const string CapitalAirdockBuildingId = "capital_airdock";
+    private const string RepairDockBuildingId = "repair_dock";
     private const string FreightItemId = "freight";
     private const int LegacySeedOriginOffsetXCells = 0;
     private const int LegacySeedOriginYCells = 0;
@@ -40,15 +44,24 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private const int ExternalDockProtrusionLengthCells = 8;
     private const int ExpectedExternalDockSlotCount = 8;
     private const int WindowSortingOrder = 875;
+    private const int MeshCompatibleCityRendererIndex = 1;
     private const float CollectBubbleHeight = 126f;
     private const float CollectBubbleDataRefreshSeconds = 0.25f;
     private const float ExpansionRegionRefreshSeconds = 0.25f;
     private const float ProcessingWindowRefreshSeconds = 0.2f;
     private const float ExpansionWindowRefreshSeconds = 0.2f;
     private const float CourierWindowRefreshSeconds = 0.2f;
+    private const float CapitalAirplaneWindowRefreshSeconds = 0.2f;
+    private const float RepairDockWindowRefreshSeconds = 0.2f;
+    private const int BuildingWorkActionIndex = 1;
 
     private static BaseBuildingDefinition[] cachedBuildingDefinitions;
     private static Sprite cachedCollectBubbleSprite;
+    private static readonly Dictionary<int, Sprite> RoundedUiSprites = new Dictionary<int, Sprite>();
+    private static Sprite cachedProcessingPrimaryButtonSprite;
+    private static Sprite cachedProcessingCollectButtonSprite;
+    private static Sprite cachedProcessingSlotSprite;
+    private static Sprite cachedProcessingCircleSprite;
     private static readonly BaseBuildingDefinition[] FallbackBuildingDefinitions =
     {
         new BaseBuildingDefinition("anchor_house", "Дом якоря", "BaseBuilding_AnchorHouse", 4, 4, 3, 1, 1, 2, 2, new Color(0.64f, 0.70f, 0.78f, 1f), "hq", "core"),
@@ -60,7 +73,9 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         new BaseBuildingDefinition("laboratory", "Лаборатория", "BaseBuilding_Laboratory", 3, 3, 2, 2, 1, 4, 9, new Color(0.54f, 0.68f, 0.70f, 1f), "laboratory", "processing"),
         new BaseBuildingDefinition("archive", "Архивы", "BaseBuilding_Archive", 4, 4, 1, 2, 1, 0, 13, new Color(0.44f, 0.50f, 0.64f, 1f), "archive", "knowledge"),
         new BaseBuildingDefinition("trader_pavilion", "Торговый павильон", "", 3, 3, 1, 1, 1, 14, 12, new Color(0.76f, 0.60f, 0.33f, 1f), "trader", "service"),
-        new BaseBuildingDefinition(CourierServiceBuildingId, "Курьерская служба", "", 4, 3, 1, 1, 1, 16, 4, new Color(0.18f, 0.56f, 0.58f, 1f), "courier", "service")
+        new BaseBuildingDefinition(CourierServiceBuildingId, "Курьерская служба", "", 4, 3, 1, 1, 1, 16, 4, new Color(0.18f, 0.56f, 0.58f, 1f), "courier", "service"),
+        new BaseBuildingDefinition(CapitalAirdockBuildingId, "Столичный аэродром", "", 4, 3, 1, 1, 1, 16, 8, new Color(0.61f, 0.48f, 0.25f, 1f), "airdock", "service"),
+        new BaseBuildingDefinition(RepairDockBuildingId, "Ремонтный док", "", 5, 8, 1, 2, 1, -1, -1, new Color(0.42f, 0.30f, 0.32f, 1f), "repair_dock", "dock")
     };
     private static readonly string[] BuildingActionLabels =
     {
@@ -127,16 +142,48 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private Button windowPrimaryButton;
     private Text windowPrimaryButtonText;
     private RectTransform processingPanel;
-    private Text processingStatsText;
-    private Text processingStorageText;
-    private Text processingBunkerText;
-    private Text processingOutputsText;
-    private Text processingStatusText;
+    private TMP_Text processingStatsText;
+    private TMP_Text processingStorageText;
+    private TMP_Text processingBunkerText;
+    private TMP_Text processingOutputsText;
+    private TMP_Text processingStatusText;
     private Button processingLoadAllButton;
     private Button processingClearButton;
     private Button processingCollectButton;
     private Button[] processingInputButtons;
-    private Text[] processingInputButtonTexts;
+    private TMP_Text[] processingInputButtonTexts;
+    private TMP_Text[] processingInputAmountTexts;
+    private Image[] processingInputIconImages;
+    private RectTransform[] processingBunkerSlots;
+    private TMP_Text[] processingBunkerSlotNameTexts;
+    private TMP_Text[] processingBunkerSlotAmountTexts;
+    private TMP_Text[] processingBunkerSlotProgressTexts;
+    private Image[] processingBunkerSlotIconImages;
+    private RectTransform[] processingOutputRows;
+    private TMP_Text[] processingOutputNameTexts;
+    private TMP_Text[] processingOutputAmountTexts;
+    private TMP_Text[] processingOutputStoredTexts;
+    private Image[] processingOutputIconImages;
+    private Image[] processingOutputProgressImages;
+    private TMP_Text processingHeaderStatsText;
+    private TMP_Text processingHeaderTitleText;
+    private TMP_Text processingStorageTitleText;
+    private TMP_Text processingBunkerTitleText;
+    private TMP_Text processingOutputsTitleText;
+    private TMP_Text processingBunkerCapacityText;
+    private TMP_Text processingBunkerSlotCountText;
+    private TMP_Text processingClearButtonText;
+    private TMP_Text processingLoadAllButtonText;
+    private TMP_Text processingCollectButtonText;
+    private Slider processingTransferSlider;
+    private TMP_Text processingTransferTitleText;
+    private TMP_Text processingTransferAmountText;
+    private Button processingTransferAllInButton;
+    private TMP_Text processingTransferAllInButtonText;
+    private Button processingTransferAllOutButton;
+    private TMP_Text processingTransferAllOutButtonText;
+    private bool processingTransferSliderSuppressCallback;
+    private string selectedProcessingInputItemId = "";
     private RectTransform cascadeCatalogPanel;
     private Text cascadeCatalogHeaderText;
     private Text cascadeCatalogStorageToggleText;
@@ -178,6 +225,36 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private string courierStatusMessage = "";
     private bool courierWindowDirty = true;
     private float nextCourierWindowRefreshTime;
+    private RectTransform capitalAirplanePanel;
+    private Text capitalAirplaneHeaderText;
+    private Text capitalAirplaneCargoText;
+    private Text capitalAirplaneRewardText;
+    private Text capitalAirplaneStatusText;
+    private Button capitalAirplaneSendButton;
+    private Text capitalAirplaneSendButtonText;
+    private bool capitalAirplaneWindowOpen;
+    private string capitalAirplaneStatusMessage = "";
+    private bool capitalAirplaneWindowDirty = true;
+    private float nextCapitalAirplaneWindowRefreshTime;
+    private RectTransform repairDockPanel;
+    private Text repairDockHeaderText;
+    private Text repairDockSlotListText;
+    private Text repairDockDetailText;
+    private Text repairDockCostText;
+    private Text repairDockStatusText;
+    private Button[] repairDockSlotButtons;
+    private Text[] repairDockSlotButtonTexts;
+    private Button repairDockWorkButton;
+    private Text repairDockWorkButtonText;
+    private Button repairDockClaimButton;
+    private Text repairDockClaimButtonText;
+    private Button repairDockSellButton;
+    private Text repairDockSellButtonText;
+    private bool repairDockWindowOpen;
+    private int selectedRepairDockSlotIndex;
+    private string repairDockStatusMessage = "";
+    private bool repairDockWindowDirty = true;
+    private float nextRepairDockWindowRefreshTime;
     private string hoveredBuildingId = "";
     private string forcedHoverBuildingIdForTests = "";
     private string selectedBuildingId = "";
@@ -238,6 +315,10 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         ? CascadeCatalogContentForTests
         : IsCourierWindowOpenForTests
         ? CourierWindowContentForTests
+        : IsCapitalAirplaneWindowOpenForTests
+        ? CapitalAirplaneWindowContentForTests
+        : IsRepairDockWindowOpenForTests
+        ? RepairDockWindowContentForTests
         : IsProcessingWindowOpenForTests
         ? ProcessingWindowContentForTests
         : windowBodyText != null ? windowBodyText.text : "";
@@ -253,6 +334,14 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         && courierWindowOpen
         && courierPanel != null
         && courierPanel.gameObject.activeSelf;
+    public bool IsCapitalAirplaneWindowOpenForTests => IsWindowOpenForTests
+        && capitalAirplaneWindowOpen
+        && capitalAirplanePanel != null
+        && capitalAirplanePanel.gameObject.activeSelf;
+    public bool IsRepairDockWindowOpenForTests => IsWindowOpenForTests
+        && repairDockWindowOpen
+        && repairDockPanel != null
+        && repairDockPanel.gameObject.activeSelf;
     public bool IsExpansionWindowOpenForTests => IsWindowOpenForTests && expansionWindowOpen;
     public int CityGridWidthForTests => city != null ? city.GridWidthForTests : 0;
     public int CityGridHeightForTests => city != null ? city.GridHeightForTests : 0;
@@ -261,6 +350,14 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     public int CityDebrisCellCountForTests => city != null ? city.DebrisCellCountForTests : 0;
     public int CityTileColliderCountForTests => city != null ? city.TileColliderCountForTests : 0;
     public int CityTileBatchRendererCountForTests => city != null ? city.TileBatchRendererCountForTests : 0;
+    public int EnabledCityRendererCountForTests => city != null ? city.EnabledCityRendererCountForTests : 0;
+    public int EnabledCityBuildingRendererCountForTests => city != null ? city.EnabledBuildingRendererCountForTests : 0;
+    public int EnabledCityTileRendererCountForTests => city != null ? city.EnabledTileRendererCountForTests : 0;
+    public int CameraVisibleCityRendererCountForTests => city != null ? city.CameraVisibleCityRendererCountForTests : 0;
+    public Vector3 CityIslandWorldSizeForTests => city != null ? city.IslandWorldSizeForTests : Vector3.zero;
+    public float CityIslandGridOverhangCellsForTests => city != null ? city.IslandGridOverhangCellsForTests : 0f;
+    public float CityIslandGridMaxOverhangCellsForTests => city != null ? city.IslandGridMaxOverhangCellsForTests : 0f;
+    public bool CityIslandFootprintCoversGridForTests => city != null && city.IslandFootprintCoversGridForTests;
     public int CityCellDataCountForTests => city != null ? city.CellDataCountForTests : 0;
     public int CityRaycastLayerForTests => city != null ? city.CityRaycastLayerForTests : -1;
     public int CityInteractiveColliderLayerMismatchCountForTests => city != null ? city.InteractiveColliderLayerMismatchCountForTests : -1;
@@ -294,6 +391,21 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         courierListText != null ? courierListText.text : "",
         courierDetailText != null ? courierDetailText.text : "",
         courierStatusText != null ? courierStatusText.text : ""
+    });
+    public string CapitalAirplaneWindowContentForTests => string.Join("\n", new[]
+    {
+        capitalAirplaneHeaderText != null ? capitalAirplaneHeaderText.text : "",
+        capitalAirplaneCargoText != null ? capitalAirplaneCargoText.text : "",
+        capitalAirplaneRewardText != null ? capitalAirplaneRewardText.text : "",
+        capitalAirplaneStatusText != null ? capitalAirplaneStatusText.text : ""
+    });
+    public string RepairDockWindowContentForTests => string.Join("\n", new[]
+    {
+        repairDockHeaderText != null ? repairDockHeaderText.text : "",
+        repairDockSlotListText != null ? repairDockSlotListText.text : "",
+        repairDockDetailText != null ? repairDockDetailText.text : "",
+        repairDockCostText != null ? repairDockCostText.text : "",
+        repairDockStatusText != null ? repairDockStatusText.text : ""
     });
     public bool IsBuildingHoverLabelVisibleForTests => buildingInfoPanel != null && buildingInfoPanel.gameObject.activeSelf;
     public bool IsBuildingActionMenuOpenForTests => !string.IsNullOrWhiteSpace(selectedBuildingId)
@@ -354,8 +466,10 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     public bool PrototypeToolbarHiddenForTests => city != null && !city.IsPrototypeToolbarVisibleForTests;
     public int SuppressedSessionRendererCountForTests => suppressedRendererStates.Count;
     public int SuppressedActiveShipRendererCountForTests => CountSuppressedActiveShipRenderers();
+    public int SuppressedCityRendererCountForTests => CountSuppressedCityRenderers();
     public bool IsCityCameraLeanRenderStateActiveForTests => IsCityCameraLeanRenderStateActive();
-    public bool IsCityCameraUsingLeanRendererForTests => IsCityCameraUsingLeanRenderer();
+    public bool IsCityCameraUsingLeanRendererForTests => IsCityCameraUsingMeshCompatibleRenderer();
+    public bool IsCityCameraUsingMeshCompatibleRendererForTests => IsCityCameraUsingMeshCompatibleRenderer();
     public string CityCameraRendererNameForTests => GetCameraRendererName(sceneCamera != null ? sceneCamera : Camera.main);
 
     public bool HasBuildingDefinitionForTests(string buildingId)
@@ -496,6 +610,8 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         RefreshProcessingWindowIfDue();
         RefreshExpansionWindowIfDue();
         RefreshCourierWindowIfDue();
+        RefreshCapitalAirplaneWindowIfDue();
+        RefreshRepairDockWindowIfDue();
     }
 
     public bool HasBuildingForTests(string buildingId)
@@ -527,6 +643,16 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     public bool BuildingHasVisualForTests(string buildingId)
     {
         return city != null && city.BuildingHasRendererForTests(buildingId);
+    }
+
+    public bool BuildingHasEnabledVisualForTests(string buildingId)
+    {
+        return city != null && city.BuildingHasEnabledRendererForTests(buildingId);
+    }
+
+    public bool BuildingHasCameraVisibleVisualForTests(string buildingId)
+    {
+        return city != null && city.BuildingHasCameraVisibleRendererForTests(buildingId);
     }
 
     public bool BuildingPrefabHasPhysicalMaterialsForTests(string buildingId)
@@ -571,7 +697,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
     public bool TryOpenBuildingForTests(string buildingId)
     {
-        return TrySelectBuilding(buildingId);
+        return OpenBuildingWorkWindow(buildingId);
     }
 
     public bool ShowBuildingHoverForTests(string buildingId)
@@ -608,21 +734,67 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
     public bool OpenProcessingWindowForTests(string buildingId)
     {
-        return TrySelectBuilding(buildingId) && OpenSelectedBuildingAction(1) && IsProcessingWindowOpenForTests;
+        return OpenBuildingWorkWindow(buildingId) && IsProcessingWindowOpenForTests;
     }
 
     public bool OpenCascadeCatalogWindowForTests(string buildingId)
     {
-        return TrySelectBuilding(buildingId)
-            && OpenSelectedBuildingAction(1)
-            && IsCascadeCatalogWindowOpenForTests;
+        return OpenBuildingWorkWindow(buildingId) && IsCascadeCatalogWindowOpenForTests;
     }
 
     public bool OpenCourierServiceWindowForTests()
     {
-        return TrySelectBuilding(CourierServiceBuildingId)
-            && OpenSelectedBuildingAction(1)
-            && IsCourierWindowOpenForTests;
+        return OpenBuildingWorkWindow(CourierServiceBuildingId) && IsCourierWindowOpenForTests;
+    }
+
+    public bool OpenCapitalAirplaneWindowForTests()
+    {
+        return OpenBuildingWorkWindow(CapitalAirdockBuildingId) && IsCapitalAirplaneWindowOpenForTests;
+    }
+
+    public bool SendCapitalAirplaneForTests()
+    {
+        return HandleCapitalAirplaneSend();
+    }
+
+    public bool OpenRepairDockWindowForTests()
+    {
+        EnsureBuilt();
+        if (city == null || !city.HasExternalDockKeyForTests(RepairDockBuildingId))
+        {
+            return false;
+        }
+
+        return OpenRepairDockWindowFromExternalDock(RepairDockBuildingId)
+            && IsRepairDockWindowOpenForTests;
+    }
+
+    public bool SelectRepairDockSlotForTests(int slotIndex)
+    {
+        if (!IsRepairDockWindowOpenForTests)
+        {
+            return false;
+        }
+
+        selectedRepairDockSlotIndex = Mathf.Clamp(slotIndex, 0, MetaGameState.RepairDockSlotCount - 1);
+        repairDockWindowDirty = true;
+        RefreshRepairDockWindow();
+        return true;
+    }
+
+    public bool RunSelectedRepairDockWorkForTests()
+    {
+        return HandleRepairDockWork();
+    }
+
+    public bool ClaimSelectedRepairDockShipForTests()
+    {
+        return HandleRepairDockClaim();
+    }
+
+    public bool SellSelectedRepairDockShipForTests()
+    {
+        return HandleRepairDockSell();
     }
 
     public bool SelectCourierOrderForTests(int slotIndex)
@@ -745,7 +917,14 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
     public bool OpenExternalDockForTests(string dockKey)
     {
-        return city != null && city.HasExternalDockKeyForTests(dockKey) && OpenDockScreenFromExternalDock();
+        if (city == null || !city.HasExternalDockKeyForTests(dockKey))
+        {
+            return false;
+        }
+
+        return IsRepairDockKey(dockKey)
+            ? OpenRepairDockWindowFromExternalDock(dockKey)
+            : OpenDockScreenFromExternalDock();
     }
 
     public bool ShowExternalDockHoverForTests(string dockKey)
@@ -1181,7 +1360,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         cameraData.renderPostProcessing = false;
         cameraData.requiresDepthTexture = false;
         cameraData.requiresColorTexture = false;
-        cameraData.SetRenderer(0);
+        cameraData.SetRenderer(MeshCompatibleCityRendererIndex);
     }
 
     private void RestoreCityCameraRenderState()
@@ -1228,10 +1407,10 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
                 && !cameraData.requiresColorTexture);
     }
 
-    private bool IsCityCameraUsingLeanRenderer()
+    private bool IsCityCameraUsingMeshCompatibleRenderer()
     {
         string rendererName = GetCameraRendererName(sceneCamera != null ? sceneCamera : Camera.main);
-        return rendererName.IndexOf("Renderer2D", StringComparison.OrdinalIgnoreCase) >= 0;
+        return rendererName.IndexOf("UniversalRenderer", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static string GetCameraRendererName(Camera camera)
@@ -1317,6 +1496,25 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         return count;
     }
 
+    private int CountSuppressedCityRenderers()
+    {
+        if (city == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        foreach (KeyValuePair<Renderer, bool> pair in suppressedRendererStates)
+        {
+            if (pair.Key != null && pair.Key.transform.IsChildOf(city.transform))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     private void RestoreSessionWorldRenderers()
     {
         foreach (KeyValuePair<Renderer, bool> pair in suppressedRendererStates)
@@ -1334,13 +1532,19 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
     private void HandleCityBuildingClicked(string buildingId)
     {
-        TrySelectBuilding(buildingId);
+        OpenBuildingWorkWindow(buildingId);
     }
 
     private void HandleCityExternalDockClicked(string dockKey)
     {
         if (string.IsNullOrWhiteSpace(dockKey))
         {
+            return;
+        }
+
+        if (IsRepairDockKey(dockKey))
+        {
+            OpenRepairDockWindowFromExternalDock(dockKey);
             return;
         }
 
@@ -1358,6 +1562,47 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         }
 
         return gameplayHud != null && gameplayHud.OpenMetaDockScreenForRuntime();
+    }
+
+    private bool OpenRepairDockWindowFromExternalDock(string dockKey)
+    {
+        EnsureBuilt();
+        EnsureWindow();
+        if (windowCanvas == null || windowPanel == null || windowFadeButton == null)
+        {
+            return false;
+        }
+
+        ClearBuildingFocus();
+        SetActiveIfNotNull(buildingCatalogPanel, false);
+        openBuildingId = string.IsNullOrWhiteSpace(dockKey) ? RepairDockBuildingId : dockKey;
+        openActionIndex = 1;
+        ConfigureRepairDockWindow();
+        processingWindowOpen = false;
+        cascadeCatalogWindowOpen = false;
+        courierWindowOpen = false;
+        capitalAirplaneWindowOpen = false;
+        repairDockWindowOpen = true;
+        expansionWindowOpen = false;
+        openExpansionRegionId = "";
+        selectedRepairDockSlotIndex = Mathf.Clamp(selectedRepairDockSlotIndex, 0, MetaGameState.RepairDockSlotCount - 1);
+        repairDockStatusMessage = "";
+        SetText(windowTitleText, "Ремонтный док");
+        SetText(windowExitButtonText, "Выйти");
+        SetActiveIfNotNull(windowBodyText, false);
+        SetActiveIfNotNull(processingPanel, false);
+        SetActiveIfNotNull(cascadeCatalogPanel, false);
+        SetActiveIfNotNull(courierPanel, false);
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+        SetActiveIfNotNull(repairDockPanel, true);
+        SetActiveIfNotNull(windowPrimaryButton, false);
+        SetActiveIfNotNull(buildingSelectionBackdropButton, false);
+        SetActiveIfNotNull(buildingActionPanel, false);
+        SetActiveIfNotNull(buildingInfoPanel, false);
+        SetActiveIfNotNull(windowFadeButton, true);
+        windowPanel.gameObject.SetActive(true);
+        RefreshRepairDockWindow();
+        return true;
     }
 
     private bool TrySelectBuilding(string buildingId)
@@ -1389,6 +1634,54 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         return true;
     }
 
+    private bool OpenBuildingWorkWindow(string buildingId)
+    {
+        return OpenBuildingActionDirectly(buildingId, BuildingWorkActionIndex);
+    }
+
+    private bool OpenBuildingActionDirectly(string buildingId, int actionIndex)
+    {
+        if (string.IsNullOrWhiteSpace(buildingId)
+            || actionIndex < 0
+            || actionIndex >= BuildingActionLabels.Length
+            || !CanInteractWithBase()
+            || city == null
+            || !city.HasBuildingKeyForTests(buildingId))
+        {
+            return false;
+        }
+
+        if (IsWindowOpenForTests)
+        {
+            return false;
+        }
+
+        EnsureWindow();
+        if (windowCanvas == null)
+        {
+            return false;
+        }
+
+        hoveredBuildingId = buildingId;
+        forcedHoverBuildingIdForTests = "";
+        selectedBuildingId = buildingId;
+        openBuildingId = "";
+        openActionIndex = -1;
+        SetActiveIfNotNull(buildingCatalogPanel, false);
+        SetHudBuildingFocus(false);
+        SetActiveIfNotNull(buildingSelectionBackdropButton, false);
+        SetActiveIfNotNull(buildingActionPanel, false);
+        SetActiveIfNotNull(buildingInfoPanel, false);
+
+        if (OpenSelectedBuildingAction(actionIndex))
+        {
+            return true;
+        }
+
+        ClearBuildingFocus();
+        return false;
+    }
+
     private bool OpenSelectedBuildingAction(int actionIndex)
     {
         if (string.IsNullOrWhiteSpace(selectedBuildingId)
@@ -1411,6 +1704,10 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         cascadeCatalogWindowOpen = false;
         courierWindowOpen = false;
         courierStatusMessage = "";
+        capitalAirplaneWindowOpen = false;
+        capitalAirplaneStatusMessage = "";
+        repairDockWindowOpen = false;
+        repairDockStatusMessage = "";
         openExpansionRegionId = "";
         expansionWindowOpen = false;
         expansionStatusMessage = "";
@@ -1435,10 +1732,17 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
             return OpenCourierServiceWindow();
         }
 
+        if (actionIndex == 1 && IsCapitalAirdockBuilding(openBuildingId))
+        {
+            return OpenCapitalAirplaneWindow();
+        }
+
         ConfigureSmallWindow();
         SetActiveIfNotNull(processingPanel, false);
         SetActiveIfNotNull(cascadeCatalogPanel, false);
         SetActiveIfNotNull(courierPanel, false);
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+        SetActiveIfNotNull(repairDockPanel, false);
         SetActiveIfNotNull(windowPrimaryButton, false);
         SetActiveIfNotNull(windowBodyText, true);
         string buildingName = GetBuildingDisplayName(openBuildingId);
@@ -1478,15 +1782,24 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
         ConfigureProcessingWindow();
         openProcessingBranch = branch;
+        EnsureRefineryProcessingSampleResources(branch);
         processingWindowOpen = true;
         expansionWindowOpen = false;
         openExpansionRegionId = "";
-        processingStatusMessage = "Загрузите сырье в бункер. Цикл идет сам, когда в бункере хватает единиц.";
+        processingStatusMessage = "";
+        selectedProcessingInputItemId = "";
         SetText(windowTitleText, GetBuildingDisplayName(openBuildingId));
-        SetText(windowExitButtonText, "Выйти");
+        SetText(windowExitButtonText, "\u2039");
+        if (windowExitButtonText != null)
+        {
+            windowExitButtonText.fontSize = 38;
+            windowExitButtonText.color = new Color32(58, 66, 83, 255);
+        }
         SetActiveIfNotNull(windowBodyText, false);
         SetActiveIfNotNull(processingPanel, true);
         SetActiveIfNotNull(courierPanel, false);
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+        SetActiveIfNotNull(repairDockPanel, false);
         SetActiveIfNotNull(buildingSelectionBackdropButton, false);
         SetActiveIfNotNull(buildingActionPanel, false);
         SetActiveIfNotNull(buildingInfoPanel, false);
@@ -1494,6 +1807,57 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         windowPanel.gameObject.SetActive(true);
         RefreshProcessingWindow();
         return true;
+    }
+
+    private void EnsureRefineryProcessingSampleResources(BaseProcessingBranch branch)
+    {
+        if (meta == null
+            || branch != BaseProcessingBranch.Ore
+            || !string.Equals(GetDefinitionId(openBuildingId), "refinery", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        PortStorageState storage = meta.GetCapitalStorageState();
+        List<string> oreInputs = meta.GetBaseProcessingInputItemIds(BaseProcessingBranch.Ore);
+        BaseProcessingFacilityState facility = meta.GetBaseProcessingFacilityState(openBuildingId, BaseProcessingBranch.Ore, GetBuildingLevelValue(openBuildingId));
+        if (storage == null || oreInputs == null || oreInputs.Count == 0)
+        {
+            return;
+        }
+
+        int existingOre = 0;
+        for (int i = 0; i < oreInputs.Count; i++)
+        {
+            existingOre += storage.GetResourceAmount(oreInputs[i]);
+            existingOre += facility != null ? facility.GetBunkerAmount(oreInputs[i]) : 0;
+        }
+
+        if (existingOre > 0)
+        {
+            return;
+        }
+
+        AddSampleOreIfConfigured(storage, oreInputs, "windshale_ore", 2500);
+        AddSampleOreIfConfigured(storage, oreInputs, "dawnspar_ore", 1240);
+        AddSampleOreIfConfigured(storage, oreInputs, "bluebrass_ore", 960);
+        AddSampleOreIfConfigured(storage, oreInputs, "needlechalk_ore", 720);
+        AddSampleOreIfConfigured(storage, oreInputs, "rainroot_ore", 560);
+        AddSampleOreIfConfigured(storage, oreInputs, "emberloam_ore", 420);
+        AddSampleOreIfConfigured(storage, oreInputs, "glassmire_ore", 320);
+        AddSampleOreIfConfigured(storage, oreInputs, "stormcrust_ore", 260);
+        AddSampleOreIfConfigured(storage, oreInputs, "ashpearl_ore", 180);
+        processingStatusMessage = "\u0414\u043b\u044f \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438 \u043e\u043a\u043d\u0430 \u043d\u0430 \u0441\u043a\u043b\u0430\u0434 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430 \u0442\u0435\u0441\u0442\u043e\u0432\u0430\u044f \u0440\u0443\u0434\u0430.";
+    }
+
+    private static void AddSampleOreIfConfigured(PortStorageState storage, List<string> oreInputs, string itemId, int amount)
+    {
+        if (storage == null || oreInputs == null || !oreInputs.Contains(itemId))
+        {
+            return;
+        }
+
+        storage.AddResource(itemId, amount);
     }
 
     private bool OpenCascadeRecipeCatalogWindow()
@@ -1514,6 +1878,8 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         SetActiveIfNotNull(processingPanel, false);
         SetActiveIfNotNull(cascadeCatalogPanel, true);
         SetActiveIfNotNull(courierPanel, false);
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+        SetActiveIfNotNull(repairDockPanel, false);
         SetActiveIfNotNull(windowPrimaryButton, false);
         SetActiveIfNotNull(buildingSelectionBackdropButton, false);
         SetActiveIfNotNull(buildingActionPanel, false);
@@ -1547,6 +1913,8 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         SetActiveIfNotNull(processingPanel, false);
         SetActiveIfNotNull(cascadeCatalogPanel, false);
         SetActiveIfNotNull(courierPanel, true);
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+        SetActiveIfNotNull(repairDockPanel, false);
         SetActiveIfNotNull(windowPrimaryButton, false);
         SetActiveIfNotNull(buildingSelectionBackdropButton, false);
         SetActiveIfNotNull(buildingActionPanel, false);
@@ -1554,6 +1922,39 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         SetActiveIfNotNull(windowFadeButton, true);
         windowPanel.gameObject.SetActive(true);
         RefreshCourierWindow();
+        return true;
+    }
+
+    private bool OpenCapitalAirplaneWindow()
+    {
+        if (string.IsNullOrWhiteSpace(openBuildingId) || windowPanel == null)
+        {
+            return false;
+        }
+
+        ConfigureCapitalAirplaneWindow();
+        processingWindowOpen = false;
+        cascadeCatalogWindowOpen = false;
+        courierWindowOpen = false;
+        capitalAirplaneWindowOpen = true;
+        expansionWindowOpen = false;
+        openExpansionRegionId = "";
+        capitalAirplaneStatusMessage = "";
+        SetText(windowTitleText, "Столичный аэродром");
+        SetText(windowExitButtonText, "Выйти");
+        SetActiveIfNotNull(windowBodyText, false);
+        SetActiveIfNotNull(processingPanel, false);
+        SetActiveIfNotNull(cascadeCatalogPanel, false);
+        SetActiveIfNotNull(courierPanel, false);
+        SetActiveIfNotNull(capitalAirplanePanel, true);
+        SetActiveIfNotNull(repairDockPanel, false);
+        SetActiveIfNotNull(windowPrimaryButton, false);
+        SetActiveIfNotNull(buildingSelectionBackdropButton, false);
+        SetActiveIfNotNull(buildingActionPanel, false);
+        SetActiveIfNotNull(buildingInfoPanel, false);
+        SetActiveIfNotNull(windowFadeButton, true);
+        windowPanel.gameObject.SetActive(true);
+        RefreshCapitalAirplaneWindow();
         return true;
     }
 
@@ -1681,6 +2082,8 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         BuildProcessingPanel();
         BuildCascadeCatalogPanel();
         BuildCourierPanel();
+        BuildCapitalAirplanePanel();
+        BuildRepairDockPanel();
 
         windowCanvas.gameObject.SetActive(true);
         SetActiveIfNotNull(buildingSelectionBackdropButton, false);
@@ -1691,10 +2094,17 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         SetActiveIfNotNull(windowPanel, false);
         SetActiveIfNotNull(cascadeCatalogPanel, false);
         SetActiveIfNotNull(courierPanel, false);
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+        SetActiveIfNotNull(repairDockPanel, false);
     }
 
     private void BuildProcessingPanel()
     {
+        if (BuildProcessingPanelFromPrefab())
+        {
+            return;
+        }
+
         processingPanel = CreateRect("Processing Window Content", windowPanel, new RectTransformSpec
         {
             anchorMin = Vector2.zero,
@@ -1704,45 +2114,334 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
             sizeDelta = Vector2.zero
         });
 
-        CreateProcessingSection("Storage Section", new Vector2(26f, -132f), new Vector2(372f, 566f));
-        CreateProcessingSection("Bunker Section", new Vector2(424f, -132f), new Vector2(374f, 566f));
-        CreateProcessingSection("Output Section", new Vector2(824f, -132f), new Vector2(416f, 566f));
+        Image panelOverlay = processingPanel.gameObject.AddComponent<Image>();
+        panelOverlay.color = new Color32(123, 138, 155, 115);
+        panelOverlay.sprite = GetProcessingRoundedSprite(20);
+        panelOverlay.type = Image.Type.Sliced;
+        panelOverlay.raycastTarget = false;
 
-        processingStatsText = CreateText(processingPanel, "", 18, new Vector2(32f, -74f), new Vector2(1020f, 44f), TextAnchor.UpperLeft, new Color(0.92f, 0.88f, 0.68f, 1f));
-        processingStorageText = CreateText(processingPanel, "", 17, new Vector2(48f, -150f), new Vector2(326f, 56f), TextAnchor.UpperLeft);
-        processingBunkerText = CreateText(processingPanel, "", 18, new Vector2(448f, -150f), new Vector2(326f, 332f), TextAnchor.UpperLeft);
-        processingOutputsText = CreateText(processingPanel, "", 17, new Vector2(848f, -150f), new Vector2(364f, 430f), TextAnchor.UpperLeft);
-        processingStatusText = CreateText(processingPanel, "", 17, new Vector2(48f, -710f), new Vector2(1160f, 34f), TextAnchor.MiddleLeft, new Color(0.96f, 0.82f, 0.54f, 1f));
+        CreateProcessingCard("Processing Inner Panel", processingPanel, new Vector2(10f, -10f), new Vector2(1832f, 1004f), new Color32(214, 220, 231, 255), new Color32(214, 220, 231, 255), 20);
 
-        processingInputButtons = new Button[24];
-        processingInputButtonTexts = new Text[processingInputButtons.Length];
+        RectTransform header = CreateProcessingCard("Processing Header", processingPanel, new Vector2(10f, -10f), new Vector2(1832f, 76f), new Color32(235, 237, 241, 255), new Color32(235, 237, 241, 255), 10);
+        processingHeaderTitleText = CreateProcessingText(header, "", 32, new Vector2(74.5f, -19.4f), new Vector2(520f, 37f), TextAnchor.MiddleLeft, new Color32(58, 66, 83, 255), FontStyle.Bold);
+        processingHeaderStatsText = CreateProcessingText(header, "", 24, new Vector2(999f, -20f), new Vector2(790f, 34f), TextAnchor.MiddleRight, new Color32(58, 66, 83, 178), FontStyle.Normal);
+        CreateProcessingHeaderSeal(header, new Vector2(10f, -13f), new Vector2(50f, 50f));
+
+        RectTransform storageSection = CreateProcessingWarehouse("Processing Storage Warehouse", new Vector2(26f, -102f), new Vector2(520f, 896f), "\u0421\u043a\u043b\u0430\u0434 \u0441\u044b\u0440\u044c\u044f");
+        RectTransform bunkerSection = CreateProcessingWarehouse("Processing Bunker Warehouse", new Vector2(558f, -102f), new Vector2(726f, 896f), "\u0421\u043a\u043b\u0430\u0434 \u043f\u0440\u043e\u0434\u0443\u043a\u0446\u0438\u0438");
+        RectTransform outputSection = CreateProcessingWarehouse("Processing Output Warehouse", new Vector2(1296f, -102f), new Vector2(520f, 896f), "\u041f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0430\u043d\u043d\u0430\u044f \u043f\u0440\u043e\u0434\u0443\u043a\u0446\u0438\u044f");
+
+        processingStorageTitleText = storageSection.Find("Warehouse Title") != null ? storageSection.Find("Warehouse Title").GetComponent<TMP_Text>() : null;
+        processingBunkerTitleText = bunkerSection.Find("Warehouse Title") != null ? bunkerSection.Find("Warehouse Title").GetComponent<TMP_Text>() : null;
+        processingOutputsTitleText = outputSection.Find("Warehouse Title") != null ? outputSection.Find("Warehouse Title").GetComponent<TMP_Text>() : null;
+
+        processingStatsText = CreateHiddenProcessingText(processingPanel);
+        processingStorageText = CreateHiddenProcessingText(processingPanel);
+        processingBunkerText = CreateHiddenProcessingText(processingPanel);
+        processingOutputsText = CreateHiddenProcessingText(processingPanel);
+        processingStatusText = CreateProcessingText(processingPanel, "", 20, new Vector2(588f, -820f), new Vector2(668f, 32f), TextAnchor.MiddleCenter, new Color32(106, 120, 146, 255), FontStyle.Normal);
+
+        processingInputButtons = new Button[8];
+        processingInputButtonTexts = new TMP_Text[processingInputButtons.Length];
+        processingInputAmountTexts = new TMP_Text[processingInputButtons.Length];
+        processingInputIconImages = new Image[processingInputButtons.Length];
         for (int i = 0; i < processingInputButtons.Length; i++)
         {
             int index = i;
-            float x = 48f;
-            float y = -214f - i * 24f;
-            processingInputButtons[i] = CreateButton(
-                processingPanel,
-                "",
-                new Vector2(x, y),
-                new Vector2(326f, 22f),
+            RectTransform row = CreateProcessingButtonRect(
+                "Processing Input Row " + i,
+                storageSection,
+                new Vector2(16f, -61f - i * 92f),
+                new Vector2(484f, 80f),
                 () => HandleProcessingInputButton(index),
-                out processingInputButtonTexts[i]);
-            processingInputButtonTexts[i].fontSize = 12;
-            processingInputButtonTexts[i].alignment = TextAnchor.MiddleLeft;
-            processingInputButtonTexts[i].horizontalOverflow = HorizontalWrapMode.Overflow;
+                new Color32(228, 230, 236, 255),
+                new Color32(184, 197, 212, 255),
+                10,
+                out processingInputButtons[i]);
+
+            processingInputIconImages[i] = CreateProcessingResourceIcon(row, new Vector2(4f, -7f), new Vector2(107f, 70f), "");
+            processingInputButtonTexts[i] = CreateProcessingText(row, "", 24, new Vector2(116f, -29f), new Vector2(246f, 28f), TextAnchor.MiddleLeft, new Color32(58, 66, 83, 255), FontStyle.Normal);
+
+            RectTransform amountPill = CreateProcessingCard("Amount Pill", row, new Vector2(392f, -22f), new Vector2(80f, 36f), new Color32(216, 219, 224, 255), new Color32(184, 197, 212, 255), 8);
+            processingInputAmountTexts[i] = CreateProcessingText(amountPill, "", 24, new Vector2(0f, -5f), new Vector2(80f, 26f), TextAnchor.MiddleCenter, new Color32(58, 66, 83, 255), FontStyle.Normal);
         }
 
-        processingLoadAllButton = CreateButton(processingPanel, "Загрузить всё", new Vector2(448f, -610f), new Vector2(176f, 42f), () => HandleProcessingLoadAll(), out _);
-        processingClearButton = CreateButton(processingPanel, "Очистить", new Vector2(638f, -610f), new Vector2(136f, 42f), () => HandleProcessingClear(), out _);
-        processingCollectButton = CreateButton(processingPanel, "Забрать всё", new Vector2(972f, -610f), new Vector2(220f, 46f), () => HandleProcessingCollect(), out _);
+        CreateProcessingScrollBar(storageSection, new Vector2(508f, -61f), new Vector2(2f, 752f));
+
+        processingLoadAllButton = CreateProcessingGradientButton(
+            storageSection,
+            "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043c\u0430\u043a\u0441\u0438\u043c\u0443\u043c",
+            new Vector2(16f, -829f),
+            new Vector2(484f, 50f),
+            () => HandleProcessingLoadAll(),
+            GetProcessingPrimaryButtonSprite(),
+            out processingLoadAllButtonText);
+
+        processingBunkerSlots = new RectTransform[9];
+        processingBunkerSlotNameTexts = new TMP_Text[processingBunkerSlots.Length];
+        processingBunkerSlotAmountTexts = new TMP_Text[processingBunkerSlots.Length];
+        processingBunkerSlotProgressTexts = new TMP_Text[processingBunkerSlots.Length];
+        processingBunkerSlotIconImages = new Image[processingBunkerSlots.Length];
+        for (int i = 0; i < processingBunkerSlots.Length; i++)
+        {
+            int column = i % 3;
+            int rowIndex = i / 3;
+            RectTransform slot = CreateProcessingCard(
+                "Processing Bunker Slot " + i,
+                bunkerSection,
+                new Vector2(28f + column * 230f, -72f - rowIndex * 230f),
+                new Vector2(210f, 210f),
+                new Color32(232, 238, 248, 255),
+                new Color32(184, 197, 212, 255),
+                10);
+            processingBunkerSlots[i] = slot;
+            RectTransform slotFill = slot.Find("Processing Bunker Slot " + i + " Fill") as RectTransform;
+            Image slotFillImage = slotFill != null ? slotFill.GetComponent<Image>() : null;
+            if (slotFillImage != null)
+            {
+                slotFillImage.sprite = GetProcessingSlotSprite();
+                slotFillImage.type = Image.Type.Sliced;
+                slotFillImage.color = Color.white;
+            }
+
+            processingBunkerSlotIconImages[i] = CreateProcessingResourceIcon(slot, new Vector2(55f, -28f), new Vector2(100f, 100f), "");
+            processingBunkerSlotNameTexts[i] = CreateProcessingText(slot, "", 20, new Vector2(14f, -132f), new Vector2(182f, 44f), TextAnchor.UpperCenter, new Color32(58, 66, 83, 255), FontStyle.Normal);
+            RectTransform pill = CreateProcessingCard("Slot Amount Pill", slot, new Vector2(65f, -164f), new Vector2(80f, 36f), new Color32(216, 219, 224, 255), new Color32(184, 197, 212, 255), 8);
+            processingBunkerSlotAmountTexts[i] = CreateProcessingText(pill, "", 22, Vector2.zero, new Vector2(80f, 36f), TextAnchor.MiddleCenter, new Color32(58, 66, 83, 255), FontStyle.Normal);
+            processingBunkerSlotProgressTexts[i] = CreateProcessingText(slot, "", 18, new Vector2(12f, -12f), new Vector2(186f, 24f), TextAnchor.MiddleRight, new Color32(106, 120, 146, 255), FontStyle.Normal);
+        }
+
+        RectTransform bunkerStats = CreateProcessingCard("Processing Bunker Stats", processingPanel, new Vector2(575f, -877f), new Vector2(692f, 104f), new Color32(228, 230, 236, 255), new Color32(184, 197, 212, 255), 10);
+        CreateProcessingResourceIcon(bunkerStats, new Vector2(7f, -20f), new Vector2(64f, 64f), "bulk");
+        processingBunkerCapacityText = CreateProcessingText(bunkerStats, "", 20, new Vector2(76f, -23f), new Vector2(150f, 24f), TextAnchor.MiddleLeft, new Color32(106, 120, 146, 255), FontStyle.Normal);
+        processingBunkerSlotCountText = CreateProcessingText(bunkerStats, "", 20, new Vector2(305f, -23f), new Vector2(150f, 24f), TextAnchor.MiddleLeft, new Color32(106, 120, 146, 255), FontStyle.Normal);
+        CreateProcessingLine(bunkerStats, "Processing Bunker Stats Divider A", new Vector2(230f, -8f), new Vector2(1f, 88f), new Color32(184, 197, 212, 255));
+        CreateProcessingLine(bunkerStats, "Processing Bunker Stats Divider B", new Vector2(460f, -8f), new Vector2(1f, 88f), new Color32(184, 197, 212, 255));
+        processingClearButton = CreateProcessingGradientButton(
+            bunkerStats,
+            "\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c",
+            new Vector2(479f, -27f),
+            new Vector2(194f, 50f),
+            () => HandleProcessingClear(),
+            GetProcessingCollectButtonSprite(),
+            out processingClearButtonText);
+
+        processingTransferTitleText = CreateProcessingText(bunkerStats, "\u0412\u044b\u0431\u0435\u0440\u0438 \u0441\u044b\u0440\u044c\u0435", 18, new Vector2(76f, -54f), new Vector2(250f, 22f), TextAnchor.MiddleLeft, new Color32(58, 66, 83, 255), FontStyle.Normal);
+        processingTransferAmountText = CreateProcessingText(bunkerStats, "", 18, new Vector2(312f, -54f), new Vector2(145f, 22f), TextAnchor.MiddleRight, new Color32(106, 120, 146, 255), FontStyle.Normal);
+        processingTransferSlider = CreateProcessingSlider(bunkerStats, new Vector2(76f, -78f), new Vector2(300f, 14f), HandleProcessingTransferSliderChanged);
+        processingTransferAllOutButton = CreateProcessingGradientButton(
+            bunkerStats,
+            "0",
+            new Vector2(384f, -70f),
+            new Vector2(36f, 28f),
+            () => HandleProcessingTransferAllOut(),
+            GetProcessingCollectButtonSprite(),
+            out processingTransferAllOutButtonText);
+        processingTransferAllInButton = CreateProcessingGradientButton(
+            bunkerStats,
+            "MAX",
+            new Vector2(426f, -70f),
+            new Vector2(52f, 28f),
+            () => HandleProcessingTransferAllIn(),
+            GetProcessingPrimaryButtonSprite(),
+            out processingTransferAllInButtonText);
+
+        processingOutputRows = new RectTransform[5];
+        processingOutputNameTexts = new TMP_Text[processingOutputRows.Length];
+        processingOutputAmountTexts = new TMP_Text[processingOutputRows.Length];
+        processingOutputStoredTexts = new TMP_Text[processingOutputRows.Length];
+        processingOutputIconImages = new Image[processingOutputRows.Length];
+        processingOutputProgressImages = new Image[processingOutputRows.Length];
+        for (int i = 0; i < processingOutputRows.Length; i++)
+        {
+            RectTransform row = CreateProcessingCard(
+                "Processing Output Row " + i,
+                outputSection,
+                new Vector2(15f, -61f - i * 132f),
+                new Vector2(484f, 120f),
+                new Color32(228, 230, 236, 255),
+                new Color32(184, 197, 212, 255),
+                10);
+            processingOutputRows[i] = row;
+            processingOutputIconImages[i] = CreateProcessingResourceIcon(row, new Vector2(8f, -27f), new Vector2(101f, 78f), "");
+            processingOutputNameTexts[i] = CreateProcessingText(row, "", 24, new Vector2(119f, -16f), new Vector2(233f, 42f), TextAnchor.UpperLeft, new Color32(58, 66, 83, 255), FontStyle.Normal);
+            processingOutputStoredTexts[i] = CreateProcessingText(row, "", 20, new Vector2(124f, -78f), new Vector2(150f, 24f), TextAnchor.MiddleCenter, new Color32(106, 120, 146, 255), FontStyle.Normal);
+            processingOutputAmountTexts[i] = CreateProcessingText(row, "", 20, new Vector2(384f, -48f), new Vector2(75f, 24f), TextAnchor.MiddleRight, new Color32(106, 120, 146, 255), FontStyle.Normal);
+            processingOutputProgressImages[i] = CreateProcessingCircularProgress(row, new Vector2(372f, -10f), new Vector2(100f, 100f));
+        }
+
+        CreateProcessingScrollBar(outputSection, new Vector2(508f, -61f), new Vector2(2f, 819f));
+
+        processingCollectButton = CreateProcessingGradientButton(
+            outputSection,
+            "\u041f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0432\u0441\u0435",
+            new Vector2(15f, -829f),
+            new Vector2(484f, 50f),
+            () => HandleProcessingCollect(),
+            GetProcessingCollectButtonSprite(),
+            out processingCollectButtonText);
 
         SetActiveIfNotNull(processingPanel, false);
     }
 
-    private void CreateProcessingSection(string name, Vector2 anchoredPosition, Vector2 size)
+    private bool BuildProcessingPanelFromPrefab()
     {
-        RectTransform section = CreateRect(name, processingPanel, new RectTransformSpec
+        RectTransform prefab = Resources.Load<RectTransform>("UI/Processing/BaseProcessingWindow");
+        if (prefab == null || windowPanel == null)
+        {
+            return false;
+        }
+
+        processingPanel = Instantiate(prefab, windowPanel);
+        processingPanel.name = "Processing Window Content";
+        processingPanel.anchorMin = Vector2.zero;
+        processingPanel.anchorMax = Vector2.one;
+        processingPanel.pivot = new Vector2(0.5f, 0.5f);
+        processingPanel.anchoredPosition = Vector2.zero;
+        processingPanel.sizeDelta = Vector2.zero;
+
+        processingHeaderTitleText = FindProcessingPrefabComponent<TMP_Text>("Processing Header/Processing Header Title");
+        processingHeaderStatsText = FindProcessingPrefabComponent<TMP_Text>("Processing Header/Processing Header Stats");
+
+        Transform storageSection = processingPanel.Find("Processing Storage Warehouse");
+        Transform bunkerSection = processingPanel.Find("Processing Bunker Warehouse");
+        Transform outputSection = processingPanel.Find("Processing Output Warehouse");
+        processingStorageTitleText = storageSection != null ? storageSection.Find("Warehouse Title")?.GetComponent<TMP_Text>() : null;
+        processingBunkerTitleText = bunkerSection != null ? bunkerSection.Find("Warehouse Title")?.GetComponent<TMP_Text>() : null;
+        processingOutputsTitleText = outputSection != null ? outputSection.Find("Warehouse Title")?.GetComponent<TMP_Text>() : null;
+
+        processingStatsText = CreateHiddenProcessingText(processingPanel);
+        processingStorageText = CreateHiddenProcessingText(processingPanel);
+        processingBunkerText = CreateHiddenProcessingText(processingPanel);
+        processingOutputsText = CreateHiddenProcessingText(processingPanel);
+        processingStatusText = FindProcessingPrefabComponent<TMP_Text>("Processing Status");
+
+        processingInputButtons = new Button[8];
+        processingInputButtonTexts = new TMP_Text[processingInputButtons.Length];
+        processingInputAmountTexts = new TMP_Text[processingInputButtons.Length];
+        processingInputIconImages = new Image[processingInputButtons.Length];
+        for (int i = 0; i < processingInputButtons.Length; i++)
+        {
+            int index = i;
+            Transform row = storageSection != null ? storageSection.Find("Input Row " + i) : null;
+            processingInputButtons[i] = row != null ? row.GetComponent<Button>() : null;
+            processingInputButtonTexts[i] = row != null ? row.Find("Input Name")?.GetComponent<TMP_Text>() : null;
+            processingInputAmountTexts[i] = row != null ? row.Find("Amount Pill/Input Amount")?.GetComponent<TMP_Text>() : null;
+            processingInputIconImages[i] = row != null ? row.Find("Resource Icon")?.GetComponent<Image>() : null;
+            if (processingInputButtons[i] != null)
+            {
+                processingInputButtons[i].onClick.RemoveAllListeners();
+                processingInputButtons[i].onClick.AddListener(() => HandleProcessingInputButton(index));
+            }
+        }
+
+        processingLoadAllButton = storageSection != null ? storageSection.Find("Load All Button")?.GetComponent<Button>() : null;
+        processingLoadAllButtonText = storageSection != null ? storageSection.Find("Load All Button/Label")?.GetComponent<TMP_Text>() : null;
+        if (processingLoadAllButton != null)
+        {
+            processingLoadAllButton.onClick.RemoveAllListeners();
+            processingLoadAllButton.onClick.AddListener(() => HandleProcessingLoadAll());
+        }
+
+        processingBunkerSlots = new RectTransform[9];
+        processingBunkerSlotNameTexts = new TMP_Text[processingBunkerSlots.Length];
+        processingBunkerSlotAmountTexts = new TMP_Text[processingBunkerSlots.Length];
+        processingBunkerSlotProgressTexts = new TMP_Text[processingBunkerSlots.Length];
+        processingBunkerSlotIconImages = new Image[processingBunkerSlots.Length];
+        for (int i = 0; i < processingBunkerSlots.Length; i++)
+        {
+            Transform slot = bunkerSection != null ? bunkerSection.Find("Bunker Slot " + i) : null;
+            processingBunkerSlots[i] = slot as RectTransform;
+            processingBunkerSlotNameTexts[i] = slot != null ? slot.Find("Slot Name")?.GetComponent<TMP_Text>() : null;
+            processingBunkerSlotAmountTexts[i] = slot != null ? slot.Find("Slot Amount Pill/Slot Amount")?.GetComponent<TMP_Text>() : null;
+            processingBunkerSlotProgressTexts[i] = slot != null ? slot.Find("Slot Progress")?.GetComponent<TMP_Text>() : null;
+            processingBunkerSlotIconImages[i] = slot != null ? slot.Find("Resource Icon")?.GetComponent<Image>() : null;
+        }
+
+        Transform bunkerStats = processingPanel.Find("Processing Bunker Stats");
+        processingBunkerCapacityText = bunkerStats != null ? bunkerStats.Find("Bunker Capacity")?.GetComponent<TMP_Text>() : null;
+        processingBunkerSlotCountText = bunkerStats != null ? bunkerStats.Find("Bunker Slots")?.GetComponent<TMP_Text>() : null;
+        processingClearButton = bunkerStats != null ? bunkerStats.Find("Clear Button")?.GetComponent<Button>() : null;
+        processingClearButtonText = bunkerStats != null ? bunkerStats.Find("Clear Button/Label")?.GetComponent<TMP_Text>() : null;
+        processingTransferTitleText = bunkerStats != null ? bunkerStats.Find("Transfer Title")?.GetComponent<TMP_Text>() : null;
+        processingTransferAmountText = bunkerStats != null ? bunkerStats.Find("Transfer Amount")?.GetComponent<TMP_Text>() : null;
+        processingTransferSlider = bunkerStats != null ? bunkerStats.Find("Transfer Slider")?.GetComponent<Slider>() : null;
+        processingTransferAllOutButton = bunkerStats != null ? bunkerStats.Find("Transfer All Out Button")?.GetComponent<Button>() : null;
+        processingTransferAllOutButtonText = bunkerStats != null ? bunkerStats.Find("Transfer All Out Button/Label")?.GetComponent<TMP_Text>() : null;
+        processingTransferAllInButton = bunkerStats != null ? bunkerStats.Find("Transfer All In Button")?.GetComponent<Button>() : null;
+        processingTransferAllInButtonText = bunkerStats != null ? bunkerStats.Find("Transfer All In Button/Label")?.GetComponent<TMP_Text>() : null;
+
+        if (processingClearButton != null)
+        {
+            processingClearButton.onClick.RemoveAllListeners();
+            processingClearButton.onClick.AddListener(() => HandleProcessingClear());
+        }
+
+        if (processingTransferSlider != null)
+        {
+            processingTransferSlider.onValueChanged.RemoveAllListeners();
+            processingTransferSlider.onValueChanged.AddListener(HandleProcessingTransferSliderChanged);
+        }
+
+        if (processingTransferAllOutButton != null)
+        {
+            processingTransferAllOutButton.onClick.RemoveAllListeners();
+            processingTransferAllOutButton.onClick.AddListener(() => HandleProcessingTransferAllOut());
+        }
+
+        if (processingTransferAllInButton != null)
+        {
+            processingTransferAllInButton.onClick.RemoveAllListeners();
+            processingTransferAllInButton.onClick.AddListener(() => HandleProcessingTransferAllIn());
+        }
+
+        processingOutputRows = new RectTransform[5];
+        processingOutputNameTexts = new TMP_Text[processingOutputRows.Length];
+        processingOutputAmountTexts = new TMP_Text[processingOutputRows.Length];
+        processingOutputStoredTexts = new TMP_Text[processingOutputRows.Length];
+        processingOutputIconImages = new Image[processingOutputRows.Length];
+        processingOutputProgressImages = new Image[processingOutputRows.Length];
+        for (int i = 0; i < processingOutputRows.Length; i++)
+        {
+            Transform row = outputSection != null ? outputSection.Find("Output Row " + i) : null;
+            processingOutputRows[i] = row as RectTransform;
+            processingOutputIconImages[i] = row != null ? row.Find("Resource Icon")?.GetComponent<Image>() : null;
+            processingOutputNameTexts[i] = row != null ? row.Find("Output Name")?.GetComponent<TMP_Text>() : null;
+            processingOutputStoredTexts[i] = row != null ? row.Find("Output Stored")?.GetComponent<TMP_Text>() : null;
+            processingOutputAmountTexts[i] = row != null ? row.Find("Output Amount")?.GetComponent<TMP_Text>() : null;
+            processingOutputProgressImages[i] = row != null ? row.Find("Circular Progress/Fill")?.GetComponent<Image>() : null;
+        }
+
+        processingCollectButton = outputSection != null ? outputSection.Find("Collect Button")?.GetComponent<Button>() : null;
+        processingCollectButtonText = outputSection != null ? outputSection.Find("Collect Button/Label")?.GetComponent<TMP_Text>() : null;
+        if (processingCollectButton != null)
+        {
+            processingCollectButton.onClick.RemoveAllListeners();
+            processingCollectButton.onClick.AddListener(() => HandleProcessingCollect());
+        }
+
+        SetActiveIfNotNull(processingPanel, false);
+        return true;
+    }
+
+    private T FindProcessingPrefabComponent<T>(string path) where T : Component
+    {
+        Transform child = processingPanel != null ? processingPanel.Find(path) : null;
+        return child != null ? child.GetComponent<T>() : null;
+    }
+
+    private RectTransform CreateProcessingWarehouse(string name, Vector2 anchoredPosition, Vector2 size, string title)
+    {
+        RectTransform section = CreateProcessingCard(name, processingPanel, anchoredPosition, size, new Color32(233, 236, 242, 255), new Color32(206, 211, 223, 255), 10);
+        CreateProcessingCard("Warehouse Header", section, new Vector2(1f, -1f), new Vector2(size.x - 2f, 44f), new Color32(235, 237, 241, 255), new Color32(235, 237, 241, 255), 10);
+        CreateProcessingText(section, title, 24, new Vector2(13f, -8f), new Vector2(size.x - 26f, 34f), TextAnchor.MiddleLeft, new Color32(58, 66, 83, 255), FontStyle.Normal).gameObject.name = "Warehouse Title";
+        CreateProcessingLine(section, "Warehouse Title Rule", new Vector2(13f, -45f), new Vector2(size.x - 26f, 1f), new Color32(184, 197, 212, 128));
+        return section;
+    }
+
+    private RectTransform CreateProcessingLine(Transform parent, string name, Vector2 anchoredPosition, Vector2 size, Color color)
+    {
+        RectTransform line = CreateRect(name, parent, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
@@ -1750,9 +2449,621 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
             anchoredPosition = anchoredPosition,
             sizeDelta = size
         });
-        Image image = section.gameObject.AddComponent<Image>();
-        image.color = new Color(0.032f, 0.055f, 0.058f, 0.90f);
+        Image image = line.gameObject.AddComponent<Image>();
+        image.color = color;
         image.raycastTarget = false;
+        return line;
+    }
+
+    private RectTransform CreateProcessingHeaderSeal(Transform parent, Vector2 anchoredPosition, Vector2 size)
+    {
+        RectTransform seal = CreateProcessingCard("Processing Header Seal", parent, anchoredPosition, size, new Color32(33, 43, 64, 255), new Color32(47, 59, 86, 255), 8);
+        RectTransform shine = CreateRect("Seal Shine", seal, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(6f, -6f),
+            sizeDelta = new Vector2(38f, 16f)
+        });
+        Image shineImage = shine.gameObject.AddComponent<Image>();
+        shineImage.sprite = GetProcessingRoundedSprite(8);
+        shineImage.type = Image.Type.Sliced;
+        shineImage.color = new Color32(189, 199, 215, 54);
+        shineImage.raycastTarget = false;
+
+        RectTransform diamond = CreateRect("Seal Diamond", seal, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0.5f, 0.5f),
+            anchorMax = new Vector2(0.5f, 0.5f),
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = new Vector2(0f, -1f),
+            sizeDelta = new Vector2(24f, 24f)
+        });
+        diamond.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        Image diamondImage = diamond.gameObject.AddComponent<Image>();
+        diamondImage.sprite = GetProcessingRoundedSprite(3);
+        diamondImage.type = Image.Type.Sliced;
+        diamondImage.color = new Color32(206, 210, 225, 190);
+        diamondImage.raycastTarget = false;
+
+        CreateProcessingLine(seal, "Seal Slash A", new Vector2(10f, -35f), new Vector2(30f, 2f), new Color32(82, 93, 113, 255)).localRotation = Quaternion.Euler(0f, 0f, -18f);
+        CreateProcessingLine(seal, "Seal Slash B", new Vector2(12f, -40f), new Vector2(16f, 2f), new Color32(82, 93, 113, 210)).localRotation = Quaternion.Euler(0f, 0f, -18f);
+        return seal;
+    }
+
+    private RectTransform CreateProcessingCard(string name, Transform parent, Vector2 anchoredPosition, Vector2 size, Color fill, Color border, int radius)
+    {
+        RectTransform rect = CreateRect(name, parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+
+        Image borderImage = rect.gameObject.AddComponent<Image>();
+        borderImage.sprite = GetProcessingRoundedSprite(radius);
+        borderImage.type = Image.Type.Sliced;
+        borderImage.color = border;
+        borderImage.raycastTarget = false;
+
+        bool needsInset = !ApproximatelySameColor(fill, border);
+        if (needsInset)
+        {
+            RectTransform inset = CreateRect(name + " Fill", rect, new RectTransformSpec
+            {
+                anchorMin = Vector2.zero,
+                anchorMax = Vector2.one,
+                pivot = new Vector2(0.5f, 0.5f),
+                anchoredPosition = Vector2.zero,
+                sizeDelta = new Vector2(-2f, -2f)
+            });
+            Image fillImage = inset.gameObject.AddComponent<Image>();
+            fillImage.sprite = GetProcessingRoundedSprite(Mathf.Max(0, radius - 1));
+            fillImage.type = Image.Type.Sliced;
+            fillImage.color = fill;
+            fillImage.raycastTarget = false;
+        }
+
+        return rect;
+    }
+
+    private TMP_Text CreateProcessingText(Transform parent, string value, int size, Vector2 anchoredPosition, Vector2 rectSize, TextAnchor anchor, Color color, FontStyle style)
+    {
+        RectTransform rect = CreateRect("Text", parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = rectSize
+        });
+        TextMeshProUGUI text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        text.font = Resources.Load<TMP_FontAsset>("Fonts/Ubuntu SDF")
+            ?? Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        text.fontSize = size;
+        text.text = value ?? "";
+        text.color = color;
+        text.alignment = ToTmpAlignment(anchor);
+        text.fontStyle = ToTmpFontStyle(style);
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = TextOverflowModes.Truncate;
+        text.raycastTarget = false;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private TMP_Text CreateHiddenProcessingText(Transform parent)
+    {
+        TMP_Text text = CreateProcessingText(parent, "", 1, new Vector2(-9000f, 9000f), Vector2.one, TextAnchor.UpperLeft, Color.clear, FontStyle.Normal);
+        text.gameObject.SetActive(true);
+        return text;
+    }
+
+    private RectTransform CreateProcessingIconFrame(Transform parent, Vector2 anchoredPosition, Vector2 size, string itemId)
+    {
+        RectTransform frame = CreateProcessingCard("Resource Icon Frame", parent, anchoredPosition, size, new Color32(218, 225, 235, 255), new Color32(184, 197, 212, 255), 8);
+        CreateProcessingResourceIcon(frame, Vector2.zero, size, itemId);
+        return frame;
+    }
+
+    private Image CreateProcessingResourceIcon(Transform parent, Vector2 anchoredPosition, Vector2 size, string itemId)
+    {
+        RectTransform rect = CreateRect("Resource Icon", parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+        Image image = rect.gameObject.AddComponent<Image>();
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+        SetProcessingIcon(image, itemId);
+        return image;
+    }
+
+    private static void SetProcessingIcon(Image image, string itemId)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        Sprite sprite = WildWindResourceIconCatalog.LoadSprite(itemId);
+        image.sprite = sprite;
+        image.enabled = sprite != null;
+        image.color = sprite != null ? Color.white : new Color(1f, 1f, 1f, 0f);
+    }
+
+    private void CreateProcessingScrollBar(Transform parent, Vector2 anchoredPosition, Vector2 size)
+    {
+        RectTransform track = CreateRect("Processing Scroll Track", parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+        Image trackImage = track.gameObject.AddComponent<Image>();
+        trackImage.sprite = GetProcessingRoundedSprite(2);
+        trackImage.type = Image.Type.Sliced;
+        trackImage.color = new Color32(161, 169, 181, 102);
+        trackImage.raycastTarget = false;
+
+        RectTransform thumb = CreateRect("Processing Scroll Thumb", track, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = new Vector2(size.x, 50f)
+        });
+        Image thumbImage = thumb.gameObject.AddComponent<Image>();
+        thumbImage.sprite = GetProcessingRoundedSprite(2);
+        thumbImage.type = Image.Type.Sliced;
+        thumbImage.color = new Color32(66, 109, 147, 255);
+        thumbImage.raycastTarget = false;
+    }
+
+    private Slider CreateProcessingSlider(Transform parent, Vector2 anchoredPosition, Vector2 size, UnityEngine.Events.UnityAction<float> callback)
+    {
+        RectTransform root = CreateRect("Processing Transfer Slider", parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+
+        Slider slider = root.gameObject.AddComponent<Slider>();
+        slider.minValue = 0f;
+        slider.maxValue = 1f;
+        slider.wholeNumbers = true;
+
+        RectTransform background = CreateRect("Background", root, new RectTransformSpec
+        {
+            anchorMin = Vector2.zero,
+            anchorMax = Vector2.one,
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = Vector2.zero
+        });
+        Image backgroundImage = background.gameObject.AddComponent<Image>();
+        backgroundImage.sprite = GetProcessingRoundedSprite(7);
+        backgroundImage.type = Image.Type.Sliced;
+        backgroundImage.color = new Color32(216, 219, 224, 255);
+
+        RectTransform fillArea = CreateRect("Fill Area", root, new RectTransformSpec
+        {
+            anchorMin = Vector2.zero,
+            anchorMax = Vector2.one,
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = new Vector2(-4f, -4f)
+        });
+        RectTransform fill = CreateRect("Fill", fillArea, new RectTransformSpec
+        {
+            anchorMin = Vector2.zero,
+            anchorMax = new Vector2(1f, 1f),
+            pivot = new Vector2(0f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = Vector2.zero
+        });
+        Image fillImage = fill.gameObject.AddComponent<Image>();
+        fillImage.sprite = GetProcessingPrimaryButtonSprite();
+        fillImage.type = Image.Type.Sliced;
+        fillImage.color = Color.white;
+
+        RectTransform handleArea = CreateRect("Handle Slide Area", root, new RectTransformSpec
+        {
+            anchorMin = Vector2.zero,
+            anchorMax = Vector2.one,
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = new Vector2(-8f, 8f)
+        });
+        RectTransform handle = CreateRect("Handle", handleArea, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 0.5f),
+            anchorMax = new Vector2(0f, 0.5f),
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = new Vector2(18f, 24f)
+        });
+        Image handleImage = handle.gameObject.AddComponent<Image>();
+        handleImage.sprite = GetProcessingRoundedSprite(8);
+        handleImage.type = Image.Type.Sliced;
+        handleImage.color = new Color32(58, 66, 83, 255);
+
+        slider.fillRect = fill;
+        slider.handleRect = handle;
+        slider.targetGraphic = handleImage;
+        slider.onValueChanged.AddListener(callback);
+        return slider;
+    }
+
+    private Image CreateProcessingCircularProgress(Transform parent, Vector2 anchoredPosition, Vector2 size)
+    {
+        RectTransform root = CreateRect("Processing Circular Progress", parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+
+        Image background = root.gameObject.AddComponent<Image>();
+        background.sprite = GetProcessingCircleSprite();
+        background.color = new Color32(196, 200, 207, 255);
+        background.raycastTarget = false;
+
+        RectTransform fill = CreateRect("Fill", root, new RectTransformSpec
+        {
+            anchorMin = Vector2.zero,
+            anchorMax = Vector2.one,
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = Vector2.zero
+        });
+        Image fillImage = fill.gameObject.AddComponent<Image>();
+        fillImage.sprite = GetProcessingCircleSprite();
+        fillImage.type = Image.Type.Filled;
+        fillImage.fillMethod = Image.FillMethod.Radial360;
+        fillImage.fillOrigin = (int)Image.Origin360.Top;
+        fillImage.fillClockwise = true;
+        fillImage.fillAmount = 0f;
+        fillImage.color = new Color32(64, 86, 143, 255);
+        fillImage.raycastTarget = false;
+
+        RectTransform hole = CreateRect("Hole", root, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0.5f, 0.5f),
+            anchorMax = new Vector2(0.5f, 0.5f),
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = size * 0.72f
+        });
+        Image holeImage = hole.gameObject.AddComponent<Image>();
+        holeImage.sprite = GetProcessingCircleSprite();
+        holeImage.color = new Color32(228, 230, 236, 255);
+        holeImage.raycastTarget = false;
+
+        return fillImage;
+    }
+
+    private RectTransform CreateProcessingButtonRect(
+        string name,
+        Transform parent,
+        Vector2 anchoredPosition,
+        Vector2 size,
+        UnityEngine.Events.UnityAction action,
+        Color fill,
+        Color border,
+        int radius,
+        out Button button)
+    {
+        RectTransform rect = CreateRect(name, parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+
+        Image image = rect.gameObject.AddComponent<Image>();
+        image.sprite = GetProcessingRoundedSprite(radius);
+        image.type = Image.Type.Sliced;
+        image.color = fill;
+        image.raycastTarget = true;
+
+        if (!ApproximatelySameColor(fill, border))
+        {
+            RectTransform borderRect = CreateRect("Border", rect, new RectTransformSpec
+            {
+                anchorMin = Vector2.zero,
+                anchorMax = Vector2.one,
+                pivot = new Vector2(0.5f, 0.5f),
+                anchoredPosition = Vector2.zero,
+                sizeDelta = Vector2.zero
+            });
+            Image borderImage = borderRect.gameObject.AddComponent<Image>();
+            borderImage.sprite = GetProcessingRoundedSprite(radius);
+            borderImage.type = Image.Type.Sliced;
+            borderImage.color = border;
+            borderImage.raycastTarget = false;
+            borderRect.SetAsFirstSibling();
+
+            RectTransform fillRect = CreateRect("Fill", rect, new RectTransformSpec
+            {
+                anchorMin = Vector2.zero,
+                anchorMax = Vector2.one,
+                pivot = new Vector2(0.5f, 0.5f),
+                anchoredPosition = Vector2.zero,
+                sizeDelta = new Vector2(-2f, -2f)
+            });
+            Image fillImage = fillRect.gameObject.AddComponent<Image>();
+            fillImage.sprite = GetProcessingRoundedSprite(Mathf.Max(0, radius - 1));
+            fillImage.type = Image.Type.Sliced;
+            fillImage.color = fill;
+            fillImage.raycastTarget = false;
+        }
+
+        button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(action);
+        ColorBlock colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(0.96f, 0.98f, 1f, 1f);
+        colors.pressedColor = new Color(0.86f, 0.91f, 0.98f, 1f);
+        colors.disabledColor = new Color(1f, 1f, 1f, 0.48f);
+        button.colors = colors;
+        return rect;
+    }
+
+    private Button CreateProcessingGradientButton(
+        Transform parent,
+        string label,
+        Vector2 anchoredPosition,
+        Vector2 size,
+        UnityEngine.Events.UnityAction action,
+        Sprite sprite,
+        out TMP_Text labelText)
+    {
+        RectTransform rect = CreateRect(label + " Button", parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+        Image image = rect.gameObject.AddComponent<Image>();
+        image.sprite = sprite;
+        image.type = Image.Type.Sliced;
+        image.color = Color.white;
+        image.raycastTarget = true;
+
+        Button button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(action);
+        ColorBlock colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.06f, 1.06f, 1.06f, 1f);
+        colors.pressedColor = new Color(0.85f, 0.88f, 0.95f, 1f);
+        colors.disabledColor = new Color(1f, 1f, 1f, 0.45f);
+        button.colors = colors;
+
+        labelText = CreateProcessingText(rect, label, 20, Vector2.zero, size, TextAnchor.MiddleCenter, new Color32(242, 244, 248, 255), FontStyle.Bold);
+        return button;
+    }
+
+    private static TextAlignmentOptions ToTmpAlignment(TextAnchor anchor)
+    {
+        switch (anchor)
+        {
+            case TextAnchor.UpperLeft: return TextAlignmentOptions.TopLeft;
+            case TextAnchor.UpperCenter: return TextAlignmentOptions.Top;
+            case TextAnchor.UpperRight: return TextAlignmentOptions.TopRight;
+            case TextAnchor.MiddleLeft: return TextAlignmentOptions.MidlineLeft;
+            case TextAnchor.MiddleCenter: return TextAlignmentOptions.Midline;
+            case TextAnchor.MiddleRight: return TextAlignmentOptions.MidlineRight;
+            case TextAnchor.LowerLeft: return TextAlignmentOptions.BottomLeft;
+            case TextAnchor.LowerCenter: return TextAlignmentOptions.Bottom;
+            case TextAnchor.LowerRight: return TextAlignmentOptions.BottomRight;
+            default: return TextAlignmentOptions.Midline;
+        }
+    }
+
+    private static FontStyles ToTmpFontStyle(FontStyle style)
+    {
+        switch (style)
+        {
+            case FontStyle.Bold: return FontStyles.Bold;
+            case FontStyle.Italic: return FontStyles.Italic;
+            case FontStyle.BoldAndItalic: return FontStyles.Bold | FontStyles.Italic;
+            default: return FontStyles.Normal;
+        }
+    }
+
+    private static bool ApproximatelySameColor(Color a, Color b)
+    {
+        return Mathf.Abs(a.r - b.r) < 0.005f
+            && Mathf.Abs(a.g - b.g) < 0.005f
+            && Mathf.Abs(a.b - b.b) < 0.005f
+            && Mathf.Abs(a.a - b.a) < 0.005f;
+    }
+
+    private static Sprite GetProcessingRoundedSprite(int radius)
+    {
+        radius = Mathf.Clamp(radius, 0, 48);
+        if (RoundedUiSprites.TryGetValue(radius, out Sprite cached) && cached != null)
+        {
+            return cached;
+        }
+
+        const int size = 96;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.name = "Runtime_Rounded_" + radius;
+        Color clear = new Color(1f, 1f, 1f, 0f);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float alpha = GetRoundedRectCoverage(x + 0.5f, y + 0.5f, size, size, radius);
+                texture.SetPixel(x, y, alpha > 0f ? new Color(1f, 1f, 1f, alpha) : clear);
+            }
+        }
+
+        FinalizeRuntimeUiTexture(texture);
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(24f, 24f, 24f, 24f));
+        sprite.name = "Sprite_Rounded_" + radius;
+        RoundedUiSprites[radius] = sprite;
+        return sprite;
+    }
+
+    private static Sprite GetProcessingSlotSprite()
+    {
+        if (cachedProcessingSlotSprite != null)
+        {
+            return cachedProcessingSlotSprite;
+        }
+
+        cachedProcessingSlotSprite = CreateProcessingGradientSprite(
+            "Sprite_ProcessingSlot",
+            10,
+            new Color32(238, 244, 252, 255),
+            new Color32(218, 228, 243, 255));
+        return cachedProcessingSlotSprite;
+    }
+
+    private static Sprite GetProcessingCircleSprite()
+    {
+        if (cachedProcessingCircleSprite != null)
+        {
+            return cachedProcessingCircleSprite;
+        }
+
+        const int size = 128;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.name = "Runtime_ProcessingCircle";
+        Color clear = new Color(1f, 1f, 1f, 0f);
+        Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
+        float radius = size * 0.5f - 1f;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center) - radius;
+                float alpha = Mathf.Clamp01(0.5f - distance);
+                texture.SetPixel(x, y, alpha > 0f ? new Color(1f, 1f, 1f, alpha) : clear);
+            }
+        }
+
+        FinalizeRuntimeUiTexture(texture);
+        cachedProcessingCircleSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        cachedProcessingCircleSprite.name = "Sprite_ProcessingCircle";
+        return cachedProcessingCircleSprite;
+    }
+
+    private static Sprite GetProcessingPrimaryButtonSprite()
+    {
+        if (cachedProcessingPrimaryButtonSprite != null)
+        {
+            return cachedProcessingPrimaryButtonSprite;
+        }
+
+        cachedProcessingPrimaryButtonSprite = CreateProcessingGradientSprite(
+            "Sprite_ProcessingPrimaryButton",
+            8,
+            new Color32(47, 59, 86, 255),
+            new Color32(80, 104, 170, 255));
+        return cachedProcessingPrimaryButtonSprite;
+    }
+
+    private static Sprite GetProcessingCollectButtonSprite()
+    {
+        if (cachedProcessingCollectButtonSprite != null)
+        {
+            return cachedProcessingCollectButtonSprite;
+        }
+
+        cachedProcessingCollectButtonSprite = CreateProcessingGradientSprite(
+            "Sprite_ProcessingCollectButton",
+            8,
+            new Color32(166, 161, 130, 255),
+            new Color32(195, 189, 164, 255));
+        return cachedProcessingCollectButtonSprite;
+    }
+
+    private static Sprite CreateProcessingGradientSprite(string name, int radius, Color left, Color right)
+    {
+        const int width = 192;
+        const int height = 64;
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        texture.name = name;
+        Color clear = new Color(1f, 1f, 1f, 0f);
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                Color color = Color.Lerp(left, right, width <= 1 ? 0f : x / (width - 1f));
+                float alpha = GetRoundedRectCoverage(x + 0.5f, y + 0.5f, width, height, radius);
+                color.a *= alpha;
+                texture.SetPixel(x, y, alpha > 0f ? color : clear);
+            }
+        }
+
+        FinalizeRuntimeUiTexture(texture);
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(16f, 16f, 16f, 16f));
+        sprite.name = name;
+        return sprite;
+    }
+
+    private static bool IsInsideRoundedRect(float x, float y, float width, float height, float radius)
+    {
+        return GetRoundedRectCoverage(x, y, width, height, radius) >= 0.5f;
+    }
+
+    private static float GetRoundedRectCoverage(float x, float y, float width, float height, float radius)
+    {
+        radius = Mathf.Max(0f, radius);
+        if (radius <= 0.01f)
+        {
+            float xCoverage = Mathf.Min(x + 0.5f, width - x + 0.5f);
+            float yCoverage = Mathf.Min(y + 0.5f, height - y + 0.5f);
+            return Mathf.Clamp01(Mathf.Min(xCoverage, yCoverage));
+        }
+
+        float left = radius;
+        float right = width - radius;
+        float bottom = radius;
+        float top = height - radius;
+        float px = Mathf.Clamp(x, left, right);
+        float py = Mathf.Clamp(y, bottom, top);
+        float dx = x - px;
+        float dy = y - py;
+        float signedDistance = Mathf.Sqrt(dx * dx + dy * dy) - radius;
+        return Mathf.Clamp01(0.5f - signedDistance);
+    }
+
+    private static void FinalizeRuntimeUiTexture(Texture2D texture)
+    {
+        if (texture == null)
+        {
+            return;
+        }
+
+        texture.filterMode = FilterMode.Bilinear;
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.Apply(false, true);
     }
 
     private void BuildCascadeCatalogPanel()
@@ -1897,6 +3208,98 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         SetActiveIfNotNull(courierPanel, false);
     }
 
+    private void BuildCapitalAirplanePanel()
+    {
+        capitalAirplanePanel = CreateRect("Capital Airplane Content", windowPanel, new RectTransformSpec
+        {
+            anchorMin = Vector2.zero,
+            anchorMax = Vector2.one,
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = Vector2.zero
+        });
+
+        Image background = capitalAirplanePanel.gameObject.AddComponent<Image>();
+        background.color = new Color(0.060f, 0.054f, 0.036f, 0.99f);
+        background.raycastTarget = false;
+
+        CreateCapitalAirplaneSection("Capital Airplane Header", new Vector2(18f, -16f), new Vector2(1284f, 82f), new Color(0.18f, 0.13f, 0.055f, 0.96f));
+        capitalAirplaneHeaderText = CreateText(capitalAirplanePanel, "", 26, new Vector2(38f, -24f), new Vector2(910f, 52f), TextAnchor.MiddleLeft, new Color(1.00f, 0.88f, 0.54f, 1f));
+        capitalAirplaneHeaderText.fontStyle = FontStyle.Bold;
+
+        CreateCapitalAirplaneSection("Capital Airplane Cargo", new Vector2(18f, -112f), new Vector2(612f, 594f), new Color(0.090f, 0.074f, 0.048f, 0.98f));
+        CreateText(capitalAirplanePanel, "Требуется загрузить", 20, new Vector2(42f, -132f), new Vector2(520f, 32f), TextAnchor.MiddleLeft, new Color(0.96f, 0.86f, 0.62f, 1f)).fontStyle = FontStyle.Bold;
+        capitalAirplaneCargoText = CreateText(capitalAirplanePanel, "", 18, new Vector2(42f, -178f), new Vector2(548f, 486f), TextAnchor.UpperLeft, new Color(0.92f, 0.90f, 0.82f, 1f));
+
+        CreateCapitalAirplaneSection("Capital Airplane Reward", new Vector2(654f, -112f), new Vector2(648f, 594f), new Color(0.110f, 0.084f, 0.048f, 0.98f));
+        CreateText(capitalAirplanePanel, "Награда столицы", 20, new Vector2(680f, -132f), new Vector2(520f, 32f), TextAnchor.MiddleLeft, new Color(0.96f, 0.86f, 0.62f, 1f)).fontStyle = FontStyle.Bold;
+        capitalAirplaneRewardText = CreateText(capitalAirplanePanel, "", 20, new Vector2(680f, -182f), new Vector2(560f, 328f), TextAnchor.UpperLeft, new Color(0.94f, 0.92f, 0.82f, 1f));
+        capitalAirplaneStatusText = CreateText(capitalAirplanePanel, "", 17, new Vector2(680f, -536f), new Vector2(560f, 72f), TextAnchor.UpperLeft, new Color(0.98f, 0.78f, 0.42f, 1f));
+
+        capitalAirplaneSendButton = CreateButton(capitalAirplanePanel, "Отправить полностью", new Vector2(886f, -646f), new Vector2(260f, 48f), () => HandleCapitalAirplaneSend(), out capitalAirplaneSendButtonText);
+        StyleCourierButton(capitalAirplaneSendButton, true);
+
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+    }
+
+    private void BuildRepairDockPanel()
+    {
+        repairDockPanel = CreateRect("Repair Dock Content", windowPanel, new RectTransformSpec
+        {
+            anchorMin = Vector2.zero,
+            anchorMax = Vector2.one,
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = Vector2.zero
+        });
+
+        Image background = repairDockPanel.gameObject.AddComponent<Image>();
+        background.color = new Color(0.050f, 0.038f, 0.042f, 0.99f);
+        background.raycastTarget = false;
+
+        CreateRepairDockSection("Repair Dock Header", new Vector2(18f, -16f), new Vector2(1284f, 82f), new Color(0.16f, 0.090f, 0.096f, 0.96f));
+        repairDockHeaderText = CreateText(repairDockPanel, "", 26, new Vector2(38f, -24f), new Vector2(910f, 52f), TextAnchor.MiddleLeft, new Color(1.00f, 0.80f, 0.64f, 1f));
+        repairDockHeaderText.fontStyle = FontStyle.Bold;
+
+        CreateRepairDockSection("Repair Dock Slots", new Vector2(18f, -112f), new Vector2(380f, 594f), new Color(0.090f, 0.052f, 0.056f, 0.98f));
+        CreateText(repairDockPanel, "Слоты", 20, new Vector2(42f, -132f), new Vector2(180f, 32f), TextAnchor.MiddleLeft, new Color(0.96f, 0.82f, 0.66f, 1f)).fontStyle = FontStyle.Bold;
+        repairDockSlotListText = CreateText(repairDockPanel, "", 15, new Vector2(236f, -134f), new Vector2(132f, 30f), TextAnchor.MiddleRight, new Color(0.78f, 0.70f, 0.64f, 1f));
+        repairDockSlotButtons = new Button[MetaGameState.RepairDockSlotCount];
+        repairDockSlotButtonTexts = new Text[repairDockSlotButtons.Length];
+        for (int i = 0; i < repairDockSlotButtons.Length; i++)
+        {
+            int index = i;
+            repairDockSlotButtons[i] = CreateButton(
+                repairDockPanel,
+                "",
+                new Vector2(42f, -184f - i * 92f),
+                new Vector2(320f, 72f),
+                () => SelectRepairDockSlot(index),
+                out repairDockSlotButtonTexts[i]);
+            repairDockSlotButtonTexts[i].fontSize = 16;
+            repairDockSlotButtonTexts[i].alignment = TextAnchor.MiddleLeft;
+            StyleRepairDockButton(repairDockSlotButtons[i], false);
+        }
+
+        CreateRepairDockSection("Repair Dock Details", new Vector2(426f, -112f), new Vector2(420f, 594f), new Color(0.070f, 0.050f, 0.052f, 0.98f));
+        CreateText(repairDockPanel, "Корпус", 20, new Vector2(450f, -132f), new Vector2(300f, 32f), TextAnchor.MiddleLeft, new Color(0.96f, 0.82f, 0.66f, 1f)).fontStyle = FontStyle.Bold;
+        repairDockDetailText = CreateText(repairDockPanel, "", 18, new Vector2(450f, -178f), new Vector2(360f, 486f), TextAnchor.UpperLeft, new Color(0.92f, 0.88f, 0.82f, 1f));
+
+        CreateRepairDockSection("Repair Dock Cost", new Vector2(874f, -112f), new Vector2(428f, 594f), new Color(0.086f, 0.058f, 0.052f, 0.98f));
+        CreateText(repairDockPanel, "Текущая работа", 20, new Vector2(902f, -132f), new Vector2(330f, 32f), TextAnchor.MiddleLeft, new Color(0.96f, 0.82f, 0.66f, 1f)).fontStyle = FontStyle.Bold;
+        repairDockCostText = CreateText(repairDockPanel, "", 18, new Vector2(902f, -178f), new Vector2(348f, 292f), TextAnchor.UpperLeft, new Color(0.94f, 0.90f, 0.82f, 1f));
+        repairDockStatusText = CreateText(repairDockPanel, "", 17, new Vector2(902f, -492f), new Vector2(348f, 86f), TextAnchor.UpperLeft, new Color(0.98f, 0.76f, 0.50f, 1f));
+
+        repairDockWorkButton = CreateButton(repairDockPanel, "Работа", new Vector2(902f, -620f), new Vector2(132f, 48f), () => HandleRepairDockWork(), out repairDockWorkButtonText);
+        repairDockClaimButton = CreateButton(repairDockPanel, "В порт", new Vector2(1050f, -620f), new Vector2(132f, 48f), () => HandleRepairDockClaim(), out repairDockClaimButtonText);
+        repairDockSellButton = CreateButton(repairDockPanel, "Продать", new Vector2(1198f, -620f), new Vector2(92f, 48f), () => HandleRepairDockSell(), out repairDockSellButtonText);
+        StyleRepairDockButton(repairDockWorkButton, true);
+        StyleRepairDockButton(repairDockClaimButton, false);
+        StyleRepairDockButton(repairDockSellButton, false);
+
+        SetActiveIfNotNull(repairDockPanel, false);
+    }
+
     private RectTransform CreateCascadeSection(string name, Vector2 anchoredPosition, Vector2 size, Color color)
     {
         RectTransform section = CreateRect(name, cascadeCatalogPanel, new RectTransformSpec
@@ -1916,6 +3319,38 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private RectTransform CreateCourierSection(string name, Vector2 anchoredPosition, Vector2 size, Color color)
     {
         RectTransform section = CreateRect(name, courierPanel, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+        Image image = section.gameObject.AddComponent<Image>();
+        image.color = color;
+        image.raycastTarget = false;
+        return section;
+    }
+
+    private RectTransform CreateCapitalAirplaneSection(string name, Vector2 anchoredPosition, Vector2 size, Color color)
+    {
+        RectTransform section = CreateRect(name, capitalAirplanePanel, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+        Image image = section.gameObject.AddComponent<Image>();
+        image.color = color;
+        image.raycastTarget = false;
+        return section;
+    }
+
+    private RectTransform CreateRepairDockSection(string name, Vector2 anchoredPosition, Vector2 size, Color color)
+    {
+        RectTransform section = CreateRect(name, repairDockPanel, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
@@ -2351,6 +3786,37 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         }
     }
 
+    private void StyleRepairDockButton(Button button, bool selected)
+    {
+        if (button == null) return;
+        Image image = button.GetComponent<Image>();
+        Color normal = selected
+            ? new Color(0.58f, 0.25f, 0.28f, 1f)
+            : new Color(0.20f, 0.075f, 0.085f, 1f);
+        Color highlighted = selected
+            ? new Color(0.72f, 0.32f, 0.36f, 1f)
+            : new Color(0.30f, 0.12f, 0.13f, 1f);
+        if (image != null)
+        {
+            image.color = normal;
+        }
+
+        ColorBlock colors = button.colors;
+        colors.normalColor = normal;
+        colors.highlightedColor = highlighted;
+        colors.pressedColor = new Color(0.12f, 0.045f, 0.050f, 1f);
+        colors.selectedColor = highlighted;
+        colors.disabledColor = new Color(0.10f, 0.060f, 0.065f, 0.55f);
+        colors.colorMultiplier = 1f;
+        button.colors = colors;
+
+        Text label = button.GetComponentInChildren<Text>(true);
+        if (label != null)
+        {
+            label.color = new Color(0.98f, 0.91f, 0.82f, button.interactable ? 1f : 0.48f);
+        }
+    }
+
     private void BuildBuildingCatalogPanel()
     {
         buildingCatalogPanel = CreateRect("Building Catalog Panel", overlayRoot, new RectTransformSpec
@@ -2529,6 +3995,10 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         cascadeCatalogWindowOpen = false;
         courierWindowOpen = false;
         courierStatusMessage = "";
+        capitalAirplaneWindowOpen = false;
+        capitalAirplaneStatusMessage = "";
+        repairDockWindowOpen = false;
+        repairDockStatusMessage = "";
         openExpansionRegionId = "";
         expansionWindowOpen = false;
         expansionStatusMessage = "";
@@ -2537,6 +4007,8 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         SetActiveIfNotNull(processingPanel, false);
         SetActiveIfNotNull(cascadeCatalogPanel, false);
         SetActiveIfNotNull(courierPanel, false);
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+        SetActiveIfNotNull(repairDockPanel, false);
         SetActiveIfNotNull(windowPrimaryButton, false);
         ClearBuildingFocus();
     }
@@ -2552,6 +4024,10 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         cascadeCatalogWindowOpen = false;
         courierWindowOpen = false;
         courierStatusMessage = "";
+        capitalAirplaneWindowOpen = false;
+        capitalAirplaneStatusMessage = "";
+        repairDockWindowOpen = false;
+        repairDockStatusMessage = "";
         openExpansionRegionId = "";
         expansionWindowOpen = false;
         expansionStatusMessage = "";
@@ -2561,7 +4037,10 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         SetActiveIfNotNull(windowFadeButton, false);
         SetActiveIfNotNull(windowPanel, false);
         SetActiveIfNotNull(processingPanel, false);
+        SetActiveIfNotNull(cascadeCatalogPanel, false);
         SetActiveIfNotNull(courierPanel, false);
+        SetActiveIfNotNull(capitalAirplanePanel, false);
+        SetActiveIfNotNull(repairDockPanel, false);
         SetActiveIfNotNull(windowPrimaryButton, false);
         RefreshBuildingOverlay();
     }
@@ -2583,6 +4062,22 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     {
         if (windowPanel != null)
         {
+            windowPanel.sizeDelta = new Vector2(1852f, 1024f);
+        }
+
+        SetRect(windowTitleText, new Vector2(74f, -20f), new Vector2(860f, 46f));
+        SetRect(windowExitButton, new Vector2(10f, -13f), new Vector2(50f, 50f));
+        if (windowExitButton != null)
+        {
+            windowExitButton.transform.SetAsLastSibling();
+        }
+        SetActiveIfNotNull(windowPrimaryButton, false);
+    }
+
+    private void ConfigureCourierWindow()
+    {
+        if (windowPanel != null)
+        {
             windowPanel.sizeDelta = new Vector2(1320f, 760f);
         }
 
@@ -2591,7 +4086,19 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         SetActiveIfNotNull(windowPrimaryButton, false);
     }
 
-    private void ConfigureCourierWindow()
+    private void ConfigureCapitalAirplaneWindow()
+    {
+        if (windowPanel != null)
+        {
+            windowPanel.sizeDelta = new Vector2(1320f, 760f);
+        }
+
+        SetRect(windowTitleText, new Vector2(26f, -20f), new Vector2(860f, 46f));
+        SetRect(windowExitButton, new Vector2(1110f, -24f), new Vector2(184f, 48f));
+        SetActiveIfNotNull(windowPrimaryButton, false);
+    }
+
+    private void ConfigureRepairDockWindow()
     {
         if (windowPanel != null)
         {
@@ -2637,21 +4144,27 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         List<string> outputs = meta.GetBaseProcessingOutputItemIds(openProcessingBranch);
 
         SetText(processingStatsText,
-            "Уровень " + facility.level
-            + "    КПД " + (facility.efficiency * 100f).ToString("0.#") + "%"
-            + "    Объем " + facility.cycleInputUnits + " ед./цикл"
-            + "    Бункер " + facility.BunkerLoadUnits + "/" + facility.bunkerCapacityUnits
-            + "    Цикл " + facility.cycleElapsedSeconds.ToString("0.0") + " / " + facility.cycleDurationSeconds.ToString("0") + " сек");
+            "\u0423\u0440\u043e\u0432\u0435\u043d\u044c " + facility.level
+            + "    \u041a\u041f\u0414 " + (facility.efficiency * 100f).ToString("0.#") + "%"
+            + "    \u041f\u0440\u043e\u0438\u0437\u0432. " + facility.processingUnitsPerMinute.ToString("0.#") + " \u0435\u0434./\u043c\u0438\u043d"
+            + "    \u0411\u0443\u043d\u043a\u0435\u0440 " + facility.BunkerLoadUnits + "/" + facility.bunkerCapacityUnits
+            + "    \u0422\u0438\u043a " + facility.processingTickElapsedSeconds.ToString("0.0") + " / 1.0 \u0441");
 
         SetText(processingStorageText, BuildProcessingStorageText(storage, inputs));
         SetText(processingBunkerText, BuildProcessingBunkerText(facility));
         SetText(processingOutputsText, BuildProcessingOutputsText(facility, outputs));
         SetText(processingStatusText, processingStatusMessage);
+        SetActiveIfNotNull(processingStatusText, !string.IsNullOrWhiteSpace(processingStatusMessage));
+        RefreshProcessingHeader(facility, inputs, outputs);
         RefreshProcessingInputButtons(storage, facility, inputs);
+        RefreshProcessingBunkerSlots(facility);
+        RefreshProcessingOutputRows(storage, facility, outputs);
+        RefreshProcessingTransferPanel(storage, facility, inputs);
 
         SetInteractable(processingLoadAllButton, facility.BunkerFreeUnits > 0 && HasAnyStoredInput(storage, inputs));
         SetInteractable(processingClearButton, facility.BunkerLoadUnits > 0);
         SetInteractable(processingCollectButton, HasAnyReadyOutput(facility));
+        RefreshProcessingActionButtonText(facility);
         processingWindowDirty = false;
         nextProcessingWindowRefreshTime = Time.unscaledTime + ProcessingWindowRefreshSeconds;
     }
@@ -2728,6 +4241,398 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         nextCourierWindowRefreshTime = Time.unscaledTime + CourierWindowRefreshSeconds;
     }
 
+    private void RefreshCapitalAirplaneWindowIfDue()
+    {
+        if (!capitalAirplaneWindowOpen)
+        {
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        if (!capitalAirplaneWindowDirty && now < nextCapitalAirplaneWindowRefreshTime)
+        {
+            return;
+        }
+
+        RefreshCapitalAirplaneWindow();
+    }
+
+    private void RefreshCapitalAirplaneWindow()
+    {
+        if (!capitalAirplaneWindowOpen
+            || capitalAirplanePanel == null
+            || !capitalAirplanePanel.gameObject.activeSelf
+            || meta == null)
+        {
+            return;
+        }
+
+        int level = GetBuildingLevelValue(openBuildingId);
+        CapitalAirplaneState state = meta.GetCapitalAirplaneState(level);
+        PortStorageState storage = meta.GetCapitalStorageState();
+        int remainingSeconds = meta.GetCapitalAirplaneRemainingSeconds(level);
+        bool canSend = meta.CanSendCapitalAirplane(level, out string blockReason);
+
+        SetText(capitalAirplaneHeaderText,
+            "Столичный самолет  |  служба " + (state != null ? state.serviceLevel : level)
+            + " уровень  |  цикл 24 часа  |  смена через " + FormatSecondsShort(remainingSeconds));
+        SetText(capitalAirplaneCargoText, BuildCapitalAirplaneCargoText(state, storage));
+        SetText(capitalAirplaneRewardText, BuildCapitalAirplaneRewardText(state, remainingSeconds));
+        SetText(capitalAirplaneStatusText,
+            !string.IsNullOrWhiteSpace(capitalAirplaneStatusMessage)
+                ? capitalAirplaneStatusMessage
+                : state != null && state.sent
+                    ? "Самолет уже отправлен. Новый прилетит только после дневного таймера."
+                    : canSend
+                        ? "Все полки готовы. Можно отправлять полный самолет."
+                        : blockReason);
+        SetInteractable(capitalAirplaneSendButton, canSend);
+        SetText(capitalAirplaneSendButtonText, state != null && state.sent ? "Ждем новый самолет" : "Отправить полностью");
+
+        capitalAirplaneWindowDirty = false;
+        nextCapitalAirplaneWindowRefreshTime = Time.unscaledTime + CapitalAirplaneWindowRefreshSeconds;
+    }
+
+    private void RefreshRepairDockWindowIfDue()
+    {
+        if (!repairDockWindowOpen)
+        {
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        if (!repairDockWindowDirty && now < nextRepairDockWindowRefreshTime)
+        {
+            return;
+        }
+
+        RefreshRepairDockWindow();
+    }
+
+    private void RefreshRepairDockWindow()
+    {
+        if (!repairDockWindowOpen
+            || repairDockPanel == null
+            || !repairDockPanel.gameObject.activeSelf
+            || meta == null)
+        {
+            return;
+        }
+
+        int level = GetBuildingLevelValue(openBuildingId);
+        meta.GetRepairDockSlots(level);
+        selectedRepairDockSlotIndex = Mathf.Clamp(selectedRepairDockSlotIndex, 0, MetaGameState.RepairDockSlotCount - 1);
+        RepairDockSlotState selectedSlot = meta.GetRepairDockSlot(selectedRepairDockSlotIndex, level);
+        PortStorageState storage = meta.GetCapitalStorageState();
+        bool canWork = meta.CanRunRepairDockWork(selectedRepairDockSlotIndex, level, out string workBlockReason);
+
+        SetText(repairDockHeaderText,
+            "Ремонтный док  |  площадки " + MetaGameState.RepairDockSlotCount
+            + "  |  уровень дока " + level
+            + "  |  случайные подбитые корабли");
+        SetText(repairDockSlotListText, "выбран: " + (selectedRepairDockSlotIndex + 1));
+        RefreshRepairDockSlotButtons(level);
+        SetText(repairDockDetailText, BuildRepairDockDetailText(selectedSlot));
+        SetText(repairDockCostText, BuildRepairDockCostText(selectedSlot, storage, level));
+        SetText(repairDockStatusText,
+            !string.IsNullOrWhiteSpace(repairDockStatusMessage)
+                ? repairDockStatusMessage
+                : selectedSlot != null && selectedSlot.repaired
+                    ? "Корабль восстановлен. Забери его в портовый слот или продай сразу."
+                    : canWork
+                        ? "Ресурсов хватает на текущую работу."
+                        : workBlockReason);
+
+        SetInteractable(repairDockWorkButton, canWork);
+        SetInteractable(repairDockClaimButton, selectedSlot != null && selectedSlot.repaired);
+        SetInteractable(repairDockSellButton, selectedSlot != null && selectedSlot.repaired);
+        SetText(repairDockWorkButtonText, selectedSlot != null && selectedSlot.repaired ? "Готово" : "Работа");
+        SetText(repairDockClaimButtonText, "В порт");
+        SetText(repairDockSellButtonText, "Продать");
+
+        repairDockWindowDirty = false;
+        nextRepairDockWindowRefreshTime = Time.unscaledTime + RepairDockWindowRefreshSeconds;
+    }
+
+    private void RefreshRepairDockSlotButtons(int buildingLevel)
+    {
+        if (repairDockSlotButtons == null || meta == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < repairDockSlotButtons.Length; i++)
+        {
+            RepairDockSlotState slot = meta.GetRepairDockSlot(i, buildingLevel);
+            bool selected = i == selectedRepairDockSlotIndex;
+            string shipName = "нет корпуса";
+            string progress = "-";
+            if (slot != null && slot.HasWreck)
+            {
+                ShipTreeEntryConfig ship = meta.GetShipTreeEntryConfigs() != null ? GetShipTreeEntry(slot.shipId) : null;
+                shipName = ship != null ? ship.DisplayNameRu : slot.shipId;
+                progress = slot.repaired
+                    ? "готов"
+                    : slot.completedWorkSteps + "/" + Mathf.Max(1, slot.workStepCount);
+            }
+
+            SetText(repairDockSlotButtonTexts[i],
+                (i + 1) + ". " + shipName
+                + "\n" + progress);
+            SetInteractable(repairDockSlotButtons[i], true);
+            StyleRepairDockButton(repairDockSlotButtons[i], selected);
+        }
+    }
+
+    private ShipTreeEntryConfig GetShipTreeEntry(string shipId)
+    {
+        if (meta == null || string.IsNullOrWhiteSpace(shipId))
+        {
+            return null;
+        }
+
+        IReadOnlyList<ShipTreeEntryConfig> ships = meta.GetShipTreeEntryConfigs();
+        if (ships == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < ships.Count; i++)
+        {
+            ShipTreeEntryConfig ship = ships[i];
+            if (ship != null && string.Equals(ship.shipId, shipId, StringComparison.OrdinalIgnoreCase))
+            {
+                return ship;
+            }
+        }
+
+        return null;
+    }
+
+    private string BuildRepairDockDetailText(RepairDockSlotState slot)
+    {
+        if (slot == null || !slot.HasWreck)
+        {
+            return "Подбитый корабль еще не прибыл.";
+        }
+
+        ShipTreeEntryConfig ship = GetShipTreeEntry(slot.shipId);
+        string shipName = ship != null ? ship.DisplayNameRu : slot.shipId;
+        string shipClass = ship != null ? ship.ClassDisplayNameRu : "корабль";
+        string faction = ship != null ? ship.FactionDisplayNameRu : "-";
+        StringBuilder builder = new StringBuilder();
+        builder.AppendLine(shipName);
+        builder.AppendLine("Ранг: " + slot.shipRank + "  |  " + shipClass);
+        builder.AppendLine("Фракция: " + faction);
+        builder.AppendLine("Служба дока: " + slot.serviceLevel);
+        builder.AppendLine("Работы: " + slot.completedWorkSteps + "/" + Mathf.Max(1, slot.workStepCount));
+        builder.AppendLine("Статус: " + (slot.repaired ? "восстановлен" : "подбитый корпус"));
+        builder.AppendLine();
+        builder.AppendLine("Стоимость ремонта: " + FormatCompactAmount(slot.repairCostFe) + " FE ресурсами.");
+        builder.AppendLine("Продажа после ремонта: " + FormatCompactAmount(slot.sellRewardFreight) + " фрахтов.");
+        builder.AppendLine();
+        builder.AppendLine("Док не меняет найденный корпус. Его можно только восстановить, затем забрать в портовый слот или продать.");
+        return builder.ToString().TrimEnd();
+    }
+
+    private string BuildRepairDockCostText(RepairDockSlotState slot, PortStorageState storage, int buildingLevel)
+    {
+        if (slot == null || !slot.HasWreck)
+        {
+            return "Нет активного ремонта.";
+        }
+
+        if (slot.repaired)
+        {
+            return "Все работы закрыты.\n\nКорабль можно поставить в порт или продать за фрахты.";
+        }
+
+        List<CascadeItemAmount> currentInputs = meta != null
+            ? meta.GetRepairDockCurrentWorkInputs(slot.slotIndex, buildingLevel)
+            : new List<CascadeItemAmount>();
+        StringBuilder builder = new StringBuilder();
+        builder.AppendLine("Шаг " + (slot.completedWorkSteps + 1) + "/" + Mathf.Max(1, slot.workStepCount));
+        builder.AppendLine();
+        if (currentInputs.Count == 0)
+        {
+            builder.AppendLine("- контрольная работа без расхода");
+        }
+        else
+        {
+            for (int i = 0; i < currentInputs.Count; i++)
+            {
+                CascadeItemAmount input = currentInputs[i];
+                if (input == null) continue;
+                int available = storage != null ? storage.GetResourceAmount(input.itemId) : 0;
+                builder.Append("- ")
+                    .Append(GetItemDisplayName(input.itemId))
+                    .Append(" x").Append(input.amount)
+                    .Append("  |  склад: ").Append(available);
+                if (available < input.amount)
+                {
+                    builder.Append("  |  не хватает ").Append(input.amount - available);
+                }
+
+                builder.AppendLine();
+            }
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Полный список ремонта:");
+        if (slot.inputs == null || slot.inputs.Count == 0)
+        {
+            builder.AppendLine("- пусто");
+        }
+        else
+        {
+            for (int i = 0; i < slot.inputs.Count; i++)
+            {
+                CascadeItemAmount input = slot.inputs[i];
+                if (input == null) continue;
+                builder.AppendLine("- " + GetItemDisplayName(input.itemId) + " x" + input.amount);
+            }
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private string BuildCapitalAirplaneCargoText(CapitalAirplaneState state, PortStorageState storage)
+    {
+        if (state == null || !state.HasPlane)
+        {
+            return "Самолет столицы еще не прибыл.";
+        }
+
+        System.Text.StringBuilder builder = new System.Text.StringBuilder();
+        builder.AppendLine("Требуется загрузить:");
+        builder.AppendLine(state.sent
+            ? "Этот рейс уже отправлен. Заявка сохранена до конца дневного цикла."
+            : "Загрузка принимается только полностью:");
+        builder.AppendLine();
+
+        if (state.inputs == null || state.inputs.Count == 0)
+        {
+            builder.AppendLine("- заявка пуста");
+        }
+        else
+        {
+            for (int i = 0; i < state.inputs.Count; i++)
+            {
+                CascadeItemAmount input = state.inputs[i];
+                if (input == null) continue;
+                int available = storage != null ? storage.GetResourceAmount(input.itemId) : 0;
+                builder.Append("- ")
+                    .Append(GetItemDisplayName(input.itemId))
+                    .Append(" x").Append(input.amount)
+                    .Append("  |  склад: ").Append(available);
+                if (available < input.amount)
+                {
+                    builder.Append("  |  не хватает ").Append(input.amount - available);
+                }
+
+                builder.AppendLine();
+            }
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Чем выше уровень аэродрома и освоения, тем тяжелее заявка и тем больше солидов в полной награде.");
+        return builder.ToString().TrimEnd();
+    }
+
+    private string BuildCapitalAirplaneRewardText(CapitalAirplaneState state, int remainingSeconds)
+    {
+        if (state == null || !state.HasPlane)
+        {
+            return "Награда появится вместе с самолетом.";
+        }
+
+        System.Text.StringBuilder builder = new System.Text.StringBuilder();
+        builder.AppendLine("Полная отправка:");
+        builder.AppendLine("- Солиды x" + state.solidReward);
+        builder.AppendLine("- Фрахт x" + state.freightReward);
+        builder.AppendLine("- Очки освоения x" + state.designExperienceReward);
+        if (!string.IsNullOrWhiteSpace(state.bonusSummary))
+        {
+            builder.AppendLine("- Бонус: " + state.bonusSummary);
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Осталось до смены: " + FormatSecondsShort(remainingSeconds));
+        builder.AppendLine("После ранней отправки следующий самолет не появится раньше этого таймера.");
+        return builder.ToString().TrimEnd();
+    }
+
+    private bool HandleCapitalAirplaneSend()
+    {
+        if (meta == null)
+        {
+            capitalAirplaneStatusMessage = "Мета-состояние не найдено.";
+            RefreshCapitalAirplaneWindow();
+            return false;
+        }
+
+        int level = GetBuildingLevelValue(openBuildingId);
+        bool sent = meta.TrySendCapitalAirplane(level, out capitalAirplaneStatusMessage);
+        capitalAirplaneWindowDirty = true;
+        RefreshCapitalAirplaneWindow();
+        return sent;
+    }
+
+    private void SelectRepairDockSlot(int slotIndex)
+    {
+        selectedRepairDockSlotIndex = Mathf.Clamp(slotIndex, 0, MetaGameState.RepairDockSlotCount - 1);
+        repairDockWindowDirty = true;
+        RefreshRepairDockWindow();
+    }
+
+    private bool HandleRepairDockWork()
+    {
+        if (meta == null)
+        {
+            repairDockStatusMessage = "Мета-состояние не найдено.";
+            RefreshRepairDockWindow();
+            return false;
+        }
+
+        int level = GetBuildingLevelValue(openBuildingId);
+        bool result = meta.TryRunRepairDockWork(selectedRepairDockSlotIndex, level, out repairDockStatusMessage);
+        repairDockWindowDirty = true;
+        RefreshRepairDockWindow();
+        return result;
+    }
+
+    private bool HandleRepairDockClaim()
+    {
+        if (meta == null)
+        {
+            repairDockStatusMessage = "Мета-состояние не найдено.";
+            RefreshRepairDockWindow();
+            return false;
+        }
+
+        int level = GetBuildingLevelValue(openBuildingId);
+        bool result = meta.TryClaimRepairedDockShip(selectedRepairDockSlotIndex, 0, level, out repairDockStatusMessage);
+        repairDockWindowDirty = true;
+        RefreshRepairDockWindow();
+        return result;
+    }
+
+    private bool HandleRepairDockSell()
+    {
+        if (meta == null)
+        {
+            repairDockStatusMessage = "Мета-состояние не найдено.";
+            RefreshRepairDockWindow();
+            return false;
+        }
+
+        int level = GetBuildingLevelValue(openBuildingId);
+        bool result = meta.TrySellRepairDockShip(selectedRepairDockSlotIndex, level, out repairDockStatusMessage);
+        repairDockWindowDirty = true;
+        RefreshRepairDockWindow();
+        return result;
+    }
+
     private void RefreshCourierOrderButtons()
     {
         if (courierOrderButtons == null || meta == null)
@@ -2789,7 +4694,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
         System.Text.StringBuilder builder = new System.Text.StringBuilder();
         builder.AppendLine("Площадка " + (slot.slotIndex + 1) + ": " + (string.IsNullOrWhiteSpace(slot.clientName) ? "Курьер Ветровых Домов" : slot.clientName));
-        builder.AppendLine("Фракция: Ветровые Дома");
+        builder.AppendLine("Фракция: " + (string.IsNullOrWhiteSpace(slot.customerFactionNameRu) ? "Ветровые Дома" : slot.customerFactionNameRu));
         builder.AppendLine();
         builder.AppendLine("Нужно загрузить:");
         if (slot.inputs == null || slot.inputs.Count == 0)
@@ -2820,6 +4725,11 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         builder.AppendLine("Награда:");
         builder.AppendLine("- Фрахт x" + slot.freightReward);
         builder.AppendLine("- Очки освоения x" + slot.designExperienceReward);
+        if (slot.reputationReward > 0)
+        {
+            builder.AppendLine("- Репутация фракции x" + slot.reputationReward);
+        }
+
         builder.AppendLine();
         builder.AppendLine("Заявка ждёт без дедлайна. Отмена поставит площадку на 15 минут обновления.");
         return builder.ToString().TrimEnd();
@@ -3535,7 +5445,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         }
         else
         {
-            builder.Append("Нажмите строку ресурса, чтобы переложить 1 ед. в бункер.");
+            builder.Append("\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u044b\u0440\u044c\u0435 \u0441\u043b\u0435\u0432\u0430 \u0438 \u0437\u0430\u0434\u0430\u0439\u0442\u0435 \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e \u0432 \u0437\u0434\u0430\u043d\u0438\u0438 \u043f\u043e\u043b\u0437\u0443\u043d\u043a\u043e\u043c.");
         }
 
         return builder.ToString();
@@ -3583,6 +5493,24 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         return builder.ToString();
     }
 
+    private void RefreshProcessingHeader(BaseProcessingFacilityState facility, List<string> inputs, List<string> outputs)
+    {
+        string buildingName = GetBuildingDisplayName(openBuildingId);
+        SetText(processingHeaderTitleText, string.IsNullOrWhiteSpace(buildingName) ? "\u041f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u043a\u0430" : buildingName);
+        SetText(processingStorageTitleText, "\u0421\u043a\u043b\u0430\u0434 \u0441\u044b\u0440\u044c\u044f");
+        SetText(processingBunkerTitleText, "\u0421\u043a\u043b\u0430\u0434 \u043f\u0440\u043e\u0434\u0443\u043a\u0446\u0438\u0438");
+        SetText(processingOutputsTitleText, "\u041f\u0435\u0440\u0435\u0440\u0430\u0431\u043e\u0442\u0430\u043d\u043d\u0430\u044f \u043f\u0440\u043e\u0434\u0443\u043a\u0446\u0438\u044f");
+
+        int inputCount = inputs != null ? inputs.Count : 0;
+        int outputCount = outputs != null ? outputs.Count : 0;
+        SetText(processingHeaderStatsText,
+            "\u0423\u0440\u043e\u0432\u0435\u043d\u044c " + (facility != null ? facility.level : 1)
+            + "   \u041a\u041f\u0414 " + (facility != null ? (facility.efficiency * 100f).ToString("0.#") : "0") + "%"
+            + "   \u041f\u0440\u043e\u0438\u0437\u0432. " + (facility != null ? facility.processingUnitsPerMinute.ToString("0.#") : "0") + " \u0435\u0434./\u043c\u0438\u043d"
+            + "   \u0441\u044b\u0440\u044c\u0435 " + inputCount
+            + "   \u0432\u044b\u0445\u043e\u0434\u044b " + outputCount);
+    }
+
     private void RefreshProcessingInputButtons(PortStorageState storage, BaseProcessingFacilityState facility, List<string> inputs)
     {
         if (processingInputButtons == null || processingInputButtonTexts == null)
@@ -3598,13 +5526,226 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
             string itemId = inputs[i];
             int amount = storage != null ? storage.GetResourceAmount(itemId) : 0;
-            bool canLoad = amount > 0 && facility != null && facility.BunkerFreeUnits > 0;
-            SetText(processingInputButtonTexts[i], "+1  " + ShortenItemName(GetItemDisplayName(itemId), 24) + "    " + amount);
-            processingInputButtonTexts[i].color = canLoad
-                ? new Color(0.94f, 0.90f, 0.73f, 1f)
-                : new Color(0.48f, 0.56f, 0.56f, 1f);
-            SetInteractable(processingInputButtons[i], canLoad);
+            int inBunker = facility != null ? facility.GetBunkerAmount(itemId) : 0;
+            bool selected = string.Equals(selectedProcessingInputItemId, itemId, StringComparison.OrdinalIgnoreCase);
+            bool canSelect = amount > 0 || inBunker > 0;
+            SetText(processingInputButtonTexts[i], ShortenItemName(GetItemDisplayName(itemId), 24));
+            if (processingInputAmountTexts != null && i < processingInputAmountTexts.Length)
+            {
+                SetText(processingInputAmountTexts[i], FormatProcessingAmount(amount));
+                processingInputAmountTexts[i].color = canSelect
+                    ? new Color32(58, 66, 83, 255)
+                    : new Color32(132, 141, 154, 255);
+            }
+
+            if (processingInputIconImages != null && i < processingInputIconImages.Length)
+            {
+                SetProcessingIcon(processingInputIconImages[i], itemId);
+            }
+
+            Image rowImage = processingInputButtons[i] != null ? processingInputButtons[i].GetComponent<Image>() : null;
+            if (rowImage != null)
+            {
+                rowImage.color = selected
+                    ? new Color32(210, 221, 238, 255)
+                    : canSelect ? new Color32(228, 230, 236, 255) : new Color32(218, 222, 229, 255);
+            }
+
+            processingInputButtonTexts[i].color = canSelect
+                ? new Color32(58, 66, 83, 255)
+                : new Color32(132, 141, 154, 255);
+            SetInteractable(processingInputButtons[i], canSelect);
         }
+    }
+
+    private void RefreshProcessingBunkerSlots(BaseProcessingFacilityState facility)
+    {
+        if (processingBunkerSlots == null)
+        {
+            return;
+        }
+
+        int load = facility != null ? facility.BunkerLoadUnits : 0;
+        int capacity = facility != null ? facility.bunkerCapacityUnits : 0;
+        SetText(processingBunkerCapacityText, "\u041e\u0431\u044a\u0435\u043c: " + load + " / " + capacity);
+        SetText(processingBunkerSlotCountText, "\u0421\u043b\u043e\u0442\u044b: " + CountProcessingBunkerStacks(facility) + " / " + processingBunkerSlots.Length);
+
+        for (int i = 0; i < processingBunkerSlots.Length; i++)
+        {
+            ResourceStack stack = facility != null && facility.bunker != null && i < facility.bunker.Count
+                ? facility.bunker[i]
+                : null;
+            bool hasStack = stack != null && !string.IsNullOrWhiteSpace(stack.resourceId) && stack.amount > 0;
+
+            if (processingBunkerSlotNameTexts != null && i < processingBunkerSlotNameTexts.Length)
+            {
+                SetText(processingBunkerSlotNameTexts[i], hasStack ? ShortenItemName(GetItemDisplayName(stack.resourceId), 22) : "\u041f\u0443\u0441\u0442\u043e");
+                processingBunkerSlotNameTexts[i].color = hasStack ? new Color32(58, 66, 83, 255) : new Color32(137, 148, 164, 255);
+            }
+
+            if (processingBunkerSlotAmountTexts != null && i < processingBunkerSlotAmountTexts.Length)
+            {
+                SetText(processingBunkerSlotAmountTexts[i], hasStack ? FormatProcessingAmount(stack.amount) : "");
+            }
+
+            if (processingBunkerSlotProgressTexts != null && i < processingBunkerSlotProgressTexts.Length)
+            {
+                SetText(processingBunkerSlotProgressTexts[i], "");
+            }
+
+            if (processingBunkerSlotIconImages != null && i < processingBunkerSlotIconImages.Length)
+            {
+                SetProcessingIcon(processingBunkerSlotIconImages[i], hasStack ? stack.resourceId : "");
+            }
+        }
+    }
+
+    private void RefreshProcessingOutputRows(PortStorageState storage, BaseProcessingFacilityState facility, List<string> outputs)
+    {
+        if (processingOutputRows == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < processingOutputRows.Length; i++)
+        {
+            bool visible = outputs != null && i < outputs.Count;
+            SetActiveIfNotNull(processingOutputRows[i], visible);
+            if (!visible)
+            {
+                continue;
+            }
+
+            string itemId = outputs[i];
+            BaseProcessingOutputBufferState buffer = facility != null ? facility.GetOutputBuffer(itemId, false) : null;
+            int ready = buffer != null ? buffer.readyAmount : 0;
+            float fraction = buffer != null ? buffer.fractionalAmount : 0f;
+            int stored = storage != null ? storage.GetResourceAmount(itemId) : 0;
+
+            if (processingOutputIconImages != null && i < processingOutputIconImages.Length)
+            {
+                SetProcessingIcon(processingOutputIconImages[i], itemId);
+            }
+
+            if (processingOutputNameTexts != null && i < processingOutputNameTexts.Length)
+            {
+                SetText(processingOutputNameTexts[i], ShortenItemName(GetItemDisplayName(itemId), 22));
+            }
+
+            if (processingOutputAmountTexts != null && i < processingOutputAmountTexts.Length)
+            {
+                SetText(processingOutputAmountTexts[i], FormatProcessingAmount(ready) + "  " + (fraction * 100f).ToString("0") + "%");
+            }
+
+            if (processingOutputStoredTexts != null && i < processingOutputStoredTexts.Length)
+            {
+                SetText(processingOutputStoredTexts[i], "\u0421\u043a\u043b\u0430\u0434: " + FormatProcessingAmount(stored));
+            }
+
+            if (processingOutputProgressImages != null && i < processingOutputProgressImages.Length && processingOutputProgressImages[i] != null)
+            {
+                processingOutputProgressImages[i].fillAmount = Mathf.Clamp01(fraction);
+            }
+        }
+    }
+
+    private void RefreshProcessingTransferPanel(PortStorageState storage, BaseProcessingFacilityState facility, List<string> inputs)
+    {
+        bool selectedIsValid = !string.IsNullOrWhiteSpace(selectedProcessingInputItemId)
+            && inputs != null
+            && inputs.Contains(selectedProcessingInputItemId);
+        int inBunker = selectedIsValid && facility != null ? facility.GetBunkerAmount(selectedProcessingInputItemId) : 0;
+        int inStorage = selectedIsValid && storage != null ? storage.GetResourceAmount(selectedProcessingInputItemId) : 0;
+        int total = Mathf.Max(0, inBunker + inStorage);
+        int maxDesiredInBunker = facility != null ? Mathf.Min(total, inBunker + facility.BunkerFreeUnits) : inBunker;
+        bool hasSelection = selectedIsValid && total > 0;
+
+        if (!hasSelection && !string.IsNullOrWhiteSpace(selectedProcessingInputItemId))
+        {
+            selectedProcessingInputItemId = "";
+            selectedIsValid = false;
+        }
+
+        SetText(processingTransferTitleText, selectedIsValid ? ShortenItemName(GetItemDisplayName(selectedProcessingInputItemId), 24) : "\u0412\u044b\u0431\u0435\u0440\u0438 \u0441\u044b\u0440\u044c\u0435");
+        SetText(processingTransferAmountText, selectedIsValid
+            ? "\u0412 \u0437\u0434\u0430\u043d\u0438\u0438: " + FormatProcessingAmount(inBunker)
+            : "");
+
+        if (processingTransferSlider != null)
+        {
+            processingTransferSliderSuppressCallback = true;
+            processingTransferSlider.minValue = 0f;
+            processingTransferSlider.maxValue = Mathf.Max(1, maxDesiredInBunker);
+            processingTransferSlider.wholeNumbers = true;
+            processingTransferSlider.value = Mathf.Clamp(inBunker, 0, Mathf.Max(1, maxDesiredInBunker));
+            processingTransferSliderSuppressCallback = false;
+            SetInteractable(processingTransferSlider, hasSelection);
+        }
+
+        SetInteractable(processingTransferAllOutButton, selectedIsValid && inBunker > 0);
+        SetInteractable(processingTransferAllInButton, selectedIsValid && inStorage > 0 && facility != null && facility.BunkerFreeUnits > 0);
+
+        if (processingTransferAllOutButtonText != null)
+        {
+            processingTransferAllOutButtonText.color = processingTransferAllOutButton != null && processingTransferAllOutButton.interactable
+                ? new Color32(58, 66, 83, 255)
+                : new Color32(132, 141, 154, 255);
+        }
+
+        if (processingTransferAllInButtonText != null)
+        {
+            processingTransferAllInButtonText.color = processingTransferAllInButton != null && processingTransferAllInButton.interactable
+                ? new Color32(242, 244, 248, 255)
+                : new Color32(186, 194, 204, 255);
+        }
+    }
+
+    private void RefreshProcessingActionButtonText(BaseProcessingFacilityState facility)
+    {
+        SetText(processingLoadAllButtonText, "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043c\u0430\u043a\u0441\u0438\u043c\u0443\u043c");
+        SetText(processingClearButtonText, "\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c");
+        SetText(processingCollectButtonText, "\u041f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0432\u0441\u0435");
+
+        if (processingLoadAllButtonText != null)
+        {
+            processingLoadAllButtonText.color = processingLoadAllButton != null && processingLoadAllButton.interactable
+                ? new Color32(242, 244, 248, 255)
+                : new Color32(186, 194, 204, 255);
+        }
+
+        if (processingClearButtonText != null)
+        {
+            processingClearButtonText.color = processingClearButton != null && processingClearButton.interactable
+                ? new Color32(58, 66, 83, 255)
+                : new Color32(132, 141, 154, 255);
+        }
+
+        if (processingCollectButtonText != null)
+        {
+            processingCollectButtonText.color = processingCollectButton != null && processingCollectButton.interactable
+                ? new Color32(58, 66, 83, 255)
+                : new Color32(132, 141, 154, 255);
+        }
+    }
+
+    private static int CountProcessingBunkerStacks(BaseProcessingFacilityState facility)
+    {
+        if (facility == null || facility.bunker == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int i = 0; i < facility.bunker.Count; i++)
+        {
+            ResourceStack stack = facility.bunker[i];
+            if (stack != null && !string.IsNullOrWhiteSpace(stack.resourceId) && stack.amount > 0)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private bool HandleProcessingInputButton(int index)
@@ -3620,7 +5761,73 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
             return false;
         }
 
-        bool result = meta.TryLoadBaseProcessingInput(openBuildingId, openProcessingBranch, GetBuildingLevelValue(openBuildingId), inputs[index], 1, out processingStatusMessage);
+        selectedProcessingInputItemId = inputs[index];
+        processingStatusMessage = "";
+        RefreshProcessingWindow();
+        return true;
+    }
+
+    private void HandleProcessingTransferSliderChanged(float value)
+    {
+        if (processingTransferSliderSuppressCallback || !processingWindowOpen || meta == null || string.IsNullOrWhiteSpace(selectedProcessingInputItemId))
+        {
+            return;
+        }
+
+        int desired = Mathf.RoundToInt(value);
+        bool result = meta.TrySetBaseProcessingBunkerAmount(
+            openBuildingId,
+            openProcessingBranch,
+            GetBuildingLevelValue(openBuildingId),
+            selectedProcessingInputItemId,
+            desired,
+            out string message);
+        processingStatusMessage = result ? "" : message;
+        processingCollectBubbleDataDirty = true;
+        RefreshProcessingWindow();
+    }
+
+    private bool HandleProcessingTransferAllOut()
+    {
+        if (!processingWindowOpen || meta == null || string.IsNullOrWhiteSpace(selectedProcessingInputItemId))
+        {
+            return false;
+        }
+
+        bool result = meta.TrySetBaseProcessingBunkerAmount(
+            openBuildingId,
+            openProcessingBranch,
+            GetBuildingLevelValue(openBuildingId),
+            selectedProcessingInputItemId,
+            0,
+            out string message);
+        processingStatusMessage = result ? "" : message;
+        processingCollectBubbleDataDirty = true;
+        RefreshProcessingWindow();
+        return result;
+    }
+
+    private bool HandleProcessingTransferAllIn()
+    {
+        if (!processingWindowOpen || meta == null || string.IsNullOrWhiteSpace(selectedProcessingInputItemId))
+        {
+            return false;
+        }
+
+        BaseProcessingFacilityState facility = meta.GetBaseProcessingFacilityState(openBuildingId, openProcessingBranch, GetBuildingLevelValue(openBuildingId));
+        PortStorageState storage = meta.GetCapitalStorageState();
+        int inBunker = facility != null ? facility.GetBunkerAmount(selectedProcessingInputItemId) : 0;
+        int inStorage = storage != null ? storage.GetResourceAmount(selectedProcessingInputItemId) : 0;
+        int desired = facility != null ? Mathf.Min(inBunker + inStorage, inBunker + facility.BunkerFreeUnits) : inBunker;
+        bool result = meta.TrySetBaseProcessingBunkerAmount(
+            openBuildingId,
+            openProcessingBranch,
+            GetBuildingLevelValue(openBuildingId),
+            selectedProcessingInputItemId,
+            desired,
+            out string message);
+        processingStatusMessage = result ? "" : message;
+        processingCollectBubbleDataDirty = true;
         RefreshProcessingWindow();
         return result;
     }
@@ -4115,7 +6322,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
             }
         }
 
-        texture.Apply(false, true);
+        FinalizeRuntimeUiTexture(texture);
         cachedCollectBubbleSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0f), 100f);
         cachedCollectBubbleSprite.name = "Sprite_ProcessingCollectBubble";
         return cachedCollectBubbleSprite;
@@ -4146,6 +6353,22 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         if (amount >= 1000)
         {
             return TrimCompactNumber(amount / 1000f) + "K";
+        }
+
+        return amount.ToString();
+    }
+
+    private static string FormatProcessingAmount(int amount)
+    {
+        amount = Mathf.Max(0, amount);
+        if (amount >= 1000000)
+        {
+            return TrimCompactNumber(amount / 1000000f) + "M";
+        }
+
+        if (amount >= 10000)
+        {
+            return TrimCompactNumber(amount / 1000f) + "k";
         }
 
         return amount.ToString();
@@ -4276,6 +6499,18 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     }
 
     private static void SetText(Text text, string value)
+    {
+        if (text != null)
+        {
+            value ??= "";
+            if (text.text != value)
+            {
+                text.text = value;
+            }
+        }
+    }
+
+    private static void SetText(TMP_Text text, string value)
     {
         if (text != null)
         {
@@ -4565,6 +6800,16 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         return string.Equals(GetDefinitionId(buildingId), CourierServiceBuildingId, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsCapitalAirdockBuilding(string buildingId)
+    {
+        return string.Equals(GetDefinitionId(buildingId), CapitalAirdockBuildingId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsRepairDockKey(string dockKey)
+    {
+        return string.Equals(GetDefinitionId(dockKey), RepairDockBuildingId, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsKnowledgeBuilding(string buildingId)
     {
         return TryGetDefinition(buildingId, out BaseBuildingDefinition definition)
@@ -4576,6 +6821,11 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         if (actionIndex == 1 && IsKnowledgeBuilding(buildingId))
         {
             return "Знания";
+        }
+
+        if (actionIndex == 1 && IsCapitalAirdockBuilding(buildingId))
+        {
+            return "Самолет";
         }
 
         if (actionIndex >= 0 && actionIndex < BuildingActionLabels.Length)

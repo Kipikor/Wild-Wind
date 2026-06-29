@@ -1,0 +1,4 @@
+ship_id,ship_name_ru,scenario_id,mining_rating,cargo_capacity_tons,load_factor,raw_ore_tons,ore_mix,outputs_kg,useful_output_kg,processed_value_fe,wind_buyback_fe
+capital_cargo_frigate_r02,Возчик,bad,14,50,0.613,30.6,Угольная гарь 16.9t; Ржавик 13.8t,iron:2651kg; quartz:720kg; charcoal:7080kg; calcite:414kg,10865,16199,2430
+capital_cargo_frigate_r02,Возчик,normal,14,50,0.613,30.6,Угольная гарь 7.1t; Ржавик 7.7t; Белокварц 5.8t; Соленый мел 4.5t; Медная пыль 5.5t,iron:1520kg; copper:658kg; magnesium:58kg; quartz:2304kg; charcoal:2981kg; calcite:1220kg; sylvine:632kg; gems:10kg,9383,25036,3477
+capital_cargo_frigate_r02,Возчик,lucky,14,50,0.613,30.6,Угольная гарь 2.3t; Ржавик 4.0t; Белокварц 7.4t; Соленый мел 9.1t; Медная пыль 7.9t,iron:817kg; copper:954kg; magnesium:74kg; quartz:2770kg; charcoal:954kg; calcite:1975kg; sylvine:1271kg; gems:16kg,8831,31274,4247

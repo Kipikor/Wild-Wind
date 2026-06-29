@@ -39,9 +39,9 @@ public class ShipGunGroup
     [InspectorName("Скорость опускания ствола, град/с")]
     [Min(0f)] public float elevationDownSpeedDegPerSecond = 35f;
     [InspectorName("Минимальный угол ствола, град")]
-    public float minElevationDegrees = -5f;
+    public float minElevationDegrees = -80f;
     [InspectorName("Максимальный угол ствола, град")]
-    public float maxElevationDegrees = 55f;
+    public float maxElevationDegrees = 80f;
     [InspectorName("Допуск готовности к выстрелу, град")]
     [Min(0f)] public float fireAlignmentToleranceDegrees = 1.5f;
     [InspectorName("Дальность от центра корабля, м")]
@@ -76,13 +76,18 @@ public class ShipGunGroup
 
 public class ShipPhysics : MonoBehaviour
 {
-    private const float MainGunRoundsPerMinute = 60f;
+    private const float MainGunRoundsPerMinute = 30f;
+    private const float MainGunMinElevationDegrees = -80f;
+    private const float MainGunMaxElevationDegrees = 80f;
+    private const float SecondaryGunMinElevationDegrees = -80f;
+    private const float SecondaryGunMaxElevationDegrees = 80f;
     private const float ManualGunAimTargetSmoothSeconds = 0.055f;
     private const float ManualGunSphereAimSensitivityDegreesPerPixel = 0.18f;
     private const float ManualGunSphereAimMinPitchDegrees = -89f;
     private const float ManualGunSphereAimMaxPitchDegrees = 89f;
     private const float GunProjectileTrailBrightnessMultiplier = 6f;
     private const float GunProjectileTrailEmissionMultiplier = 2.5f;
+    private const float GunMuzzleFlashLifetimeSeconds = 0.08f;
     public const float ClaudiumSlipstreamActivationMinSpeedMS = 15f;
     public const float ClaudiumSlipstreamActivationSeconds = 20f;
     private const float ClaudiumSlipstreamFullDragMultiplier = 1f;
@@ -173,7 +178,9 @@ public class ShipPhysics : MonoBehaviour
     [Tooltip("Сколько килограммов оружия тратит один ручной выстрел.")]
     public float weaponShotCostKg = 0f;
     [Tooltip("Показывать прицел и время полета у курсора для ручной орудийной группы.")]
-    public bool showGunAimHud = true;
+    public bool showGunAimHud = false;
+    [Tooltip("Временно отключено: ручной главный калибр вернется, когда камера/прицел будут готовы.")]
+    public bool manualMainBatteryEnabled = false;
     [Tooltip("Индекс ручной группы в списке shipGunGroups.")]
     public int manualGunGroupIndex;
     [Tooltip("Орудийные группы корабля: главный калибр, ПМК и будущие группы.")]
@@ -183,15 +190,15 @@ public class ShipPhysics : MonoBehaviour
         {
             groupId = "main",
             displayNameRu = "Главный калибр",
-            fireMode = ShipGunFireMode.Manual,
+            fireMode = ShipGunFireMode.Automatic,
             localMuzzleOffset = new Vector3(0f, 2.7f, 7.85f),
             barrelsPerSalvo = 1,
             roundsPerMinute = MainGunRoundsPerMinute,
             yawSpeedDegPerSecond = 45f,
             elevationUpSpeedDegPerSecond = 22f,
             elevationDownSpeedDegPerSecond = 30f,
-            minElevationDegrees = -5f,
-            maxElevationDegrees = 55f,
+            minElevationDegrees = MainGunMinElevationDegrees,
+            maxElevationDegrees = MainGunMaxElevationDegrees,
             fireAlignmentToleranceDegrees = 1.5f,
             maxRangeMeters = 2500f,
             muzzleVelocityMS = 360f,
@@ -199,6 +206,7 @@ public class ShipPhysics : MonoBehaviour
             projectileRadiusMeters = 0.10f,
             horizontalSpreadAtMaxRangeMeters = 24f,
             verticalSpreadAtMaxRangeMeters = 9f,
+            automaticTargetsDamageableShips = true,
             shell = new DamageShellPreset
             {
                 displayNameRu = "ББ 76 мм",
@@ -225,8 +233,8 @@ public class ShipPhysics : MonoBehaviour
             yawSpeedDegPerSecond = 140f,
             elevationUpSpeedDegPerSecond = 90f,
             elevationDownSpeedDegPerSecond = 110f,
-            minElevationDegrees = -10f,
-            maxElevationDegrees = 70f,
+            minElevationDegrees = SecondaryGunMinElevationDegrees,
+            maxElevationDegrees = SecondaryGunMaxElevationDegrees,
             fireAlignmentToleranceDegrees = 3f,
             maxRangeMeters = 1500f,
             muzzleVelocityMS = 420f,
@@ -609,8 +617,16 @@ public class ShipPhysics : MonoBehaviour
         if (!Application.isPlaying) return;
 
         EnsureGunGroups();
-        UpdateManualGunAim();
-        UpdateGunInput();
+        if (IsManualMainBatteryEnabled())
+        {
+            UpdateManualGunAim();
+            UpdateGunInput();
+        }
+        else
+        {
+            ClearManualGunRuntimeState();
+        }
+
         UpdateAutomaticGunGroups();
     }
 
@@ -623,7 +639,7 @@ public class ShipPhysics : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!Application.isPlaying || !showGunAimHud) return;
+        if (!Application.isPlaying || !showGunAimHud || !IsManualMainBatteryEnabled()) return;
         ShipGunGroup group = GetManualGunGroup();
         if (group == null || !group.enabled) return;
         if (IsGameplayCursorReleasedForUi()) return;
@@ -661,7 +677,7 @@ public class ShipPhysics : MonoBehaviour
         out BallisticAimSolution solution)
     {
         solution = default;
-        group = group ?? GetManualGunGroup();
+        group = group ?? ResolveDefaultGunGroupForBallistics();
         if (group == null) return false;
 
         Vector3 center = transform.position;
@@ -684,6 +700,13 @@ public class ShipPhysics : MonoBehaviour
     public bool TryFireManualGunGroup(out string reason)
     {
         reason = "";
+        if (!IsManualMainBatteryEnabled())
+        {
+            reason = "Ручной главный калибр временно отключен. Работает ПМК.";
+            weaponLastMessage = reason;
+            return false;
+        }
+
         ShipGunGroup group = GetManualGunGroup();
         if (group == null)
         {
@@ -703,6 +726,8 @@ public class ShipPhysics : MonoBehaviour
         bool anyFired = false;
         int attemptedGroups = 0;
         int firedGroups = 0;
+        int reloadingGroups = 0;
+        float longestReloadSeconds = 0f;
         string lastFailure = "";
         if (shipGunGroups != null)
         {
@@ -732,6 +757,12 @@ public class ShipPhysics : MonoBehaviour
                 }
                 else
                 {
+                    if (IsGunGroupReloading(manualGroup, out float reloadSeconds))
+                    {
+                        reloadingGroups++;
+                        longestReloadSeconds = Mathf.Max(longestReloadSeconds, reloadSeconds);
+                    }
+
                     lastFailure = groupReason;
                 }
             }
@@ -744,7 +775,21 @@ public class ShipPhysics : MonoBehaviour
             return true;
         }
 
-        reason = string.IsNullOrWhiteSpace(lastFailure) ? "No manual turret is ready to fire." : lastFailure;
+        if (reloadingGroups > 1)
+        {
+            reason = "Главный калибр перезаряжается: "
+                + longestReloadSeconds.ToString("0.0")
+                + " с. ("
+                + reloadingGroups.ToString()
+                + "/"
+                + Mathf.Max(1, attemptedGroups).ToString()
+                + " башн.)";
+        }
+        else
+        {
+            reason = string.IsNullOrWhiteSpace(lastFailure) ? "No manual turret is ready to fire." : lastFailure;
+        }
+
         weaponLastMessage = reason;
         return false;
     }
@@ -752,6 +797,11 @@ public class ShipPhysics : MonoBehaviour
     public bool TryGetManualGunCameraAimTarget(out Vector3 targetPoint)
     {
         targetPoint = Vector3.zero;
+        if (!IsManualMainBatteryEnabled())
+        {
+            return false;
+        }
+
         ShipGunGroup group = GetManualGunGroup();
         if (group == null || !group.enabled)
         {
@@ -777,6 +827,11 @@ public class ShipPhysics : MonoBehaviour
     public bool TryGetManualGunCameraAnchor(out Vector3 anchor)
     {
         anchor = Vector3.zero;
+        if (!IsManualMainBatteryEnabled())
+        {
+            return false;
+        }
+
         ShipGunGroup group = GetManualGunGroup();
         if (group == null || !group.enabled)
         {
@@ -833,7 +888,7 @@ public class ShipPhysics : MonoBehaviour
     public bool TryFireGunGroupAtPointForTests(ShipGunGroup group, Vector3 targetPoint, Vector3 targetVelocity, out string reason)
     {
         reason = "";
-        group ??= GetManualGunGroup();
+        group ??= ResolveDefaultGunGroupForBallistics();
         if (group == null)
         {
             reason = "No gun group.";
@@ -853,6 +908,12 @@ public class ShipPhysics : MonoBehaviour
 
     private void UpdateManualGunAim()
     {
+        if (!IsManualMainBatteryEnabled())
+        {
+            ClearManualGunRuntimeState();
+            return;
+        }
+
         ShipGunGroup group = GetManualGunGroup();
         if (group == null || !group.enabled)
         {
@@ -921,6 +982,11 @@ public class ShipPhysics : MonoBehaviour
 
     private void UpdateGunInput()
     {
+        if (!IsManualMainBatteryEnabled())
+        {
+            return;
+        }
+
         if (IsGameplayCursorReleasedForUi()) return;
         if (IsPointerOverBlockingUi()) return;
         if (!WasMouseButtonPressedThisFrame(0)) return;
@@ -961,7 +1027,12 @@ public class ShipPhysics : MonoBehaviour
             return false;
         }
 
-        Ray ray = camera.ScreenPointToRay(mousePosition);
+        if (!TryBuildManualGunAimRay(camera, mousePosition, out Ray ray))
+        {
+            if (smoothTarget) ResetManualGunTargetSmoothing();
+            return false;
+        }
+
         Vector3 center = transform.position;
         float maxRange = Mathf.Max(1f, group.maxRangeMeters);
         float freeAimRange = useLockedRange
@@ -971,7 +1042,11 @@ public class ShipPhysics : MonoBehaviour
         Vector3 targetVelocity = Vector3.zero;
         bool hasHitTarget = false;
 
-        if (TryRaycastCursorTarget(ray, maxRange, out RaycastHit hit))
+        if (IsLockedGameplayAim())
+        {
+            targetPoint = center + ray.direction.normalized * freeAimRange;
+        }
+        else if (TryRaycastCursorTarget(ray, maxRange, out RaycastHit hit))
         {
             targetPoint = hit.point;
             targetVelocity = ResolveHitVelocity(hit.collider);
@@ -1005,6 +1080,30 @@ public class ShipPhysics : MonoBehaviour
         return BuildGunAimSolutionForPoint(group, targetPoint, targetVelocity, false, true, out solution);
     }
 
+    private ShipGunGroup ResolveDefaultGunGroupForBallistics()
+    {
+        EnsureGunGroups();
+        return GetManualGunGroup()
+            ?? FindGunGroupById("main")
+            ?? FindFirstGunGroup(ShipGunFireMode.Automatic);
+    }
+
+    private bool IsManualMainBatteryEnabled()
+    {
+        return manualMainBatteryEnabled;
+    }
+
+    private void ClearManualGunRuntimeState()
+    {
+        weaponAimFlightTimeSeconds = 0f;
+        weaponAimDistanceMeters = 0f;
+        weaponAimStatus = "";
+        lastManualGunAim = default;
+        manualGunRangeLocked = false;
+        hasManualGunSphereAim = false;
+        ResetManualGunTargetSmoothing();
+    }
+
     private bool TryFireGunGroup(ShipGunGroup group, BallisticAimSolution aim, out string reason)
     {
         reason = "";
@@ -1017,7 +1116,9 @@ public class ShipPhysics : MonoBehaviour
 
         if (Time.time + 0.0001f < group.nextShotTime)
         {
-            reason = "Орудийная группа перезаряжается.";
+            float remainingSeconds = GetGunReloadRemainingSeconds(group);
+            reason = ResolveGunGroupDisplayName(group) + ": перезарядка "
+                + remainingSeconds.ToString("0.0") + " с.";
             weaponLastMessage = reason;
             return false;
         }
@@ -1038,6 +1139,7 @@ public class ShipPhysics : MonoBehaviour
         }
 
         aim = RefreshAimOriginFromCurrentMuzzle(group, aim);
+        aim = AlignAimWithCurrentBarrel(group, aim);
         for (int i = 0; i < barrels; i++)
         {
             BallisticAimSolution shotAim = BuildSpreadSolution(group, aim);
@@ -1094,6 +1196,22 @@ public class ShipPhysics : MonoBehaviour
         return aim;
     }
 
+    private BallisticAimSolution AlignAimWithCurrentBarrel(ShipGunGroup group, BallisticAimSolution aim)
+    {
+        Vector3 origin = ResolveGunMuzzlePosition(group);
+        Vector3 barrelForward = ResolveGunMuzzleForward(group, aim.launchDirection);
+        if (barrelForward.sqrMagnitude > 0.001f)
+        {
+            barrelForward.Normalize();
+            aim.origin = origin;
+            aim.launchDirection = barrelForward;
+            aim.launchVelocity = barrelForward * Mathf.Max(1f, group != null ? group.muzzleVelocityMS : 1f);
+            aim.directDistanceFromMuzzle = Vector3.Distance(origin, aim.targetPoint);
+        }
+
+        return aim;
+    }
+
     private void SpawnGunProjectile(ShipGunGroup group, BallisticAimSolution aim, int barrelIndex)
     {
         Vector3 spawnPosition = ResolveGunMuzzlePosition(group);
@@ -1111,7 +1229,10 @@ public class ShipPhysics : MonoBehaviour
         if (renderer != null)
         {
             renderer.material.color = projectileColor;
+            ApplyGunProjectileTrailMaterialColor(renderer.material, BuildGunProjectileTrailColor(projectileColor));
         }
+
+        SpawnGunMuzzleFlash(spawnPosition, projectileColor, group);
 
         Collider projectileCollider = projectileObject.GetComponent<Collider>();
         if (projectileCollider != null)
@@ -1130,7 +1251,7 @@ public class ShipPhysics : MonoBehaviour
         {
             TrailRenderer trail = projectileObject.AddComponent<TrailRenderer>();
             trail.time = Mathf.Max(0.05f, group.projectileTrailSeconds);
-            trail.startWidth = Mathf.Max(0.01f, group.projectileRadiusMeters * 2.2f);
+            trail.startWidth = Mathf.Max(0.08f, group.projectileRadiusMeters * 4.5f);
             trail.endWidth = 0f;
             trail.autodestruct = false;
             Color trailColor = BuildGunProjectileTrailColor(projectileColor);
@@ -1161,6 +1282,41 @@ public class ShipPhysics : MonoBehaviour
             group.maxRangeMeters,
             lifetime,
             group.gravityScale);
+    }
+
+    private void SpawnGunMuzzleFlash(Vector3 position, Color projectileColor, ShipGunGroup group)
+    {
+        if (!Application.isPlaying || !IsFinite(position))
+        {
+            return;
+        }
+
+        GameObject flashObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        flashObject.name = (group != null ? group.displayNameRu : "Gun") + " Muzzle Flash";
+        flashObject.transform.position = position;
+        float caliberScale = group != null ? Mathf.Max(0.35f, group.projectileRadiusMeters * 8f) : 0.35f;
+        flashObject.transform.localScale = Vector3.one * caliberScale;
+
+        Collider flashCollider = flashObject.GetComponent<Collider>();
+        if (flashCollider != null)
+        {
+            flashCollider.enabled = false;
+        }
+
+        Renderer flashRenderer = flashObject.GetComponent<Renderer>();
+        if (flashRenderer != null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Standard");
+            Material material = shader != null ? new Material(shader) : flashRenderer.material;
+            Color flashColor = BuildGunProjectileTrailColor(projectileColor);
+            flashColor = Color.Lerp(flashColor, Color.white, 0.35f);
+            ApplyGunProjectileTrailMaterialColor(material, flashColor);
+            flashRenderer.material = material;
+        }
+
+        Destroy(flashObject, GunMuzzleFlashLifetimeSeconds);
     }
 
     private static Color BuildGunProjectileTrailColor(Color projectileColor)
@@ -1494,6 +1650,32 @@ public class ShipPhysics : MonoBehaviour
         return group != null && group.enabled && group.fireMode == ShipGunFireMode.Manual;
     }
 
+    private static string ResolveGunGroupDisplayName(ShipGunGroup group)
+    {
+        if (group == null || string.IsNullOrWhiteSpace(group.displayNameRu))
+        {
+            return "Орудийная группа";
+        }
+
+        return group.displayNameRu;
+    }
+
+    private static bool IsGunGroupReloading(ShipGunGroup group, out float remainingSeconds)
+    {
+        remainingSeconds = GetGunReloadRemainingSeconds(group);
+        return remainingSeconds > 0.001f;
+    }
+
+    private static float GetGunReloadRemainingSeconds(ShipGunGroup group)
+    {
+        if (group == null)
+        {
+            return 0f;
+        }
+
+        return Mathf.Max(0f, group.nextShotTime - Time.time);
+    }
+
     private Transform EnsureGunMountForGroup(ShipGunGroup group)
     {
         if (group == null) return null;
@@ -1503,6 +1685,49 @@ public class ShipPhysics : MonoBehaviour
         }
 
         return group.muzzle;
+    }
+
+    public bool BindGunGroupsFromVisual(Transform visualRoot)
+    {
+        if (visualRoot == null)
+        {
+            return false;
+        }
+
+        EnsureGunGroups();
+        if (shipGunGroups == null || shipGunGroups.Count == 0)
+        {
+            return false;
+        }
+
+        bool boundAny = false;
+        if (IsMainBatteryEnabled())
+        {
+            ShipGunGroup main = EnsureMainGunGroup(
+                "main",
+                "Главный калибр",
+                FindGunGroupById("main") ?? FindFirstGunGroup(ShipGunFireMode.Manual));
+            NormalizeMainGunGroup(main);
+            if (TryBindVisualMainGunMount(main, visualRoot, "Fwd_76mmTwinTurret"))
+            {
+                main.barrelsPerSalvo = Mathf.Max(main.barrelsPerSalvo, 2);
+                boundAny = true;
+            }
+
+            if (HasVisualMainGunMount(visualRoot, "Aft_76mmTwinTurret"))
+            {
+                ShipGunGroup aftMain = EnsureMainGunGroup("main_aft", "Главный калибр: кормовая башня", main);
+                if (TryBindVisualMainGunMount(aftMain, visualRoot, "Aft_76mmTwinTurret"))
+                {
+                    aftMain.barrelsPerSalvo = Mathf.Max(aftMain.barrelsPerSalvo, 2);
+                    boundAny = true;
+                }
+            }
+        }
+
+        boundAny |= BindVisualSecondaryGunMounts(visualRoot);
+
+        return boundAny;
     }
 
     private bool ShouldRebindGunMount(ShipGunGroup group)
@@ -1520,7 +1745,8 @@ public class ShipPhysics : MonoBehaviour
         if (candidate == null) return false;
         string name = candidate.name;
         return string.Equals(name, "Muzzle", System.StringComparison.OrdinalIgnoreCase) ||
-            name.StartsWith("GunMuzzle", System.StringComparison.OrdinalIgnoreCase);
+            name.StartsWith("GunMuzzle", System.StringComparison.OrdinalIgnoreCase) ||
+            name.IndexOf("Muzzle", System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static bool IsNamedPitchPivot(Transform candidate)
@@ -1531,7 +1757,11 @@ public class ShipPhysics : MonoBehaviour
             string.Equals(name, "BarrelPitch", System.StringComparison.OrdinalIgnoreCase) ||
             string.Equals(name, "\u0421\u0442\u0432\u043e\u043b", System.StringComparison.OrdinalIgnoreCase) ||
             string.Equals(name, "РЎС‚РІРѕР»", System.StringComparison.OrdinalIgnoreCase) ||
-            name.StartsWith("GunPitch", System.StringComparison.OrdinalIgnoreCase);
+            name.StartsWith("GunPitch", System.StringComparison.OrdinalIgnoreCase) ||
+            name.IndexOf("PitchPivot", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            name.IndexOf("Barrel", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            (name.IndexOf("MG_", System.StringComparison.OrdinalIgnoreCase) >= 0 &&
+                name.IndexOf("_ROOT", System.StringComparison.OrdinalIgnoreCase) >= 0);
     }
 
     private bool TryBindExistingGunMount(ShipGunGroup group)
@@ -1543,12 +1773,17 @@ public class ShipPhysics : MonoBehaviour
             ?? FindDeepChild(transform, "Turret")
             ?? FindDeepChild(transform, "\u0422\u0443\u0440\u0435\u043b\u044c")
             ?? FindDeepChild(transform, "Турель");
+        yaw ??= FindDeepChildContaining(transform, "YawPivot");
+
         Transform pitch = FindDeepChild(transform, "GunPitch_" + suffix)
             ?? FindDeepChild(transform, "GunPitch")
             ?? FindDeepChild(transform, "BarrelPitch")
             ?? FindDeepChild(transform, "Barrel")
             ?? FindDeepChild(transform, "\u0421\u0442\u0432\u043e\u043b")
             ?? FindDeepChild(transform, "Ствол");
+        pitch ??= FindDeepChildContaining(yaw != null ? yaw : transform, "PitchPivot")
+            ?? FindDeepChildContaining(yaw != null ? yaw : transform, "Barrel");
+
         Transform muzzle = pitch != null
             ? FindDeepChild(pitch, "GunMuzzle_" + suffix)
                 ?? FindDeepChild(pitch, "GunMuzzle")
@@ -1557,6 +1792,8 @@ public class ShipPhysics : MonoBehaviour
         muzzle ??= FindDeepChild(transform, "GunMuzzle_" + suffix)
             ?? FindDeepChild(transform, "GunMuzzle")
             ?? FindDeepChild(transform, "Muzzle");
+
+        muzzle ??= FindDeepChildContaining(pitch != null ? pitch : transform, "Muzzle");
 
         if (muzzle == null)
         {
@@ -1784,6 +2021,401 @@ public class ShipPhysics : MonoBehaviour
         return null;
     }
 
+    private ShipGunGroup FindGunGroupById(string groupId)
+    {
+        if (shipGunGroups == null || string.IsNullOrWhiteSpace(groupId))
+        {
+            return null;
+        }
+
+        for (int i = 0; i < shipGunGroups.Count; i++)
+        {
+            ShipGunGroup group = shipGunGroups[i];
+            if (group != null && string.Equals(group.groupId, groupId, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return group;
+            }
+        }
+
+        return null;
+    }
+
+    private ShipGunGroup FindFirstGunGroup(ShipGunFireMode fireMode)
+    {
+        if (shipGunGroups == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < shipGunGroups.Count; i++)
+        {
+            ShipGunGroup group = shipGunGroups[i];
+            if (group != null && group.fireMode == fireMode)
+            {
+                return group;
+            }
+        }
+
+        return null;
+    }
+
+    private ShipGunGroup EnsureMainGunGroup(string groupId, string displayNameRu, ShipGunGroup template)
+    {
+        if (shipGunGroups == null)
+        {
+            shipGunGroups = new List<ShipGunGroup>();
+        }
+
+        ShipGunGroup group = FindGunGroupById(groupId);
+        if (group == null)
+        {
+            group = CreateMainGunGroupFromTemplate(groupId, displayNameRu, template);
+            shipGunGroups.Add(group);
+        }
+
+        NormalizeMainGunGroup(group);
+        if (!string.IsNullOrWhiteSpace(displayNameRu))
+        {
+            group.displayNameRu = displayNameRu;
+        }
+
+        return group;
+    }
+
+    private static ShipGunGroup CreateMainGunGroupFromTemplate(string groupId, string displayNameRu, ShipGunGroup template)
+    {
+        template ??= CreateDefaultMainGunGroup();
+        return new ShipGunGroup
+        {
+            groupId = groupId,
+            displayNameRu = string.IsNullOrWhiteSpace(displayNameRu) ? groupId : displayNameRu,
+            enabled = true,
+            fireMode = ShipGunFireMode.Automatic,
+            shell = template.shell,
+            localMuzzleOffset = template.localMuzzleOffset,
+            barrelsPerSalvo = Mathf.Max(1, template.barrelsPerSalvo),
+            roundsPerMinute = MainGunRoundsPerMinute,
+            yawSpeedDegPerSecond = template.yawSpeedDegPerSecond,
+            useYawLimits = template.useYawLimits,
+            minYawDegrees = template.minYawDegrees,
+            maxYawDegrees = template.maxYawDegrees,
+            elevationUpSpeedDegPerSecond = template.elevationUpSpeedDegPerSecond,
+            elevationDownSpeedDegPerSecond = template.elevationDownSpeedDegPerSecond,
+            minElevationDegrees = template.minElevationDegrees,
+            maxElevationDegrees = template.maxElevationDegrees,
+            fireAlignmentToleranceDegrees = template.fireAlignmentToleranceDegrees,
+            maxRangeMeters = template.maxRangeMeters,
+            muzzleVelocityMS = template.muzzleVelocityMS,
+            projectileMassKg = template.projectileMassKg,
+            projectileRadiusMeters = template.projectileRadiusMeters,
+            horizontalSpreadAtMaxRangeMeters = template.horizontalSpreadAtMaxRangeMeters,
+            verticalSpreadAtMaxRangeMeters = template.verticalSpreadAtMaxRangeMeters,
+            gravityScale = template.gravityScale,
+            projectileTrailSeconds = template.projectileTrailSeconds,
+            automaticTargetsDamageableShips = template.automaticTargetsDamageableShips
+        };
+    }
+
+    private void NormalizeMainGunGroup(ShipGunGroup group)
+    {
+        if (group == null)
+        {
+            return;
+        }
+
+        group.enabled = true;
+        bool manual = IsManualMainBatteryEnabled();
+        group.fireMode = manual ? ShipGunFireMode.Manual : ShipGunFireMode.Automatic;
+        group.roundsPerMinute = MainGunRoundsPerMinute;
+        group.useYawLimits = false;
+        group.minElevationDegrees = MainGunMinElevationDegrees;
+        group.maxElevationDegrees = MainGunMaxElevationDegrees;
+        group.automaticTargetsDamageableShips = !manual;
+    }
+
+    private bool IsMainBatteryEnabled()
+    {
+        return true;
+    }
+
+    private static bool IsMainGunGroupId(string groupId)
+    {
+        return !string.IsNullOrWhiteSpace(groupId) &&
+            (string.Equals(groupId, "main", System.StringComparison.OrdinalIgnoreCase) ||
+             groupId.StartsWith("main_", System.StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsSecondaryGunGroupId(string groupId)
+    {
+        return !string.IsNullOrWhiteSpace(groupId) &&
+            (string.Equals(groupId, "secondary", System.StringComparison.OrdinalIgnoreCase) ||
+             groupId.StartsWith("secondary_", System.StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasVisualMainGunMount(Transform visualRoot, string mountNamePart)
+    {
+        return FindVisualMainGunMuzzle(visualRoot, mountNamePart) != null;
+    }
+
+    private static bool TryBindVisualMainGunMount(ShipGunGroup group, Transform visualRoot, string mountNamePart)
+    {
+        if (group == null || visualRoot == null)
+        {
+            return false;
+        }
+
+        Transform muzzle = FindVisualMainGunMuzzle(visualRoot, mountNamePart);
+        if (muzzle == null)
+        {
+            return false;
+        }
+
+        Transform pitch = FindClosestAncestorContaining(muzzle, visualRoot, "PitchPivot")
+            ?? FindDeepChildContaining(visualRoot, mountNamePart, "PitchPivot");
+        Transform yaw = FindClosestAncestorContaining(muzzle, visualRoot, "YawPivot")
+            ?? FindDeepChildContaining(visualRoot, mountNamePart, "YawPivot");
+
+        group.yawPivot = yaw != null ? yaw : muzzle;
+        group.pitchPivot = pitch != null ? pitch : muzzle;
+        group.muzzle = muzzle;
+        return true;
+    }
+
+    private static bool TryBindFirstVisualSecondaryGunMount(ShipGunGroup group, Transform visualRoot)
+    {
+        if (group == null || visualRoot == null)
+        {
+            return false;
+        }
+
+        Transform muzzle = FindDeepChildContaining(visualRoot, "MG_", "Muzzle");
+        if (muzzle == null)
+        {
+            return false;
+        }
+
+        Transform pitch = FindClosestAncestorContaining(muzzle, visualRoot, "_ROOT")
+            ?? muzzle.parent;
+
+        group.yawPivot = pitch != null ? pitch : muzzle;
+        group.pitchPivot = pitch != null ? pitch : muzzle;
+        group.muzzle = muzzle;
+        return true;
+    }
+
+    private bool BindVisualSecondaryGunMounts(Transform visualRoot)
+    {
+        if (visualRoot == null)
+        {
+            return false;
+        }
+
+        List<Transform> muzzles = new List<Transform>();
+        CollectDeepChildrenContaining(visualRoot, muzzles, "MG_", "Muzzle");
+        if (muzzles.Count == 0)
+        {
+            ShipGunGroup secondary = FindGunGroupById("secondary") ?? FindFirstGunGroup(ShipGunFireMode.Automatic);
+            return TryBindFirstVisualSecondaryGunMount(secondary, visualRoot);
+        }
+
+        ShipGunGroup template = FindGunGroupById("secondary") ?? FindFirstGunGroup(ShipGunFireMode.Automatic);
+        bool boundAny = false;
+        for (int i = 0; i < muzzles.Count; i++)
+        {
+            string groupId = i == 0 ? "secondary" : "secondary_" + (i + 1).ToString("00");
+            string displayName = i == 0 ? "ПМК" : "ПМК " + (i + 1).ToString();
+            ShipGunGroup group = EnsureAutomaticSecondaryGunGroup(groupId, displayName, template);
+            if (TryBindVisualSecondaryMuzzle(group, muzzles[i]))
+            {
+                boundAny = true;
+            }
+        }
+
+        return boundAny;
+    }
+
+    private ShipGunGroup EnsureAutomaticSecondaryGunGroup(string groupId, string displayNameRu, ShipGunGroup template)
+    {
+        if (shipGunGroups == null)
+        {
+            shipGunGroups = new List<ShipGunGroup>();
+        }
+
+        ShipGunGroup group = FindGunGroupById(groupId);
+        if (group == null)
+        {
+            group = CreateAutomaticSecondaryGunGroupFromTemplate(groupId, displayNameRu, template);
+            shipGunGroups.Add(group);
+        }
+
+        NormalizeSecondaryGunGroup(group);
+        if (!string.IsNullOrWhiteSpace(displayNameRu))
+        {
+            group.displayNameRu = displayNameRu;
+        }
+
+        return group;
+    }
+
+    private static ShipGunGroup CreateAutomaticSecondaryGunGroupFromTemplate(string groupId, string displayNameRu, ShipGunGroup template)
+    {
+        template ??= CreateDefaultSecondaryGunGroup();
+        return new ShipGunGroup
+        {
+            groupId = groupId,
+            displayNameRu = string.IsNullOrWhiteSpace(displayNameRu) ? groupId : displayNameRu,
+            enabled = true,
+            fireMode = ShipGunFireMode.Automatic,
+            shell = template.shell,
+            localMuzzleOffset = template.localMuzzleOffset,
+            barrelsPerSalvo = Mathf.Max(1, template.barrelsPerSalvo),
+            roundsPerMinute = template.roundsPerMinute,
+            yawSpeedDegPerSecond = template.yawSpeedDegPerSecond,
+            useYawLimits = template.useYawLimits,
+            minYawDegrees = template.minYawDegrees,
+            maxYawDegrees = template.maxYawDegrees,
+            elevationUpSpeedDegPerSecond = template.elevationUpSpeedDegPerSecond,
+            elevationDownSpeedDegPerSecond = template.elevationDownSpeedDegPerSecond,
+            minElevationDegrees = template.minElevationDegrees,
+            maxElevationDegrees = template.maxElevationDegrees,
+            fireAlignmentToleranceDegrees = template.fireAlignmentToleranceDegrees,
+            maxRangeMeters = template.maxRangeMeters,
+            muzzleVelocityMS = template.muzzleVelocityMS,
+            projectileMassKg = template.projectileMassKg,
+            projectileRadiusMeters = template.projectileRadiusMeters,
+            horizontalSpreadAtMaxRangeMeters = template.horizontalSpreadAtMaxRangeMeters,
+            verticalSpreadAtMaxRangeMeters = template.verticalSpreadAtMaxRangeMeters,
+            gravityScale = template.gravityScale,
+            projectileTrailSeconds = template.projectileTrailSeconds,
+            automaticTargetsDamageableShips = true
+        };
+    }
+
+    private static void NormalizeSecondaryGunGroup(ShipGunGroup group)
+    {
+        if (group == null)
+        {
+            return;
+        }
+
+        group.enabled = true;
+        group.fireMode = ShipGunFireMode.Automatic;
+        group.useYawLimits = false;
+        group.minElevationDegrees = SecondaryGunMinElevationDegrees;
+        group.maxElevationDegrees = SecondaryGunMaxElevationDegrees;
+        group.automaticTargetsDamageableShips = true;
+    }
+
+    private static bool TryBindVisualSecondaryMuzzle(ShipGunGroup group, Transform muzzle)
+    {
+        if (group == null || muzzle == null)
+        {
+            return false;
+        }
+
+        Transform pitch = FindClosestAncestorContaining(muzzle, null, "_ROOT")
+            ?? muzzle.parent;
+
+        group.yawPivot = pitch != null ? pitch : muzzle;
+        group.pitchPivot = pitch != null ? pitch : muzzle;
+        group.muzzle = muzzle;
+        return true;
+    }
+
+    private static Transform FindVisualMainGunMuzzle(Transform visualRoot, string mountNamePart)
+    {
+        if (visualRoot == null || string.IsNullOrWhiteSpace(mountNamePart))
+        {
+            return null;
+        }
+
+        return FindDeepChildContaining(visualRoot, mountNamePart, "Muzzle_1")
+            ?? FindDeepChildContaining(visualRoot, mountNamePart, "Muzzle");
+    }
+
+    private static Transform FindDeepChildContaining(Transform root, params string[] requiredNameParts)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        if (NameContainsAll(root.name, requiredNameParts))
+        {
+            return root;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindDeepChildContaining(root.GetChild(i), requiredNameParts);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private static void CollectDeepChildrenContaining(Transform root, List<Transform> results, params string[] requiredNameParts)
+    {
+        if (root == null || results == null)
+        {
+            return;
+        }
+
+        if (NameContainsAll(root.name, requiredNameParts))
+        {
+            results.Add(root);
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            CollectDeepChildrenContaining(root.GetChild(i), results, requiredNameParts);
+        }
+    }
+
+    private static Transform FindClosestAncestorContaining(Transform child, Transform stopRoot, params string[] requiredNameParts)
+    {
+        Transform current = child;
+        while (current != null)
+        {
+            if (NameContainsAll(current.name, requiredNameParts))
+            {
+                return current;
+            }
+
+            if (current == stopRoot)
+            {
+                break;
+            }
+
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    private static bool NameContainsAll(string name, params string[] requiredNameParts)
+    {
+        if (string.IsNullOrWhiteSpace(name) || requiredNameParts == null || requiredNameParts.Length == 0)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < requiredNameParts.Length; i++)
+        {
+            string part = requiredNameParts[i];
+            if (!string.IsNullOrWhiteSpace(part) &&
+                name.IndexOf(part, System.StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static string SanitizeName(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return "main";
@@ -1857,45 +2489,65 @@ public class ShipPhysics : MonoBehaviour
                 group.shell = new DamageShellPreset();
             }
 
-            if (group.fireMode == ShipGunFireMode.Automatic && string.Equals(group.groupId, "secondary", System.StringComparison.OrdinalIgnoreCase))
+            if (IsMainGunGroupId(group.groupId))
             {
+                NormalizeMainGunGroup(group);
+            }
+
+            if (IsSecondaryGunGroupId(group.groupId))
+            {
+                NormalizeSecondaryGunGroup(group);
                 hasSecondaryGroup = true;
             }
         }
 
-        int enabledManualIndex = FindManualGunGroupIndex(true);
-        if (enabledManualIndex < 0)
+        if (IsManualMainBatteryEnabled())
         {
-            int disabledManualIndex = FindManualGunGroupIndex(false);
-            if (disabledManualIndex >= 0)
+            int enabledManualIndex = FindManualGunGroupIndex(true);
+            if (enabledManualIndex < 0)
             {
-                shipGunGroups[disabledManualIndex].enabled = true;
-                enabledManualIndex = disabledManualIndex;
-            }
-            else
-            {
-                shipGunGroups.Insert(0, CreateDefaultMainGunGroup());
-                enabledManualIndex = 0;
-            }
-        }
-
-        manualGunGroupIndex = Mathf.Clamp(enabledManualIndex, 0, Mathf.Max(0, shipGunGroups.Count - 1));
-        ShipGunGroup manualGroup = shipGunGroups[manualGunGroupIndex];
-        if (manualGroup != null)
-        {
-            if (string.Equals(manualGroup.groupId, "main", System.StringComparison.OrdinalIgnoreCase))
-            {
-                manualGroup.roundsPerMinute = MainGunRoundsPerMinute;
-            }
-
-            if (Application.isPlaying)
-            {
-                float latestAllowedShotTime = Time.time + manualGroup.SecondsBetweenSalvos;
-                if (manualGroup.nextShotTime > latestAllowedShotTime)
+                int disabledManualIndex = FindManualGunGroupIndex(false);
+                if (disabledManualIndex >= 0)
                 {
-                    manualGroup.nextShotTime = latestAllowedShotTime;
+                    shipGunGroups[disabledManualIndex].enabled = true;
+                    enabledManualIndex = disabledManualIndex;
+                }
+                else
+                {
+                    shipGunGroups.Insert(0, CreateDefaultMainGunGroup());
+                    enabledManualIndex = 0;
                 }
             }
+
+            manualGunGroupIndex = Mathf.Clamp(enabledManualIndex, 0, Mathf.Max(0, shipGunGroups.Count - 1));
+            ShipGunGroup manualGroup = shipGunGroups[manualGunGroupIndex];
+            if (manualGroup != null)
+            {
+                if (IsMainGunGroupId(manualGroup.groupId))
+                {
+                    NormalizeMainGunGroup(manualGroup);
+                }
+
+                if (Application.isPlaying)
+                {
+                    float latestAllowedShotTime = Time.time + manualGroup.SecondsBetweenSalvos;
+                    if (manualGroup.nextShotTime > latestAllowedShotTime)
+                    {
+                        manualGroup.nextShotTime = latestAllowedShotTime;
+                    }
+                }
+            }
+        }
+        else
+        {
+            int mainIndex = FindMainGunGroupIndex();
+            if (mainIndex < 0 && !HasGunGroupId("main"))
+            {
+                shipGunGroups.Insert(0, CreateDefaultMainGunGroup());
+                mainIndex = 0;
+            }
+
+            manualGunGroupIndex = Mathf.Clamp(mainIndex >= 0 ? mainIndex : 0, 0, Mathf.Max(0, shipGunGroups.Count - 1));
         }
 
         if (!createdDefaultGunGroups &&
@@ -1918,6 +2570,22 @@ public class ShipPhysics : MonoBehaviour
             if (group == null || group.fireMode != ShipGunFireMode.Manual) continue;
             if (requireEnabled && !group.enabled) continue;
             return i;
+        }
+
+        return -1;
+    }
+
+    private int FindMainGunGroupIndex()
+    {
+        if (shipGunGroups == null) return -1;
+
+        for (int i = 0; i < shipGunGroups.Count; i++)
+        {
+            ShipGunGroup group = shipGunGroups[i];
+            if (group != null && IsMainGunGroupId(group.groupId))
+            {
+                return i;
+            }
         }
 
         return -1;
@@ -1985,6 +2653,55 @@ public class ShipPhysics : MonoBehaviour
         Vector2 position = mouse.position.ReadValue();
         mousePosition = new Vector3(position.x, position.y, 0f);
         return true;
+    }
+
+    private bool TryBuildManualGunAimRay(Camera camera, Vector3 mousePosition, out Ray ray)
+    {
+        ray = default;
+        if (camera == null)
+        {
+            return false;
+        }
+
+        if (IsLockedGameplayAim())
+        {
+            Vector3 direction = ResolveLockedCameraGunAimDirection(camera);
+            if (!IsFinite(direction) || direction.sqrMagnitude <= 0.001f)
+            {
+                return false;
+            }
+
+            ray = new Ray(camera.transform.position, direction.normalized);
+            return true;
+        }
+
+        Rect pixelRect = camera.pixelRect;
+        if (pixelRect.width <= 1f || pixelRect.height <= 1f)
+        {
+            return false;
+        }
+
+        float x = Mathf.Clamp(mousePosition.x, pixelRect.xMin + 0.5f, pixelRect.xMax - 0.5f);
+        float y = Mathf.Clamp(mousePosition.y, pixelRect.yMin + 0.5f, pixelRect.yMax - 0.5f);
+        ray = camera.ScreenPointToRay(new Vector3(x, y, 0f));
+        return IsFinite(ray.origin) && IsFinite(ray.direction) && ray.direction.sqrMagnitude > 0.001f;
+    }
+
+    private Vector3 ResolveLockedCameraGunAimDirection(Camera camera)
+    {
+        Vector3 direction = camera != null ? camera.transform.forward : Vector3.zero;
+        if (!IsFinite(direction) || direction.sqrMagnitude <= 0.001f)
+        {
+            direction = transform.forward.sqrMagnitude > 0.001f ? transform.forward : Vector3.forward;
+        }
+
+        return direction.sqrMagnitude > 0.001f ? direction.normalized : Vector3.forward;
+    }
+
+    private static bool IsLockedGameplayAim()
+    {
+        return WildWindSessionCameraController.GameplayCursorLockedForMouseLook &&
+            !WildWindControlSettings.IsGameplayCursorReleasePressed();
     }
 
     private static bool WasMouseButtonPressedThisFrame(int button)
@@ -2144,15 +2861,15 @@ public class ShipPhysics : MonoBehaviour
         {
             groupId = "main",
             displayNameRu = "Главный калибр",
-            fireMode = ShipGunFireMode.Manual,
+            fireMode = ShipGunFireMode.Automatic,
             localMuzzleOffset = new Vector3(0f, 2.7f, 7.85f),
             barrelsPerSalvo = 1,
             roundsPerMinute = MainGunRoundsPerMinute,
             yawSpeedDegPerSecond = 45f,
             elevationUpSpeedDegPerSecond = 22f,
             elevationDownSpeedDegPerSecond = 30f,
-            minElevationDegrees = -5f,
-            maxElevationDegrees = 55f,
+            minElevationDegrees = MainGunMinElevationDegrees,
+            maxElevationDegrees = MainGunMaxElevationDegrees,
             fireAlignmentToleranceDegrees = 1.5f,
             maxRangeMeters = 2500f,
             muzzleVelocityMS = 360f,
@@ -2160,6 +2877,7 @@ public class ShipPhysics : MonoBehaviour
             projectileRadiusMeters = 0.10f,
             horizontalSpreadAtMaxRangeMeters = 24f,
             verticalSpreadAtMaxRangeMeters = 9f,
+            automaticTargetsDamageableShips = true,
             shell = new DamageShellPreset
             {
                 displayNameRu = "ББ 76 мм",
@@ -2190,8 +2908,8 @@ public class ShipPhysics : MonoBehaviour
             yawSpeedDegPerSecond = 140f,
             elevationUpSpeedDegPerSecond = 90f,
             elevationDownSpeedDegPerSecond = 110f,
-            minElevationDegrees = -10f,
-            maxElevationDegrees = 70f,
+            minElevationDegrees = SecondaryGunMinElevationDegrees,
+            maxElevationDegrees = SecondaryGunMaxElevationDegrees,
             fireAlignmentToleranceDegrees = 3f,
             maxRangeMeters = 1500f,
             muzzleVelocityMS = 420f,
@@ -2199,6 +2917,7 @@ public class ShipPhysics : MonoBehaviour
             projectileRadiusMeters = 0.035f,
             horizontalSpreadAtMaxRangeMeters = 35f,
             verticalSpreadAtMaxRangeMeters = 16f,
+            automaticTargetsDamageableShips = true,
             shell = new DamageShellPreset
             {
                 displayNameRu = "ББ 20 мм",

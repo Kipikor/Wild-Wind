@@ -35,9 +35,9 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     private bool showPrototypeToolbar = true;
 
     [Header("Floating Island")]
-    public float islandPaddingCells = 2f;
-    public float islandDropDepth = 4.8f;
-    public float islandBottomScale = 0.16f;
+    public float islandPaddingCells = 1.5f;
+    public float islandDropDepth = 22f;
+    public float islandBottomScale = 0.18f;
 
     [Header("Camera")]
     public float cameraYawDegrees = 45f;
@@ -200,6 +200,74 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     public int TileBatchRendererCountForTests => tileRoot != null
         ? tileRoot.GetComponentsInChildren<MeshRenderer>(true).Length
         : 0;
+    public int EnabledCityRendererCountForTests => CountEnabledRenderers(transform);
+    public int EnabledBuildingRendererCountForTests => buildingRoot != null ? CountEnabledRenderers(buildingRoot) : 0;
+    public int EnabledTileRendererCountForTests => tileRoot != null ? CountEnabledRenderers(tileRoot) : 0;
+    public int CameraVisibleCityRendererCountForTests => CountCameraVisibleRenderers(transform);
+    public Vector3 IslandWorldSizeForTests => TryGetWorldRendererBounds(islandRoot != null ? islandRoot.gameObject : null, out Bounds islandBounds)
+        ? islandBounds.size
+        : Vector3.zero;
+    public float IslandGridOverhangCellsForTests
+    {
+        get
+        {
+            if (!TryGetWorldRendererBounds(islandRoot != null ? islandRoot.gameObject : null, out Bounds islandBounds))
+            {
+                return 0f;
+            }
+
+            float gridMinX = -cellSize * 0.5f;
+            float gridMaxX = (gridWidth - 1) * cellSize + cellSize * 0.5f;
+            float gridMinZ = -cellSize * 0.5f;
+            float gridMaxZ = (gridHeight - 1) * cellSize + cellSize * 0.5f;
+            float minOverhang = Mathf.Min(
+                gridMinX - islandBounds.min.x,
+                islandBounds.max.x - gridMaxX,
+                gridMinZ - islandBounds.min.z,
+                islandBounds.max.z - gridMaxZ);
+            return minOverhang / Mathf.Max(0.01f, cellSize);
+        }
+    }
+    public float IslandGridMaxOverhangCellsForTests
+    {
+        get
+        {
+            if (!TryGetWorldRendererBounds(islandRoot != null ? islandRoot.gameObject : null, out Bounds islandBounds))
+            {
+                return 0f;
+            }
+
+            float gridMinX = -cellSize * 0.5f;
+            float gridMaxX = (gridWidth - 1) * cellSize + cellSize * 0.5f;
+            float gridMinZ = -cellSize * 0.5f;
+            float gridMaxZ = (gridHeight - 1) * cellSize + cellSize * 0.5f;
+            float maxOverhang = Mathf.Max(
+                gridMinX - islandBounds.min.x,
+                islandBounds.max.x - gridMaxX,
+                gridMinZ - islandBounds.min.z,
+                islandBounds.max.z - gridMaxZ);
+            return maxOverhang / Mathf.Max(0.01f, cellSize);
+        }
+    }
+    public bool IslandFootprintCoversGridForTests
+    {
+        get
+        {
+            if (!TryGetWorldRendererBounds(islandRoot != null ? islandRoot.gameObject : null, out Bounds islandBounds))
+            {
+                return false;
+            }
+
+            float gridMinX = -cellSize * 0.5f;
+            float gridMaxX = (gridWidth - 1) * cellSize + cellSize * 0.5f;
+            float gridMinZ = -cellSize * 0.5f;
+            float gridMaxZ = (gridHeight - 1) * cellSize + cellSize * 0.5f;
+            return islandBounds.min.x <= gridMinX
+                && islandBounds.max.x >= gridMaxX
+                && islandBounds.min.z <= gridMinZ
+                && islandBounds.max.z >= gridMaxZ;
+        }
+    }
     public int CellDataCountForTests => cells != null ? cells.Length : 0;
     public int OpenCellCountForTests => CountCellsWithAccess(CityCellAccess.Open);
     public int FogCellCountForTests => CountCellsWithAccess(CityCellAccess.Fog);
@@ -1014,6 +1082,20 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
             && building.gameObject.GetComponentsInChildren<Renderer>(true).Length > 0;
     }
 
+    public bool BuildingHasEnabledRendererForTests(string buildingKey)
+    {
+        return TryGetBuildingByKey(buildingKey, out PlacedBuilding building)
+            && building.gameObject != null
+            && CountEnabledRenderers(building.gameObject.transform) > 0;
+    }
+
+    public bool BuildingHasCameraVisibleRendererForTests(string buildingKey)
+    {
+        return TryGetBuildingByKey(buildingKey, out PlacedBuilding building)
+            && building.gameObject != null
+            && CountCameraVisibleRenderers(building.gameObject.transform) > 0;
+    }
+
     public bool TryGetBuildingFootprintForTests(string buildingKey, out int width, out int height)
     {
         if (TryGetBuildingByKey(buildingKey, out PlacedBuilding building))
@@ -1379,51 +1461,74 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     {
         if (islandRoot == null) return;
 
-        float padding = Mathf.Max(0.5f, islandPaddingCells) * cellSize;
-        float halfX = gridWidth * cellSize * 0.5f + padding;
-        float halfZ = gridHeight * cellSize * 0.5f + padding;
-        float dropDepth = Mathf.Max(2.2f, islandDropDepth);
-        float bottomScale = Mathf.Clamp(islandBottomScale, 0.06f, 0.50f);
+        float padding = Mathf.Max(0.75f, islandPaddingCells) * cellSize;
+        float dropDepth = Mathf.Max(18f, islandDropDepth);
+        float bottomScale = Mathf.Clamp(islandBottomScale, 0.12f, 0.34f);
         Vector3 center = GridCenterWorld();
-        float topY = -TileHeight - 0.035f;
-        float shoulderY = -dropDepth * 0.26f;
-        float lowerY = -dropDepth * 0.72f;
+        float topY = -TileHeight - 0.045f;
+        float rimY = -dropDepth * 0.035f;
+        float shoulderY = -dropDepth * 0.18f;
+        float midY = -dropDepth * 0.52f;
+        float lowerY = -dropDepth * 0.83f;
         float bottomY = -dropDepth;
+        float gridMinX = -cellSize * 0.5f;
+        float gridMaxX = (gridWidth - 1) * cellSize + cellSize * 0.5f;
+        float gridMinZ = -cellSize * 0.5f;
+        float gridMaxZ = (gridHeight - 1) * cellSize + cellSize * 0.5f;
+        float midX = (gridMinX + gridMaxX) * 0.5f;
+        float midZ = (gridMinZ + gridMaxZ) * 0.5f;
 
         Vector2[] outline = new[]
         {
-            new Vector2(-0.90f, -0.48f),
-            new Vector2(-0.58f, -0.96f),
-            new Vector2(0.06f, -0.90f),
-            new Vector2(0.74f, -0.98f),
-            new Vector2(0.98f, -0.44f),
-            new Vector2(0.90f, 0.12f),
-            new Vector2(1.00f, 0.68f),
-            new Vector2(0.36f, 0.98f),
-            new Vector2(-0.24f, 0.90f),
-            new Vector2(-0.82f, 1.00f),
-            new Vector2(-1.00f, 0.42f),
-            new Vector2(-0.96f, -0.18f)
+            new Vector2(gridMinX - padding * 0.90f, gridMinZ - padding * 0.65f),
+            new Vector2(gridMinX + cellSize * 7f, gridMinZ - padding * 1.06f),
+            new Vector2(midX - cellSize * 3f, gridMinZ - padding * 0.82f),
+            new Vector2(gridMaxX - cellSize * 7f, gridMinZ - padding * 1.12f),
+            new Vector2(gridMaxX + padding * 0.92f, gridMinZ - padding * 0.70f),
+            new Vector2(gridMaxX + padding * 1.10f, gridMinZ + cellSize * 8f),
+            new Vector2(gridMaxX + padding * 0.82f, midZ + cellSize * 1.5f),
+            new Vector2(gridMaxX + padding * 1.02f, gridMaxZ - cellSize * 7f),
+            new Vector2(gridMaxX + padding * 0.72f, gridMaxZ + padding * 0.95f),
+            new Vector2(gridMaxX - cellSize * 8f, gridMaxZ + padding * 1.08f),
+            new Vector2(midX + cellSize * 2f, gridMaxZ + padding * 0.82f),
+            new Vector2(gridMinX + cellSize * 6f, gridMaxZ + padding * 1.02f),
+            new Vector2(gridMinX - padding * 0.82f, gridMaxZ + padding * 0.76f),
+            new Vector2(gridMinX - padding * 1.08f, gridMaxZ - cellSize * 7f),
+            new Vector2(gridMinX - padding * 0.78f, midZ - cellSize * 1f),
+            new Vector2(gridMinX - padding * 1.00f, gridMinZ + cellSize * 7f)
         };
 
         Vector3[] topRing = new Vector3[outline.Length];
+        Vector3[] rimRing = new Vector3[outline.Length];
         Vector3[] shoulderRing = new Vector3[outline.Length];
+        Vector3[] midRing = new Vector3[outline.Length];
         Vector3[] lowerRing = new Vector3[outline.Length];
         for (int i = 0; i < outline.Length; i++)
         {
             Vector2 point = outline[i];
-            topRing[i] = new Vector3(center.x + point.x * halfX, topY, center.z + point.y * halfZ);
+            topRing[i] = new Vector3(point.x, topY, point.y);
 
-            float shoulderScale = 0.76f + (i % 2 == 0 ? 0.04f : -0.03f);
-            float lowerScale = Mathf.Lerp(0.36f, bottomScale, i % 3 == 0 ? 0.25f : 0.0f);
+            Vector2 fromCenter = point - new Vector2(center.x, center.z);
+            float rimScale = 0.99f + (i % 2 == 0 ? 0.012f : -0.018f);
+            float shoulderScale = 0.92f + (i % 2 == 0 ? 0.045f : -0.035f);
+            float midScale = 0.58f + (i % 3 == 0 ? 0.06f : -0.035f);
+            float lowerScale = Mathf.Lerp(0.30f, bottomScale, i % 3 == 0 ? 0.35f : 0.0f);
+            rimRing[i] = new Vector3(
+                center.x + fromCenter.x * rimScale,
+                rimY + ((i % 3) - 1) * 0.12f,
+                center.z + fromCenter.y * rimScale);
             shoulderRing[i] = new Vector3(
-                center.x + point.x * halfX * shoulderScale,
-                shoulderY + ((i % 3) - 1) * 0.10f,
-                center.z + point.y * halfZ * shoulderScale);
+                center.x + fromCenter.x * shoulderScale,
+                shoulderY + ((i % 4) - 1.5f) * 0.22f,
+                center.z + fromCenter.y * shoulderScale);
+            midRing[i] = new Vector3(
+                center.x + fromCenter.x * midScale,
+                midY + (i % 2 == 0 ? 0.30f : -0.24f),
+                center.z + fromCenter.y * midScale);
             lowerRing[i] = new Vector3(
-                center.x + point.x * halfX * lowerScale,
-                lowerY + (i % 2 == 0 ? 0.12f : -0.08f),
-                center.z + point.y * halfZ * lowerScale);
+                center.x + fromCenter.x * lowerScale,
+                lowerY + (i % 2 == 0 ? 0.34f : -0.26f),
+                center.z + fromCenter.y * lowerScale);
         }
 
         List<Vector3> vertices = new List<Vector3>();
@@ -1447,8 +1552,10 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
             topTriangles.Add(topIndices[next]);
             topTriangles.Add(topIndices[i]);
 
-            AddMeshQuad(vertices, sideTriangles, topRing[i], topRing[next], shoulderRing[next], shoulderRing[i]);
-            AddMeshQuad(vertices, sideTriangles, shoulderRing[i], shoulderRing[next], lowerRing[next], lowerRing[i]);
+            AddMeshQuad(vertices, sideTriangles, topRing[i], topRing[next], rimRing[next], rimRing[i]);
+            AddMeshQuad(vertices, sideTriangles, rimRing[i], rimRing[next], shoulderRing[next], shoulderRing[i]);
+            AddMeshQuad(vertices, sideTriangles, shoulderRing[i], shoulderRing[next], midRing[next], midRing[i]);
+            AddMeshQuad(vertices, sideTriangles, midRing[i], midRing[next], lowerRing[next], lowerRing[i]);
             AddMeshTriangle(
                 vertices,
                 bottomTriangles,
@@ -1637,6 +1744,14 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         Vector2 pointerDelta;
         float scrollY;
         ReadCameraPointerInput(out rightHeld, out middleHeld, out pointerDelta, out scrollY);
+
+        if ((rightHeld || middleHeld || Mathf.Abs(scrollY) > 0.001f) &&
+            (WildWindGameplayHud.IsHudPointerCaptureActiveForCamera || IsPointerOverUi()))
+        {
+            pointerCameraControlActive = true;
+            ApplyCameraTransform();
+            return;
+        }
 
         if (rightHeld)
         {
@@ -2691,6 +2806,52 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         }
 
         return hasBounds;
+    }
+
+    private int CountCameraVisibleRenderers(Transform root)
+    {
+        if (root == null || sceneCamera == null)
+        {
+            return 0;
+        }
+
+        Plane[] planes = GeometryUtility.CalculateFrustumPlanes(sceneCamera);
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        int count = 0;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer != null
+                && renderer.enabled
+                && renderer.gameObject.activeInHierarchy
+                && GeometryUtility.TestPlanesAABB(planes, renderer.bounds))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static int CountEnabledRenderers(Transform root)
+    {
+        if (root == null)
+        {
+            return 0;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        int count = 0;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private static void DisableChildColliders(GameObject root, Collider rootCollider)
@@ -4784,7 +4945,7 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
 
     private Vector3 IslandOrbitCenterWorld()
     {
-        return GridCenterWorld() + Vector3.down * Mathf.Max(2.2f, islandDropDepth) * 0.34f;
+        return GridCenterWorld() + Vector3.down * Mathf.Max(18f, islandDropDepth) * 0.22f;
     }
 
     private Color BuildingColorForId(int id)

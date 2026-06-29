@@ -1,13 +1,9 @@
-job_id,local_name_ru,rank_min,rank_max,fe_share_of_total,resource_tags,can_require_rare,notes_ru
-patch_hull,Залатать корпус,2,10,0.10,plates;skin;freight,false,Базовая работа почти у всех кораблей.
-replace_beams,Заменить балки,2,10,0.09,beams;metal;freight,false,Сжигает массовые конструкционные материалы.
-clean_claudium_loop,Очистить контуры,3,10,0.08,claudium;gas;reagents,false,Связывает ремонт с газами.
-repack_lift_cells,Перебрать подъемные ячейки,4,10,0.10,claudium;instrumentation;gas,true,Средняя/поздняя работа.
-rebuild_drive,Перебрать тягу,3,10,0.12,mechanical;oil;freight,false,Механика и жир/смазки.
-seal_skin,Собрать обшивку,2,10,0.08,skin;cloth;plates,false,Может использовать шкуру левиафанов.
-align_instruments,Откалибровать приборы,4,10,0.08,instrumentation;paper;sp_package,true,Иногда просит информационные штуки.
-replace_actuators,Поставить приводы,5,10,0.12,automaton_mechanism;mechanical,true,Автоматонный sink.
-flush_tanks,Промыть баки,2,8,0.06,water;acid;freight,false,Дешевый ресурсный sink.
-restitch_rigging,Перетянуть оснастку,2,8,0.06,cloth;tendons;tools,false,Сухожилия как органический материал.
-restore_navigation,Восстановить навигацию,5,10,0.09,relic_info;instrumentation;paper,true,Информационный sink для дорогих корпусов.
-final_inspection,Финальная приемка,2,10,0.02,freight,false,Последний небольшой платеж.
+job_family,local_name_ru,rank_min,rank_max,lower_stage_policy,resource_bias,notes_ru
+patch_hull,Залатать корпус,2,10,raw_to_details,ore;plates;plating,Массовая корпусная работа, чаще просит минералы, обшивку, бронелисты и переборки.
+replace_structure,Заменить силовой набор,2,10,raw_to_details,beam;steel;bulkhead,Сжигает балки и конструкционные детали вместо дорогих блоков полного корабля.
+seal_shell,Запечатать оболочку,2,10,raw_to_materials,resin;rubber;bakelite;leviathan,Полимеры и левиафановые материалы закрывают трещины, оболочки и гибкие узлы.
+restore_drive,Вернуть тягу,3,10,materials_to_details,engine;actuator;pump;automaton,Машинная работа просит двигатели, приводы, насосы и точные детали автоматонов.
+align_instruments,Выставить приборы,4,10,materials_to_details,sensor;calculator;invar;textolite,Приборная работа, чаще появляется у разведчиков, хакеров и кораблей с куполами/X-Ray.
+purge_reactors,Прочистить контуры,4,10,materials_to_details,gas;acid;fluoroplastic;glass_ceramic,Газовые и реакторные корпуса чинятся через реагенты, фторопласт и стеклокерамику.
+repack_cargo,Собрать грузовые секции,3,10,raw_to_details,deck_section;airlock;hatch;cargo,Грузовики и промысловые корабли чаще тратят палубные секции, шлюзы и люки.
+final_acceptance,Финальная приемка,2,10,claim_to_port_or_sell,freight;mastery;reputation,После ремонта корабль нельзя reroll: его можно claim or sell, после чего слот получает новую находку.

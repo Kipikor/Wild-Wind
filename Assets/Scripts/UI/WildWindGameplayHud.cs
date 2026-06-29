@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -59,6 +60,10 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private const string WindowFactionsId = "factions";
     private const string WindowDevelopmentId = "development";
     private const string WindowMetaAllTasksId = "meta_all_tasks";
+    private const string MainHudPrefabResourcePath = "UI/HUD/MainScreen/WildWindMainScreenHud";
+    private const string MainHudIconResourceFolderPath = "UI/HUD/MainScreen/Icons/";
+    private const string HudWindowFrameResourcePath = "UI/HUD/WildWindHudWindowFrame";
+    private const string HudWindowPrefabFolderResourcePath = "UI/HUD/Windows/";
     private enum MetaScreenMode
     {
         Port,
@@ -71,36 +76,52 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private const int MetaProfileMasteryNextPlaceholder = 27;
     private const float MetaProfileMasteryProgressPlaceholder = 0.64f;
     private const int MetaResourceCounterCount = 5;
-    private const float MetaResourceCounterWidth = 154f;
-    private const float MetaResourceCounterHeight = 52f;
-    private const float MetaResourceCounterGap = 18f;
+    private const float MetaResourceCounterWidth = 198f;
+    private const float MetaResourceCounterHeight = 70f;
+    private const float MetaResourceCounterGap = 0f;
     private const int MetaTopRightButtonCount = 4;
-    private const float MetaTopRightButtonSize = 54f;
-    private const float MetaTopRightButtonGap = 14f;
-    private const int MetaLeftSideButtonCount = 4;
-    private const float MetaLeftSideButtonSize = 72f;
-    private const float MetaLeftSideButtonGap = 16f;
-    private const float MetaDockButtonSize = 138f;
+    private const float MetaTopRightButtonSize = 60f;
+    private const float MetaTopRightButtonGap = 22f;
+    private const int MetaLeftSideButtonCount = 5;
+    private const float MetaLeftSideButtonSize = 110f;
+    private const float MetaLeftSideButtonGap = 21f;
+    private const float MetaDockButtonSize = 156f;
     private const int MetaQuestMaxCount = 3;
     private const int MetaProjectMaxCount = 5;
-    private const float MetaProjectCardWidth = 118f;
+    private const float MetaProjectCardWidth = 252f;
     private const float MetaProjectCardHeight = 124f;
-    private const float MetaProjectCardGap = 10f;
+    private const float MetaProjectCardGap = 17f;
     private const int DevelopmentTreeTierCount = 10;
-    private const float DevelopmentTileWidth = 108f;
-    private const float DevelopmentTileHeight = 58f;
-    private const float DevelopmentTierStep = 128f;
-    private const float DevelopmentBranchStep = 92f;
+    private const float DevelopmentFactionListWidth = 250f;
+    private const float DevelopmentTreePanelWidth = 1220f;
+    private const float DevelopmentTreeViewportWidth = 1220f;
+    private const float DevelopmentTreeViewportHeight = 858f;
+    private const float DevelopmentTreeContentPaddingX = 72f;
+    private const float DevelopmentTreeContentPaddingY = 48f;
+    private const float DevelopmentDetailsWidth = 340f;
+    private const float DevelopmentTileWidth = 150f;
+    private const float DevelopmentTileHeight = 80f;
+    private const float DevelopmentRankStep = 118f;
+    private const float DevelopmentBranchStep = 176f;
     private static readonly Color EngineForwardThrustColor = new Color(0.14f, 0.78f, 0.28f, 0.96f);
     private static readonly Color EngineReverseThrustColor = new Color(0.96f, 0.72f, 0.12f, 0.96f);
     private static readonly int[] EngineThrottleGearNotches = { 5, 4, 3, 2, 1, 0, -1, -2, -3 };
     private static readonly Color CompassDefaultTargetColor = new Color(0.44f, 0.95f, 1f, 0.96f);
     private static readonly Color CompassExitTargetColor = new Color(1f, 0.78f, 0.22f, 0.98f);
+    private static readonly Color PortGlass = new Color(0.90f, 0.95f, 1.00f, 0.78f);
+    private static readonly Color PortGlassStrong = new Color(0.94f, 0.97f, 1.00f, 0.92f);
+    private static readonly Color PortGlassMuted = new Color(0.82f, 0.89f, 0.96f, 0.74f);
+    private static readonly Color PortStroke = new Color(0.47f, 0.56f, 0.68f, 0.62f);
+    private static readonly Color PortText = new Color(0.18f, 0.22f, 0.31f, 1f);
+    private static readonly Color PortTextSoft = new Color(0.33f, 0.39f, 0.50f, 0.96f);
+    private static readonly Color PortNavy = new Color(0.15f, 0.22f, 0.40f, 1f);
+    private static readonly Color PortGold = new Color(0.94f, 0.70f, 0.28f, 1f);
+    private static readonly Color PortTrack = new Color(0.61f, 0.67f, 0.75f, 0.78f);
     private static readonly MetaResourceCounterSpec[] MetaResourceCounters =
     {
         new MetaResourceCounterSpec("freight", 1240000, "F", new Color(0.78f, 0.76f, 0.68f, 1f)),
         new MetaResourceCounterSpec("design_experience", 853000, "XP", new Color(0.36f, 0.72f, 0.32f, 1f)),
-        new MetaResourceCounterSpec("metal", 412000, "M", new Color(0.66f, 0.46f, 0.28f, 1f)),
+        new MetaResourceCounterSpec("iron", 412000, "Fe", new Color(0.66f, 0.46f, 0.28f, 1f)),
         new MetaResourceCounterSpec("water", 18700, "W", new Color(0.28f, 0.62f, 0.92f, 1f)),
         new MetaResourceCounterSpec("solid", 2450, "S", new Color(0.94f, 0.72f, 0.26f, 1f))
     };
@@ -113,10 +134,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     };
     private static readonly MetaSideButtonSpec[] MetaLeftSideButtons =
     {
-        new MetaSideButtonSpec(WindowOfferId, "ПРЕДЛОЖЕНИЕ", "\u25A3"),
-        new MetaSideButtonSpec(WindowSideEventsId, "СОБЫТИЯ", "\u25A6"),
-        new MetaSideButtonSpec(WindowFactionsId, "ФРАКЦИИ", "\u2691"),
-        new MetaSideButtonSpec(WindowDevelopmentId, "РАЗВИТИЕ", "\u25C6")
+        new MetaSideButtonSpec(WindowSideEventsId, "События", "\u25A3", "MetaEvents"),
+        new MetaSideButtonSpec(WindowFactionsId, "Торговцы", "\u2696", "MetaMerchants"),
+        new MetaSideButtonSpec(WindowCargoId, "Инвентарь", "\u25A4", "MetaInventory"),
+        new MetaSideButtonSpec(WindowEncyclopediaId, "Знания", "\u25A5", "MetaKnowledge"),
+        new MetaSideButtonSpec(WindowOfferId, "Магазин", "\u25C6", "MetaShop")
     };
     private static readonly MetaQuestSpec[] MetaQuestSpecs =
     {
@@ -126,11 +148,21 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     };
     private static readonly MetaProjectSpec[] MetaProjectSpecs =
     {
-        new MetaProjectSpec("Болты", "3 шт.", "\u25A3", "Готово", 1f),
-        new MetaProjectSpec("Мост", "1 шт.", "\u25A4", "2ч 10м", 0.22f),
-        new MetaProjectSpec("Насос", "1 шт.", "\u2692", "46м", 0.41f),
-        new MetaProjectSpec("Маяк", "1 шт.", "\u25B2", "Ждет", 0f),
-        new MetaProjectSpec("Сталь", "12 шт.", "\u25A6", "18м", 0.64f)
+        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f),
+        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f),
+        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f),
+        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f),
+        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f)
+    };
+    private static readonly string[] MainHudRequiredIconResourceNames =
+    {
+        "MetaEvents",
+        "MetaMerchants",
+        "MetaInventory",
+        "MetaKnowledge",
+        "MetaShop",
+        "MetaProjects",
+        "MetaDock"
     };
 
     [SerializeField, InspectorName("Reference Resolution")] private Vector2 referenceResolution = new Vector2(1920f, 1080f);
@@ -192,9 +224,40 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private Text[] metaLeftSideButtonIconTexts;
     private Button metaDockButton;
     private Text metaDockButtonText;
+    private RectTransform metaBlueprintButtonRoot;
     private RectTransform metaDockScreenLayer;
     private Button metaDockScreenPortButton;
     private Text metaDockScreenPortButtonText;
+    private RectTransform metaDockShipSlotRoot;
+    private RectTransform metaDockSelectedShipRoot;
+    private RectTransform metaDockMissionRoot;
+    private RectTransform metaDockRewardRoot;
+    private RectTransform metaDockResultModalRoot;
+    private Text metaDockHeaderText;
+    private Text metaDockSelectedShipText;
+    private Text metaDockSelectedStatsText;
+    private Text metaDockMissionHeaderText;
+    private Text metaDockMissionDetailText;
+    private Text metaDockRewardText;
+    private Text metaDockResultTitleText;
+    private Text metaDockResultSubtitleText;
+    private Text metaDockResultBodyText;
+    private Text metaDockResultCloseText;
+    private Text metaDockManualSortieText;
+    private Text metaDockCoreCombatText;
+    private Text metaDockQuickBattleText;
+    private Text metaDockRunMissionText;
+    private Text metaDockSellText;
+    private Text[] metaDockSlotTexts;
+    private Text[] metaDockMissionTexts;
+    private Button[] metaDockSlotButtons;
+    private Button[] metaDockMissionButtons;
+    private Button metaDockManualSortieButton;
+    private Button metaDockCoreCombatButton;
+    private Button metaDockQuickBattleButton;
+    private Button metaDockRunMissionButton;
+    private Button metaDockSellButton;
+    private Button metaDockResultCloseButton;
     private RectTransform metaQuestPanel;
     private RectTransform[] metaQuestRows;
     private Text[] metaQuestIconTexts;
@@ -238,8 +301,18 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private HudWindow developmentWindow;
     private Text developmentWindowText;
     private RectTransform developmentSupplierTabRoot;
+    private RectTransform developmentTreeScrollRoot;
+    private RectTransform developmentTreeViewport;
     private RectTransform developmentTreeRoot;
+    private ScrollRect developmentTreeScrollRect;
+    private RectTransform developmentDetailsRoot;
+    private readonly Dictionary<string, DevelopmentShipTileView> developmentShipTilesById = new Dictionary<string, DevelopmentShipTileView>(StringComparer.OrdinalIgnoreCase);
+    private static bool hudPointerCaptureActiveForCamera;
     private string selectedDevelopmentSupplierId = "";
+    private string selectedDevelopmentShipId = "";
+    private string hoveredDevelopmentShipId = "";
+    private string selectedMetaDockMissionOfferId = "";
+    private string developmentDetailsShipId = "";
     private string developmentWindowLayoutKey = "";
     private int developmentWindowSupplierCount;
     private int developmentWindowTileCount;
@@ -280,6 +353,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private MetaScreenMode metaScreenMode = MetaScreenMode.Port;
     private static Font cachedDefaultFont;
     private static Sprite cachedCircleSprite;
+    private static Sprite cachedRoundedPanelSprite;
+    private static Sprite cachedRoundedSmallSprite;
+    private static readonly Dictionary<string, Sprite> cachedMainHudIconSprites = new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
 
     public bool IsReady => canvas != null && root != null && ResolveMeta() != null && ResolveSession() != null;
     public bool IsFlightPanelVisible => flightPanel != null && flightPanel.gameObject.activeSelf;
@@ -373,6 +449,16 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     {
         return TryGetMetaTopRightWindow(index, out HudWindow window) && window.IsOpen;
     }
+    public bool PressMetaTopRightButtonForTests(int index)
+    {
+        if (index < 0 || metaTopRightButtons == null || index >= metaTopRightButtons.Length || metaTopRightButtons[index] == null || !metaTopRightButtons[index].interactable)
+        {
+            return false;
+        }
+
+        metaTopRightButtons[index].onClick.Invoke();
+        return IsMetaTopRightWindowOpenForTests(index);
+    }
     public bool AreOpenHudWindowsModalForTests => AreOpenHudWindowsModal();
     public bool IsMetaLeftSideButtonsReadyForTests => metaLeftSideButtonStrip != null
         && metaLeftSideButtons != null
@@ -387,6 +473,17 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         && AreMetaLeftSideWindowsReadyForTests();
     public bool IsMetaLeftSideButtonsVisibleForTests => metaLeftSideButtonStrip != null && metaLeftSideButtonStrip.gameObject.activeInHierarchy;
     public int MetaLeftSideButtonCountForTests => metaLeftSideButtons != null ? metaLeftSideButtons.Length : 0;
+    public bool PressMetaLeftSideButtonForTests(int index)
+    {
+        if (index < 0 || metaLeftSideButtons == null || index >= metaLeftSideButtons.Length || metaLeftSideButtons[index] == null || !metaLeftSideButtons[index].interactable)
+        {
+            return false;
+        }
+
+        metaLeftSideButtons[index].onClick.Invoke();
+        return IsMetaLeftSideWindowOpenForTests(index);
+    }
+    public bool AreMainHudReferenceIconsReadyForTests => AreMainHudIconSpritesReadyForTests();
     public bool IsMetaDockButtonReadyForTests => metaDockButton != null
         && metaDockButtonText != null
         && metaDockButton.targetGraphic != null
@@ -402,7 +499,47 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         && metaDockScreenPortButtonText != null
         && metaDockScreenPortButton.targetGraphic != null
         && IsMetaDockScreenPortButtonAtDockButtonSpotForTests;
+    public bool IsMetaDockGameplayReadyForTests => IsMetaDockScreenReadyForTests
+        && metaDockShipSlotRoot != null
+        && metaDockSelectedShipRoot != null
+        && metaDockMissionRoot != null
+        && metaDockRewardRoot != null
+        && metaDockHeaderText != null
+        && metaDockSelectedShipText != null
+        && metaDockSelectedStatsText != null
+        && metaDockMissionHeaderText != null
+        && metaDockMissionDetailText != null
+        && metaDockRewardText != null
+        && metaDockResultModalRoot != null
+        && metaDockResultTitleText != null
+        && metaDockResultSubtitleText != null
+        && metaDockResultBodyText != null
+        && metaDockResultCloseButton != null
+        && metaDockQuickBattleButton != null
+        && metaDockRunMissionButton != null
+        && metaDockManualSortieButton != null
+        && metaDockCoreCombatButton != null
+        && metaDockSellButton != null
+        && metaDockMissionTexts != null
+        && metaDockMissionTexts.Length == 15
+        && metaDockMissionButtons != null
+        && metaDockMissionButtons.Length == 15
+        && metaDockSlotTexts != null
+        && metaDockSlotTexts.Length == MetaGameState.DevelopmentDockSlotCount
+        && metaDockSlotButtons != null
+        && metaDockSlotButtons.Length == MetaGameState.DevelopmentDockSlotCount;
     public bool IsMetaDockScreenVisibleForTests => metaDockScreenLayer != null && metaDockScreenLayer.gameObject.activeInHierarchy;
+    public string MetaDockRewardTextForTests => metaDockRewardText != null ? metaDockRewardText.text : "";
+    public bool IsMetaDockResultWindowVisibleForTests => metaDockResultModalRoot != null && metaDockResultModalRoot.gameObject.activeInHierarchy;
+    public string MetaDockResultWindowTextForTests => metaDockResultBodyText != null ? metaDockResultBodyText.text : "";
+    public int MetaDockMissionOfferCountForTests => metaDockMissionTexts != null ? metaDockMissionTexts.Length : 0;
+    public string MetaDockSelectedShipTextForTests => metaDockSelectedShipText != null ? metaDockSelectedShipText.text : "";
+    public bool CloseAllHudWindowsForTests()
+    {
+        CloseAllHudWindows();
+        RefreshState(true);
+        return !AreOpenHudWindowsModalForTests;
+    }
     public bool IsMetaDockScreenActiveForRuntime => metaScreenMode == MetaScreenMode.Dock
         && metaDockScreenLayer != null
         && metaDockScreenLayer.gameObject.activeInHierarchy;
@@ -497,10 +634,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         && metaProjectPanel != null
         && IsBottomLeftAnchoredForTests(metaProjectToolButtonStrip)
         && IsBottomLeftAnchoredForTests(metaProjectPanel)
-        && Mathf.Abs(metaProjectToolButtonStrip.anchoredPosition.x - metaProjectPanel.anchoredPosition.x) <= 1f
-        && Mathf.Abs(metaProjectPanel.anchoredPosition.x - metaQuestPanel.anchoredPosition.x) <= 1f
-        && metaProjectPanel.anchoredPosition.y <= 60f
-        && metaProjectToolButtonStrip.anchoredPosition.y >= metaProjectPanel.anchoredPosition.y + metaProjectPanel.sizeDelta.y + 8f
+        && metaProjectToolButtonStrip.anchoredPosition.x <= 24f
+            && metaProjectPanel.anchoredPosition.x >= 80f
+            && metaProjectPanel.anchoredPosition.x <= 110f
+            && metaProjectPanel.anchoredPosition.y <= 40f
+        && metaProjectToolButtonStrip.anchoredPosition.y >= metaProjectPanel.anchoredPosition.y + metaProjectPanel.sizeDelta.y + 20f
         && metaProjectHomeButton != null
         && metaProjectGridButton != null
         && metaProjectCameraButton != null
@@ -555,11 +693,38 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         && developmentWindowSupplierCount >= 6
         && developmentWindowTileCount >= 15
         && developmentWindowConnectionCount >= 14;
-    public string DevelopmentWindowTextForTests => developmentWindowText != null ? developmentWindowText.text : "";
+    public string DevelopmentWindowTextForTests => CollectWindowTextForTests(developmentWindow);
     public int DevelopmentWindowSupplierCountForTests => developmentWindowSupplierCount;
     public int DevelopmentWindowTileCountForTests => developmentWindowTileCount;
     public int DevelopmentWindowTierColumnCountForTests => DevelopmentTreeTierCount;
     public int DevelopmentWindowConnectionCountForTests => developmentWindowConnectionCount;
+
+    private static string CollectWindowTextForTests(HudWindow window)
+    {
+        if (window == null || window.root == null)
+        {
+            return "";
+        }
+
+        Text[] texts = window.root.GetComponentsInChildren<Text>(true);
+        StringBuilder builder = new StringBuilder(4096);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            if (texts[i] == null || string.IsNullOrWhiteSpace(texts[i].text))
+            {
+                continue;
+            }
+
+            if (builder.Length > 0)
+            {
+                builder.Append('\n');
+            }
+
+            builder.Append(texts[i].text);
+        }
+
+        return builder.ToString();
+    }
 
     public bool OpenMetaAllTasksWindowForTests()
     {
@@ -679,6 +844,19 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return true;
     }
 
+    private static bool AreMainHudIconSpritesReadyForTests()
+    {
+        for (int i = 0; i < MainHudRequiredIconResourceNames.Length; i++)
+        {
+            if (GetMainHudIconSprite(MainHudRequiredIconResourceNames[i]) == null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private bool AreMetaQuestRowsReadyForTests()
     {
         int count = GetMetaQuestVisibleCount();
@@ -743,9 +921,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                     || string.IsNullOrWhiteSpace(metaProjectAmountTexts[i].text)
                     || string.IsNullOrWhiteSpace(metaProjectIconTexts[i].text)
                     || string.IsNullOrWhiteSpace(metaProjectTimerTexts[i].text)
+                    || !Mathf.Approximately(fill.anchorMin.x, 0f)
                     || !Mathf.Approximately(fill.anchorMin.y, 0f)
-                    || fill.anchorMax.y < 0f
-                    || fill.anchorMax.y > 1f)
+                    || !Mathf.Approximately(fill.anchorMax.y, 1f)
+                    || fill.anchorMax.x < 0f
+                    || fill.anchorMax.x > 1f)
                 {
                     return false;
                 }
@@ -797,10 +977,20 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 return false;
             }
 
-            bool developmentSlot = i == 3;
-            if (developmentSlot)
+            string windowId = MetaLeftSideButtons[i].windowId;
+            if (windowId == WindowDevelopmentId)
             {
                 if (developmentWindowText == null || developmentWindowText.transform.parent != window.content)
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (windowId == WindowCargoId)
+            {
+                if (cargoHeaderText == null || cargoHeaderText.transform.parent != window.content)
                 {
                     return false;
                 }
@@ -885,8 +1075,15 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return;
         }
 
-        GameObject hudObject = new GameObject(HudObjectName);
-        hudObject.AddComponent<WildWindGameplayHud>();
+        GameObject prefab = Resources.Load<GameObject>(MainHudPrefabResourcePath);
+        GameObject hudObject = prefab != null
+            ? UnityEngine.Object.Instantiate(prefab)
+            : new GameObject(HudObjectName);
+        hudObject.name = HudObjectName;
+        if (hudObject.GetComponent<WildWindGameplayHud>() == null)
+        {
+            hudObject.AddComponent<WildWindGameplayHud>();
+        }
     }
 
     private void Awake()
@@ -905,6 +1102,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private void OnDisable()
     {
+        hudPointerCaptureActiveForCamera = false;
         WildWindLocalization.LanguageChanged -= RefreshTexts;
         MetaGameState currentMeta = ResolveMeta();
         if (currentMeta == null || currentMeta.CurrentMode != GameSessionMode.Flight || !currentMeta.HasActiveSortie)
@@ -998,6 +1196,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return OpenMetaDockScreen();
     }
 
+    public bool PressMetaDockShipSlotForTests(int slotIndex)
+    {
+        return HandleMetaDockSlotSelected(slotIndex);
+    }
+
     public bool OpenMetaDockScreenForRuntime()
     {
         return OpenMetaDockScreen();
@@ -1011,6 +1214,92 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     public bool ReturnFromMetaDockScreenToPortForTests()
     {
         return ReturnFromMetaDockScreenToPort();
+    }
+
+    public bool BuySelectedDevelopmentShipForTests()
+    {
+        return HandleDevelopmentBuyShip(selectedDevelopmentShipId);
+    }
+
+    public bool RunQuickDockSortieForTests()
+    {
+        return HandleMetaDockQuickBattle();
+    }
+
+    public bool RunCoreCombatDockSortieForTests()
+    {
+        return HandleMetaDockCoreCombatSortie();
+    }
+
+    public bool CloseMetaDockResultWindowForTests()
+    {
+        HideMetaDockSortieResultWindow();
+        return metaDockResultModalRoot == null || !metaDockResultModalRoot.gameObject.activeSelf;
+    }
+
+    public bool SelectDockMissionForTests(int offerIndex)
+    {
+        return HandleMetaDockMissionSelected(offerIndex);
+    }
+
+    public bool RunSelectedOrdinaryDockMissionForTests()
+    {
+        return HandleMetaDockRunSelectedMission();
+    }
+
+    public bool RunFirstOrdinaryDockMissionForTests()
+    {
+        return HandleMetaDockMissionSelected(0) && HandleMetaDockRunSelectedMission();
+    }
+
+    public bool SellSelectedDockShipForTests()
+    {
+        return HandleMetaDockSellShip();
+    }
+
+    public bool OpenDevelopmentWindowForTests()
+    {
+        return OpenDevelopmentWindow();
+    }
+
+    public bool IsDevelopmentWindowOpenForTests => IsHudWindowOpen(WindowDevelopmentId);
+    public bool IsDevelopmentWindowVisibleForTests => developmentWindow != null
+        && developmentWindow.IsOpen
+        && developmentWindow.root != null
+        && developmentWindow.root.gameObject.activeInHierarchy;
+
+    public bool DragDevelopmentTreeForTests(PointerEventData.InputButton button, Vector2 delta)
+    {
+        if (developmentTreeViewport == null)
+        {
+            return false;
+        }
+
+        DevelopmentTreeMousePanHandler handler = developmentTreeViewport.GetComponent<DevelopmentTreeMousePanHandler>();
+        if (handler == null)
+        {
+            return false;
+        }
+
+        float beforeX = developmentTreeScrollRect != null ? developmentTreeScrollRect.horizontalNormalizedPosition : 0f;
+        float beforeY = developmentTreeScrollRect != null ? developmentTreeScrollRect.verticalNormalizedPosition : 0f;
+        EventSystem eventSystem = EventSystem.current;
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            button = button,
+            delta = delta
+        };
+
+        handler.OnPointerDown(eventData);
+        bool capturedDuringDrag = IsHudPointerCaptureActiveForCamera;
+        handler.OnDrag(eventData);
+        handler.OnPointerUp(eventData);
+
+        float afterX = developmentTreeScrollRect != null ? developmentTreeScrollRect.horizontalNormalizedPosition : beforeX;
+        float afterY = developmentTreeScrollRect != null ? developmentTreeScrollRect.verticalNormalizedPosition : beforeY;
+        return capturedDuringDrag
+            && !IsHudPointerCaptureActiveForCamera
+            && (Mathf.Abs(afterX - beforeX) > 0.0001f || Mathf.Abs(afterY - beforeY) > 0.0001f);
     }
 
     public bool OpenResourceCatalogWindowForTests()
@@ -1037,6 +1326,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         canvasObject.transform.SetParent(transform, false);
         canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.pixelPerfect = true;
         canvas.sortingOrder = 850;
 
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
@@ -1047,14 +1337,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         root = CreateRect("Gameplay HUD Root", canvas.transform, StretchFull()).GetComponent<RectTransform>();
 
-        RectTransform topBand = CreatePanel("Session Status Strip", root, new RectTransformSpec
-        {
-            anchorMin = new Vector2(0f, 1f),
-            anchorMax = new Vector2(1f, 1f),
-            pivot = new Vector2(0.5f, 1f),
-            anchoredPosition = new Vector2(0f, -24f),
-            sizeDelta = new Vector2(-80f, 92f)
-        }, new Color(0.025f, 0.026f, 0.028f, 0.82f));
+        RectTransform topBand = CreateRect("Session Status Strip", root, StretchFull()).GetComponent<RectTransform>();
 
         BuildPlayerProfile(topBand);
         BuildMetaResourceCounters(topBand);
@@ -1170,10 +1453,10 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         mailWindow = CreateMetaTopRightWindow(2);
         settingsWindow = CreateMetaTopRightWindow(3);
         BuildSettingsWindowContent(settingsWindow.content);
-        offerWindow = CreateMetaLeftSideWindow(0);
-        sideEventsWindow = CreateMetaLeftSideWindow(1);
-        factionsWindow = CreateMetaLeftSideWindow(2);
-        developmentWindow = CreateHudWindow(WindowDevelopmentId, MetaLeftSideButtons[3].title, new Vector2(154f, -150f), new Vector2(1500f, 760f), false);
+        offerWindow = CreateHudWindow(WindowOfferId, "МАГАЗИН", new Vector2(1180f, -150f), new Vector2(520f, 360f), false);
+        sideEventsWindow = CreateHudWindow(WindowSideEventsId, "СОБЫТИЯ", new Vector2(1180f, -150f), new Vector2(520f, 360f), false);
+        factionsWindow = CreateHudWindow(WindowFactionsId, "ТОРГОВЦЫ", new Vector2(1180f, -150f), new Vector2(520f, 360f), false);
+        developmentWindow = CreateHudWindow(WindowDevelopmentId, "РАЗВИТИЕ", new Vector2(0f, 0f), new Vector2(1880f, 980f), false);
         BuildDevelopmentWindowContent(developmentWindow.content);
         metaAllTasksWindow = CreateHudWindow(WindowMetaAllTasksId, "ЗАДАЧИ", new Vector2(480f, -150f), new Vector2(520f, 360f), false);
 
@@ -1185,41 +1468,49 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private void BuildPlayerProfile(RectTransform parent)
     {
-        playerProfilePanel = CreatePanel("Meta Player Profile", parent, new RectTransformSpec
+        playerProfilePanel = CreateGlassPanel("Meta Player Profile", parent, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
             pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(14f, -8f),
-            sizeDelta = new Vector2(378f, 76f)
-        }, new Color(0.02f, 0.16f, 0.18f, 0.94f));
+            anchoredPosition = new Vector2(20f, -20f),
+            sizeDelta = new Vector2(400f, 110f)
+        }, PortGlassStrong);
 
         RectTransform avatar = CreatePanel("Profile Icon", playerProfilePanel, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
             pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(8f, -8f),
-            sizeDelta = new Vector2(60f, 60f)
-        }, new Color(0.11f, 0.33f, 0.42f, 1f));
+            anchoredPosition = new Vector2(0f, 0f),
+            sizeDelta = new Vector2(110f, 110f)
+        }, new Color(0.82f, 0.89f, 0.96f, 1f));
+        Image avatarImage = avatar.GetComponent<Image>();
+        if (avatarImage != null)
+        {
+            avatarImage.sprite = GetCircleSprite();
+            avatarImage.type = Image.Type.Simple;
+        }
+        AddSoftShadow(avatar, new Color(0.18f, 0.26f, 0.36f, 0.22f), new Vector2(0f, -3f));
 
-        Text avatarText = CreateText(avatar, MetaProfileInitialsPlaceholder, 20, Vector2.zero, new Vector2(60f, 60f), TextAnchor.MiddleCenter, new Color(0.96f, 0.84f, 0.58f, 1f));
+        Text avatarText = CreateText(avatar, MetaProfileInitialsPlaceholder, 22, Vector2.zero, new Vector2(110f, 110f), TextAnchor.MiddleCenter, PortText);
         avatarText.fontStyle = FontStyle.Bold;
 
-        playerProfileTitleText = CreateText(playerProfilePanel, "", 19, new Vector2(80f, -9f), new Vector2(278f, 28f), TextAnchor.MiddleLeft, new Color(0.95f, 0.88f, 0.72f, 1f));
+        playerProfileTitleText = CreateText(playerProfilePanel, "", 20, new Vector2(120f, -22f), new Vector2(250f, 30f), TextAnchor.MiddleLeft, PortText);
         playerProfileTitleText.fontStyle = FontStyle.Bold;
 
-        playerProfileMasteryCurrentText = CreateText(playerProfilePanel, "", 16, new Vector2(82f, -42f), new Vector2(34f, 24f), TextAnchor.MiddleLeft, new Color(0.94f, 0.86f, 0.66f, 1f));
-        playerProfileMasteryNextText = CreateText(playerProfilePanel, "", 16, new Vector2(334f, -42f), new Vector2(28f, 24f), TextAnchor.MiddleRight, new Color(0.94f, 0.86f, 0.66f, 1f));
+        playerProfileMasteryCurrentText = CreateText(playerProfilePanel, "", 15, new Vector2(122f, -64f), new Vector2(38f, 24f), TextAnchor.MiddleLeft, PortText);
+        playerProfileMasteryNextText = CreateText(playerProfilePanel, "", 15, new Vector2(350f, -64f), new Vector2(30f, 24f), TextAnchor.MiddleRight, PortTextSoft);
 
         RectTransform masteryBar = CreatePanel("Profile Mastery Bar", playerProfilePanel, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
             pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(120f, -49f),
-            sizeDelta = new Vector2(204f, 12f)
-        }, new Color(0.02f, 0.04f, 0.05f, 0.92f));
+            anchoredPosition = new Vector2(168f, -70f),
+            sizeDelta = new Vector2(174f, 16f)
+        }, PortTrack);
+        ApplyRoundedSprite(masteryBar.GetComponent<Image>(), GetRoundedSmallSprite());
 
         playerProfileMasteryFill = CreatePanel("Profile Mastery Fill", masteryBar, new RectTransformSpec
         {
@@ -1228,7 +1519,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             pivot = new Vector2(0f, 0.5f),
             anchoredPosition = Vector2.zero,
             sizeDelta = Vector2.zero
-        }, new Color(0.10f, 0.64f, 0.88f, 1f));
+        }, new Color(0.93f, 0.74f, 0.36f, 1f));
+        ApplyRoundedSprite(playerProfileMasteryFill.GetComponent<Image>(), GetRoundedSmallSprite());
 
         RefreshPlayerProfile(true);
     }
@@ -1237,14 +1529,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     {
         float totalWidth = MetaResourceCounterCount * MetaResourceCounterWidth
             + (MetaResourceCounterCount - 1) * MetaResourceCounterGap;
-        metaResourceCounterStrip = CreateRect("Meta Resource Counters", parent, new RectTransformSpec
+        metaResourceCounterStrip = CreateGlassPanel("Meta Resource Counters", parent, new RectTransformSpec
         {
             anchorMin = new Vector2(0.5f, 1f),
             anchorMax = new Vector2(0.5f, 1f),
             pivot = new Vector2(0.5f, 1f),
-            anchoredPosition = new Vector2(0f, -12f),
+            anchoredPosition = new Vector2(110f, -20f),
             sizeDelta = new Vector2(totalWidth, MetaResourceCounterHeight)
-        }).GetComponent<RectTransform>();
+        }, PortGlassStrong);
 
         metaResourceCounterAmountTexts = new Text[MetaResourceCounterCount];
         metaResourceCounterPlusButtons = new Button[MetaResourceCounterCount];
@@ -1260,16 +1552,30 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 pivot = new Vector2(0f, 1f),
                 anchoredPosition = new Vector2(i * (MetaResourceCounterWidth + MetaResourceCounterGap), 0f),
                 sizeDelta = new Vector2(MetaResourceCounterWidth, MetaResourceCounterHeight)
-            }, new Color(0.025f, 0.13f, 0.15f, 0.94f));
+            }, new Color(1f, 1f, 1f, 0f));
+
+            if (i > 0)
+            {
+                CreatePanel("Resource Counter Divider", counter, new RectTransformSpec
+                {
+                    anchorMin = new Vector2(0f, 0.5f),
+                    anchorMax = new Vector2(0f, 0.5f),
+                    pivot = new Vector2(0.5f, 0.5f),
+                    anchoredPosition = new Vector2(0f, 0f),
+                    sizeDelta = new Vector2(1f, 48f)
+                }, new Color(0.55f, 0.63f, 0.74f, 0.32f));
+            }
 
             RectTransform iconRoot = CreatePanel("Icon " + spec.itemId, counter, new RectTransformSpec
             {
                 anchorMin = new Vector2(0f, 1f),
                 anchorMax = new Vector2(0f, 1f),
                 pivot = new Vector2(0f, 1f),
-                anchoredPosition = new Vector2(8f, -8f),
-                sizeDelta = new Vector2(34f, 34f)
+                anchoredPosition = new Vector2(18f, -12f),
+                sizeDelta = new Vector2(46f, 46f)
             }, spec.fallbackColor);
+            ApplyRoundedSprite(iconRoot.GetComponent<Image>(), GetRoundedSmallSprite());
+            AddSoftShadow(iconRoot, new Color(0.18f, 0.24f, 0.34f, 0.18f), new Vector2(0f, -2f));
 
             Image iconImage = iconRoot.GetComponent<Image>();
             Sprite sprite = WildWindResourceIconCatalog.LoadSprite(spec.itemId);
@@ -1280,19 +1586,18 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 iconImage.preserveAspect = true;
             }
 
-            Text fallbackIconText = CreateText(iconRoot, sprite == null ? spec.fallbackText : "", 12, Vector2.zero, new Vector2(34f, 34f), TextAnchor.MiddleCenter, new Color(0.08f, 0.08f, 0.07f, 1f));
+            Text fallbackIconText = CreateText(iconRoot, sprite == null ? spec.fallbackText : "", 12, Vector2.zero, new Vector2(46f, 46f), TextAnchor.MiddleCenter, new Color(0.08f, 0.08f, 0.07f, 1f));
             fallbackIconText.fontStyle = FontStyle.Bold;
             fallbackIconText.raycastTarget = false;
 
-            Text amountText = CreateText(counter, "", 22, new Vector2(48f, -8f), new Vector2(66f, 34f), TextAnchor.MiddleLeft, new Color(0.95f, 0.88f, 0.70f, 1f));
+            Text amountText = CreateText(counter, "", 24, new Vector2(76f, -13f), new Vector2(78f, 42f), TextAnchor.MiddleLeft, PortText);
             amountText.fontStyle = FontStyle.Bold;
             metaResourceCounterAmountTexts[i] = amountText;
             metaResourceCounterIconImages[i] = iconImage;
 
-            Text plusText = CreateButton(counter, "Meta Resource Plus " + spec.itemId, new Vector2(118f, -10f), new Vector2(28f, 32f), HandleMetaResourcePlus, out Button plusButton);
-            plusText.fontSize = 22;
+            Text plusText = CreateGlassButton(counter, "Meta Resource Plus " + spec.itemId, new Vector2(154f, -16f), new Vector2(34f, 34f), HandleMetaResourcePlus, out Button plusButton, "+");
+            plusText.fontSize = 24;
             plusText.fontStyle = FontStyle.Bold;
-            SetText(plusText, "+");
             metaResourceCounterPlusButtons[i] = plusButton;
         }
 
@@ -1308,7 +1613,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             anchorMin = new Vector2(1f, 1f),
             anchorMax = new Vector2(1f, 1f),
             pivot = new Vector2(1f, 1f),
-            anchoredPosition = new Vector2(-18f, -12f),
+            anchoredPosition = new Vector2(-22f, -20f),
             sizeDelta = new Vector2(totalWidth, MetaTopRightButtonSize)
         }).GetComponent<RectTransform>();
 
@@ -1327,19 +1632,15 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             });
 
             Image image = buttonObject.AddComponent<Image>();
-            image.color = new Color(0.035f, 0.14f, 0.16f, 0.95f);
+            image.color = new Color(1f, 1f, 1f, 0.08f);
+            ApplyRoundedSprite(image, GetRoundedSmallSprite());
 
             Button button = buttonObject.AddComponent<Button>();
-            ColorBlock colors = button.colors;
-            colors.normalColor = new Color(0.035f, 0.14f, 0.16f, 0.95f);
-            colors.highlightedColor = new Color(0.08f, 0.25f, 0.28f, 1f);
-            colors.pressedColor = new Color(0.12f, 0.35f, 0.38f, 1f);
-            colors.disabledColor = new Color(0.05f, 0.05f, 0.05f, 0.45f);
-            button.colors = colors;
+            ConfigureGlassButton(button, image);
             string windowId = spec.windowId;
             button.onClick.AddListener(() => ToggleHudWindow(windowId));
 
-            Text iconText = CreateText(buttonObject.GetComponent<RectTransform>(), spec.iconText, 28, Vector2.zero, new Vector2(MetaTopRightButtonSize, MetaTopRightButtonSize), TextAnchor.MiddleCenter, new Color(0.94f, 0.84f, 0.62f, 1f));
+            Text iconText = CreateText(buttonObject.GetComponent<RectTransform>(), spec.iconText, 40, Vector2.zero, new Vector2(MetaTopRightButtonSize, MetaTopRightButtonSize), TextAnchor.MiddleCenter, new Color(0.53f, 0.59f, 0.70f, 1f));
             iconText.fontStyle = FontStyle.Bold;
             iconText.raycastTarget = false;
 
@@ -1359,7 +1660,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             anchorMin = new Vector2(1f, 1f),
             anchorMax = new Vector2(1f, 1f),
             pivot = new Vector2(1f, 1f),
-            anchoredPosition = new Vector2(-42f, -150f),
+            anchoredPosition = new Vector2(-20f, -123f),
             sizeDelta = new Vector2(MetaLeftSideButtonSize, totalHeight)
         }).GetComponent<RectTransform>();
 
@@ -1378,21 +1679,36 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             });
 
             Image image = buttonObject.AddComponent<Image>();
-            image.color = new Color(0.03f, 0.14f, 0.16f, 0.95f);
+            image.color = PortGlassStrong;
+            ApplyRoundedSprite(image, GetRoundedSmallSprite());
+            AddSoftShadow(buttonObject.GetComponent<RectTransform>(), new Color(0.18f, 0.26f, 0.38f, 0.16f), new Vector2(0f, -3f));
 
             Button button = buttonObject.AddComponent<Button>();
-            ColorBlock colors = button.colors;
-            colors.normalColor = new Color(0.03f, 0.14f, 0.16f, 0.95f);
-            colors.highlightedColor = new Color(0.08f, 0.25f, 0.28f, 1f);
-            colors.pressedColor = new Color(0.12f, 0.35f, 0.38f, 1f);
-            colors.disabledColor = new Color(0.05f, 0.05f, 0.05f, 0.45f);
-            button.colors = colors;
+            ConfigureGlassButton(button, image);
             string windowId = spec.windowId;
             button.onClick.AddListener(() => ToggleHudWindow(windowId));
 
-            Text iconText = CreateText(buttonObject.GetComponent<RectTransform>(), spec.iconText, 32, Vector2.zero, new Vector2(MetaLeftSideButtonSize, MetaLeftSideButtonSize), TextAnchor.MiddleCenter, new Color(0.94f, 0.84f, 0.62f, 1f));
+            Text iconText = CreateText(buttonObject.GetComponent<RectTransform>(), spec.iconText, 38, new Vector2(0f, -8f), new Vector2(MetaLeftSideButtonSize, 54f), TextAnchor.MiddleCenter, new Color(0.51f, 0.57f, 0.68f, 1f));
             iconText.fontStyle = FontStyle.Bold;
             iconText.raycastTarget = false;
+            Image iconImage = CreateMainHudIconImage(
+                buttonObject.GetComponent<RectTransform>(),
+                "Meta Side Icon " + spec.windowId,
+                spec.iconResourceName,
+                new RectTransformSpec
+                {
+                    anchorMin = new Vector2(0.5f, 1f),
+                    anchorMax = new Vector2(0.5f, 1f),
+                    pivot = new Vector2(0.5f, 1f),
+                    anchoredPosition = new Vector2(0f, -8f),
+                    sizeDelta = new Vector2(78f, 64f)
+                },
+                Color.white);
+            SetFallbackTextVisibleWhenIconMissing(iconText, iconImage);
+
+            Text labelText = CreateText(buttonObject.GetComponent<RectTransform>(), spec.title, 18, new Vector2(6f, -72f), new Vector2(MetaLeftSideButtonSize - 12f, 28f), TextAnchor.MiddleCenter, PortText);
+            labelText.fontStyle = FontStyle.Bold;
+            labelText.raycastTarget = false;
 
             metaLeftSideButtons[i] = button;
             metaLeftSideButtonIconTexts[i] = iconText;
@@ -1408,25 +1724,55 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             anchorMin = new Vector2(1f, 0f),
             anchorMax = new Vector2(1f, 0f),
             pivot = new Vector2(1f, 0f),
-            anchoredPosition = new Vector2(-34f, 34f),
+            anchoredPosition = new Vector2(-20f, 24f),
             sizeDelta = new Vector2(MetaDockButtonSize, MetaDockButtonSize)
         });
 
         Image image = buttonObject.AddComponent<Image>();
         image.sprite = GetCircleSprite();
-        image.color = new Color(0.82f, 0.43f, 0.10f, 0.96f);
+        image.color = new Color(0.72f, 0.80f, 0.92f, 0.78f);
+        AddSoftShadow(buttonObject.GetComponent<RectTransform>(), new Color(0.12f, 0.20f, 0.34f, 0.28f), new Vector2(0f, -6f));
 
         metaDockButton = buttonObject.AddComponent<Button>();
         metaDockButton.targetGraphic = image;
         ColorBlock colors = metaDockButton.colors;
-        colors.normalColor = new Color(0.82f, 0.43f, 0.10f, 0.96f);
-        colors.highlightedColor = new Color(0.96f, 0.58f, 0.16f, 1f);
-        colors.pressedColor = new Color(1.00f, 0.66f, 0.20f, 1f);
-        colors.disabledColor = new Color(0.10f, 0.09f, 0.08f, 0.45f);
+        colors.normalColor = new Color(0.72f, 0.80f, 0.92f, 0.78f);
+        colors.highlightedColor = new Color(0.84f, 0.90f, 1.00f, 0.95f);
+        colors.pressedColor = new Color(0.60f, 0.70f, 0.86f, 0.98f);
+        colors.disabledColor = new Color(0.45f, 0.50f, 0.58f, 0.45f);
         metaDockButton.colors = colors;
         metaDockButton.onClick.AddListener(() => HandleMetaDockButton());
 
-        metaDockButtonText = CreateText(buttonObject.GetComponent<RectTransform>(), "ДОК", 30, Vector2.zero, new Vector2(MetaDockButtonSize, MetaDockButtonSize), TextAnchor.MiddleCenter, new Color(1f, 0.90f, 0.70f, 1f));
+        Text wheelText = CreateText(buttonObject.GetComponent<RectTransform>(), "\u2638", 86, new Vector2(0f, -8f), new Vector2(MetaDockButtonSize, 96f), TextAnchor.MiddleCenter, new Color(0.70f, 0.50f, 0.27f, 0.95f));
+        wheelText.fontStyle = FontStyle.Bold;
+        wheelText.raycastTarget = false;
+        Image dockIconImage = CreateMainHudIconImage(
+            buttonObject.GetComponent<RectTransform>(),
+            "Meta Dock Icon",
+            "MetaDock",
+            new RectTransformSpec
+            {
+                anchorMin = new Vector2(0.5f, 0.5f),
+                anchorMax = new Vector2(0.5f, 0.5f),
+                pivot = new Vector2(0.5f, 0.5f),
+                anchoredPosition = new Vector2(0f, 8f),
+                sizeDelta = new Vector2(128f, 128f)
+            },
+            Color.white);
+        SetFallbackTextVisibleWhenIconMissing(wheelText, dockIconImage);
+
+        RectTransform labelPill = CreatePanel("Meta Dock Label", buttonObject.GetComponent<RectTransform>(), new RectTransformSpec
+        {
+            anchorMin = new Vector2(0.5f, 0f),
+            anchorMax = new Vector2(0.5f, 0f),
+            pivot = new Vector2(0.5f, 0f),
+            anchoredPosition = new Vector2(0f, -2f),
+            sizeDelta = new Vector2(136f, 28f)
+        }, PortGlassStrong);
+        Image dockLabelImage = labelPill.GetComponent<Image>();
+        ApplyRoundedSprite(dockLabelImage, GetRoundedSmallSprite());
+        SetGraphicRaycastTarget(dockLabelImage, false);
+        metaDockButtonText = CreateText(labelPill, "В док", 21, Vector2.zero, new Vector2(136f, 28f), TextAnchor.MiddleCenter, PortText);
         metaDockButtonText.fontStyle = FontStyle.Bold;
         metaDockButtonText.raycastTarget = false;
 
@@ -1450,18 +1796,105 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         title.fontStyle = FontStyle.Bold;
         title.raycastTarget = false;
 
-        RectTransform placeholder = CreatePanel("Dock Screen Empty Panel", metaDockScreenLayer, new RectTransformSpec
+        metaDockHeaderText = CreateText(metaDockScreenLayer, "Купи корабль в развитии, поставь его в слот и нажми быстрый вылет.", 18, new Vector2(42f, -104f), new Vector2(1120f, 32f), TextAnchor.MiddleLeft, new Color(0.78f, 0.88f, 0.86f, 0.94f));
+        metaDockManualSortieText = CreateButton(metaDockScreenLayer, "Dock Manual Quick Sortie", new Vector2(1180f, -92f), new Vector2(312f, 44f), HandleMetaDockManualSortie, out metaDockManualSortieButton);
+        SetText(metaDockManualSortieText, "РУЧНОЙ ВЫЛЕТ");
+        metaDockManualSortieText.fontSize = 19;
+        metaDockManualSortieText.fontStyle = FontStyle.Bold;
+
+        metaDockCoreCombatText = CreateButton(metaDockScreenLayer, "Dock Core Tactical Combat Sortie", new Vector2(1510f, -92f), new Vector2(312f, 44f), HandleMetaDockCoreCombatSortie, out metaDockCoreCombatButton);
+        SetText(metaDockCoreCombatText, "CORE COMBAT");
+        metaDockCoreCombatText.fontSize = 19;
+        metaDockCoreCombatText.fontStyle = FontStyle.Bold;
+
+        metaDockSelectedShipRoot = CreatePanel("Dock Selected Ship Panel", metaDockScreenLayer, new RectTransformSpec
         {
-            anchorMin = new Vector2(0.5f, 0.5f),
-            anchorMax = new Vector2(0.5f, 0.5f),
-            pivot = new Vector2(0.5f, 0.5f),
-            anchoredPosition = new Vector2(0f, -8f),
-            sizeDelta = new Vector2(680f, 360f)
-        }, new Color(0.034f, 0.054f, 0.058f, 0.72f));
-        Image placeholderImage = placeholder.GetComponent<Image>();
-        if (placeholderImage != null)
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(42f, -154f),
+            sizeDelta = new Vector2(650f, 540f)
+        }, new Color(0.020f, 0.070f, 0.078f, 0.88f));
+
+        metaDockSelectedShipText = CreateText(metaDockSelectedShipRoot, "", 24, new Vector2(24f, -22f), new Vector2(590f, 40f), TextAnchor.MiddleLeft, new Color(0.95f, 0.86f, 0.64f, 1f));
+        metaDockSelectedShipText.fontStyle = FontStyle.Bold;
+        metaDockSelectedStatsText = CreateText(metaDockSelectedShipRoot, "", 17, new Vector2(24f, -76f), new Vector2(596f, 300f), TextAnchor.UpperLeft, new Color(0.84f, 0.90f, 0.86f, 0.96f));
+
+        metaDockQuickBattleText = CreateButton(metaDockSelectedShipRoot, "Dock Enter Core Combat", new Vector2(24f, -402f), new Vector2(284f, 56f), HandleMetaDockCoreCombatSortie, out metaDockQuickBattleButton);
+        SetText(metaDockQuickBattleText, "В БОЙ");
+        metaDockQuickBattleText.fontSize = 28;
+        metaDockQuickBattleText.fontStyle = FontStyle.Bold;
+
+        metaDockSellText = CreateButton(metaDockSelectedShipRoot, "Dock Sell Ship", new Vector2(324f, -402f), new Vector2(284f, 56f), HandleMetaDockSellShip, out metaDockSellButton);
+        SetText(metaDockSellText, "ПРОДАТЬ");
+        metaDockSellText.fontSize = 22;
+        metaDockSellText.fontStyle = FontStyle.Bold;
+
+        metaDockMissionRoot = CreatePanel("Dock Mission Panel", metaDockScreenLayer, new RectTransformSpec
         {
-            placeholderImage.raycastTarget = false;
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(720f, -154f),
+            sizeDelta = new Vector2(552f, 540f)
+        }, new Color(0.025f, 0.052f, 0.066f, 0.90f));
+
+        metaDockMissionHeaderText = CreateText(metaDockMissionRoot, "ОБЫЧНЫЕ МИССИИ", 20, new Vector2(20f, -18f), new Vector2(330f, 30f), TextAnchor.MiddleLeft, new Color(0.95f, 0.84f, 0.62f, 1f));
+        metaDockMissionHeaderText.fontStyle = FontStyle.Bold;
+        metaDockMissionDetailText = CreateText(metaDockMissionRoot, "", 14, new Vector2(260f, -16f), new Vector2(270f, 46f), TextAnchor.UpperRight, new Color(0.80f, 0.88f, 0.86f, 0.95f));
+        metaDockMissionTexts = new Text[15];
+        metaDockMissionButtons = new Button[15];
+        for (int i = 0; i < metaDockMissionTexts.Length; i++)
+        {
+            int offerIndex = i;
+            float x = i < 8 ? 20f : 284f;
+            float y = -64f - (i % 8) * 44f;
+            Text missionText = CreateButton(metaDockMissionRoot, "Dock Mission Offer " + i, new Vector2(x, y), new Vector2(248f, 38f), () => HandleMetaDockMissionSelected(offerIndex), out Button missionButton);
+            missionText.fontSize = 13;
+            missionText.alignment = TextAnchor.MiddleLeft;
+            metaDockMissionTexts[i] = missionText;
+            metaDockMissionButtons[i] = missionButton;
+        }
+
+        metaDockRunMissionText = CreateButton(metaDockMissionRoot, "Dock Run Ordinary Mission", new Vector2(20f, -468f), new Vector2(512f, 46f), HandleMetaDockRunSelectedMission, out metaDockRunMissionButton);
+        SetText(metaDockRunMissionText, "ВЫЛЕТ ПО ВЫБРАННОЙ МИССИИ");
+        metaDockRunMissionText.fontSize = 19;
+        metaDockRunMissionText.fontStyle = FontStyle.Bold;
+
+        metaDockRewardRoot = CreatePanel("Dock Reward Panel", metaDockScreenLayer, new RectTransformSpec
+        {
+            anchorMin = new Vector2(1f, 1f),
+            anchorMax = new Vector2(1f, 1f),
+            pivot = new Vector2(1f, 1f),
+            anchoredPosition = new Vector2(-42f, -154f),
+            sizeDelta = new Vector2(570f, 540f)
+        }, new Color(0.030f, 0.038f, 0.050f, 0.90f));
+
+        Text rewardTitle = CreateText(metaDockRewardRoot, "ПОСЛЕДНИЙ ВЫЛЕТ", 20, new Vector2(22f, -20f), new Vector2(520f, 34f), TextAnchor.MiddleLeft, new Color(0.95f, 0.84f, 0.62f, 1f));
+        rewardTitle.fontStyle = FontStyle.Bold;
+        metaDockRewardText = CreateText(metaDockRewardRoot, "", 16, new Vector2(22f, -70f), new Vector2(522f, 430f), TextAnchor.UpperLeft, new Color(0.82f, 0.90f, 0.86f, 0.96f));
+
+        metaDockShipSlotRoot = CreatePanel("Dock Ship Slot Strip", metaDockScreenLayer, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 0f),
+            anchorMax = new Vector2(0f, 0f),
+            pivot = new Vector2(0f, 0f),
+            anchoredPosition = new Vector2(42f, 42f),
+            sizeDelta = new Vector2(960f, 150f)
+        }, new Color(0.018f, 0.058f, 0.064f, 0.90f));
+
+        Text slotTitle = CreateText(metaDockShipSlotRoot, "СЛОТЫ ДОКА", 18, new Vector2(20f, -12f), new Vector2(260f, 26f), TextAnchor.MiddleLeft, new Color(0.95f, 0.84f, 0.62f, 1f));
+        slotTitle.fontStyle = FontStyle.Bold;
+        metaDockSlotTexts = new Text[MetaGameState.DevelopmentDockSlotCount];
+        metaDockSlotButtons = new Button[MetaGameState.DevelopmentDockSlotCount];
+        for (int i = 0; i < MetaGameState.DevelopmentDockSlotCount; i++)
+        {
+            int slotIndex = i;
+            Text slotText = CreateButton(metaDockShipSlotRoot, "Dock Ship Slot " + i, new Vector2(20f + i * 226f, -52f), new Vector2(206f, 72f), () => HandleMetaDockSlotSelected(slotIndex), out Button slotButton);
+            slotText.fontSize = 15;
+            slotText.alignment = TextAnchor.MiddleCenter;
+            metaDockSlotTexts[i] = slotText;
+            metaDockSlotButtons[i] = slotButton;
         }
 
         GameObject portButtonObject = CreateRect("Meta Dock Screen Port Button", metaDockScreenLayer, new RectTransformSpec
@@ -1469,7 +1902,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             anchorMin = new Vector2(1f, 0f),
             anchorMax = new Vector2(1f, 0f),
             pivot = new Vector2(1f, 0f),
-            anchoredPosition = new Vector2(-34f, 34f),
+            anchoredPosition = new Vector2(-20f, 24f),
             sizeDelta = new Vector2(MetaDockButtonSize, MetaDockButtonSize)
         });
 
@@ -1491,23 +1924,106 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         metaDockScreenPortButtonText.fontStyle = FontStyle.Bold;
         metaDockScreenPortButtonText.raycastTarget = false;
 
+        BuildMetaDockResultWindow();
         RefreshMetaDockScreen(false);
+    }
+
+    private void BuildMetaDockResultWindow()
+    {
+        if (metaDockScreenLayer == null)
+        {
+            return;
+        }
+
+        metaDockResultModalRoot = CreatePanel("Dock Sortie Result Modal", metaDockScreenLayer, StretchFull(), new Color(0.002f, 0.004f, 0.006f, 0.72f));
+        metaDockResultModalRoot.SetAsLastSibling();
+
+        RectTransform panel = CreatePanel("Dock Sortie Result Window", metaDockResultModalRoot, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0.5f, 0.5f),
+            anchorMax = new Vector2(0.5f, 0.5f),
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = new Vector2(0f, 8f),
+            sizeDelta = new Vector2(860f, 620f)
+        }, new Color(0.020f, 0.040f, 0.050f, 0.98f));
+
+        CreatePanel("Dock Sortie Result Top Accent", panel, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(1f, 1f),
+            pivot = new Vector2(0.5f, 1f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = new Vector2(0f, 5f)
+        }, new Color(0.80f, 0.54f, 0.20f, 1f));
+
+        metaDockResultTitleText = CreateText(panel, "", 30, new Vector2(30f, -24f), new Vector2(660f, 42f), TextAnchor.MiddleLeft, new Color(0.96f, 0.86f, 0.62f, 1f));
+        metaDockResultTitleText.fontStyle = FontStyle.Bold;
+        metaDockResultSubtitleText = CreateText(panel, "", 16, new Vector2(32f, -70f), new Vector2(660f, 28f), TextAnchor.MiddleLeft, new Color(0.78f, 0.88f, 0.86f, 0.96f));
+
+        metaDockResultCloseText = CreateButton(panel, "Dock Sortie Result Close", new Vector2(760f, -22f), new Vector2(68f, 44f), HideMetaDockSortieResultWindow, out metaDockResultCloseButton);
+        SetText(metaDockResultCloseText, "OK");
+        metaDockResultCloseText.fontSize = 20;
+        metaDockResultCloseText.fontStyle = FontStyle.Bold;
+
+        CreatePanel("Dock Sortie Result Divider", panel, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(1f, 1f),
+            pivot = new Vector2(0.5f, 1f),
+            anchoredPosition = new Vector2(0f, -112f),
+            sizeDelta = new Vector2(-60f, 2f)
+        }, new Color(0.24f, 0.34f, 0.36f, 0.92f));
+
+        metaDockResultBodyText = CreateText(panel, "", 18, new Vector2(34f, -134f), new Vector2(792f, 430f), TextAnchor.UpperLeft, new Color(0.86f, 0.92f, 0.88f, 0.98f));
+        metaDockResultBodyText.lineSpacing = 1.08f;
+
+        Text spentSortieText = CreateText(panel, "Списан 1 вылет корабля.", 16, new Vector2(34f, -576f), new Vector2(500f, 28f), TextAnchor.MiddleLeft, new Color(0.72f, 0.78f, 0.74f, 0.94f));
+        spentSortieText.fontStyle = FontStyle.Italic;
+
+        metaDockResultModalRoot.gameObject.SetActive(false);
     }
 
     private void BuildMetaQuestPanel(RectTransform parent)
     {
-        metaQuestPanel = CreatePanel("Meta Quest Panel", parent, new RectTransformSpec
+        metaQuestPanel = CreateGlassPanel("Meta Quest Panel", parent, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
             pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(42f, -150f),
-            sizeDelta = new Vector2(330f, 374f)
-        }, new Color(0.025f, 0.13f, 0.15f, 0.94f));
+            anchoredPosition = new Vector2(20f, -163f),
+            sizeDelta = new Vector2(344f, 368f)
+        }, PortGlass);
 
-        Text header = CreateText(metaQuestPanel, "Задачи", 22, new Vector2(18f, -10f), new Vector2(230f, 30f), TextAnchor.MiddleLeft, new Color(0.95f, 0.84f, 0.62f, 1f));
-        header.fontStyle = FontStyle.Bold;
+        Text header = CreateText(metaQuestPanel, "Задачи", 30, new Vector2(22f, -18f), new Vector2(220f, 40f), TextAnchor.MiddleLeft, PortText);
+        header.fontStyle = FontStyle.Normal;
         header.raycastTarget = false;
+
+        RectTransform arrow = CreatePanel("Meta Quest Arrow", metaQuestPanel, new RectTransformSpec
+        {
+            anchorMin = new Vector2(1f, 1f),
+            anchorMax = new Vector2(1f, 1f),
+            pivot = new Vector2(1f, 1f),
+            anchoredPosition = new Vector2(-14f, -12f),
+            sizeDelta = new Vector2(48f, 48f)
+        }, PortNavy);
+        Image arrowImage = arrow.GetComponent<Image>();
+        if (arrowImage != null)
+        {
+            arrowImage.sprite = GetCircleSprite();
+            arrowImage.type = Image.Type.Simple;
+        }
+        Text arrowText = CreateText(arrow, ">", 34, Vector2.zero, new Vector2(48f, 48f), TextAnchor.MiddleCenter, Color.white);
+        arrowText.fontStyle = FontStyle.Bold;
+        arrowText.raycastTarget = false;
+
+        CreatePanel("Meta Quest Header Line", metaQuestPanel, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(1f, 1f),
+            pivot = new Vector2(0.5f, 1f),
+            anchoredPosition = new Vector2(0f, -68f),
+            sizeDelta = new Vector2(-44f, 2f)
+        }, new Color(0.48f, 0.56f, 0.68f, 0.45f));
 
         metaQuestRows = new RectTransform[MetaQuestMaxCount];
         metaQuestIconTexts = new Text[MetaQuestMaxCount];
@@ -1518,39 +2034,41 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         for (int i = 0; i < MetaQuestMaxCount; i++)
         {
-            float y = -50f - i * 86f;
+            float y = -82f - i * 76f;
             RectTransform row = CreatePanel("Meta Quest Row " + i, metaQuestPanel, new RectTransformSpec
             {
                 anchorMin = new Vector2(0f, 1f),
                 anchorMax = new Vector2(1f, 1f),
                 pivot = new Vector2(0.5f, 1f),
                 anchoredPosition = new Vector2(0f, y),
-                sizeDelta = new Vector2(-24f, 74f)
-            }, new Color(0.018f, 0.065f, 0.075f, 0.72f));
+                sizeDelta = new Vector2(-40f, 70f)
+            }, new Color(1f, 1f, 1f, 0f));
 
             RectTransform icon = CreatePanel("Quest Icon", row, new RectTransformSpec
             {
                 anchorMin = new Vector2(0f, 1f),
                 anchorMax = new Vector2(0f, 1f),
                 pivot = new Vector2(0f, 1f),
-                anchoredPosition = new Vector2(10f, -10f),
-                sizeDelta = new Vector2(44f, 44f)
-            }, new Color(0.14f, 0.24f, 0.28f, 1f));
+                anchoredPosition = new Vector2(0f, -4f),
+                sizeDelta = new Vector2(48f, 48f)
+            }, PortGlassMuted);
+            ApplyRoundedSprite(icon.GetComponent<Image>(), GetRoundedSmallSprite());
 
-            metaQuestIconTexts[i] = CreateText(icon, "", 22, Vector2.zero, new Vector2(44f, 44f), TextAnchor.MiddleCenter, new Color(0.94f, 0.84f, 0.62f, 1f));
+            metaQuestIconTexts[i] = CreateText(icon, "", 22, Vector2.zero, new Vector2(48f, 48f), TextAnchor.MiddleCenter, PortText);
             metaQuestIconTexts[i].fontStyle = FontStyle.Bold;
             metaQuestIconTexts[i].raycastTarget = false;
-            metaQuestLineOneTexts[i] = CreateText(row, "", 15, new Vector2(64f, -5f), new Vector2(216f, 22f), TextAnchor.MiddleLeft, new Color(0.92f, 0.90f, 0.78f, 1f));
-            metaQuestLineTwoTexts[i] = CreateText(row, "", 15, new Vector2(64f, -28f), new Vector2(216f, 22f), TextAnchor.MiddleLeft, new Color(0.82f, 0.88f, 0.88f, 1f));
+            metaQuestLineOneTexts[i] = CreateText(row, "", 15, new Vector2(60f, -1f), new Vector2(236f, 22f), TextAnchor.MiddleLeft, PortText);
+            metaQuestLineTwoTexts[i] = CreateText(row, "", 15, new Vector2(60f, -23f), new Vector2(236f, 22f), TextAnchor.MiddleLeft, PortText);
 
             RectTransform bar = CreatePanel("Quest Progress Bar", row, new RectTransformSpec
             {
                 anchorMin = new Vector2(0f, 1f),
                 anchorMax = new Vector2(0f, 1f),
                 pivot = new Vector2(0f, 1f),
-                anchoredPosition = new Vector2(64f, -56f),
-                sizeDelta = new Vector2(150f, 10f)
-            }, new Color(0.02f, 0.03f, 0.035f, 0.92f));
+                anchoredPosition = new Vector2(60f, -54f),
+                sizeDelta = new Vector2(154f, 10f)
+            }, PortTrack);
+            ApplyRoundedSprite(bar.GetComponent<Image>(), GetRoundedSmallSprite());
 
             metaQuestProgressFills[i] = CreatePanel("Quest Progress Fill", bar, new RectTransformSpec
             {
@@ -1559,50 +2077,83 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 pivot = new Vector2(0f, 0.5f),
                 anchoredPosition = Vector2.zero,
                 sizeDelta = Vector2.zero
-            }, new Color(0.48f, 0.78f, 0.20f, 1f));
+            }, PortNavy);
+            ApplyRoundedSprite(metaQuestProgressFills[i].GetComponent<Image>(), GetRoundedSmallSprite());
 
-            metaQuestCounterTexts[i] = CreateText(row, "", 14, new Vector2(224f, -49f), new Vector2(60f, 20f), TextAnchor.MiddleRight, new Color(0.92f, 0.88f, 0.70f, 1f));
+            metaQuestCounterTexts[i] = CreateText(row, "", 16, new Vector2(224f, -46f), new Vector2(76f, 24f), TextAnchor.MiddleRight, PortTextSoft);
             metaQuestRows[i] = row;
         }
 
-        metaAllTasksButtonText = CreateButton(metaQuestPanel, "Meta All Tasks", new Vector2(18f, -320f), new Vector2(294f, 40f), OpenMetaAllTasksWindow, out metaAllTasksButton);
-        SetText(metaAllTasksButtonText, "Все задачи");
+        metaAllTasksButtonText = CreateGlassButton(metaQuestPanel, "Meta All Tasks", new Vector2(22f, -310f), new Vector2(300f, 44f), OpenMetaAllTasksWindow, out metaAllTasksButton, "Все задачи");
+        metaAllTasksButtonText.fontSize = 18;
         RefreshMetaQuestPanel(true);
     }
 
     private void BuildMetaProjectPanel(RectTransform parent)
     {
-        float cardsWidth = MetaProjectMaxCount * MetaProjectCardWidth
-            + (MetaProjectMaxCount - 1) * MetaProjectCardGap;
-
-        metaProjectToolButtonStrip = CreatePanel("Meta Project Tool Buttons", parent, new RectTransformSpec
+        metaProjectToolButtonStrip = CreateRect("Meta Project Tool Buttons", parent, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 0f),
             anchorMax = new Vector2(0f, 0f),
             pivot = new Vector2(0f, 0f),
-            anchoredPosition = new Vector2(42f, 236f),
-            sizeDelta = new Vector2(150f, 38f)
-        }, new Color(0f, 0f, 0f, 0f));
+            anchoredPosition = new Vector2(20f, 238f),
+            sizeDelta = new Vector2(252f, 74f)
+        }).GetComponent<RectTransform>();
 
-        metaProjectHomeButtonText = CreateButton(metaProjectToolButtonStrip, "Meta Project Home", new Vector2(0f, 0f), new Vector2(42f, 38f), HandleMetaProjectToolButton, out metaProjectHomeButton);
-        metaProjectGridButtonText = CreateButton(metaProjectToolButtonStrip, "Meta Project Grid", new Vector2(54f, 0f), new Vector2(42f, 38f), HandleMetaBuildingCatalogButton, out metaProjectGridButton);
-        metaProjectCameraButtonText = CreateButton(metaProjectToolButtonStrip, "Meta Project Camera", new Vector2(108f, 0f), new Vector2(42f, 38f), HandleMetaCameraButton, out metaProjectCameraButton);
-        SetText(metaProjectHomeButtonText, "\u2302");
-        SetText(metaProjectGridButtonText, "\u25A6");
-        SetText(metaProjectCameraButtonText, "\u25C9");
+        metaProjectHomeButtonText = CreateRoundGlassButton(metaProjectToolButtonStrip, "Meta Project Home", new Vector2(0f, 0f), 74f, HandleMetaProjectToolButton, out metaProjectHomeButton, "\u2708");
+        metaProjectGridButtonText = CreateRoundGlassButton(metaProjectToolButtonStrip, "Meta Project Grid", new Vector2(90f, 0f), 74f, HandleMetaBuildingCatalogButton, out metaProjectGridButton, "\u25A6");
+        metaProjectCameraButtonText = CreateRoundGlassButton(metaProjectToolButtonStrip, "Meta Project Camera", new Vector2(180f, 0f), 74f, HandleMetaCameraButton, out metaProjectCameraButton, "\u2699");
+        SetText(metaProjectHomeButtonText, "\u2708");
+        SetText(metaProjectGridButtonText, "\u2693");
+        SetText(metaProjectCameraButtonText, "\u25A3");
 
-        metaProjectPanel = CreatePanel("Meta Project Queue Panel", parent, new RectTransformSpec
+        Text blueprintText = CreateRoundGlassButton(parent, "Meta Blueprint Development", new Vector2(32f, 28f), 156f, OpenDevelopmentWindow, out _, "\u2692");
+        metaBlueprintButtonRoot = blueprintText != null && blueprintText.transform.parent != null
+            ? blueprintText.transform.parent.GetComponent<RectTransform>()
+            : null;
+        blueprintText.fontSize = 68;
+        blueprintText.color = new Color(0.64f, 0.55f, 0.40f, 0.95f);
+        if (metaBlueprintButtonRoot != null)
+        {
+            Image projectsIconImage = CreateMainHudIconImage(
+                metaBlueprintButtonRoot,
+                "Meta Projects Icon",
+                "MetaProjects",
+                new RectTransformSpec
+                {
+                    anchorMin = new Vector2(0.5f, 0.5f),
+                    anchorMax = new Vector2(0.5f, 0.5f),
+                    pivot = new Vector2(0.5f, 0.5f),
+                    anchoredPosition = new Vector2(0f, 10f),
+                    sizeDelta = new Vector2(126f, 126f)
+                },
+                Color.white);
+            SetFallbackTextVisibleWhenIconMissing(blueprintText, projectsIconImage);
+
+            RectTransform labelPill = CreatePanel("Meta Blueprint Label", metaBlueprintButtonRoot, new RectTransformSpec
+            {
+                anchorMin = new Vector2(0.5f, 0f),
+                anchorMax = new Vector2(0.5f, 0f),
+                pivot = new Vector2(0.5f, 0f),
+                anchoredPosition = new Vector2(0f, -2f),
+                sizeDelta = new Vector2(136f, 28f)
+            }, PortGlassStrong);
+            Image blueprintLabelImage = labelPill.GetComponent<Image>();
+            ApplyRoundedSprite(blueprintLabelImage, GetRoundedSmallSprite());
+            SetGraphicRaycastTarget(blueprintLabelImage, false);
+            Text labelText = CreateText(labelPill, "Проекты", 21, Vector2.zero, new Vector2(136f, 28f), TextAnchor.MiddleCenter, PortText);
+            labelText.fontStyle = FontStyle.Bold;
+            labelText.raycastTarget = false;
+        }
+
+        metaProjectPanel = CreateGlassPanel("Meta Project Queue Panel", parent, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 0f),
             anchorMax = new Vector2(0f, 0f),
             pivot = new Vector2(0f, 0f),
-            anchoredPosition = new Vector2(42f, 42f),
-            sizeDelta = new Vector2(cardsWidth + 28f, MetaProjectCardHeight + 56f)
-        }, new Color(0.020f, 0.12f, 0.14f, 0.94f));
-
-        Text header = CreateText(metaProjectPanel, "Очередь проектов", 18, new Vector2(14f, -10f), new Vector2(300f, 34f), TextAnchor.MiddleLeft, new Color(0.95f, 0.84f, 0.62f, 1f));
-        header.fontStyle = FontStyle.Bold;
-        header.raycastTarget = false;
+            anchoredPosition = new Vector2(86f, 26f),
+            sizeDelta = new Vector2(1458f, 148f)
+        }, PortGlass);
 
         metaProjectCards = new RectTransform[MetaProjectMaxCount];
         metaProjectProgressFills = new RectTransform[MetaProjectMaxCount];
@@ -1613,35 +2164,79 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         for (int i = 0; i < MetaProjectMaxCount; i++)
         {
-            RectTransform card = CreatePanel("Meta Project Card " + i, metaProjectPanel, new RectTransformSpec
+            RectTransform card = CreateGlassPanel("Meta Project Card " + i, metaProjectPanel, new RectTransformSpec
             {
                 anchorMin = new Vector2(0f, 1f),
                 anchorMax = new Vector2(0f, 1f),
                 pivot = new Vector2(0f, 1f),
-                anchoredPosition = new Vector2(14f + i * (MetaProjectCardWidth + MetaProjectCardGap), -48f),
+                anchoredPosition = new Vector2(122f + i * (MetaProjectCardWidth + 16f), -10f),
                 sizeDelta = new Vector2(MetaProjectCardWidth, MetaProjectCardHeight)
-            }, new Color(0.018f, 0.055f, 0.065f, 0.92f));
+            }, PortGlassStrong, false);
 
-            metaProjectProgressFills[i] = CreatePanel("Meta Project Progress Fill", card, new RectTransformSpec
+            RectTransform iconDisc = CreatePanel("Meta Project Icon Disc " + i, card, new RectTransformSpec
+            {
+                anchorMin = new Vector2(0f, 1f),
+                anchorMax = new Vector2(0f, 1f),
+                pivot = new Vector2(0f, 1f),
+                anchoredPosition = new Vector2(14f, -18f),
+                sizeDelta = new Vector2(58f, 58f)
+            }, PortGlassMuted);
+            Image iconDiscImage = iconDisc.GetComponent<Image>();
+            if (iconDiscImage != null)
+            {
+                iconDiscImage.sprite = GetCircleSprite();
+                iconDiscImage.type = Image.Type.Simple;
+            }
+
+            RectTransform track = CreatePanel("Meta Project Progress Track " + i, card, new RectTransformSpec
+            {
+                anchorMin = new Vector2(0f, 1f),
+                anchorMax = new Vector2(0f, 1f),
+                pivot = new Vector2(0f, 1f),
+                anchoredPosition = new Vector2(76f, -54f),
+                sizeDelta = new Vector2(128f, 11f)
+            }, PortTrack);
+            ApplyRoundedSprite(track.GetComponent<Image>(), GetRoundedSmallSprite());
+
+            metaProjectProgressFills[i] = CreatePanel("Meta Project Progress Fill", track, new RectTransformSpec
             {
                 anchorMin = new Vector2(0f, 0f),
-                anchorMax = new Vector2(1f, 0f),
-                pivot = new Vector2(0.5f, 0f),
+                anchorMax = new Vector2(0f, 1f),
+                pivot = new Vector2(0f, 0.5f),
                 anchoredPosition = Vector2.zero,
                 sizeDelta = Vector2.zero
-            }, new Color(0.18f, 0.52f, 0.20f, 0.82f));
+            }, PortNavy);
+            ApplyRoundedSprite(metaProjectProgressFills[i].GetComponent<Image>(), GetRoundedSmallSprite());
 
-            metaProjectTitleTexts[i] = CreateText(card, "", 14, new Vector2(8f, -7f), new Vector2(MetaProjectCardWidth - 16f, 22f), TextAnchor.MiddleCenter, new Color(0.94f, 0.88f, 0.72f, 1f));
+            metaProjectTitleTexts[i] = CreateText(card, "", 18, new Vector2(76f, -20f), new Vector2(158f, 26f), TextAnchor.MiddleLeft, PortText);
             metaProjectTitleTexts[i].fontStyle = FontStyle.Bold;
-            metaProjectAmountTexts[i] = CreateText(card, "", 13, new Vector2(8f, -29f), new Vector2(MetaProjectCardWidth - 16f, 20f), TextAnchor.MiddleCenter, new Color(0.80f, 0.88f, 0.86f, 1f));
-            metaProjectIconTexts[i] = CreateText(card, "", 36, new Vector2(8f, -48f), new Vector2(MetaProjectCardWidth - 16f, 42f), TextAnchor.MiddleCenter, new Color(0.94f, 0.84f, 0.62f, 1f));
+            metaProjectAmountTexts[i] = CreateText(card, "", 17, new Vector2(204f, -48f), new Vector2(38f, 24f), TextAnchor.MiddleRight, PortTextSoft);
+            metaProjectAmountTexts[i].fontStyle = FontStyle.Bold;
+            metaProjectIconTexts[i] = CreateText(iconDisc, "", 30, Vector2.zero, new Vector2(58f, 58f), TextAnchor.MiddleCenter, PortText);
             metaProjectIconTexts[i].fontStyle = FontStyle.Bold;
-            metaProjectTimerTexts[i] = CreateText(card, "", 13, new Vector2(8f, -94f), new Vector2(MetaProjectCardWidth - 16f, 22f), TextAnchor.MiddleCenter, new Color(0.92f, 0.88f, 0.70f, 1f));
+            CreatePanel("Meta Project Card Divider " + i, card, new RectTransformSpec
+            {
+                anchorMin = new Vector2(0f, 1f),
+                anchorMax = new Vector2(1f, 1f),
+                pivot = new Vector2(0.5f, 1f),
+                anchoredPosition = new Vector2(0f, -86f),
+                sizeDelta = new Vector2(-24f, 1f)
+            }, new Color(0.42f, 0.48f, 0.56f, 0.22f));
+            metaProjectTimerTexts[i] = CreateText(card, "", 17, new Vector2(34f, -94f), new Vector2(184f, 24f), TextAnchor.MiddleCenter, PortTextSoft);
 
             metaProjectCards[i] = card;
         }
 
         RefreshMetaProjectPanel(true);
+        if (metaBlueprintButtonRoot != null)
+        {
+            metaBlueprintButtonRoot.SetAsLastSibling();
+        }
+
+        if (metaProjectToolButtonStrip != null)
+        {
+            metaProjectToolButtonStrip.SetAsLastSibling();
+        }
     }
 
     private void RefreshPlayerProfile(bool visible)
@@ -1762,8 +2357,420 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         {
             metaDockScreenLayer.SetAsLastSibling();
         }
+        else
+        {
+            HideMetaDockSortieResultWindow();
+        }
 
         SetInteractable(metaDockScreenPortButton, visible);
+        RefreshMetaDockGameplayPanel(visible);
+    }
+
+    private void ShowMetaDockSortieResultWindow(string reportText, ShipTreeEntryConfig ship, DockedDevelopmentShipState slot)
+    {
+        if (metaDockResultModalRoot == null)
+        {
+            return;
+        }
+
+        string title = ship != null
+            ? "РЕЗУЛЬТАТ: " + ShortenButtonLabel(ship.DisplayNameRu, 34)
+            : "РЕЗУЛЬТАТ ВЫЛЕТА";
+        string subtitle = ship != null
+            ? FormatRomanTier(Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount)) + " ранг"
+            : "";
+        if (slot != null)
+        {
+            subtitle = string.IsNullOrWhiteSpace(subtitle)
+                ? slot.sortiesRemaining + "/" + MetaGameState.DevelopmentDockShipMaxSorties + " вылетов"
+                : subtitle + " | " + slot.sortiesRemaining + "/" + MetaGameState.DevelopmentDockShipMaxSorties + " вылетов";
+        }
+
+        SetText(metaDockResultTitleText, title);
+        SetText(metaDockResultSubtitleText, subtitle);
+        SetText(metaDockResultBodyText, string.IsNullOrWhiteSpace(reportText) ? "Вылет завершён." : reportText);
+        metaDockResultModalRoot.gameObject.SetActive(true);
+        metaDockResultModalRoot.SetAsLastSibling();
+    }
+
+    private bool HideMetaDockSortieResultWindow()
+    {
+        if (metaDockResultModalRoot != null)
+        {
+            metaDockResultModalRoot.gameObject.SetActive(false);
+        }
+
+        return true;
+    }
+
+    private void RefreshMetaDockGameplayPanel(bool visible)
+    {
+        if (metaDockShipSlotRoot == null || metaDockSelectedShipRoot == null || metaDockMissionRoot == null || metaDockRewardRoot == null)
+        {
+            return;
+        }
+
+        metaDockShipSlotRoot.gameObject.SetActive(visible);
+        metaDockSelectedShipRoot.gameObject.SetActive(visible);
+        metaDockMissionRoot.gameObject.SetActive(visible);
+        metaDockRewardRoot.gameObject.SetActive(visible);
+        if (!visible)
+        {
+            return;
+        }
+
+        MetaGameState currentMeta = ResolveMeta();
+        IReadOnlyList<DockedDevelopmentShipState> slots = currentMeta != null ? currentMeta.GetDevelopmentDockShipSlots() : null;
+        DockedDevelopmentShipState selectedSlot = currentMeta != null ? currentMeta.GetSelectedDevelopmentDockShipSlot() : null;
+        SessionConfigDatabase config = currentMeta != null ? currentMeta.SessionConfig : null;
+        bool canLaunchSelectedDockShip = currentMeta != null
+            && currentMeta.IsDockedAtCapital()
+            && selectedSlot != null
+            && selectedSlot.HasShip
+            && selectedSlot.sortiesRemaining > 0;
+        SetInteractable(metaDockManualSortieButton, canLaunchSelectedDockShip);
+        SetInteractable(metaDockCoreCombatButton, canLaunchSelectedDockShip);
+
+        SetText(metaDockHeaderText, "Быстрые миссии подстраиваются под корабль: высокий рейтинг привозит более дорогой конкретный ресурс.");
+        if (metaDockSlotTexts != null)
+        {
+            for (int i = 0; i < metaDockSlotTexts.Length; i++)
+            {
+                DockedDevelopmentShipState slot = slots != null && i < slots.Count ? slots[i] : null;
+                bool selected = selectedSlot != null && slot != null && selectedSlot.slotIndex == slot.slotIndex;
+                ShipTreeEntryConfig ship = slot != null && slot.HasShip && config != null ? config.GetShipTreeEntry(slot.shipId) : null;
+                string slotText = "Слот " + (i + 1).ToString(CultureInfo.InvariantCulture) + "\n";
+                slotText += ship != null
+                    ? ShortenButtonLabel(ship.DisplayNameRu, 20) + "\n" + slot.sortiesRemaining + "/" + MetaGameState.DevelopmentDockShipMaxSorties + " вылетов"
+                    : "Пустой док";
+                SetText(metaDockSlotTexts[i], slotText);
+
+                if (metaDockSlotButtons != null && i < metaDockSlotButtons.Length && metaDockSlotButtons[i] != null)
+                {
+                    Image image = metaDockSlotButtons[i].GetComponent<Image>();
+                    if (image != null)
+                    {
+                        image.color = selected
+                            ? new Color(0.26f, 0.20f, 0.09f, 0.98f)
+                            : new Color(0.08f, 0.075f, 0.055f, 0.94f);
+                    }
+                }
+            }
+        }
+
+        if (selectedSlot == null || !selectedSlot.HasShip || config == null)
+        {
+            SetText(metaDockSelectedShipText, "Слот пуст");
+            SetText(metaDockSelectedStatsText, "Купи корабль в окне развития. Он встанет сюда, после чего можно нажимать быстрый вылет и смотреть конкретный вывоз ресурсов.");
+            RefreshMetaDockMissionPanel(null, null, null);
+            SetText(metaDockRewardText, string.IsNullOrWhiteSpace(currentMeta != null ? currentMeta.LastQuickSortieReport : "") ? "Пока вылетов не было." : currentMeta.LastQuickSortieReport);
+            SetInteractable(metaDockQuickBattleButton, false);
+            SetInteractable(metaDockRunMissionButton, false);
+            SetInteractable(metaDockManualSortieButton, false);
+            SetInteractable(metaDockCoreCombatButton, false);
+            SetInteractable(metaDockSellButton, false);
+            return;
+        }
+
+        ShipTreeEntryConfig selectedShip = config.GetShipTreeEntry(selectedSlot.shipId);
+        if (selectedShip == null)
+        {
+            SetText(metaDockSelectedShipText, selectedSlot.shipId);
+            SetText(metaDockSelectedStatsText, "Корабль не найден в Ship_tree.csv.");
+            RefreshMetaDockMissionPanel(null, null, null);
+            SetInteractable(metaDockQuickBattleButton, false);
+            SetInteractable(metaDockRunMissionButton, false);
+            SetInteractable(metaDockManualSortieButton, false);
+            SetInteractable(metaDockCoreCombatButton, false);
+            SetInteractable(metaDockSellButton, true);
+            return;
+        }
+
+        SetText(metaDockSelectedShipText, FormatRomanTier(Mathf.Clamp(selectedShip.treeTier, 1, DevelopmentTreeTierCount)) + " " + selectedShip.DisplayNameRu);
+        SetText(metaDockSelectedStatsText, BuildMetaDockShipStatsText(selectedShip, selectedSlot));
+        RefreshMetaDockMissionPanel(currentMeta, selectedSlot, selectedShip);
+        string reward = !string.IsNullOrWhiteSpace(selectedSlot.lastRewardSummary)
+            ? selectedSlot.lastRewardSummary
+            : currentMeta.LastQuickSortieReport;
+        SetText(metaDockRewardText, string.IsNullOrWhiteSpace(reward) ? "Пока этот корабль не летал." : reward);
+        SetInteractable(metaDockQuickBattleButton, canLaunchSelectedDockShip);
+        SetInteractable(metaDockRunMissionButton, selectedSlot.sortiesRemaining > 0 && !string.IsNullOrWhiteSpace(selectedMetaDockMissionOfferId));
+        SetInteractable(metaDockSellButton, true);
+    }
+
+    private void RefreshMetaDockMissionPanel(MetaGameState currentMeta, DockedDevelopmentShipState selectedSlot, ShipTreeEntryConfig selectedShip)
+    {
+        if (metaDockMissionTexts == null || metaDockMissionButtons == null)
+        {
+            return;
+        }
+
+        List<SortieMissionOffer> offers = currentMeta != null && selectedSlot != null && selectedSlot.HasShip
+            ? currentMeta.GetDevelopmentDockOrdinaryMissionOffers(selectedSlot.slotIndex)
+            : null;
+        if (offers == null || offers.Count == 0)
+        {
+            selectedMetaDockMissionOfferId = "";
+            SetText(metaDockMissionDetailText, "Нет корабля");
+            for (int i = 0; i < metaDockMissionTexts.Length; i++)
+            {
+                SetText(metaDockMissionTexts[i], "");
+                SetInteractable(metaDockMissionButtons[i], false);
+            }
+
+            SetInteractable(metaDockRunMissionButton, false);
+            return;
+        }
+
+        bool selectedStillExists = false;
+        for (int i = 0; i < offers.Count; i++)
+        {
+            if (string.Equals(offers[i].offerId, selectedMetaDockMissionOfferId, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedStillExists = true;
+                break;
+            }
+        }
+
+        if (!selectedStillExists)
+        {
+            selectedMetaDockMissionOfferId = offers[0].offerId;
+        }
+
+        SortieMissionOffer selectedOffer = null;
+        for (int i = 0; i < metaDockMissionTexts.Length; i++)
+        {
+            SortieMissionOffer offer = i < offers.Count ? offers[i] : null;
+            bool hasOffer = offer != null;
+            bool selected = hasOffer && string.Equals(offer.offerId, selectedMetaDockMissionOfferId, StringComparison.OrdinalIgnoreCase);
+            SetInteractable(metaDockMissionButtons[i], hasOffer);
+            SetText(metaDockMissionTexts[i], hasOffer
+                ? ShortenButtonLabel(offer.titleRu, 28) + "\n" + offer.BuildRequirementSummary(selectedShip)
+                : "");
+            if (metaDockMissionButtons[i] != null)
+            {
+                Image image = metaDockMissionButtons[i].GetComponent<Image>();
+                if (image != null)
+                {
+                    image.color = selected
+                        ? new Color(0.23f, 0.16f, 0.06f, 0.98f)
+                        : new Color(0.065f, 0.074f, 0.080f, 0.94f);
+                }
+            }
+
+            if (selected)
+            {
+                selectedOffer = offer;
+            }
+        }
+
+        if (selectedOffer != null)
+        {
+            SetText(metaDockMissionDetailText,
+                "Шанс выхода " + Mathf.RoundToInt(selectedOffer.estimatedSuccessFactor * 100f).ToString(CultureInfo.InvariantCulture) + "%\n"
+                + selectedOffer.primaryActivityRu);
+        }
+        else
+        {
+            SetText(metaDockMissionDetailText, "Выбери миссию");
+        }
+
+        SetInteractable(metaDockRunMissionButton, selectedSlot != null && selectedSlot.sortiesRemaining > 0 && selectedOffer != null);
+    }
+
+    private bool HandleMetaDockMissionSelected(int offerIndex)
+    {
+        MetaGameState currentMeta = ResolveMeta();
+        DockedDevelopmentShipState slot = currentMeta != null ? currentMeta.GetSelectedDevelopmentDockShipSlot() : null;
+        List<SortieMissionOffer> offers = currentMeta != null && slot != null && slot.HasShip
+            ? currentMeta.GetDevelopmentDockOrdinaryMissionOffers(slot.slotIndex)
+            : null;
+        if (offers == null || offerIndex < 0 || offerIndex >= offers.Count || offers[offerIndex] == null)
+        {
+            return false;
+        }
+
+        selectedMetaDockMissionOfferId = offers[offerIndex].offerId;
+        RefreshState(true);
+        return true;
+    }
+
+    private bool HandleMetaDockRunSelectedMission()
+    {
+        MetaGameState currentMeta = ResolveMeta();
+        if (currentMeta == null)
+        {
+            return false;
+        }
+
+        DockedDevelopmentShipState slot = currentMeta.GetSelectedDevelopmentDockShipSlot();
+        bool success = currentMeta.TryRunDevelopmentDockOrdinaryMission(
+            slot != null ? slot.slotIndex : 0,
+            selectedMetaDockMissionOfferId,
+            out statusMessage);
+        RefreshState(true);
+        if (success)
+        {
+            DockedDevelopmentShipState updatedSlot = currentMeta.GetSelectedDevelopmentDockShipSlot();
+            SessionConfigDatabase config = currentMeta.SessionConfig;
+            ShipTreeEntryConfig ship = updatedSlot != null && updatedSlot.HasShip && config != null
+                ? config.GetShipTreeEntry(updatedSlot.shipId)
+                : null;
+            ShowMetaDockSortieResultWindow(statusMessage, ship, updatedSlot);
+        }
+
+        return success;
+    }
+
+    private bool HandleMetaDockSlotSelected(int slotIndex)
+    {
+        MetaGameState currentMeta = ResolveMeta();
+        if (currentMeta == null)
+        {
+            return false;
+        }
+
+        bool selected = currentMeta.SelectDevelopmentDockSlot(slotIndex);
+        DockedDevelopmentShipState selectedSlot = currentMeta.GetSelectedDevelopmentDockShipSlot();
+        if (selected && (selectedSlot == null || !selectedSlot.HasShip))
+        {
+            return OpenDevelopmentWindowFromDock();
+        }
+
+        RefreshState(true);
+        return selected;
+    }
+
+    private bool HandleMetaDockQuickBattle()
+    {
+        MetaGameState currentMeta = ResolveMeta();
+        if (currentMeta == null)
+        {
+            return false;
+        }
+
+        DockedDevelopmentShipState slot = currentMeta.GetSelectedDevelopmentDockShipSlot();
+        bool success = currentMeta.TryRunQuickDevelopmentSortie(slot != null ? slot.slotIndex : 0, out statusMessage);
+        RefreshState(true);
+        if (success)
+        {
+            DockedDevelopmentShipState updatedSlot = currentMeta.GetSelectedDevelopmentDockShipSlot();
+            SessionConfigDatabase config = currentMeta.SessionConfig;
+            ShipTreeEntryConfig ship = updatedSlot != null && updatedSlot.HasShip && config != null
+                ? config.GetShipTreeEntry(updatedSlot.shipId)
+                : null;
+            ShowMetaDockSortieResultWindow(statusMessage, ship, updatedSlot);
+        }
+
+        return success;
+    }
+
+    private bool HandleMetaDockManualSortie()
+    {
+        MetaGameState currentMeta = ResolveMeta();
+        if (currentMeta == null)
+        {
+            return false;
+        }
+
+        bool success = currentMeta.BeginQuickAdaptiveManualSessionSortie();
+        statusMessage = currentMeta.LastAccountMessage;
+        if (success)
+        {
+            metaScreenMode = MetaScreenMode.Port;
+            HideMetaDockSortieResultWindow();
+        }
+
+        RefreshState(true);
+        return success;
+    }
+
+    private bool HandleMetaDockCoreCombatSortie()
+    {
+        MetaGameState currentMeta = ResolveMeta();
+        if (currentMeta == null)
+        {
+            return false;
+        }
+
+        bool success = currentMeta.BeginCoreTacticalIntroCombatSortie();
+        statusMessage = currentMeta.LastAccountMessage;
+        if (success)
+        {
+            metaScreenMode = MetaScreenMode.Port;
+            HideMetaDockSortieResultWindow();
+        }
+
+        RefreshState(true);
+        return success;
+    }
+
+    private bool HandleMetaDockSellShip()
+    {
+        MetaGameState currentMeta = ResolveMeta();
+        if (currentMeta == null)
+        {
+            return false;
+        }
+
+        DockedDevelopmentShipState slot = currentMeta.GetSelectedDevelopmentDockShipSlot();
+        bool success = currentMeta.TrySellDevelopmentDockShip(slot != null ? slot.slotIndex : 0, out statusMessage);
+        if (success)
+        {
+            HideMetaDockSortieResultWindow();
+        }
+
+        RefreshState(true);
+        return success;
+    }
+
+    private static string BuildMetaDockShipStatsText(ShipTreeEntryConfig ship, DockedDevelopmentShipState slot)
+    {
+        if (ship == null)
+        {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.AppendLine(GetDevelopmentRoleText(ship));
+        if (slot != null)
+        {
+            builder.Append("Вылеты: ");
+            builder.Append(slot.sortiesRemaining.ToString(CultureInfo.InvariantCulture));
+            builder.Append("/");
+            builder.AppendLine(MetaGameState.DevelopmentDockShipMaxSorties.ToString(CultureInfo.InvariantCulture));
+        }
+
+        builder.Append("Груз: ");
+        builder.AppendLine(FormatCargoCapacityTons(ship.cargoCapacityTons));
+        builder.AppendLine();
+        builder.AppendLine("Основные");
+        builder.AppendLine("Живучесть " + GetDevelopmentDefenseRating(ship).ToString(CultureInfo.InvariantCulture));
+        builder.AppendLine("Мобильность " + GetDevelopmentMobilityRating(ship).ToString(CultureInfo.InvariantCulture));
+        builder.AppendLine("Маскировка " + GetDevelopmentStealthRating(ship).ToString(CultureInfo.InvariantCulture));
+        builder.AppendLine();
+        builder.AppendLine("Активные");
+        AppendMetaDockRating(builder, "Вооружение", GetDevelopmentWarfareRating(ship));
+        AppendMetaDockRating(builder, "Руда", ship.miningRating);
+        AppendMetaDockRating(builder, "Облака", ship.harvestingRating);
+        AppendMetaDockRating(builder, "Охота", ship.huntingRating);
+        AppendMetaDockRating(builder, "Взлом", ship.hackingRating);
+        AppendMetaDockRating(builder, "Сальваж", ship.salvageRating);
+        AppendMetaDockRating(builder, "Сканирование", ship.surveyRating);
+        AppendMetaDockRating(builder, "Ремонт союзников", ship.repairRating);
+        return builder.ToString().TrimEnd();
+    }
+
+    private static void AppendMetaDockRating(StringBuilder builder, string label, int value)
+    {
+        if (builder == null || value <= 0)
+        {
+            return;
+        }
+
+        builder.Append(label);
+        builder.Append(" ");
+        builder.AppendLine(Mathf.Clamp(value, 1, 100).ToString(CultureInfo.InvariantCulture));
     }
 
     private bool OpenMetaDockScreen()
@@ -1928,7 +2935,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         float progress = Mathf.Clamp01(project.progress01);
         metaProjectProgressFills[index].anchorMin = new Vector2(0f, 0f);
-        metaProjectProgressFills[index].anchorMax = new Vector2(1f, progress);
+        metaProjectProgressFills[index].anchorMax = new Vector2(progress, 1f);
         metaProjectProgressFills[index].offsetMin = Vector2.zero;
         metaProjectProgressFills[index].offsetMax = Vector2.zero;
     }
@@ -2045,29 +3052,70 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         developmentWindowText = CreateText(
             parent,
             "",
-            15,
-            new Vector2(18f, -10f),
-            new Vector2(1416f, 26f),
-            TextAnchor.UpperLeft,
+            16,
+            new Vector2(16f, -8f),
+            new Vector2(720f, 28f),
+            TextAnchor.MiddleLeft,
             new Color(0.86f, 0.90f, 0.82f, 1f));
+        developmentWindowText.fontStyle = FontStyle.Bold;
 
-        developmentSupplierTabRoot = CreateRect("Development Supplier Tabs", parent, new RectTransformSpec
+        developmentSupplierTabRoot = CreatePanel("Development Faction List", parent, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
-            anchorMax = new Vector2(1f, 1f),
-            pivot = new Vector2(0.5f, 1f),
-            anchoredPosition = new Vector2(0f, -42f),
-            sizeDelta = new Vector2(-24f, 48f)
-        }).GetComponent<RectTransform>();
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(16f, -44f),
+            sizeDelta = new Vector2(DevelopmentFactionListWidth, 858f)
+        }, new Color(0.020f, 0.024f, 0.029f, 0.90f));
 
-        developmentTreeRoot = CreatePanel("Development Ship Tree", parent, new RectTransformSpec
+        developmentTreeScrollRoot = CreatePanel("Development Ship Tree Scroll", parent, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
-            anchorMax = new Vector2(1f, 1f),
-            pivot = new Vector2(0.5f, 1f),
-            anchoredPosition = new Vector2(0f, -104f),
-            sizeDelta = new Vector2(-24f, 590f)
-        }, new Color(0.022f, 0.028f, 0.034f, 0.92f));
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(284f, -44f),
+            sizeDelta = new Vector2(DevelopmentTreeViewportWidth, DevelopmentTreeViewportHeight)
+        }, new Color(0.018f, 0.023f, 0.029f, 0.93f));
+
+        developmentTreeScrollRect = developmentTreeScrollRoot.gameObject.AddComponent<ScrollRect>();
+        developmentTreeScrollRect.horizontal = true;
+        developmentTreeScrollRect.vertical = true;
+        developmentTreeScrollRect.inertia = true;
+        developmentTreeScrollRect.movementType = ScrollRect.MovementType.Clamped;
+        developmentTreeScrollRect.scrollSensitivity = 42f;
+
+        developmentTreeViewport = CreatePanel("Development Ship Tree Viewport", developmentTreeScrollRoot, new RectTransformSpec
+        {
+            anchorMin = Vector2.zero,
+            anchorMax = Vector2.one,
+            pivot = new Vector2(0.5f, 0.5f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = Vector2.zero
+        }, new Color(0f, 0f, 0f, 0f));
+        developmentTreeViewport.gameObject.AddComponent<RectMask2D>();
+        InstallDevelopmentTreePanHandler(developmentTreeViewport);
+
+        developmentTreeRoot = CreatePanel("Development Ship Tree Content", developmentTreeViewport, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = new Vector2(DevelopmentTreePanelWidth, DevelopmentTreeViewportHeight)
+        }, new Color(0.018f, 0.023f, 0.029f, 0.10f));
+
+        developmentTreeScrollRect.viewport = developmentTreeViewport;
+        developmentTreeScrollRect.content = developmentTreeRoot;
+        InstallDevelopmentTreePanHandler(developmentTreeRoot);
+
+        developmentDetailsRoot = CreatePanel("Development Ship Details", parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(1522f, -44f),
+            sizeDelta = new Vector2(DevelopmentDetailsWidth, 858f)
+        }, new Color(0.020f, 0.024f, 0.029f, 0.94f));
     }
 
     private void BuildCargoGrid(RectTransform parent)
@@ -2368,6 +3416,213 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return panelObject.GetComponent<RectTransform>();
     }
 
+    private RectTransform CreateDecorativePanel(string name, Transform parent, RectTransformSpec spec, Color color)
+    {
+        RectTransform panel = CreatePanel(name, parent, spec, color);
+        Image image = panel.GetComponent<Image>();
+        if (image != null)
+        {
+            image.raycastTarget = false;
+        }
+
+        return panel;
+    }
+
+    private RectTransform CreateGlassPanel(string name, Transform parent, RectTransformSpec spec, Color color, bool shadow = true)
+    {
+        RectTransform panel = CreatePanel(name, parent, spec, color);
+        Image image = panel.GetComponent<Image>();
+        ApplyRoundedSprite(image, GetRoundedPanelSprite());
+        if (shadow)
+        {
+            AddSoftShadow(panel, new Color(0.20f, 0.30f, 0.45f, 0.18f), new Vector2(0f, -4f));
+        }
+
+        return panel;
+    }
+
+    private Text CreateGlassButton(
+        RectTransform parent,
+        string name,
+        Vector2 anchoredPosition,
+        Vector2 size,
+        System.Func<bool> action,
+        out Button button,
+        string label = "")
+    {
+        GameObject buttonObject = CreateRect("Button " + name, parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = size
+        });
+
+        Image image = buttonObject.AddComponent<Image>();
+        image.color = PortGlassStrong;
+        ApplyRoundedSprite(image, GetRoundedSmallSprite());
+        AddSoftShadow(buttonObject.GetComponent<RectTransform>(), new Color(0.18f, 0.26f, 0.38f, 0.16f), new Vector2(0f, -3f));
+
+        button = buttonObject.AddComponent<Button>();
+        ConfigureGlassButton(button, image);
+        button.onClick.AddListener(() => action?.Invoke());
+
+        Text text = CreateText(buttonObject.GetComponent<RectTransform>(), label, size.y >= 70f ? 20 : 17, Vector2.zero, size, TextAnchor.MiddleCenter, PortText);
+        text.fontStyle = FontStyle.Bold;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private Text CreateRoundGlassButton(
+        RectTransform parent,
+        string name,
+        Vector2 anchoredPosition,
+        float size,
+        System.Func<bool> action,
+        out Button button,
+        string label = "")
+    {
+        GameObject buttonObject = CreateRect("Button " + name, parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 0f),
+            anchorMax = new Vector2(0f, 0f),
+            pivot = new Vector2(0f, 0f),
+            anchoredPosition = anchoredPosition,
+            sizeDelta = new Vector2(size, size)
+        });
+
+        Image image = buttonObject.AddComponent<Image>();
+        image.sprite = GetCircleSprite();
+        image.type = Image.Type.Simple;
+        image.color = PortGlassStrong;
+        AddSoftShadow(buttonObject.GetComponent<RectTransform>(), new Color(0.18f, 0.26f, 0.38f, 0.18f), new Vector2(0f, -3f));
+
+        button = buttonObject.AddComponent<Button>();
+        ConfigureGlassButton(button, image);
+        button.onClick.AddListener(() => action?.Invoke());
+
+        Text text = CreateText(buttonObject.GetComponent<RectTransform>(), label, 32, Vector2.zero, new Vector2(size, size), TextAnchor.MiddleCenter, new Color(0.51f, 0.57f, 0.68f, 1f));
+        text.fontStyle = FontStyle.Bold;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private static Image CreateMainHudIconImage(
+        RectTransform parent,
+        string name,
+        string iconResourceName,
+        RectTransformSpec spec,
+        Color color)
+    {
+        Sprite sprite = GetMainHudIconSprite(iconResourceName);
+        if (sprite == null)
+        {
+            return null;
+        }
+
+        GameObject iconObject = CreateRect(name, parent, spec);
+        Image image = iconObject.AddComponent<Image>();
+        image.sprite = sprite;
+        image.color = color;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    private static void SetFallbackTextVisibleWhenIconMissing(Text fallbackText, Image iconImage)
+    {
+        if (fallbackText == null || iconImage == null)
+        {
+            return;
+        }
+
+        fallbackText.gameObject.SetActive(false);
+    }
+
+    private static void SetGraphicRaycastTarget(Graphic graphic, bool raycastTarget)
+    {
+        if (graphic != null)
+        {
+            graphic.raycastTarget = raycastTarget;
+        }
+    }
+
+    private static Sprite GetMainHudIconSprite(string iconResourceName)
+    {
+        if (string.IsNullOrWhiteSpace(iconResourceName))
+        {
+            return null;
+        }
+
+        if (cachedMainHudIconSprites.TryGetValue(iconResourceName, out Sprite cachedSprite))
+        {
+            return cachedSprite;
+        }
+
+        Texture2D texture = Resources.Load<Texture2D>(MainHudIconResourceFolderPath + iconResourceName);
+        if (texture == null)
+        {
+            cachedMainHudIconSprites[iconResourceName] = null;
+            return null;
+        }
+
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f),
+            Mathf.Max(texture.width, texture.height),
+            0,
+            SpriteMeshType.FullRect);
+        sprite.name = iconResourceName;
+        cachedMainHudIconSprites[iconResourceName] = sprite;
+        return sprite;
+    }
+
+    private static void ConfigureGlassButton(Button button, Graphic targetGraphic)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        button.targetGraphic = targetGraphic;
+        ColorBlock colors = button.colors;
+        colors.normalColor = PortGlassStrong;
+        colors.highlightedColor = new Color(0.98f, 1.00f, 1.00f, 0.98f);
+        colors.pressedColor = new Color(0.78f, 0.88f, 0.98f, 0.98f);
+        colors.selectedColor = new Color(0.90f, 0.96f, 1.00f, 1f);
+        colors.disabledColor = new Color(0.72f, 0.76f, 0.82f, 0.48f);
+        colors.colorMultiplier = 1f;
+        button.colors = colors;
+    }
+
+    private static void ApplyRoundedSprite(Image image, Sprite sprite)
+    {
+        if (image == null || sprite == null)
+        {
+            return;
+        }
+
+        image.sprite = sprite;
+        image.type = Image.Type.Sliced;
+    }
+
+    private static void AddSoftShadow(RectTransform target, Color color, Vector2 distance)
+    {
+        if (target == null || target.GetComponent<Shadow>() != null)
+        {
+            return;
+        }
+
+        Shadow shadow = target.gameObject.AddComponent<Shadow>();
+        shadow.effectColor = color;
+        shadow.effectDistance = distance;
+        shadow.useGraphicAlpha = true;
+    }
+
     private Text CreateText(RectTransform parent, string initialText, int fontSize, Vector2 anchoredPosition, Vector2 size, TextAnchor alignment, Color color)
     {
         GameObject textObject = CreateRect("Text", parent, new RectTransformSpec
@@ -2386,6 +3641,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         text.color = color;
         text.horizontalOverflow = HorizontalWrapMode.Wrap;
         text.verticalOverflow = VerticalWrapMode.Truncate;
+        text.alignByGeometry = true;
+        text.raycastTarget = false;
         text.text = initialText ?? "";
         return text;
     }
@@ -2525,11 +3782,13 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             bool keepDockedMetaTopWindowVisible = IsMetaTopRightWindowId(pair.Key) && pair.Value.IsOpen;
             bool keepDockedMetaLeftWindowVisible = IsMetaLeftSideWindowId(pair.Key) && pair.Value.IsOpen;
             bool keepDockedAllTasksVisible = pair.Key == WindowMetaAllTasksId && pair.Value.IsOpen;
+            bool keepDockedDevelopmentVisible = pair.Key == WindowDevelopmentId && pair.Value.IsOpen;
             pair.Value.SetFlightVisible(visible
                 || keepDockedResourceVisible
                 || keepDockedMetaTopWindowVisible
                 || keepDockedMetaLeftWindowVisible
-                || keepDockedAllTasksVisible);
+                || keepDockedAllTasksVisible
+                || keepDockedDevelopmentVisible);
         }
     }
 
@@ -2600,6 +3859,31 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private bool ToggleResourcesWindow()
     {
         return ToggleHudWindow(WindowResourcesId);
+    }
+
+    private bool OpenDevelopmentWindow()
+    {
+        if (!hudWindows.TryGetValue(WindowDevelopmentId, out HudWindow window) || window == null)
+        {
+            return false;
+        }
+
+        metaScreenMode = MetaScreenMode.Port;
+        window.SetOpen(true);
+        RefreshState(true);
+        return window.IsOpen;
+    }
+
+    private bool OpenDevelopmentWindowFromDock()
+    {
+        bool opened = OpenDevelopmentWindow();
+        if (opened)
+        {
+            statusMessage = "Выбери корабль и нажми «Купить в док».";
+            RefreshState(true);
+        }
+
+        return opened;
     }
 
     private bool OpenResourceCatalogWindow()
@@ -2727,7 +4011,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private void RefreshDevelopmentWindow(MetaGameState currentMeta)
     {
-        if (developmentWindowText == null || developmentSupplierTabRoot == null || developmentTreeRoot == null)
+        if (developmentWindowText == null || developmentSupplierTabRoot == null || developmentTreeRoot == null || developmentDetailsRoot == null)
         {
             return;
         }
@@ -2741,8 +4025,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             developmentWindowTileCount = 0;
             developmentWindowConnectionCount = 0;
             developmentWindowLayoutKey = "";
+            developmentDetailsShipId = "";
+            developmentShipTilesById.Clear();
             ClearChildren(developmentSupplierTabRoot);
             ClearChildren(developmentTreeRoot);
+            ClearChildren(developmentDetailsRoot);
             SetText(developmentWindowText, "Корабельный каталог не загружен.");
             return;
         }
@@ -2753,23 +4040,34 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             developmentWindowLayoutKey = "";
         }
 
+        DevelopmentSupplierView selectedSupplier = FindDevelopmentSupplier(suppliers, selectedDevelopmentSupplierId);
+        EnsureDevelopmentSelectedShip(selectedSupplier);
+
         string layoutKey = BuildDevelopmentWindowLayoutKey(suppliers, selectedDevelopmentSupplierId);
+        bool rebuilt = false;
         if (layoutKey != developmentWindowLayoutKey)
         {
             developmentWindowLayoutKey = layoutKey;
             RebuildDevelopmentWindowLayout(suppliers);
+            rebuilt = true;
+        }
+
+        if (!rebuilt)
+        {
+            if (!string.Equals(developmentDetailsShipId, selectedDevelopmentShipId, StringComparison.OrdinalIgnoreCase))
+            {
+                BuildDevelopmentShipDetails(selectedSupplier);
+            }
+
+            RefreshDevelopmentTileVisuals();
         }
 
         int developmentShipCount = CountDevelopmentSupplierShips(suppliers);
         SetText(developmentWindowText, "Корабли развития: "
             + developmentShipCount
-            + " | Поставщики: "
+            + " | Фракции: "
             + developmentWindowSupplierCount
-            + " | Уровни I-X | Карточки: "
-            + developmentWindowTileCount
-            + " | Связи: "
-            + developmentWindowConnectionCount
-            + " | Модель: placeholder_square");
+            + " | Ранги I-X");
     }
 
     private List<DevelopmentSupplierView> BuildDevelopmentSupplierViews(IReadOnlyList<ShipTreeEntryConfig> entries)
@@ -2794,16 +4092,23 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 supplier = new DevelopmentSupplierView
                 {
                     factionId = entry.factionId,
-                    displayName = string.IsNullOrWhiteSpace(entry.FactionDisplayNameRu) ? entry.factionId : entry.FactionDisplayNameRu,
+                    displayName = GetDevelopmentFactionDisplayName(entry.factionId, entry.FactionDisplayNameRu),
                     color = entry.visualColor
                 };
                 byFaction[entry.factionId] = supplier;
                 suppliers.Add(supplier);
             }
 
+            if (IsDevelopmentStarterEntry(entry))
+            {
+                supplier.starterShip = entry;
+                continue;
+            }
+
             supplier.ships.Add(entry);
         }
 
+        suppliers.Sort(CompareDevelopmentSuppliers);
         return suppliers;
     }
 
@@ -2811,6 +4116,10 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     {
         ClearChildren(developmentSupplierTabRoot);
         ClearChildren(developmentTreeRoot);
+        ClearChildren(developmentDetailsRoot);
+        developmentShipTilesById.Clear();
+        hoveredDevelopmentShipId = "";
+        developmentDetailsShipId = "";
         developmentWindowTileCount = 0;
         developmentWindowConnectionCount = 0;
 
@@ -2821,6 +4130,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             selectedDevelopmentSupplierId = selectedSupplier.factionId;
         }
 
+        EnsureDevelopmentSelectedShip(selectedSupplier);
         BuildDevelopmentSupplierTabs(suppliers);
         if (selectedSupplier == null)
         {
@@ -2828,12 +4138,24 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
 
         BuildDevelopmentTreeGrid(selectedSupplier);
+        BuildDevelopmentShipDetails(selectedSupplier);
+        RefreshDevelopmentTileVisuals();
+
+        if (developmentTreeScrollRect != null)
+        {
+            developmentTreeScrollRect.horizontalNormalizedPosition = 0f;
+            developmentTreeScrollRect.verticalNormalizedPosition = 1f;
+        }
     }
 
     private void BuildDevelopmentSupplierTabs(List<DevelopmentSupplierView> suppliers)
     {
-        const float tabWidth = 214f;
-        const float tabGap = 8f;
+        Text title = CreateText(developmentSupplierTabRoot, "ФРАКЦИИ", 16, new Vector2(14f, -12f), new Vector2(210f, 26f), TextAnchor.MiddleLeft, new Color(0.88f, 0.82f, 0.64f, 1f));
+        title.fontStyle = FontStyle.Bold;
+
+        const float tabWidth = 222f;
+        const float tabHeight = 42f;
+        const float tabGap = 7f;
         for (int i = 0; i < suppliers.Count; i++)
         {
             DevelopmentSupplierView supplier = suppliers[i];
@@ -2842,61 +4164,69 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             Text label = CreateButton(
                 developmentSupplierTabRoot,
                 "Development Supplier " + factionId,
-                new Vector2(i * (tabWidth + tabGap), 0f),
-                new Vector2(tabWidth, 42f),
+                new Vector2(14f, -48f - i * (tabHeight + tabGap)),
+                new Vector2(tabWidth, tabHeight),
                 () => SelectDevelopmentSupplier(factionId),
                 out Button button);
-            SetText(label, ShortenButtonLabel(supplier.displayName, 19) + "\n" + supplier.ships.Count + " ships");
-            label.fontSize = 13;
+            SetText(label, ShortenButtonLabel(supplier.displayName, 22));
+            label.fontSize = 15;
+            label.alignment = TextAnchor.MiddleLeft;
+            label.rectTransform.offsetMin = new Vector2(16f, label.rectTransform.offsetMin.y);
             TintDevelopmentSupplierButton(button, selected, supplier.color);
         }
     }
 
     private void BuildDevelopmentTreeGrid(DevelopmentSupplierView supplier)
     {
-        const float gridX = 118f;
-        const float tierHeaderY = -18f;
-        const float starterY = -56f;
-        const float branchStartY = -154f;
+        const float rankLabelX = 18f;
+        const float rankOneY = -104f;
+        const float branchHeaderY = -48f;
 
-        for (int tier = 1; tier <= DevelopmentTreeTierCount; tier++)
+        List<DevelopmentBranchView> branches = BuildDevelopmentBranchViews(supplier);
+        float branchAreaWidth = branches.Count > 0
+            ? (branches.Count - 1) * DevelopmentBranchStep + DevelopmentTileWidth
+            : DevelopmentTileWidth;
+        float contentWidth = Mathf.Max(
+            DevelopmentTreeViewportWidth,
+            branchAreaWidth + DevelopmentTreeContentPaddingX * 2f + 48f);
+        float contentHeight = Mathf.Max(
+            DevelopmentTreeViewportHeight,
+            DevelopmentTreeContentPaddingY * 2f + DevelopmentTileHeight + (DevelopmentTreeTierCount - 1) * DevelopmentRankStep + 96f);
+
+        developmentTreeRoot.sizeDelta = new Vector2(contentWidth, contentHeight);
+
+        float gridX = Mathf.Max(DevelopmentTreeContentPaddingX, (contentWidth - branchAreaWidth) * 0.5f);
+        float railX = DevelopmentTreeContentPaddingX * 0.55f;
+        float railWidth = Mathf.Max(DevelopmentTileWidth, contentWidth - railX - DevelopmentTreeContentPaddingX * 0.65f);
+
+        for (int rank = 1; rank <= DevelopmentTreeTierCount; rank++)
         {
-            float x = gridX + (tier - 1) * DevelopmentTierStep;
-            Text tierText = CreateText(developmentTreeRoot, FormatRomanTier(tier), 14, new Vector2(x + 38f, tierHeaderY), new Vector2(44f, 20f), TextAnchor.MiddleCenter, new Color(0.76f, 0.84f, 0.88f, 0.88f));
-            tierText.fontStyle = FontStyle.Bold;
-            CreatePanel("Development Tier Rail " + tier, developmentTreeRoot, new RectTransformSpec
+            float y = GetDevelopmentRankY(rankOneY, rank);
+            Text rankText = CreateText(developmentTreeRoot, FormatRomanTier(rank), 16, new Vector2(rankLabelX, y - 2f), new Vector2(38f, 24f), TextAnchor.MiddleCenter, new Color(0.76f, 0.84f, 0.88f, 0.82f));
+            rankText.fontStyle = FontStyle.Bold;
+            CreateDecorativePanel("Development Rank Rail " + rank, developmentTreeRoot, new RectTransformSpec
             {
                 anchorMin = new Vector2(0f, 1f),
                 anchorMax = new Vector2(0f, 1f),
                 pivot = new Vector2(0f, 1f),
-                anchoredPosition = new Vector2(x + DevelopmentTileWidth * 0.5f - 1f, -42f),
-                sizeDelta = new Vector2(2f, 510f)
-            }, new Color(0.32f, 0.44f, 0.50f, tier == 1 ? 0.24f : 0.12f));
+                anchoredPosition = new Vector2(railX, y - DevelopmentTileHeight * 0.5f),
+                sizeDelta = new Vector2(railWidth, 1.5f)
+            }, new Color(0.32f, 0.44f, 0.50f, rank == 1 ? 0.22f : 0.11f));
         }
 
-        List<DevelopmentBranchView> branches = BuildDevelopmentBranchViews(supplier);
         for (int i = 0; i < branches.Count; i++)
         {
             DevelopmentBranchView branch = branches[i];
-            float y = branchStartY - i * DevelopmentBranchStep;
-            Text branchText = CreateText(developmentTreeRoot, branch.displayName, 13, new Vector2(14f, y + 2f), new Vector2(92f, 28f), TextAnchor.MiddleLeft, new Color(0.90f, 0.78f, 0.56f, 0.94f));
+            float x = gridX + i * DevelopmentBranchStep;
+            Text branchText = CreateText(developmentTreeRoot, ShortenButtonLabel(branch.displayName, 17), 14, new Vector2(x, branchHeaderY), new Vector2(DevelopmentTileWidth, 30f), TextAnchor.MiddleCenter, new Color(0.90f, 0.78f, 0.56f, 0.86f));
             branchText.fontStyle = FontStyle.Bold;
-
-            for (int tier = 2; tier <= DevelopmentTreeTierCount; tier++)
-            {
-                CreatePanel("Development Empty Slot " + branch.branchId + " " + tier, developmentTreeRoot, new RectTransformSpec
-                {
-                    anchorMin = new Vector2(0f, 1f),
-                    anchorMax = new Vector2(0f, 1f),
-                    pivot = new Vector2(0f, 1f),
-                    anchoredPosition = new Vector2(gridX + (tier - 1) * DevelopmentTierStep, y),
-                    sizeDelta = new Vector2(DevelopmentTileWidth, DevelopmentTileHeight)
-                }, new Color(0.10f, 0.13f, 0.15f, 0.24f));
-            }
         }
 
         Dictionary<string, Vector2> centersByShip = new Dictionary<string, Vector2>(StringComparer.OrdinalIgnoreCase);
-        Vector2 starterTopLeft = new Vector2(gridX, starterY);
+        float starterX = gridX + Mathf.Max(0f, (branches.Count - 1) * DevelopmentBranchStep) * 0.5f;
+        Vector2 starterTopLeft = new Vector2(starterX, rankOneY);
+        string starterShipId = supplier.starterShip != null ? supplier.starterShip.shipId : "pioneer";
+        centersByShip[starterShipId] = GetDevelopmentTileCenter(starterTopLeft);
         centersByShip["pioneer"] = GetDevelopmentTileCenter(starterTopLeft);
 
         for (int i = 0; i < branches.Count; i++)
@@ -2905,7 +4235,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             for (int j = 0; j < branch.ships.Count; j++)
             {
                 ShipTreeEntryConfig ship = branch.ships[j];
-                Vector2 topLeft = new Vector2(gridX + (Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount) - 1) * DevelopmentTierStep, branchStartY - i * DevelopmentBranchStep);
+                int rank = Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount);
+                Vector2 topLeft = new Vector2(gridX + i * DevelopmentBranchStep, GetDevelopmentRankY(rankOneY, rank));
                 centersByShip[ship.shipId] = GetDevelopmentTileCenter(topLeft);
             }
         }
@@ -2944,7 +4275,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             for (int j = 0; j < branch.ships.Count; j++)
             {
                 ShipTreeEntryConfig ship = branch.ships[j];
-                Vector2 topLeft = new Vector2(gridX + (Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount) - 1) * DevelopmentTierStep, branchStartY - i * DevelopmentBranchStep);
+                int rank = Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount);
+                Vector2 topLeft = new Vector2(gridX + i * DevelopmentBranchStep, GetDevelopmentRankY(rankOneY, rank));
                 CreateDevelopmentShipTile(topLeft, ship);
                 developmentWindowTileCount++;
             }
@@ -3012,8 +4344,22 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return tierComparison != 0 ? tierComparison : string.Compare(left.shipId, right.shipId, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static int CompareDevelopmentSuppliers(DevelopmentSupplierView left, DevelopmentSupplierView right)
+    {
+        if (left == null && right == null) return 0;
+        if (left == null) return -1;
+        if (right == null) return 1;
+
+        int orderComparison = GetDevelopmentFactionOrder(left.factionId).CompareTo(GetDevelopmentFactionOrder(right.factionId));
+        return orderComparison != 0 ? orderComparison : string.Compare(left.displayName, right.displayName, StringComparison.OrdinalIgnoreCase);
+    }
+
     private void CreateDevelopmentStarterTile(Vector2 topLeft, DevelopmentSupplierView supplier)
     {
+        ShipTreeEntryConfig starter = supplier != null ? supplier.starterShip : null;
+        bool selected = starter != null && string.Equals(starter.shipId, selectedDevelopmentShipId, StringComparison.OrdinalIgnoreCase);
+        Color normalColor = new Color(0.085f, 0.105f, 0.120f, 0.98f);
+        Color selectedColor = new Color(0.145f, 0.160f, 0.172f, 1f);
         RectTransform tile = CreatePanel("Development Starter Tile", developmentTreeRoot, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
@@ -3021,25 +4367,49 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             pivot = new Vector2(0f, 1f),
             anchoredPosition = topLeft,
             sizeDelta = new Vector2(DevelopmentTileWidth, DevelopmentTileHeight)
-        }, new Color(0.12f, 0.15f, 0.17f, 0.98f));
-        tile.gameObject.AddComponent<Outline>().effectColor = new Color(0.92f, 0.74f, 0.36f, 0.65f);
+        }, selected ? selectedColor : normalColor);
 
-        CreatePanel("Starter Shape", tile, new RectTransformSpec
+        Image tileImage = tile.GetComponent<Image>();
+        string starterId = starter != null ? starter.shipId : "pioneer";
+        InstallDevelopmentTreePanHandler(tile);
+
+        if (starter != null)
+        {
+            Button button = tile.gameObject.AddComponent<Button>();
+            button.targetGraphic = tileImage;
+            button.transition = Selectable.Transition.None;
+            button.onClick.AddListener(() => SelectDevelopmentShip(starterId));
+            AddDevelopmentTilePointerEvents(tile, starterId);
+        }
+
+        Outline outline = tile.gameObject.AddComponent<Outline>();
+        outline.effectColor = selected ? Color.white : new Color(0.92f, 0.74f, 0.36f, 0.65f);
+        outline.effectDistance = selected ? new Vector2(2f, -2f) : new Vector2(1f, -1f);
+        RegisterDevelopmentTile(starterId, tileImage, outline, normalColor, selectedColor, new Color(0.92f, 0.74f, 0.36f, 0.65f));
+
+        CreateDecorativePanel("Starter Empty Image", tile, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
             pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(8f, -10f),
-            sizeDelta = new Vector2(30f, 30f)
-        }, supplier != null ? supplier.color : new Color(0.58f, 0.64f, 0.68f, 1f));
+            anchoredPosition = new Vector2(12f, -28f),
+            sizeDelta = new Vector2(126f, 32f)
+        }, new Color(0.10f, 0.13f, 0.15f, 0.92f));
 
-        Text label = CreateText(tile, "START\nPioneer", 12, new Vector2(44f, -7f), new Vector2(56f, 42f), TextAnchor.MiddleLeft, new Color(0.96f, 0.90f, 0.72f, 1f));
+        Text rank = CreateText(tile, "I", 15, new Vector2(12f, -4f), new Vector2(42f, 22f), TextAnchor.MiddleLeft, new Color(0.92f, 0.92f, 0.86f, 1f));
+        rank.fontStyle = FontStyle.Bold;
+
+        string starterName = starter != null ? starter.DisplayNameRu : "ПИОНЕР";
+        Text label = CreateText(tile, ShortenButtonLabel(starterName, 18).ToUpperInvariant(), 14, new Vector2(12f, -54f), new Vector2(126f, 22f), TextAnchor.MiddleRight, supplier != null ? supplier.color : new Color(0.96f, 0.90f, 0.72f, 1f));
         label.fontStyle = FontStyle.Bold;
     }
 
     private void CreateDevelopmentShipTile(Vector2 topLeft, ShipTreeEntryConfig ship)
     {
         Color baseColor = ship != null ? ship.visualColor : Color.white;
+        bool selected = ship != null && string.Equals(ship.shipId, selectedDevelopmentShipId, StringComparison.OrdinalIgnoreCase);
+        Color normalColor = new Color(0.065f, 0.078f, 0.092f, 0.98f);
+        Color selectedColor = new Color(0.145f, 0.160f, 0.172f, 1f);
         RectTransform tile = CreatePanel("Development Ship Tile " + (ship != null ? ship.shipId : "empty"), developmentTreeRoot, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
@@ -3047,40 +4417,187 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             pivot = new Vector2(0f, 1f),
             anchoredPosition = topLeft,
             sizeDelta = new Vector2(DevelopmentTileWidth, DevelopmentTileHeight)
-        }, new Color(0.075f, 0.090f, 0.105f, 0.98f));
+        }, selected ? selectedColor : normalColor);
+
+        Image tileImage = tile.GetComponent<Image>();
+        InstallDevelopmentTreePanHandler(tile);
+
+        if (ship != null)
+        {
+            Button button = tile.gameObject.AddComponent<Button>();
+            button.targetGraphic = tileImage;
+            button.transition = Selectable.Transition.None;
+            string shipId = ship.shipId;
+            button.onClick.AddListener(() => SelectDevelopmentShip(shipId));
+            AddDevelopmentTilePointerEvents(tile, shipId);
+        }
 
         Outline outline = tile.gameObject.AddComponent<Outline>();
-        outline.effectColor = new Color(baseColor.r, baseColor.g, baseColor.b, ship != null && ship.HasRuntimeHull ? 0.92f : 0.42f);
-        outline.effectDistance = ship != null && ship.HasRuntimeHull ? new Vector2(2f, -2f) : new Vector2(1f, -1f);
+        outline.effectColor = selected ? Color.white : new Color(baseColor.r, baseColor.g, baseColor.b, ship != null && ship.HasRuntimeHull ? 0.82f : 0.38f);
+        outline.effectDistance = selected ? new Vector2(2f, -2f) : new Vector2(1f, -1f);
+        if (ship != null)
+        {
+            RegisterDevelopmentTile(ship.shipId, tileImage, outline, normalColor, selectedColor, new Color(baseColor.r, baseColor.g, baseColor.b, ship.HasRuntimeHull ? 0.82f : 0.38f));
+        }
 
-        CreatePanel("Ship Placeholder Square", tile, new RectTransformSpec
+        CreateDecorativePanel("Ship Empty Image", tile, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
             pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(8f, -10f),
-            sizeDelta = new Vector2(30f, 30f)
-        }, baseColor);
+            anchoredPosition = new Vector2(12f, -28f),
+            sizeDelta = new Vector2(126f, 32f)
+        }, new Color(baseColor.r * 0.25f, baseColor.g * 0.25f, baseColor.b * 0.25f, 0.92f));
 
         string tierText = ship != null ? FormatRomanTier(Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount)) : "";
-        Text tier = CreateText(tile, tierText, 10, new Vector2(8f, -40f), new Vector2(30f, 14f), TextAnchor.MiddleCenter, new Color(0.08f, 0.10f, 0.12f, 1f));
+        Text tier = CreateText(tile, tierText, 15, new Vector2(12f, -4f), new Vector2(42f, 22f), TextAnchor.MiddleLeft, new Color(0.92f, 0.92f, 0.86f, 1f));
         tier.fontStyle = FontStyle.Bold;
 
-        string name = ship != null ? ShortenButtonLabel(ship.DisplayNameRu, 16) : "";
-        Text nameText = CreateText(tile, name, 11, new Vector2(44f, -6f), new Vector2(58f, 28f), TextAnchor.UpperLeft, new Color(0.91f, 0.94f, 0.90f, 1f));
+        string name = ship != null ? ShortenButtonLabel(ship.DisplayNameRu, 18).ToUpperInvariant() : "";
+        Text nameText = CreateText(tile, name, 14, new Vector2(12f, -54f), new Vector2(126f, 22f), TextAnchor.MiddleRight, new Color(0.91f, 0.94f, 0.90f, 1f));
         nameText.fontStyle = FontStyle.Bold;
+    }
 
-        string cost = ship != null ? ship.costAmount.ToString(CultureInfo.InvariantCulture) + " " + ship.costCurrencyItemId : "";
-        CreateText(tile, cost, 10, new Vector2(44f, -34f), new Vector2(58f, 16f), TextAnchor.UpperLeft, new Color(0.78f, 0.82f, 0.72f, 0.92f));
+    public static bool IsHudPointerCaptureActiveForCamera => hudPointerCaptureActiveForCamera;
+
+    private void InstallDevelopmentTreePanHandler(RectTransform target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        DevelopmentTreeMousePanHandler handler = target.gameObject.GetComponent<DevelopmentTreeMousePanHandler>();
+        if (handler == null)
+        {
+            handler = target.gameObject.AddComponent<DevelopmentTreeMousePanHandler>();
+        }
+
+        handler.owner = this;
+    }
+
+    private void SetDevelopmentTreePointerCapture(bool active)
+    {
+        hudPointerCaptureActiveForCamera = active;
+    }
+
+    private void PanDevelopmentTreeScroll(Vector2 pointerDelta)
+    {
+        if (developmentTreeScrollRect == null || developmentTreeRoot == null || developmentTreeViewport == null)
+        {
+            return;
+        }
+
+        Rect viewportRect = developmentTreeViewport.rect;
+        Rect contentRect = developmentTreeRoot.rect;
+        float horizontalRange = contentRect.width - viewportRect.width;
+        if (horizontalRange > 1f)
+        {
+            developmentTreeScrollRect.horizontalNormalizedPosition = Mathf.Clamp01(
+                developmentTreeScrollRect.horizontalNormalizedPosition - pointerDelta.x / horizontalRange);
+        }
+
+        float verticalRange = contentRect.height - viewportRect.height;
+        if (verticalRange > 1f)
+        {
+            developmentTreeScrollRect.verticalNormalizedPosition = Mathf.Clamp01(
+                developmentTreeScrollRect.verticalNormalizedPosition - pointerDelta.y / verticalRange);
+        }
+    }
+
+    private void RegisterDevelopmentTile(string shipId, Image image, Outline outline, Color normalColor, Color selectedColor, Color normalOutlineColor)
+    {
+        if (string.IsNullOrWhiteSpace(shipId) || image == null || outline == null)
+        {
+            return;
+        }
+
+        developmentShipTilesById[shipId] = new DevelopmentShipTileView
+        {
+            shipId = shipId,
+            image = image,
+            outline = outline,
+            normalColor = normalColor,
+            selectedColor = selectedColor,
+            normalOutlineColor = normalOutlineColor
+        };
+    }
+
+    private void AddDevelopmentTilePointerEvents(RectTransform tile, string shipId)
+    {
+        if (tile == null || string.IsNullOrWhiteSpace(shipId))
+        {
+            return;
+        }
+
+        EventTrigger trigger = tile.gameObject.GetComponent<EventTrigger>();
+        if (trigger == null)
+        {
+            trigger = tile.gameObject.AddComponent<EventTrigger>();
+        }
+
+        AddTrigger(trigger, EventTriggerType.PointerEnter, () => SetDevelopmentHoveredShip(shipId));
+        AddTrigger(trigger, EventTriggerType.PointerExit, () => SetDevelopmentHoveredShip(""));
+    }
+
+    private void SetDevelopmentHoveredShip(string shipId)
+    {
+        string normalized = shipId ?? "";
+        if (string.Equals(hoveredDevelopmentShipId, normalized, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        hoveredDevelopmentShipId = normalized;
+        RefreshDevelopmentTileVisuals();
+    }
+
+    private void RefreshDevelopmentTileVisuals()
+    {
+        foreach (KeyValuePair<string, DevelopmentShipTileView> pair in developmentShipTilesById)
+        {
+            DevelopmentShipTileView tile = pair.Value;
+            if (tile == null || tile.image == null || tile.outline == null)
+            {
+                continue;
+            }
+
+            bool selected = string.Equals(tile.shipId, selectedDevelopmentShipId, StringComparison.OrdinalIgnoreCase);
+            bool hovered = string.Equals(tile.shipId, hoveredDevelopmentShipId, StringComparison.OrdinalIgnoreCase);
+            if (selected)
+            {
+                tile.image.color = tile.selectedColor;
+                tile.outline.effectColor = Color.white;
+                tile.outline.effectDistance = new Vector2(2.5f, -2.5f);
+                continue;
+            }
+
+            if (hovered)
+            {
+                Color hoverColor = new Color(
+                    Mathf.Clamp01(tile.normalColor.r + tile.normalOutlineColor.r * 0.28f + 0.04f),
+                    Mathf.Clamp01(tile.normalColor.g + tile.normalOutlineColor.g * 0.28f + 0.04f),
+                    Mathf.Clamp01(tile.normalColor.b + tile.normalOutlineColor.b * 0.28f + 0.04f),
+                    1f);
+                tile.image.color = hoverColor;
+                tile.outline.effectColor = new Color(1f, 0.86f, 0.45f, 0.98f);
+                tile.outline.effectDistance = new Vector2(2f, -2f);
+                continue;
+            }
+
+            tile.image.color = tile.normalColor;
+            tile.outline.effectColor = tile.normalOutlineColor;
+            tile.outline.effectDistance = new Vector2(1f, -1f);
+        }
     }
 
     private void DrawDevelopmentConnection(Vector2 parentCenter, Vector2 childCenter, Color supplierColor)
     {
-        float midX = Mathf.Lerp(parentCenter.x, childCenter.x, 0.58f);
+        float midY = Mathf.Lerp(parentCenter.y, childCenter.y, 0.5f);
         Color color = new Color(supplierColor.r, supplierColor.g, supplierColor.b, 0.54f);
-        DrawDevelopmentLine(new Vector2(parentCenter.x, parentCenter.y), new Vector2(midX, parentCenter.y), color);
-        DrawDevelopmentLine(new Vector2(midX, parentCenter.y), new Vector2(midX, childCenter.y), color);
-        DrawDevelopmentLine(new Vector2(midX, childCenter.y), new Vector2(childCenter.x, childCenter.y), color);
+        DrawDevelopmentLine(parentCenter, new Vector2(parentCenter.x, midY), color);
+        DrawDevelopmentLine(new Vector2(parentCenter.x, midY), new Vector2(childCenter.x, midY), color);
+        DrawDevelopmentLine(new Vector2(childCenter.x, midY), childCenter, color);
     }
 
     private void DrawDevelopmentLine(Vector2 start, Vector2 end, Color color)
@@ -3090,7 +4607,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         {
             float minX = Mathf.Min(start.x, end.x);
             float width = Mathf.Max(thickness, Mathf.Abs(start.x - end.x));
-            CreatePanel("Development Connection H", developmentTreeRoot, new RectTransformSpec
+            CreateDecorativePanel("Development Connection H", developmentTreeRoot, new RectTransformSpec
             {
                 anchorMin = new Vector2(0f, 1f),
                 anchorMax = new Vector2(0f, 1f),
@@ -3103,7 +4620,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         float topY = Mathf.Max(start.y, end.y);
         float height = Mathf.Max(thickness, Mathf.Abs(start.y - end.y));
-        CreatePanel("Development Connection V", developmentTreeRoot, new RectTransformSpec
+        CreateDecorativePanel("Development Connection V", developmentTreeRoot, new RectTransformSpec
         {
             anchorMin = new Vector2(0f, 1f),
             anchorMax = new Vector2(0f, 1f),
@@ -3118,6 +4635,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return new Vector2(topLeft.x + DevelopmentTileWidth * 0.5f, topLeft.y - DevelopmentTileHeight * 0.5f);
     }
 
+    private static float GetDevelopmentRankY(float rankOneY, int rank)
+    {
+        return rankOneY - (Mathf.Clamp(rank, 1, DevelopmentTreeTierCount) - 1) * DevelopmentRankStep;
+    }
+
     private bool SelectDevelopmentSupplier(string factionId)
     {
         if (string.IsNullOrWhiteSpace(factionId))
@@ -3126,9 +4648,57 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
 
         selectedDevelopmentSupplierId = factionId;
+        selectedDevelopmentShipId = "";
+        hoveredDevelopmentShipId = "";
         developmentWindowLayoutKey = "";
         RefreshState(true);
         return true;
+    }
+
+    private bool SelectDevelopmentShip(string shipId)
+    {
+        if (string.IsNullOrWhiteSpace(shipId))
+        {
+            return false;
+        }
+
+        selectedDevelopmentShipId = shipId;
+        hoveredDevelopmentShipId = "";
+        RefreshDevelopmentTileVisuals();
+        RefreshState(true);
+        return true;
+    }
+
+    private bool HandleDevelopmentBuyShip(string shipId)
+    {
+        if (string.IsNullOrWhiteSpace(shipId))
+        {
+            statusMessage = "Корабль не выбран.";
+            RefreshState(true);
+            return false;
+        }
+
+        MetaGameState currentMeta = ResolveMeta();
+        if (currentMeta == null)
+        {
+            statusMessage = "Мета-состояние не найдено.";
+            RefreshState(true);
+            return false;
+        }
+
+        bool success = currentMeta.TryBuyDevelopmentShipToDock(shipId, out statusMessage);
+        if (success)
+        {
+            if (hudWindows.TryGetValue(WindowDevelopmentId, out HudWindow development) && development != null)
+            {
+                development.SetOpen(false);
+            }
+
+            metaScreenMode = MetaScreenMode.Dock;
+        }
+
+        RefreshState(true);
+        return success;
     }
 
     private DevelopmentSupplierView FindDevelopmentSupplier(List<DevelopmentSupplierView> suppliers, string factionId)
@@ -3149,6 +4719,478 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return null;
     }
 
+    private void EnsureDevelopmentSelectedShip(DevelopmentSupplierView supplier)
+    {
+        if (supplier == null)
+        {
+            selectedDevelopmentShipId = "";
+            return;
+        }
+
+        if (FindDevelopmentShip(supplier, selectedDevelopmentShipId) != null)
+        {
+            return;
+        }
+
+        ShipTreeEntryConfig firstShip = FindFirstDevelopmentShip(supplier);
+        selectedDevelopmentShipId = firstShip != null ? firstShip.shipId : "";
+    }
+
+    private ShipTreeEntryConfig FindDevelopmentShip(DevelopmentSupplierView supplier, string shipId)
+    {
+        if (supplier == null || string.IsNullOrWhiteSpace(shipId))
+        {
+            return null;
+        }
+
+        if (supplier.starterShip != null && string.Equals(supplier.starterShip.shipId, shipId, StringComparison.OrdinalIgnoreCase))
+        {
+            return supplier.starterShip;
+        }
+
+        for (int i = 0; i < supplier.ships.Count; i++)
+        {
+            ShipTreeEntryConfig ship = supplier.ships[i];
+            if (ship != null && string.Equals(ship.shipId, shipId, StringComparison.OrdinalIgnoreCase))
+            {
+                return ship;
+            }
+        }
+
+        return null;
+    }
+
+    private ShipTreeEntryConfig FindFirstDevelopmentShip(DevelopmentSupplierView supplier)
+    {
+        if (supplier != null && supplier.starterShip != null)
+        {
+            return supplier.starterShip;
+        }
+
+        if (supplier == null || supplier.ships.Count == 0)
+        {
+            return null;
+        }
+
+        ShipTreeEntryConfig best = null;
+        for (int i = 0; i < supplier.ships.Count; i++)
+        {
+            ShipTreeEntryConfig ship = supplier.ships[i];
+            if (ship == null)
+            {
+                continue;
+            }
+
+            if (best == null || CompareDevelopmentShips(ship, best) < 0)
+            {
+                best = ship;
+            }
+        }
+
+        return best;
+    }
+
+    private void BuildDevelopmentShipDetails(DevelopmentSupplierView supplier)
+    {
+        if (developmentDetailsRoot == null)
+        {
+            return;
+        }
+
+        ClearChildren(developmentDetailsRoot);
+        ShipTreeEntryConfig ship = FindDevelopmentShip(supplier, selectedDevelopmentShipId) ?? FindFirstDevelopmentShip(supplier);
+        developmentDetailsShipId = ship != null ? ship.shipId : "";
+        if (ship == null)
+        {
+            CreateText(developmentDetailsRoot, "Корабль не выбран.", 16, new Vector2(18f, -18f), new Vector2(300f, 34f), TextAnchor.MiddleLeft, new Color(0.86f, 0.84f, 0.76f, 1f));
+            return;
+        }
+
+        Color color = ship.visualColor;
+        CreatePanel("Development Details Accent", developmentDetailsRoot, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(0f, 0f),
+            sizeDelta = new Vector2(DevelopmentDetailsWidth, 4f)
+        }, new Color(color.r, color.g, color.b, 0.85f));
+
+        Text title = CreateText(developmentDetailsRoot,
+            FormatRomanTier(Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount)) + " " + ShortenButtonLabel(ship.DisplayNameRu, 22).ToUpperInvariant(),
+            22,
+            new Vector2(18f, -18f),
+            new Vector2(300f, 32f),
+            TextAnchor.MiddleLeft,
+            new Color(0.95f, 0.90f, 0.78f, 1f));
+        title.fontStyle = FontStyle.Bold;
+
+        CreateText(developmentDetailsRoot,
+            GetDevelopmentRoleText(ship),
+            15,
+            new Vector2(20f, -54f),
+            new Vector2(294f, 24f),
+            TextAnchor.MiddleLeft,
+            new Color(0.70f, 0.78f, 0.78f, 0.95f));
+
+        float y = -96f;
+        y = AddDevelopmentStatRow(developmentDetailsRoot, "Живучесть", GetDevelopmentDefenseRating(ship), y, color);
+        y = AddDevelopmentStatRow(developmentDetailsRoot, "Мобильность", GetDevelopmentMobilityRating(ship), y, color);
+        y = AddDevelopmentStatRow(developmentDetailsRoot, "Маскировка", GetDevelopmentStealthRating(ship), y, color);
+        y = AddDevelopmentCargoCapacityRow(developmentDetailsRoot, ship, y);
+
+        y -= 12f;
+        CreatePanel("Development Details Divider", developmentDetailsRoot, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(18f, y),
+            sizeDelta = new Vector2(298f, 1.5f)
+        }, new Color(0.26f, 0.34f, 0.36f, 0.76f));
+        y -= 24f;
+
+        y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Вооружение", GetDevelopmentWarfareRating(ship), y, color);
+        y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Добыча руды", ship.miningRating, y, color);
+        y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Сбор облаков", ship.harvestingRating, y, color);
+        y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Охота", ship.huntingRating, y, color);
+        y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Взлом", ship.hackingRating, y, color);
+        y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Сальваж", ship.salvageRating, y, color);
+        y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Сканирование", ship.surveyRating, y, color);
+        y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Ремонт", ship.repairRating, y, color);
+
+        if (!HasExplicitActivityRatings(ship))
+        {
+            y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Груз", ship.cargo, y, color);
+            y = AddDevelopmentActivityStatRow(developmentDetailsRoot, "Утилитарность", ship.utility, y, color);
+        }
+
+        y = Mathf.Min(y - 18f, -520f);
+        CreateText(developmentDetailsRoot, "Исследование:", 16, new Vector2(20f, y), new Vector2(150f, 24f), TextAnchor.MiddleLeft, new Color(0.82f, 0.86f, 0.82f, 1f));
+        CreateText(developmentDetailsRoot, FormatMetaResourceAmount(GetDevelopmentResearchCost(ship)) + " опыта", 16, new Vector2(164f, y), new Vector2(150f, 24f), TextAnchor.MiddleRight, new Color(0.95f, 0.90f, 0.74f, 1f));
+        y -= 32f;
+        CreateText(developmentDetailsRoot, "Покупка:", 16, new Vector2(20f, y), new Vector2(150f, 24f), TextAnchor.MiddleLeft, new Color(0.82f, 0.86f, 0.82f, 1f));
+        CreateText(developmentDetailsRoot, FormatMetaResourceAmount(ship.costAmount) + " фрахтов", 16, new Vector2(164f, y), new Vector2(150f, 24f), TextAnchor.MiddleRight, new Color(0.95f, 0.90f, 0.74f, 1f));
+
+        y -= 42f;
+        Text buyText = CreateButton(developmentDetailsRoot, "Development Buy Ship To Dock", new Vector2(20f, y), new Vector2(296f, 38f), () => HandleDevelopmentBuyShip(ship.shipId), out _);
+        SetText(buyText, "КУПИТЬ В ДОК");
+        buyText.fontStyle = FontStyle.Bold;
+
+        string lore = ship.LoreDisplayRu;
+        if (!string.IsNullOrWhiteSpace(lore))
+        {
+            y -= 42f;
+            CreatePanel("Development Lore Divider", developmentDetailsRoot, new RectTransformSpec
+            {
+                anchorMin = new Vector2(0f, 1f),
+                anchorMax = new Vector2(0f, 1f),
+                pivot = new Vector2(0f, 1f),
+                anchoredPosition = new Vector2(18f, y + 10f),
+                sizeDelta = new Vector2(298f, 1.5f)
+            }, new Color(0.26f, 0.34f, 0.36f, 0.76f));
+
+            Text loreText = CreateText(developmentDetailsRoot, lore, 14, new Vector2(20f, y), new Vector2(296f, 220f), TextAnchor.UpperLeft, new Color(0.78f, 0.82f, 0.76f, 0.96f));
+            loreText.lineSpacing = 1.05f;
+        }
+    }
+
+    private float AddDevelopmentActivityStatRow(RectTransform parent, string label, int value, float y, Color color)
+    {
+        if (value <= 0)
+        {
+            return y;
+        }
+
+        return AddDevelopmentStatRow(parent, label, value, y, color);
+    }
+
+    private float AddDevelopmentCargoCapacityRow(RectTransform parent, ShipTreeEntryConfig ship, float y)
+    {
+        if (ship == null || ship.cargoCapacityTons <= 0f)
+        {
+            return y;
+        }
+
+        CreateText(parent, "Грузоподъёмность", 14, new Vector2(20f, y), new Vector2(176f, 22f), TextAnchor.MiddleLeft, new Color(0.88f, 0.88f, 0.82f, 1f));
+        Text valueText = CreateText(parent, FormatCargoCapacityTons(ship.cargoCapacityTons), 16, new Vector2(204f, y), new Vector2(112f, 22f), TextAnchor.MiddleRight, new Color(0.94f, 0.90f, 0.78f, 1f));
+        valueText.fontStyle = FontStyle.Bold;
+        return y - 30f;
+    }
+
+    private float AddDevelopmentStatRow(RectTransform parent, string label, int value, float y, Color color)
+    {
+        int clamped = Mathf.Clamp(value, 0, 100);
+        CreateText(parent, label, 15, new Vector2(20f, y), new Vector2(122f, 22f), TextAnchor.MiddleLeft, new Color(0.88f, 0.88f, 0.82f, 1f));
+        RectTransform bar = CreatePanel("Development Stat Bar " + label, parent, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = new Vector2(142f, y - 7f),
+            sizeDelta = new Vector2(122f, 8f)
+        }, new Color(0.060f, 0.076f, 0.082f, 0.96f));
+
+        CreatePanel("Development Stat Fill " + label, bar, new RectTransformSpec
+        {
+            anchorMin = new Vector2(0f, 1f),
+            anchorMax = new Vector2(0f, 1f),
+            pivot = new Vector2(0f, 1f),
+            anchoredPosition = Vector2.zero,
+            sizeDelta = new Vector2(122f * (clamped / 100f), 8f)
+        }, new Color(Mathf.Clamp01(color.r * 0.70f + 0.10f), Mathf.Clamp01(color.g * 0.70f + 0.18f), Mathf.Clamp01(color.b * 0.70f + 0.22f), 0.96f));
+
+        Text valueText = CreateText(parent, clamped.ToString(CultureInfo.InvariantCulture), 16, new Vector2(270f, y), new Vector2(46f, 22f), TextAnchor.MiddleRight, new Color(0.94f, 0.90f, 0.78f, 1f));
+        valueText.fontStyle = FontStyle.Bold;
+        return y - 30f;
+    }
+
+    private static string GetDevelopmentFactionDisplayName(string factionId, string fallback)
+    {
+        switch ((factionId ?? "").Trim().ToLowerInvariant())
+        {
+            case "capital":
+            case "imperial":
+            case "empire":
+                return "Империя";
+            case "wind_houses":
+            case "windhouse":
+                return "Ветровые Дома";
+            case "mist_synod":
+            case "gas_synod":
+                return "Туманный Синод";
+            case "stone_vault":
+                return "Каменный Свод";
+            case "factory_ark":
+            case "clockwork_ark":
+                return "Заводные Ковчеги";
+            case "devourers":
+            case "devourer":
+                return "Пожиратели";
+            default:
+                return string.IsNullOrWhiteSpace(fallback) ? factionId : fallback;
+        }
+    }
+
+    private static int GetDevelopmentFactionOrder(string factionId)
+    {
+        switch ((factionId ?? "").Trim().ToLowerInvariant())
+        {
+            case "capital":
+            case "imperial":
+            case "empire":
+                return 0;
+            case "wind_houses":
+            case "windhouse":
+                return 1;
+            case "mist_synod":
+            case "gas_synod":
+                return 2;
+            case "stone_vault":
+                return 3;
+            case "factory_ark":
+            case "clockwork_ark":
+                return 4;
+            case "devourers":
+            case "devourer":
+                return 5;
+            default:
+                return 100;
+        }
+    }
+
+    private static string GetDevelopmentRoleText(ShipTreeEntryConfig ship)
+    {
+        if (ship == null)
+        {
+            return "";
+        }
+
+        string shipClass = GetDevelopmentClassName(ship.shipClassId, ship.ClassDisplayNameRu);
+        string role = GetDevelopmentRoleName(ship.roleId, ship.roleNameRu);
+        return string.IsNullOrWhiteSpace(role) ? shipClass : shipClass + " · " + role;
+    }
+
+    private static string GetDevelopmentClassName(string classId, string fallback)
+    {
+        switch ((classId ?? "").Trim().ToLowerInvariant())
+        {
+            case "prototype":
+                return "Стартовый корабль";
+            case "destroyer":
+            case "frigate":
+                return "Фрегат";
+            case "cruiser":
+                return "Крейсер";
+            case "battleship":
+                return "Линкор";
+            default:
+                return string.IsNullOrWhiteSpace(fallback) ? classId : fallback;
+        }
+    }
+
+    private static string GetDevelopmentRoleName(string roleId, string fallback)
+    {
+        switch ((roleId ?? "").Trim().ToLowerInvariant())
+        {
+            case "starter_universal": return "стартовый";
+            case "screen": return "экран";
+            case "raider": return "рейдер";
+            case "escort": return "эскорт";
+            case "interceptor": return "перехват";
+            case "patrol": return "патруль";
+            case "scout": return "разведка";
+            case "logistics": return "логистика";
+            case "cargo": return "грузовой";
+            case "artillery": return "артиллерия";
+            case "assault": return "штурм";
+            case "industrial": return "промышленный";
+            case "expedition": return "экспедиционный";
+            case "line": return "линейный";
+            case "platform": return "платформа";
+            case "starter": return "стартовый";
+            case "combat": return "боевой";
+            case "recon": return "разведка";
+            case "light_recon": return "легкая разведка";
+            case "light_research": return "исследователь";
+            case "light_interceptor": return "легкий перехват";
+            case "torpedo_recon": return "торпедная разведка";
+            case "repair": return "ремонт";
+            case "harpoon": return "гарпунный";
+            case "brawler": return "ближний бой";
+            case "ore_hauler": return "рудный грузовой";
+            case "bomb": return "бомбовый";
+            case "ripper": return "разрыватель";
+            case "leviathan_hunter": return "охота на левиафанов";
+            case "leviathan_processor": return "разделка левиафанов";
+            case "ore_tug": return "рудный буксир";
+            case "single_gun_line": return "линейная пушка";
+            case "armored_gun": return "бронированный артиллерист";
+            case "magnet_hauler": return "магнитный сборщик";
+            case "refinery": return "рудная переработка";
+            case "heavy_gun": return "тяжелая артиллерия";
+            case "ore_foundry": return "рудный завод";
+            case "siphon_scout": return "газовый сборщик";
+            case "dome_recon": return "купольная разведка";
+            case "gunline": return "пушечная линия";
+            case "toxic_cloud": return "ядовитый туман";
+            case "chemical": return "химический";
+            case "heavy_egg": return "тяжелое яйцо";
+            case "gas_combine": return "газовый комбинат";
+            case "x_ray_scout": return "X-Ray разведка";
+            case "automaton_tender": return "тендер автоматонов";
+            case "modular_survey": return "модульное исследование";
+            case "combat_ark": return "боевой ковчег";
+            case "mechanized_citadel": return "механизированная цитадель";
+            case "automaton_factory": return "фабрика автоматонов";
+            case "bomb_artillery": return "бомбовая артиллерия";
+            case "long_range_heavy": return "дальнобойный тяжелый";
+            case "heavy": return "тяжелый";
+            default:
+                return string.IsNullOrWhiteSpace(fallback) ? "" : fallback;
+        }
+    }
+
+    private static int GetDevelopmentDefenseRating(ShipTreeEntryConfig ship)
+    {
+        if (ship == null)
+        {
+            return 0;
+        }
+
+        if (ship.defenseRating >= 0)
+        {
+            return Mathf.Clamp(ship.defenseRating, 0, 100);
+        }
+
+        return Mathf.Clamp(Mathf.RoundToInt((ship.armor + ship.durability) * 0.5f), 0, 100);
+    }
+
+    private static int GetDevelopmentMobilityRating(ShipTreeEntryConfig ship)
+    {
+        if (ship == null)
+        {
+            return 0;
+        }
+
+        if (ship.mobilityRating >= 0)
+        {
+            return Mathf.Clamp(ship.mobilityRating, 0, 100);
+        }
+
+        return Mathf.Clamp(Mathf.RoundToInt((ship.speed + ship.maneuverability) * 0.5f), 0, 100);
+    }
+
+    private static int GetDevelopmentStealthRating(ShipTreeEntryConfig ship)
+    {
+        if (ship == null)
+        {
+            return 0;
+        }
+
+        if (ship.stealthRating >= 0)
+        {
+            return Mathf.Clamp(ship.stealthRating, 0, 100);
+        }
+
+        return Mathf.Clamp(Mathf.RoundToInt((ship.speed + ship.maneuverability + ship.utility) / 3f), 0, 100);
+    }
+
+    private static int GetDevelopmentWarfareRating(ShipTreeEntryConfig ship)
+    {
+        if (ship == null)
+        {
+            return 0;
+        }
+
+        return Mathf.Clamp(ship.warfareRating >= 0 ? ship.warfareRating : ship.firepower, 0, 100);
+    }
+
+    private static string FormatCargoCapacityTons(float tons)
+    {
+        if (tons >= 100f)
+        {
+            return tons.ToString("0", CultureInfo.InvariantCulture) + " т";
+        }
+
+        return tons.ToString(tons >= 10f ? "0.#" : "0.##", CultureInfo.InvariantCulture) + " т";
+    }
+
+    private static bool HasExplicitActivityRatings(ShipTreeEntryConfig ship)
+    {
+        return ship != null
+            && (ship.warfareRating >= 0
+                || ship.miningRating >= 0
+                || ship.harvestingRating >= 0
+                || ship.huntingRating >= 0
+                || ship.hackingRating >= 0
+                || ship.salvageRating >= 0
+                || ship.surveyRating >= 0
+                || ship.repairRating >= 0);
+    }
+
+    private static int GetDevelopmentResearchCost(ShipTreeEntryConfig ship)
+    {
+        if (ship == null)
+        {
+            return 0;
+        }
+
+        if (ship.researchCostAmount > 0)
+        {
+            return ship.researchCostAmount;
+        }
+
+        return Mathf.Max(0, Mathf.RoundToInt(ship.costAmount * 1.25f));
+    }
+
+    private static bool IsDevelopmentStarterEntry(ShipTreeEntryConfig entry)
+    {
+        return entry != null
+            && entry.IsDevelopmentRosterShip
+            && (entry.treeTier <= 1 || string.Equals(entry.branchId, "starter", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static string BuildDevelopmentWindowLayoutKey(List<DevelopmentSupplierView> suppliers, string selectedSupplierId)
     {
         int supplierCount = suppliers != null ? suppliers.Count : 0;
@@ -3157,7 +5199,12 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         {
             for (int i = 0; i < suppliers.Count; i++)
             {
-                shipCount += suppliers[i] != null ? suppliers[i].ships.Count : 0;
+                if (suppliers[i] == null)
+                {
+                    continue;
+                }
+
+                shipCount += suppliers[i].ships.Count + (suppliers[i].starterShip != null ? 1 : 0);
             }
         }
 
@@ -3174,7 +5221,12 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         for (int i = 0; i < suppliers.Count; i++)
         {
-            count += suppliers[i] != null ? suppliers[i].ships.Count : 0;
+            if (suppliers[i] == null)
+            {
+                continue;
+            }
+
+            count += suppliers[i].ships.Count + (suppliers[i].starterShip != null ? 1 : 0);
         }
 
         return count;
@@ -3382,22 +5434,15 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             + "\nДо края зоны: " + (sortieEstimate.hasActiveSortie ? FormatBoundaryDistance(sortieEstimate.distanceToBoundaryMeters) : "-")
             + "\nЗона: " + (zone != null ? zone.displayName : "-"));
 
-        float fuelRate = ship != null ? ship.fuelConsumptionKgPerSecond : 0f;
-        float claudiumRate = 0f;
-        bool hasReturnFuel = !sortieEstimate.hasActiveSortie || sortieEstimate.hasEnoughCoal;
-        bool hasReturnClaudium = !sortieEstimate.hasActiveSortie || sortieEstimate.hasEnoughClaudium;
         SetText(returnWindowText,
-            "Уголь: " + FormatReserveTime(sortieEstimate.currentCoalKg, fuelRate) + " осталось"
-            + "\nКлавдий: " + FormatReserveTime(sortieEstimate.currentClaudiumKg, claudiumRate) + " осталось"
-            + "\nДо базы нужно: уголь " + sortieEstimate.requiredCoalKg.ToString("0") + " кг"
-            + " | клавдий " + sortieEstimate.requiredClaudiumKg.ToString("0") + " кг"
-            + "\nВыход: " + (sortieEstimate.canExtract ? "готов" : FormatExtractionBlocker(sortieEstimate))
-            + "\nСкольжение: " + sortieEstimate.extractionRunupSeconds.ToString("0.0") + "/" + sortieEstimate.requiredExtractionRunupSeconds.ToString("0.0") + " с");
+            "Return: no coal/claudium cost"
+            + "\nTo edge: " + (sortieEstimate.hasActiveSortie ? FormatBoundaryDistance(sortieEstimate.distanceToBoundaryMeters) : "-")
+            + "\nTo base: " + sortieEstimate.distanceToBaseKm.ToString("0") + " km | ETA " + FormatHudDuration(sortieEstimate.returnTimeSeconds)
+            + "\nExit: " + (sortieEstimate.canExtract ? "ready" : FormatExtractionBlocker(sortieEstimate))
+            + "\nSlip: " + sortieEstimate.extractionRunupSeconds.ToString("0.0") + "/" + sortieEstimate.requiredExtractionRunupSeconds.ToString("0.0") + " s");
         if (returnWindowText != null)
         {
-            returnWindowText.color = hasReturnFuel && hasReturnClaudium
-                ? new Color(0.90f, 0.86f, 0.70f, 1f)
-                : new Color(1f, 0.32f, 0.24f, 1f);
+            returnWindowText.color = new Color(0.90f, 0.86f, 0.70f, 1f);
         }
 
         SetText(shipWindowText,
@@ -3537,9 +5582,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private void RefreshModulesWindow(ShipPhysics ship, WildWindFlightControlBridge controls, string resourceId, PlayerProgress progress)
     {
-        string activeBur = "БУР: " + (ship != null ? "готов " + MakeAsciiBar(0.63f, 10) : "-");
-        string activeWeapon = "ОРУЖИЕ: " + (progress != null ? progress.GetShipCargoAmount(SessionExtractionConstants.StarterWeaponCargoItemId) + " ед." : "-");
-        string passive = "Пассивные: ГРУЗ | БРОНЯ | ДВИГ | РИГ";
+        string activeBur = "CRUSHER: " + (ship != null ? "ready " + MakeAsciiBar(0.63f, 10) : "-");
+        string activeWeapon = "WEAPONS: " + (progress != null ? progress.GetShipCargoAmount(SessionExtractionConstants.StarterWeaponCargoItemId) + " units" : "-");
+        string passive = "BUILT-IN: guns | crusher | sensors | hold";
         SetText(modulesWindowText, activeBur + "\n" + activeWeapon + "\n" + passive);
     }
 
@@ -3607,10 +5652,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             + "/"
             + sortieEstimate.requiredExtractionRunupSeconds.ToString("0.0")
             + "s");
-        SetText(sortieReservesText, "Reserves: coal "
-            + FormatReserve(sortieEstimate.currentCoalKg, sortieEstimate.requiredCoalKg)
-            + " | claudium "
-            + FormatReserve(sortieEstimate.currentClaudiumKg, sortieEstimate.requiredClaudiumKg));
+        SetText(sortieReservesText, "Autonomy: built-in systems | no coal/claudium cost");
         SetText(sortieCargoText, "Cargo: "
             + resourceName
             + " "
@@ -3638,9 +5680,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         if (sortieReservesText != null)
         {
-            sortieReservesText.color = sortieEstimate.hasEnoughCoal && sortieEstimate.hasEnoughClaudium
-                ? new Color(0.84f, 0.90f, 0.76f, 1f)
-                : warningColor;
+            sortieReservesText.color = new Color(0.84f, 0.90f, 0.76f, 1f);
         }
 
         if (sortieStatusDetailText != null)
@@ -4294,9 +6334,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         if (!estimate.hasActiveSortie) return "no sortie";
         if (!estimate.isAboveStorm) return "storm layer";
         if (estimate.isInsideCylinder) return "leave cylinder";
-        if (!estimate.hasEnoughCoal && !estimate.hasEnoughClaudium) return "reserve short";
-        if (!estimate.hasEnoughCoal) return "coal short";
-        if (!estimate.hasEnoughClaudium) return "claudium short";
         if (!estimate.hasExtractionRunup) return "hold slip " + estimate.missingExtractionRunupSeconds.ToString("0.0") + "s";
         return "blocked";
     }
@@ -4461,6 +6498,25 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
     }
 
+    private static void MakeInvisibleHitboxLayer(RectTransform layer)
+    {
+        if (layer == null)
+        {
+            return;
+        }
+
+        CanvasGroup group = layer.GetComponent<CanvasGroup>();
+        if (group == null)
+        {
+            group = layer.gameObject.AddComponent<CanvasGroup>();
+        }
+
+        group.alpha = 0f;
+        group.interactable = true;
+        group.blocksRaycasts = true;
+        group.ignoreParentGroups = false;
+    }
+
     private static bool TryReadCoordinate(InputField input, out float value)
     {
         value = 0f;
@@ -4580,6 +6636,61 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return cachedCircleSprite;
     }
 
+    private static Sprite GetRoundedPanelSprite()
+    {
+        if (cachedRoundedPanelSprite == null)
+        {
+            cachedRoundedPanelSprite = CreateRoundedSprite("Port Rounded Panel Sprite", 96, 22f, 28f);
+        }
+
+        return cachedRoundedPanelSprite;
+    }
+
+    private static Sprite GetRoundedSmallSprite()
+    {
+        if (cachedRoundedSmallSprite == null)
+        {
+            cachedRoundedSmallSprite = CreateRoundedSprite("Port Rounded Small Sprite", 80, 14f, 22f);
+        }
+
+        return cachedRoundedSmallSprite;
+    }
+
+    private static Sprite CreateRoundedSprite(string spriteName, int size, float radius, float border)
+    {
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+        {
+            name = spriteName,
+            hideFlags = HideFlags.HideAndDontSave
+        };
+
+        Vector2 min = new Vector2(radius, radius);
+        Vector2 max = new Vector2(size - 1 - radius, size - 1 - radius);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float cx = Mathf.Clamp(x, min.x, max.x);
+                float cy = Mathf.Clamp(y, min.y, max.y);
+                float distance = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
+                float alpha = Mathf.Clamp01(radius + 0.75f - distance);
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        texture.Apply(false, true);
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, size, size),
+            new Vector2(0.5f, 0.5f),
+            size,
+            0,
+            SpriteMeshType.FullRect,
+            new Vector4(border, border, border, border));
+        sprite.name = spriteName;
+        return sprite;
+    }
+
     private static GameObject CreateRect(string name, Transform parent, RectTransformSpec spec)
     {
         GameObject gameObject = new GameObject(name, typeof(RectTransform));
@@ -4591,6 +6702,20 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         rect.anchoredPosition = spec.anchoredPosition;
         rect.sizeDelta = spec.sizeDelta;
         return gameObject;
+    }
+
+    private static void ApplyRectTransform(RectTransform rect, RectTransformSpec spec)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = spec.anchorMin;
+        rect.anchorMax = spec.anchorMax;
+        rect.pivot = spec.pivot;
+        rect.anchoredPosition = spec.anchoredPosition;
+        rect.sizeDelta = spec.sizeDelta;
     }
 
     private struct MetaResourceCounterSpec
@@ -4628,12 +6753,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         public readonly string windowId;
         public readonly string title;
         public readonly string iconText;
+        public readonly string iconResourceName;
 
-        public MetaSideButtonSpec(string windowId, string title, string iconText)
+        public MetaSideButtonSpec(string windowId, string title, string iconText, string iconResourceName)
         {
             this.windowId = windowId;
             this.title = title;
             this.iconText = iconText;
+            this.iconResourceName = iconResourceName;
         }
     }
 
@@ -4710,6 +6837,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             Vector2 size,
             bool openByDefault)
         {
+            if (TryCreateFromPrefab(owner, parent, id, title, size, openByDefault, out HudWindow prefabWindow))
+            {
+                return prefabWindow;
+            }
+
             HudWindow window = new HudWindow
             {
                 IsOpen = openByDefault
@@ -4778,6 +6910,207 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return window;
         }
 
+        private static bool TryCreateFromPrefab(
+            WildWindGameplayHud owner,
+            RectTransform parent,
+            string id,
+            string title,
+            Vector2 size,
+            bool openByDefault,
+            out HudWindow window)
+        {
+            window = null;
+            if (owner == null || parent == null)
+            {
+                return false;
+            }
+
+            GameObject prefab = Resources.Load<GameObject>(HudWindowPrefabFolderResourcePath + id);
+            if (prefab == null)
+            {
+                prefab = Resources.Load<GameObject>(HudWindowFrameResourcePath);
+            }
+
+            if (prefab == null)
+            {
+                return false;
+            }
+
+            GameObject instance = UnityEngine.Object.Instantiate(prefab, parent);
+            instance.name = "HUD Window Modal Layer " + id;
+
+            WildWindHudWindowFrame frame = instance.GetComponent<WildWindHudWindowFrame>();
+            if (frame == null)
+            {
+                frame = instance.GetComponentInChildren<WildWindHudWindowFrame>(true);
+            }
+
+            if (frame == null)
+            {
+                UnityEngine.Object.Destroy(instance);
+                return false;
+            }
+
+            frame.ResolveReferences();
+            RectTransform modalLayer = frame.ModalLayer;
+            RectTransform fadeLayer = frame.FadeLayer;
+            RectTransform windowRoot = frame.WindowRoot;
+            RectTransform headerRoot = frame.HeaderRoot;
+            RectTransform titleRoot = frame.TitleRoot;
+            RectTransform closeButtonRoot = frame.CloseButtonRoot;
+            RectTransform contentRoot = frame.ContentRoot;
+            if (modalLayer == null || fadeLayer == null || windowRoot == null || headerRoot == null || titleRoot == null || closeButtonRoot == null || contentRoot == null)
+            {
+                UnityEngine.Object.Destroy(instance);
+                return false;
+            }
+
+            window = new HudWindow
+            {
+                IsOpen = openByDefault,
+                modalLayer = modalLayer,
+                root = windowRoot,
+                content = contentRoot
+            };
+            HudWindow createdWindow = window;
+
+            ApplyRectTransform(window.modalLayer, StretchFull());
+            ApplyRectTransform(fadeLayer, StretchFull());
+            fadeLayer.SetAsFirstSibling();
+            window.root.SetAsLastSibling();
+
+            Image fadeImage = EnsureImage(fadeLayer, new Color(0f, 0f, 0f, 0.58f), true);
+            window.fadeButton = EnsureButton(fadeLayer, fadeImage);
+            window.fadeButton.transition = Selectable.Transition.None;
+            window.fadeButton.onClick.RemoveAllListeners();
+            window.fadeButton.onClick.AddListener(() => createdWindow.SetOpen(false));
+
+            window.root.name = "HUD Window " + id;
+            ApplyRectTransform(window.root, new RectTransformSpec
+            {
+                anchorMin = new Vector2(0.5f, 0.5f),
+                anchorMax = new Vector2(0.5f, 0.5f),
+                pivot = new Vector2(0.5f, 0.5f),
+                anchoredPosition = Vector2.zero,
+                sizeDelta = size
+            });
+            EnsureImage(window.root, new Color(0.014f, 0.017f, 0.021f, 0.86f), false);
+
+            ApplyRectTransform(headerRoot, new RectTransformSpec
+            {
+                anchorMin = new Vector2(0f, 1f),
+                anchorMax = new Vector2(1f, 1f),
+                pivot = new Vector2(0.5f, 1f),
+                anchoredPosition = Vector2.zero,
+                sizeDelta = new Vector2(0f, HeaderHeight)
+            });
+            EnsureImage(headerRoot, new Color(0.055f, 0.047f, 0.032f, 0.94f), false);
+
+            ApplyRectTransform(titleRoot, new RectTransformSpec
+            {
+                anchorMin = new Vector2(0f, 1f),
+                anchorMax = new Vector2(1f, 1f),
+                pivot = new Vector2(0f, 1f),
+                anchoredPosition = new Vector2(10f, -3f),
+                sizeDelta = new Vector2(-54f, 28f)
+            });
+            Text titleText = EnsureText(owner, titleRoot, title, 16, TextAnchor.MiddleLeft, new Color(0.95f, 0.82f, 0.55f, 1f));
+            titleText.fontStyle = FontStyle.Bold;
+            titleText.raycastTarget = false;
+
+            ApplyRectTransform(closeButtonRoot, new RectTransformSpec
+            {
+                anchorMin = new Vector2(1f, 1f),
+                anchorMax = new Vector2(1f, 1f),
+                pivot = new Vector2(1f, 1f),
+                anchoredPosition = new Vector2(-10f, -4f),
+                sizeDelta = new Vector2(24f, 24f)
+            });
+            Image closeImage = EnsureImage(closeButtonRoot, new Color(0.12f, 0.095f, 0.055f, 0.94f), true);
+            window.closeButton = EnsureButton(closeButtonRoot, closeImage);
+            window.closeButton.onClick.RemoveAllListeners();
+            window.closeButton.onClick.AddListener(() => createdWindow.SetOpen(false));
+            EnsureChildLabel(owner, closeButtonRoot, "x", 14, TextAnchor.MiddleCenter, new Color(0.94f, 0.84f, 0.62f, 1f));
+
+            ApplyRectTransform(window.content, StretchFull());
+            window.content.offsetMin = new Vector2(10f, 10f);
+            window.content.offsetMax = new Vector2(-10f, -HeaderHeight - 8f);
+
+            window.RefreshVisible();
+            return true;
+        }
+
+        private static Image EnsureImage(RectTransform rect, Color color, bool raycastTarget = true)
+        {
+            Image image = rect.GetComponent<Image>();
+            if (image == null)
+            {
+                image = rect.gameObject.AddComponent<Image>();
+            }
+
+            image.color = color;
+            image.raycastTarget = raycastTarget;
+            return image;
+        }
+
+        private static Button EnsureButton(RectTransform rect, Image targetGraphic)
+        {
+            Button button = rect.GetComponent<Button>();
+            if (button == null)
+            {
+                button = rect.gameObject.AddComponent<Button>();
+            }
+
+            button.targetGraphic = targetGraphic;
+            return button;
+        }
+
+        private static Text EnsureText(WildWindGameplayHud owner, RectTransform rect, string value, int fontSize, TextAnchor alignment, Color color)
+        {
+            Text text = rect.GetComponent<Text>();
+            if (text == null)
+            {
+                text = rect.gameObject.AddComponent<Text>();
+            }
+
+            text.font = GetDefaultFont();
+            text.fontSize = fontSize;
+            text.alignment = alignment;
+            text.color = color;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.alignByGeometry = true;
+            text.raycastTarget = false;
+            text.text = value ?? "";
+            return text;
+        }
+
+        private static Text EnsureChildLabel(WildWindGameplayHud owner, RectTransform parent, string value, int fontSize, TextAnchor alignment, Color color)
+        {
+            Text text = parent.GetComponentInChildren<Text>(true);
+            if (text == null)
+            {
+                text = owner.CreateText(parent, value, fontSize, Vector2.zero, parent.sizeDelta, alignment, color);
+            }
+
+            RectTransform textRect = text.GetComponent<RectTransform>();
+            if (textRect != null)
+            {
+                ApplyRectTransform(textRect, StretchFull());
+            }
+
+            text.font = GetDefaultFont();
+            text.fontSize = fontSize;
+            text.alignment = alignment;
+            text.color = color;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.alignByGeometry = true;
+            text.raycastTarget = false;
+            text.text = value ?? "";
+            return text;
+        }
+
         public void SetFlightVisible(bool visible)
         {
             flightVisible = visible;
@@ -4795,6 +7128,16 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             if (open && modalLayer != null)
             {
                 root.anchoredPosition = Vector2.zero;
+                if (fadeButton != null)
+                {
+                    fadeButton.transform.SetAsFirstSibling();
+                }
+
+                if (root != null)
+                {
+                    root.SetAsLastSibling();
+                }
+
                 modalLayer.SetAsLastSibling();
             }
 
@@ -5211,6 +7554,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         public string factionId = "";
         public string displayName = "";
         public Color color = Color.white;
+        public ShipTreeEntryConfig starterShip;
         public readonly List<ShipTreeEntryConfig> ships = new List<ShipTreeEntryConfig>();
     }
 
@@ -5220,6 +7564,78 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         public string displayName = "";
         public int treeRow;
         public readonly List<ShipTreeEntryConfig> ships = new List<ShipTreeEntryConfig>();
+    }
+
+    private sealed class DevelopmentShipTileView
+    {
+        public string shipId = "";
+        public Image image;
+        public Outline outline;
+        public Color normalColor;
+        public Color selectedColor;
+        public Color normalOutlineColor;
+    }
+
+    private sealed class DevelopmentTreeMousePanHandler : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler, IEndDragHandler
+    {
+        public WildWindGameplayHud owner;
+        private bool dragging;
+        private PointerEventData.InputButton activeButton;
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (eventData == null)
+            {
+                return;
+            }
+
+            activeButton = eventData.button;
+            dragging = true;
+            owner?.SetDevelopmentTreePointerCapture(true);
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (!dragging || eventData == null)
+            {
+                return;
+            }
+
+            owner?.PanDevelopmentTreeScroll(eventData.delta);
+            eventData.Use();
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (eventData == null || eventData.button != activeButton)
+            {
+                return;
+            }
+
+            Release();
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            Release();
+            eventData?.Use();
+        }
+
+        private void OnDisable()
+        {
+            Release();
+        }
+
+        private void Release()
+        {
+            if (!dragging)
+            {
+                return;
+            }
+
+            dragging = false;
+            owner?.SetDevelopmentTreePointerCapture(false);
+        }
     }
 
     private struct RectTransformSpec

@@ -10,17 +10,6 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     private const float HardMaxCameraDistanceMeters = 2000f;
     private const float CalibratedWheelScrollUnitsAcrossZoomRange = 0.383f;
     private const float CameraWheelEffectivenessMultiplier = 20f;
-    private const float FlightGunToStandardWheelUnits = 1.25f;
-    private const float FlightStandardToHighWheelUnits = 2.25f;
-    private const float FlightHighToScopeWheelUnits = 2f;
-    private const float FlightGunViewHeightMeters = 1.2f;
-    private const float FlightShipStandardHeightMeters = 18f;
-    private const float FlightShipStandardBackOffsetMeters = 24f;
-    private const float FlightShipHighLengthMultiplier = 2f;
-    private const float FlightCameraWideFieldOfView = 55f;
-    private const float FlightScopeReferenceRangeMeters = 20000f;
-    private const float FlightScopeScreenWidthMetersAtReferenceRange = 1000f;
-    private const float FlightScopeMinimumWheelEffectiveness = 0.2f;
 
     [SerializeField, HideInInspector] private Transform focus;
     [SerializeField, HideInInspector] private Camera sessionCamera;
@@ -47,18 +36,9 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     [SerializeField, HideInInspector, Range(0.04f, 2f)] private float flightCameraVerticalPivotSmoothSeconds = 0.62f;
     [SerializeField, HideInInspector, Range(0.04f, 2f)] private float flightCameraHeightSmoothSeconds = 0.48f;
     [SerializeField, HideInInspector, Range(0.02f, 1f)] private float flightCameraRotationSmoothSeconds = 0.14f;
-    [SerializeField, HideInInspector, Range(0.02f, 1.5f)] private float flightCameraOrbitHeadingSmoothSeconds = 0.38f;
     [SerializeField, HideInInspector] private bool rigidFlightCamera = false;
-    [SerializeField, HideInInspector, Range(0f, 45f)] private float tailAutoAlignWindowDegrees = 15f;
-    [SerializeField, HideInInspector, Range(0f, 1f)] private float tailAutoAlignDelaySeconds = 0.12f;
-    [SerializeField, HideInInspector, Range(0.02f, 1.5f)] private float tailAutoAlignSmoothSeconds = 0.24f;
-    [SerializeField, HideInInspector, Range(-20f, 80f)] private float minCameraPitchDegrees = 6f;
-    [SerializeField, HideInInspector, Range(0f, 85f)] private float maxCameraPitchDegrees = 58f;
-
-    [SerializeField, HideInInspector] private bool warshipsFlightMouseLook = true;
-    [SerializeField, HideInInspector] private bool altReleasesCursor = true;
-    [SerializeField, HideInInspector, Range(50f, 1800f)] private float flightAimLookAheadMeters = 650f;
-    [SerializeField, HideInInspector, Range(-50f, 180f)] private float flightAimVerticalOffsetMeters = 28f;
+    [SerializeField, HideInInspector, Range(-85f, 80f)] private float minCameraPitchDegrees = -80f;
+    [SerializeField, HideInInspector, Range(0f, 85f)] private float maxCameraPitchDegrees = 80f;
 
     private Vector3 uiInput;
     private float uiInputUntilTime;
@@ -75,21 +55,11 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     private bool hasSmoothedCameraOrbitPivot;
     private Vector3 smoothedCameraOrbitPivot;
     private float smoothedCameraOrbitPivotYVelocity;
-    private bool hasSmoothedCameraOrbitHeading;
-    private float smoothedCameraOrbitHeadingDegrees;
-    private float smoothedCameraOrbitHeadingVelocity;
     private float cameraHeightVelocity;
-    private bool hasCameraOrbitManualDrag;
-    private float lastCameraOrbitControlTime = -999f;
-    private float cameraOrbitTailAlignVelocity;
     private bool ownsGameplayCursor;
     private CursorLockMode storedCursorLockState;
     private bool storedCursorVisible;
     private Vector3 lastCameraAimTarget;
-    private float flightCameraWheelRouteUnits;
-    private float flightCameraWheelRoute01;
-    private bool ownsFlightCameraFieldOfView;
-    private float storedFlightCameraFieldOfView;
 
     public static bool GameplayCursorLockedForMouseLook { get; private set; }
     public static bool GameplayCursorReleasedForUi { get; private set; }
@@ -104,7 +74,6 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     public float MaximumCameraDistanceMeters => GetMaximumCameraDistanceMeters();
     public Vector3 LastCameraOrbitPivot => lastCameraOrbitPivot;
     public Vector3 LastCameraAimTarget => lastCameraAimTarget;
-    public float FlightCameraWheelRoute01 => flightCameraWheelRoute01;
 
     private void Awake()
     {
@@ -121,7 +90,6 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     private void OnDisable()
     {
         RestoreGameplayCursorStateIfOwned();
-        RestoreFlightCameraFieldOfView(true);
         GameplayMouseLookSensitivityScale = 1f;
     }
 
@@ -237,8 +205,6 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
             takeoffCameraDistanceMeters,
             GetMinimumCameraDistanceMeters(),
             GetMaximumCameraDistanceMeters());
-        flightCameraWheelRouteUnits = 0f;
-        flightCameraWheelRoute01 = 0f;
         cameraWasOrbitingPlayerShip = IsPlayerShipFlightTarget(target);
         BeginTakeoffCameraBlend();
         ApplyCamera(false, target);
@@ -258,8 +224,7 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     {
         Transform target = GetMovementTarget();
         bool shouldControl = ShouldControlGameplayCursor(target);
-        bool releaseCursor = shouldControl && altReleasesCursor && altPressed;
-        ResolveGameplayCursorState(shouldControl, releaseCursor, out lockState, out cursorVisible);
+        ResolveGameplayCursorState(shouldControl, out lockState, out cursorVisible);
         return shouldControl;
     }
 
@@ -360,13 +325,8 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     {
         InitializeCameraOrbit(GetEffectiveCameraOffset());
 
-        Vector2 dragDelta = ReadCameraOrbitDragDelta(out bool orbitControlActive);
+        Vector2 dragDelta = ReadCameraOrbitDragDelta();
         bool hasDragDelta = dragDelta.sqrMagnitude > 0.0001f;
-        if (orbitControlActive)
-        {
-            lastCameraOrbitControlTime = Time.unscaledTime;
-            cameraOrbitTailAlignVelocity = 0f;
-        }
 
         if (hasDragDelta)
         {
@@ -376,7 +336,6 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
                 cameraOrbitPitchDegrees + dragDelta.y * effectiveOrbitSensitivity,
                 minCameraPitchDegrees,
                 maxCameraPitchDegrees);
-            hasCameraOrbitManualDrag = true;
         }
 
         float scroll = ReadCameraZoomScroll();
@@ -385,8 +344,6 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
             ApplyCameraWheelZoomForTarget(movementTarget, scroll);
             UpdateGameplayMouseLookSensitivityScale(movementTarget);
         }
-
-        ApplyTailAutoAlignmentAfterOrbitInput(orbitControlActive);
     }
 
     private Vector3 GetEffectiveCameraOffset()
@@ -422,20 +379,10 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
         cameraOrbitInitialized = true;
     }
 
-    private Vector2 ReadCameraOrbitDragDelta(out bool orbitControlActive)
+    private Vector2 ReadCameraOrbitDragDelta()
     {
-        orbitControlActive = false;
-        if (ShouldUseLockedFlightMouseLook())
+        if (WildWindGameplayHud.IsHudPointerCaptureActiveForCamera)
         {
-            orbitControlActive = true;
-#if ENABLE_INPUT_SYSTEM
-            Mouse lockedMouse = Mouse.current;
-            if (lockedMouse != null)
-            {
-                return lockedMouse.delta.ReadValue();
-            }
-#endif
-
             return Vector2.zero;
         }
 
@@ -443,7 +390,6 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
         Mouse dragMouse = Mouse.current;
         if (dragMouse != null && dragMouse.rightButton.isPressed)
         {
-            orbitControlActive = true;
             return dragMouse.delta.ReadValue();
         }
 #endif
@@ -451,60 +397,13 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
         return Vector2.zero;
     }
 
-    private void ApplyTailAutoAlignmentAfterOrbitInput(bool orbitControlActive)
-    {
-        if (orbitControlActive)
-        {
-            return;
-        }
-
-        Transform target = GetMovementTarget();
-        bool isPlayerShipFlightTarget = IsPlayerShipFlightTarget(target);
-        if (!isPlayerShipFlightTarget)
-        {
-            hasCameraOrbitManualDrag = false;
-            cameraOrbitTailAlignVelocity = 0f;
-            return;
-        }
-
-        if (!hasCameraOrbitManualDrag)
-        {
-            cameraOrbitTailAlignVelocity = 0f;
-            return;
-        }
-
-        float alignWindow = Mathf.Max(0f, tailAutoAlignWindowDegrees);
-        if (alignWindow <= 0.001f ||
-            Time.unscaledTime - lastCameraOrbitControlTime < Mathf.Max(0f, tailAutoAlignDelaySeconds))
-        {
-            return;
-        }
-
-        float tailDelta = Mathf.DeltaAngle(cameraOrbitYawDegrees, 0f);
-        if (Mathf.Abs(tailDelta) > alignWindow)
-        {
-            cameraOrbitTailAlignVelocity = 0f;
-            return;
-        }
-
-        cameraOrbitYawDegrees = NormalizeDegrees(Mathf.SmoothDampAngle(
-            cameraOrbitYawDegrees,
-            0f,
-            ref cameraOrbitTailAlignVelocity,
-            Mathf.Max(0.001f, tailAutoAlignSmoothSeconds),
-            float.PositiveInfinity,
-            GetCameraDeltaTime()));
-
-        if (Mathf.Abs(Mathf.DeltaAngle(cameraOrbitYawDegrees, 0f)) <= 0.05f &&
-            Mathf.Abs(cameraOrbitTailAlignVelocity) <= 0.05f)
-        {
-            cameraOrbitYawDegrees = 0f;
-            cameraOrbitTailAlignVelocity = 0f;
-        }
-    }
-
     private float ReadCameraZoomScroll()
     {
+        if (WildWindGameplayHud.IsHudPointerCaptureActiveForCamera)
+        {
+            return 0f;
+        }
+
 #if ENABLE_INPUT_SYSTEM
         Mouse mouse = Mouse.current;
         if (mouse != null)
@@ -534,11 +433,10 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
 
         Vector3 rawOrbitPivot = GetCameraOrbitPivot(target);
         lastCameraOrbitPivot = GetSmoothedCameraOrbitPivot(target, rawOrbitPivot, snap);
-        lastCameraAimTarget = GetCameraAimTarget(target, lastCameraOrbitPivot, orbitFrame);
-        Vector3 targetPosition = IsPlayerShipFlightTarget(target)
-            ? GetFlightWheelCameraPosition(target, lastCameraOrbitPivot, lastCameraAimTarget, orbitFrame)
-            : GetOrbitCameraPosition(lastCameraOrbitPivot, orbitFrame);
-        Quaternion targetRotation = GetCameraLookRotation(targetPosition, lastCameraAimTarget);
+        Vector3 targetPosition = GetOrbitCameraPosition(lastCameraOrbitPivot, orbitFrame);
+        Vector3 targetAimTarget = GetCameraAimTarget(target, lastCameraOrbitPivot, targetPosition, orbitFrame);
+        lastCameraAimTarget = targetAimTarget;
+        Quaternion targetRotation = GetCameraLookRotation(targetPosition, targetAimTarget);
 
         if (!snap && TryApplyTakeoffCameraBlend(targetPosition, targetRotation))
         {
@@ -549,11 +447,11 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
             ? targetPosition
             : GetSmoothedCameraPosition(target, targetPosition, effectiveFollowSharpness);
         sessionCamera.transform.position = nextPosition;
+        lastCameraAimTarget = GetCameraAimTarget(target, lastCameraOrbitPivot, nextPosition, orbitFrame);
         Quaternion lookRotation = GetCameraLookRotation(nextPosition, lastCameraAimTarget);
         sessionCamera.transform.rotation = snap
             ? lookRotation
             : GetSmoothedCameraRotation(target, lookRotation);
-        ApplyFlightCameraFieldOfView(target, snap);
     }
 
     private Transform GetMovementTarget()
@@ -587,34 +485,9 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
         return target.position + GetEffectiveCameraLookOffset();
     }
 
-    private Vector3 GetCameraAimTarget(Transform target, Vector3 orbitPivot, Quaternion orbitFrame)
+    private Vector3 GetCameraAimTarget(Transform target, Vector3 orbitPivot, Vector3 cameraPosition, Quaternion orbitFrame)
     {
-        if (!IsPlayerShipFlightTarget(target))
-        {
-            return orbitPivot;
-        }
-
-        if (TryGetManualGunCameraAimTarget(target, out Vector3 manualGunAimTarget))
-        {
-            return manualGunAimTarget;
-        }
-
-        Vector3 aimForward = orbitFrame * (Quaternion.Euler(0f, cameraOrbitYawDegrees, 0f) * Vector3.forward);
-        aimForward = Vector3.ProjectOnPlane(aimForward, Vector3.up);
-        if (aimForward.sqrMagnitude <= 0.001f)
-        {
-            aimForward = Vector3.ProjectOnPlane(target.forward, Vector3.up);
-        }
-
-        if (aimForward.sqrMagnitude <= 0.001f)
-        {
-            aimForward = Vector3.forward;
-        }
-
-        float lookAheadMeters = GetFlightAimLookAheadMeters();
-        return orbitPivot +
-            aimForward.normalized * lookAheadMeters +
-            Vector3.up * flightAimVerticalOffsetMeters;
+        return orbitPivot;
     }
 
     private Vector3 GetOrbitCameraPosition(Vector3 orbitPivot, Quaternion orbitFrame)
@@ -622,145 +495,6 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
         Vector3 localOrbitOffset = Quaternion.Euler(cameraOrbitPitchDegrees, cameraOrbitYawDegrees, 0f) *
             (Vector3.back * cameraOrbitDistanceMeters);
         return orbitPivot + orbitFrame * localOrbitOffset;
-    }
-
-    private Vector3 GetFlightWheelCameraPosition(Transform target, Vector3 orbitPivot, Vector3 aimTarget, Quaternion orbitFrame)
-    {
-        Vector3 shipForward = ResolveFlightShipFlatForward(target);
-        Vector3 gunAnchor = TryGetManualGunCameraAnchor(target, out Vector3 manualGunAnchor)
-            ? manualGunAnchor
-            : orbitPivot + shipForward * 12f;
-
-        Vector3 gunViewPosition = gunAnchor + Vector3.up * FlightGunViewHeightMeters;
-        Vector3 shipStandardPosition = orbitPivot +
-            Vector3.up * FlightShipStandardHeightMeters -
-            shipForward * FlightShipStandardBackOffsetMeters;
-        Vector3 shipHighPosition = orbitPivot +
-            Vector3.up * ResolveFlightShipHighHeightMeters(target) -
-            shipForward * FlightShipStandardBackOffsetMeters;
-
-        float route = Mathf.Clamp(flightCameraWheelRouteUnits, 0f, GetFlightCameraWheelTotalUnits());
-        float gunEnd = GetFlightGunToStandardWheelUnits();
-        float highEnd = gunEnd + GetFlightStandardToHighWheelUnits();
-        if (route <= gunEnd)
-        {
-            float t = Mathf.SmoothStep(0f, 1f, route / gunEnd);
-            return Vector3.Lerp(gunViewPosition, shipStandardPosition, t);
-        }
-
-        if (route <= highEnd)
-        {
-            float t = Mathf.SmoothStep(0f, 1f, (route - gunEnd) / (highEnd - gunEnd));
-            return Vector3.Lerp(shipStandardPosition, shipHighPosition, t);
-        }
-
-        return shipHighPosition;
-    }
-
-    private float ResolveFlightShipHighHeightMeters(Transform target)
-    {
-        float shipLength = ResolveFlightShipLengthMeters(target);
-        float highHeight = shipLength * FlightShipHighLengthMultiplier;
-        return Mathf.Max(FlightShipStandardHeightMeters, highHeight);
-    }
-
-    private static float ResolveFlightShipLengthMeters(Transform target)
-    {
-        if (target == null)
-        {
-            return 20f;
-        }
-
-        Renderer[] renderers = target.GetComponentsInChildren<Renderer>();
-        bool hasBounds = false;
-        Bounds bounds = new Bounds(target.position, Vector3.zero);
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            Renderer renderer = renderers[i];
-            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
-            {
-                continue;
-            }
-
-            if (!hasBounds)
-            {
-                bounds = renderer.bounds;
-                hasBounds = true;
-            }
-            else
-            {
-                bounds.Encapsulate(renderer.bounds);
-            }
-        }
-
-        if (!hasBounds)
-        {
-            return 20f;
-        }
-
-        Vector3 size = bounds.size;
-        float length = Mathf.Max(size.x, size.z);
-        return Mathf.Clamp(length, 8f, 160f);
-    }
-
-    private Vector3 ResolveFlightCameraFlatForward(Transform target, Quaternion orbitFrame)
-    {
-        Vector3 flatForward = orbitFrame * (Quaternion.Euler(0f, cameraOrbitYawDegrees, 0f) * Vector3.forward);
-        flatForward = Vector3.ProjectOnPlane(flatForward, Vector3.up);
-        if (flatForward.sqrMagnitude <= 0.001f && target != null)
-        {
-            flatForward = Vector3.ProjectOnPlane(target.forward, Vector3.up);
-        }
-
-        if (flatForward.sqrMagnitude <= 0.001f)
-        {
-            flatForward = Vector3.forward;
-        }
-
-        return flatForward.normalized;
-    }
-
-    private static Vector3 ResolveFlightShipFlatForward(Transform target)
-    {
-        Vector3 flatForward = target != null
-            ? Vector3.ProjectOnPlane(target.forward, Vector3.up)
-            : Vector3.zero;
-        if (flatForward.sqrMagnitude <= 0.001f)
-        {
-            flatForward = Vector3.forward;
-        }
-
-        return flatForward.normalized;
-    }
-
-    private static bool TryGetManualGunCameraAimTarget(Transform target, out Vector3 aimTarget)
-    {
-        aimTarget = Vector3.zero;
-        if (target == null)
-        {
-            return false;
-        }
-
-        ShipPhysics ship = target.GetComponent<ShipPhysics>();
-        return ship != null && ship.TryGetManualGunCameraAimTarget(out aimTarget);
-    }
-
-    private static bool TryGetManualGunCameraAnchor(Transform target, out Vector3 anchor)
-    {
-        anchor = Vector3.zero;
-        if (target == null)
-        {
-            return false;
-        }
-
-        ShipPhysics ship = target.GetComponent<ShipPhysics>();
-        return ship != null && ship.TryGetManualGunCameraAnchor(out anchor);
-    }
-
-    private float GetFlightAimLookAheadMeters()
-    {
-        float scaledLookAhead = Mathf.Max(flightAimLookAheadMeters, cameraOrbitDistanceMeters * 0.7f);
-        return Mathf.Clamp(scaledLookAhead, 50f, 1800f);
     }
 
     private Vector3 GetSmoothedCameraOrbitPivot(Transform target, Vector3 rawPivot, bool snap)
@@ -810,8 +544,12 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
         }
 
         Vector3 currentPosition = sessionCamera.transform.position;
-        Vector3 nextPosition = Vector3.Lerp(currentPosition, targetPosition, effectiveFollowSharpness);
-        if (!IsPlayerShipFlightTarget(target))
+        bool flightTarget = IsPlayerShipFlightTarget(target);
+        float alpha = flightTarget
+            ? 1f - Mathf.Exp(-GetCameraDeltaTime() / Mathf.Max(0.001f, flightCameraPivotSmoothSeconds))
+            : Mathf.Clamp01(effectiveFollowSharpness);
+        Vector3 nextPosition = Vector3.Lerp(currentPosition, targetPosition, alpha);
+        if (!flightTarget)
         {
             cameraHeightVelocity = 0f;
             return nextPosition;
@@ -895,44 +633,7 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
 
     private Quaternion GetCameraOrbitFrame(Transform target, bool snap)
     {
-        if (!IsPlayerShipFlightTarget(target))
-        {
-            hasSmoothedCameraOrbitHeading = false;
-            smoothedCameraOrbitHeadingVelocity = 0f;
-            return Quaternion.identity;
-        }
-
-        Vector3 flatForward = Vector3.ProjectOnPlane(target.forward, Vector3.up);
-        if (flatForward.sqrMagnitude <= 0.001f)
-        {
-            return Quaternion.Euler(0f, smoothedCameraOrbitHeadingDegrees, 0f);
-        }
-
-        float rawHeading = NormalizeDegrees(Mathf.Atan2(flatForward.x, flatForward.z) * Mathf.Rad2Deg);
-        if (UseRigidFlightCamera(target))
-        {
-            smoothedCameraOrbitHeadingDegrees = rawHeading;
-            smoothedCameraOrbitHeadingVelocity = 0f;
-            hasSmoothedCameraOrbitHeading = true;
-        }
-        else if (snap || !hasSmoothedCameraOrbitHeading)
-        {
-            smoothedCameraOrbitHeadingDegrees = rawHeading;
-            smoothedCameraOrbitHeadingVelocity = 0f;
-            hasSmoothedCameraOrbitHeading = true;
-        }
-        else
-        {
-            smoothedCameraOrbitHeadingDegrees = Mathf.SmoothDampAngle(
-                smoothedCameraOrbitHeadingDegrees,
-                rawHeading,
-                ref smoothedCameraOrbitHeadingVelocity,
-                Mathf.Max(0.001f, flightCameraOrbitHeadingSmoothSeconds),
-                float.PositiveInfinity,
-                GetCameraDeltaTime());
-        }
-
-        return Quaternion.Euler(0f, smoothedCameraOrbitHeadingDegrees, 0f);
+        return Quaternion.identity;
     }
 
     private bool UseRigidFlightCamera(Transform target)
@@ -961,22 +662,12 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
 
     private bool ShouldControlGameplayCursor(Transform target)
     {
-        return warshipsFlightMouseLook && IsPlayerShipFlightTarget(target);
-    }
-
-    private bool ShouldUseLockedFlightMouseLook()
-    {
-        Transform target = GetMovementTarget();
-        return ShouldControlGameplayCursor(target) &&
-            !(altReleasesCursor && WildWindControlSettings.IsGameplayCursorReleasePressed());
+        return IsPlayerShipFlightTarget(target);
     }
 
     private void ApplyGameplayCursorState(Transform target)
     {
         bool shouldControl = ShouldControlGameplayCursor(target);
-        bool releaseCursor = shouldControl &&
-            altReleasesCursor &&
-            WildWindControlSettings.IsGameplayCursorReleasePressed();
 
         if (!shouldControl)
         {
@@ -994,11 +685,11 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
             ownsGameplayCursor = true;
         }
 
-        ResolveGameplayCursorState(shouldControl, releaseCursor, out CursorLockMode lockState, out bool cursorVisible);
+        ResolveGameplayCursorState(shouldControl, out CursorLockMode lockState, out bool cursorVisible);
         Cursor.lockState = lockState;
         Cursor.visible = cursorVisible;
-        GameplayCursorLockedForMouseLook = lockState == CursorLockMode.Locked;
-        GameplayCursorReleasedForUi = releaseCursor;
+        GameplayCursorLockedForMouseLook = false;
+        GameplayCursorReleasedForUi = shouldControl;
     }
 
     private void UpdateGameplayMouseLookSensitivityScale(Transform target)
@@ -1010,26 +701,7 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
 
     private float GetFlightMouseLookSensitivityScale()
     {
-        float scopeRatio = GetFlightCameraScopeRatio();
-        if (scopeRatio <= 0.001f)
-        {
-            return 1f;
-        }
-
-        float currentVerticalFovDegrees = Mathf.Lerp(
-            FlightCameraWideFieldOfView,
-            GetFlightScopeVerticalFieldOfView(),
-            scopeRatio);
-        return GetFieldOfViewSensitivityScale(FlightCameraWideFieldOfView, currentVerticalFovDegrees);
-    }
-
-    private static float GetFieldOfViewSensitivityScale(float referenceVerticalFovDegrees, float currentVerticalFovDegrees)
-    {
-        float referenceTangent = Mathf.Tan(Mathf.Clamp(referenceVerticalFovDegrees, 0.5f, 179f) * 0.5f * Mathf.Deg2Rad);
-        float currentTangent = Mathf.Tan(Mathf.Clamp(currentVerticalFovDegrees, 0.5f, 179f) * 0.5f * Mathf.Deg2Rad);
-        return referenceTangent > 0.0001f
-            ? Mathf.Clamp(currentTangent / referenceTangent, 0.001f, 1f)
-            : 1f;
+        return 1f;
     }
 
     private void RestoreGameplayCursorStateIfOwned()
@@ -1049,239 +721,16 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
 
     private void ApplyCameraWheelZoomForTarget(Transform target, float scrollDelta)
     {
-        if (IsPlayerShipFlightTarget(target))
-        {
-            ApplyFlightCameraWheelRoute(scrollDelta * CameraWheelEffectivenessMultiplier);
-            return;
-        }
-
         ApplyProgressiveZoom(scrollDelta * CameraWheelEffectivenessMultiplier);
-    }
-
-    private void ApplyFlightCameraWheelRoute(float scrollDelta)
-    {
-        if (Mathf.Abs(scrollDelta) <= 0.001f)
-        {
-            return;
-        }
-
-        flightCameraWheelRouteUnits = ApplyFlightCameraWheelRouteDelta(flightCameraWheelRouteUnits, scrollDelta);
-        flightCameraWheelRoute01 = GetFlightCameraWheelRoute01();
-    }
-
-    private float ApplyFlightCameraWheelRouteDelta(float currentRouteUnits, float scrollDelta)
-    {
-        float total = GetFlightCameraWheelTotalUnits();
-        float scopeStart = GetFlightScopeStartWheelUnits();
-        float clampedRoute = Mathf.Clamp(currentRouteUnits, 0f, total);
-        if (scrollDelta > 0f)
-        {
-            return ApplyPositiveFlightCameraWheelRouteDelta(clampedRoute, scrollDelta, scopeStart, total);
-        }
-
-        return ApplyNegativeFlightCameraWheelRouteDelta(clampedRoute, scrollDelta, scopeStart, total);
-    }
-
-    private float ApplyPositiveFlightCameraWheelRouteDelta(float currentRouteUnits, float scrollDelta, float scopeStart, float total)
-    {
-        if (currentRouteUnits < scopeStart)
-        {
-            float deltaToScopeStart = scopeStart - currentRouteUnits;
-            if (scrollDelta <= deltaToScopeStart)
-            {
-                return Mathf.Clamp(currentRouteUnits + scrollDelta, 0f, total);
-            }
-
-            currentRouteUnits = scopeStart;
-            scrollDelta -= deltaToScopeStart;
-        }
-
-        if (currentRouteUnits >= total)
-        {
-            return total;
-        }
-
-        float rawDeltaToMaxScope = GetRawFlightScopeWheelDelta(currentRouteUnits, total, scopeStart, total);
-        return scrollDelta >= rawDeltaToMaxScope
-            ? total
-            : ApplyFlightScopeWheelDampedDelta(currentRouteUnits, scrollDelta, scopeStart, total);
-    }
-
-    private float ApplyNegativeFlightCameraWheelRouteDelta(float currentRouteUnits, float scrollDelta, float scopeStart, float total)
-    {
-        if (currentRouteUnits > scopeStart)
-        {
-            float rawDeltaToScopeStart = GetRawFlightScopeWheelDelta(currentRouteUnits, scopeStart, scopeStart, total);
-            if (scrollDelta >= rawDeltaToScopeStart)
-            {
-                return ApplyFlightScopeWheelDampedDelta(currentRouteUnits, scrollDelta, scopeStart, total);
-            }
-
-            currentRouteUnits = scopeStart;
-            scrollDelta -= rawDeltaToScopeStart;
-        }
-
-        return Mathf.Clamp(currentRouteUnits + scrollDelta, 0f, total);
-    }
-
-    private float ApplyFlightScopeWheelDampedDelta(float currentRouteUnits, float scrollDelta, float scopeStart, float total)
-    {
-        float scopeLength = Mathf.Max(0.001f, total - scopeStart);
-        float minimumEffectiveness = Mathf.Clamp(FlightScopeMinimumWheelEffectiveness, 0.01f, 1f);
-        float reduction = 1f - minimumEffectiveness;
-        float currentRatio = Mathf.InverseLerp(scopeStart, total, currentRouteUnits);
-        if (reduction <= 0.0001f)
-        {
-            return Mathf.Clamp(currentRouteUnits + scrollDelta, scopeStart, total);
-        }
-
-        float remainingEffectiveness = 1f - reduction * currentRatio;
-        float nextRatio = (1f - remainingEffectiveness * Mathf.Exp(-reduction * scrollDelta / scopeLength)) / reduction;
-        return Mathf.Lerp(scopeStart, total, Mathf.Clamp01(nextRatio));
-    }
-
-    private float GetRawFlightScopeWheelDelta(float fromRouteUnits, float toRouteUnits, float scopeStart, float total)
-    {
-        float scopeLength = Mathf.Max(0.001f, total - scopeStart);
-        float minimumEffectiveness = Mathf.Clamp(FlightScopeMinimumWheelEffectiveness, 0.01f, 1f);
-        float reduction = 1f - minimumEffectiveness;
-        float fromRatio = Mathf.InverseLerp(scopeStart, total, fromRouteUnits);
-        float toRatio = Mathf.InverseLerp(scopeStart, total, toRouteUnits);
-        if (reduction <= 0.0001f)
-        {
-            return (toRatio - fromRatio) * scopeLength;
-        }
-
-        float fromEffectiveness = Mathf.Max(0.001f, 1f - reduction * fromRatio);
-        float toEffectiveness = Mathf.Max(0.001f, 1f - reduction * toRatio);
-        return scopeLength / reduction * Mathf.Log(fromEffectiveness / toEffectiveness);
-    }
-
-    private void ApplyFlightCameraFieldOfView(Transform target, bool snap)
-    {
-        if (sessionCamera == null)
-        {
-            return;
-        }
-
-        if (!IsPlayerShipFlightTarget(target))
-        {
-            RestoreFlightCameraFieldOfView(snap);
-            return;
-        }
-
-        if (!ownsFlightCameraFieldOfView)
-        {
-            storedFlightCameraFieldOfView = sessionCamera.fieldOfView;
-            ownsFlightCameraFieldOfView = true;
-        }
-
-        float focusRatio = GetFlightCameraScopeRatio();
-        float desiredFieldOfView = Mathf.Lerp(
-            FlightCameraWideFieldOfView,
-            GetFlightScopeVerticalFieldOfView(),
-            focusRatio);
-        sessionCamera.fieldOfView = snap
-            ? desiredFieldOfView
-            : Mathf.Lerp(sessionCamera.fieldOfView, desiredFieldOfView, 1f - Mathf.Exp(-GetCameraDeltaTime() / 0.08f));
-    }
-
-    private float GetFlightScopeVerticalFieldOfView()
-    {
-        float referenceRange = Mathf.Max(1f, FlightScopeReferenceRangeMeters);
-        float screenWidth = Mathf.Clamp(
-            FlightScopeScreenWidthMetersAtReferenceRange,
-            1f,
-            referenceRange * 2f);
-        float aspect = sessionCamera != null
-            ? Mathf.Max(0.01f, sessionCamera.aspect)
-            : 16f / 9f;
-
-        float horizontalRadians = 2f * Mathf.Atan((screenWidth * 0.5f) / referenceRange);
-        float verticalRadians = 2f * Mathf.Atan(Mathf.Tan(horizontalRadians * 0.5f) / aspect);
-        return Mathf.Clamp(verticalRadians * Mathf.Rad2Deg, 0.5f, FlightCameraWideFieldOfView);
-    }
-
-    private void RestoreFlightCameraFieldOfView(bool snap)
-    {
-        if (!ownsFlightCameraFieldOfView || sessionCamera == null)
-        {
-            return;
-        }
-
-        if (snap)
-        {
-            sessionCamera.fieldOfView = storedFlightCameraFieldOfView;
-            ownsFlightCameraFieldOfView = false;
-            return;
-        }
-
-        sessionCamera.fieldOfView = Mathf.Lerp(
-            sessionCamera.fieldOfView,
-            storedFlightCameraFieldOfView,
-            1f - Mathf.Exp(-GetCameraDeltaTime() / 0.12f));
-        if (Mathf.Abs(sessionCamera.fieldOfView - storedFlightCameraFieldOfView) <= 0.05f)
-        {
-            sessionCamera.fieldOfView = storedFlightCameraFieldOfView;
-            ownsFlightCameraFieldOfView = false;
-        }
-    }
-
-    private float GetFlightCameraWheelRoute01()
-    {
-        float total = GetFlightCameraWheelTotalUnits();
-        return total > 0.001f ? Mathf.Clamp01(flightCameraWheelRouteUnits / total) : 0f;
-    }
-
-    private float GetFlightCameraScopeRatio()
-    {
-        float scopeStart = GetFlightScopeStartWheelUnits();
-        float total = GetFlightCameraWheelTotalUnits();
-        return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(scopeStart, total, flightCameraWheelRouteUnits));
-    }
-
-    private float GetFlightScopeStartWheelUnits()
-    {
-        return GetFlightGunToStandardWheelUnits() + GetFlightStandardToHighWheelUnits();
-    }
-
-    private float GetFlightCameraWheelTotalUnits()
-    {
-        return GetFlightGunToStandardWheelUnits() +
-            GetFlightStandardToHighWheelUnits() +
-            GetFlightHighToScopeWheelUnits();
-    }
-
-    private float GetFlightGunToStandardWheelUnits()
-    {
-        return FlightGunToStandardWheelUnits;
-    }
-
-    private float GetFlightStandardToHighWheelUnits()
-    {
-        return FlightStandardToHighWheelUnits;
-    }
-
-    private float GetFlightHighToScopeWheelUnits()
-    {
-        return FlightHighToScopeWheelUnits;
     }
 
     private static void ResolveGameplayCursorState(
         bool shouldControl,
-        bool releaseCursor,
         out CursorLockMode lockState,
         out bool cursorVisible)
     {
-        if (!shouldControl || releaseCursor)
-        {
-            lockState = CursorLockMode.None;
-            cursorVisible = true;
-            return;
-        }
-
-        lockState = CursorLockMode.Locked;
-        cursorVisible = false;
+        lockState = CursorLockMode.None;
+        cursorVisible = true;
     }
 
     private float GetMinimumCameraDistanceMeters()
@@ -1359,6 +808,16 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
     {
         value %= 360f;
         return value < 0f ? value + 360f : value;
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     private static void RotateTargetTowardInput(Transform target, Vector3 input)

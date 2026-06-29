@@ -330,7 +330,7 @@ public static class ShipAssemblyBuilder
         List<ShipSlotDefinition> slots = new List<ShipSlotDefinition>();
         if (hullConfig == null) return slots;
 
-        string claudiumLoopId = hullConfig.id == "starter_hull" ? "starter_claudium_loop" : "";
+        string claudiumLoopId = "";
         slots.Add(CreateRequiredSlot("claudium_loop", "Claudium loop", "claudium_loop", claudiumLoopId));
         AddSessionExtractionSlots(slots);
         return slots;

@@ -1,0 +1,5 @@
+reward_layer,on_destroyed,on_extracted,fe_rule,notes_ru
+material_cargo,lost,kept,material_value_fe,Руда обломки левиафаны газы реликты и информация в трюме теряются при уничтожении корабля.
+intangible_progress,kept,kept_and_doubled,intangible_value_fe * 2,Урон разведка ремонт курьерские действия фрахты опыт и репутация сохраняются при уничтожении и удваиваются при успешном выходе.
+successful_sortie_total,not_applicable,material_plus_double_intangible,material_value_fe + intangible_value_fe * 2,Правильный расчет окупаемости использует успешный выход.
+destroyed_sortie_total,intangible_only,not_applicable,intangible_value_fe,Уничтожение не обнуляет прогресс действий но обнуляет трюм.

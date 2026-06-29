@@ -1,6 +1,10 @@
 ﻿id_item,local_name_ru,local_name_en,mass_kg_per_unit
 freight,Фрахт,Freight,0
 solid,Солид,Solid,0
+gems,Геммы,Gems,0
+nobel,Нобель,Nobel,0
+perfcards,Перфокарты,Perfcards,0
+amber,Амбра,Amber,0
 resonant_sublikat,Резонансный субликат,Resonant Sublikat,0.1
 null_sublikat,Нулевой субликат,Null Sublikat,0.1
 phase_sublikat,Фазовый субликат,Phase Sublikat,0.1
@@ -10,57 +14,44 @@ spectral_sublikat,Спектральный субликат,Spectral Sublikat,0.
 coronal_sublikat,Коронный субликат,Coronal Sublikat,0.1
 deep_sublikat,Глубинный субликат,Deep Sublikat,0.1
 inertial_sublikat,Инерционный субликат,Inertial Sublikat,0.1
-automaton_relay,Реле автоматона,Automaton Relay,0.4
-automaton_coil,Катушка автоматона,Automaton Coil,1.2
-automaton_contact_comb,Контактная гребенка,Automaton Contact Comb,0.3
-automaton_brass_valve,Латунный клапан автоматона,Automaton Brass Valve,0.8
-automaton_mainspring,Заводная пружина,Automaton Mainspring,0.6
-automaton_calibration_gear,Калибровочная шестерня,Automaton Calibration Gear,0.5
-automaton_gyroscope,Гироскоп автоматона,Automaton Gyroscope,2
-automaton_optic_lens,Оптическая линза автоматона,Automaton Optic Lens,0.4
-automaton_pressure_gauge,Давлениемер автоматона,Automaton Pressure Gauge,1
-automaton_servo_joint,Сервошарнир,Automaton Servo Joint,2.5
-automaton_armor_plate,Броневая пластина автоматона,Automaton Armor Plate,8
-automaton_logic_drum,Памятный барабан,Automaton Memory Drum,1.4
-automaton_command_cylinder,Командный цилиндр,Automaton Command Cylinder,3.5
-automaton_servo_core,Сервоядро,Automaton Servo Core,4
-broken_automaton,Broken Automaton,Broken Automaton,1
-automaton_core,Automaton Core,Automaton Core,1
-charcoal,Уголь,Charcoal,1
-metal,Металл,Metal,1
-aerolite,Аэролит,Aerolite,1
-tools,Инструменты,Tools,1
-weapon,Оружие,Weapons,1
-paper,Бумага,Paper,1
-design_experience,Очки освоения,Mastery Points,1
-fundamental_experience,Архивные фрагменты,Archive Fragments,1
-rock_info,Информация о глыбах,Rock Survey Data,1
+automaton_relay,Реле,Relay,0.4
+automaton_coil,Катушка,Coil,1.2
+automaton_contact_comb,Контактная гребенка,Contact Comb,0.3
+automaton_brass_valve,Латунный клапан,Brass Valve,0.8
+automaton_mainspring,Заводная пружина,Mainspring,0.6
+automaton_calibration_gear,Калибровочная шестерня,Calibration Gear,0.5
+automaton_gyroscope,Гироскоп,Gyroscope,2
+automaton_optic_lens,Оптическая линза,Optic Lens,0.4
+automaton_pressure_gauge,Давлениемер,Pressure Gauge,1
+automaton_servo_joint,Сервошарнир,Servo Joint,2.5
+automaton_logic_drum,Памятный барабан,Memory Drum,1.4
+automaton_command_cylinder,Командный цилиндр,Command Cylinder,3.5
+automaton_servo_core,Сервоядро,Servo Core,4
+automaton_core,Ядро,Core,1
+charcoal,Уголь,Coal,1
+iron,Железо,Iron,1
+copper,Медь,Copper,1
+magnesium,Магний,Magnesium,1
+quartz,Кварц,Quartz,1
+calcite,Кальцит,Calcite,1
+sylvine,Сильвин,Sylvine,1
 claudium,Клавдий,Claudium,1
-medicines,Медикаменты,Medicines,1
-alcohol,Спирт,Alcohol,0.79
-gunpowder,Взрывчатка,Explosives,1
-mechanisms,Механизмы,Mechanisms,1
-fat,Жир,Fat,0.92
-water,Вода,Water,1
-cloth,Ткань,Cloth,1
-aer_silt,Аэрная взвесь,Aer Silt,1
+monazite,Монацит,Monazite,1
+tin,Олово,Tin,1
+zinc,Цинк,Zinc,1
+nickel,Никель,Nickel,1
+aerosil,Аэросил,Aerosil,1
 vespar,Веспар,Vespar,1
 fulgur,Фульгур,Fulgur,1
-azurite_gas,Лазуритовый газ,Azurite Gas,1
-amberon,Амберон,Amberon,1
-viridine,Виридин,Viridine,1
-ionite,Ионит,Ionite,1
-calorine,Калорин,Calorine,1
-crystane,Кристан,Crystane,1
-claudine,Клавдин,Claudine,1
+ionide,Ионид,Ionide,1
 nulgas,Нульгаз,Nulgas,1
 mist_condensate,Концентрат сухой дымки,Dry Mist Condensate,1
 cloud_condensate,Облачный концентрат,Cloud Condensate,1
 wet_condensate,Влажный концентрат,Wet Cloud Condensate,1
 storm_condensate,Грозовой концентрат,Storm Condensate,1
-azure_condensate,Лазурный газовый концентрат,Azure Gas Condensate,1
-amber_condensate,Янтарный газовый концентрат,Amber Gas Condensate,1
-green_condensate,Зеленый газовый концентрат,Green Gas Condensate,1
+azure_condensate,Лазурный концентрат,Azure Condensate,1
+amber_condensate,Янтарный концентрат,Amber Condensate,1
+green_condensate,Зеленый концентрат,Green Condensate,1
 ion_condensate,Ионный концентрат,Ion Condensate,1
 thermal_condensate,Тепловой концентрат,Thermal Condensate,1
 crystal_condensate,Кристаллический концентрат,Crystal Condensate,1
@@ -86,31 +77,106 @@ silverdrift_ore,Сребродрейф,Silver Drift Ore,1
 embervein_ore,Жарожила,Ember Vein Ore,1
 claudreef_ore,Клавдиевый риф,Claudium Reef Ore,1
 nullcrust_ore,Нулевая корка,Null Crust Ore,1
-ferron,Феррон,Ferron,1
-silvate,Сильват,Silvate,1
-cupryl,Куприл,Cupryl,1
-aerin,Аэрин,Aerin,1
-fulgrin,Фульгрин,Fulgrin,1
-lumite,Люмит,Lumite,1
-gravinol,Гравинол,Gravinol,1
-myrglass,Мирстекло,Myrglass,1
-claudite,Клавдит,Claudite,1
-umbracite,Умбрацит,Umbracite,1
-nullsalt,Нульсоль,Nullsalt,1
 windcalf_carcass,Туша ветротеленка,Wind Calf Carcass,1
 windminnow_carcass,Тушка ветропескаря,Wind Minnow Carcass,1
 mistwhale_carcass,Туша дымного кита,Mist Whale Carcass,1
 sky_eel_carcass,Туша небесного угря,Sky Eel Carcass,1
 stoneback_carcass,Туша камнеспина,Stoneback Carcass,1
 leviathan_meat,Мясо левиафана,Leviathan Meat,1
-leviathan_fat,Левиафанов жир,Leviathan Fat,0.92
+leviathan_fat,Ворвань левиафана,Leviathan Blubber,0.92
 leviathan_hide,Шкура левиафана,Leviathan Hide,1
-mineral_shell,Минеральный панцирь,Mineral Shell,1
+leviathan_sinew,Сухожилия левиафана,Leviathan Sinew,1
+bone_grit,Костяная мука,Bone Grit,1
+acid,Кислота,Acid,1
 leviathan_ichor,Ихор левиафана,Leviathan Ichor,1.05
-leviathan_sinew,Левиафановая жила,Leviathan Sinew,1
-nerve_substrate,Нервный субстрат,Nerve Substrate,0.2
-bone_plate,Костяная пластина,Bone Plate,1
+steel,Сталь,Steel,1
+bronze,Бронза,Bronze,1
+brass,Латунь,Brass,1
+elektron,Электрон,Elektron,1
+bulat,Булат,Bulat,1
+melchior,Мельхиор,Melchior,1
+invar,Инвар,Invar,1
+orkit,Оркит,Orkit,1
+resin,Смола,Resin,1
+rubber,Каучук,Rubber,1
+bakelite,Бакелит,Bakelite,1
+textolite,Текстолит,Textolite,1
+fluoroplastic,Фторопласт,Fluoroplastic,1
+aramid,Арамид,Aramid,1
+siloxane,Силоксан,Siloxane,1
+glass_ceramic,Стеклокерамика,Glass Ceramic,1
+beam,Балка,Beam,1
+plating,Обшивка,Plating,1
+armor_plate,Бронелист,Armor Plate,1
+bulkhead,Переборка,Bulkhead,1
+deck_section,Палубная секция,Deck Section,1
+airlock,Шлюз,Airlock,1
+cowling,Кожух,Cowling,1
+hatch,Люк,Hatch,1
+engine,Двигатель,Engine,1
+actuator,Привод,Actuator,1
+transmission,Передача,Transmission,1
+pump,Насос,Pump,1
+compressor,Компрессор,Compressor,1
+gyroscope,Гироскоп,Gyroscope,1
+sensor,Сенсор,Sensor,1
+calculator,Вычислитель,Calculator,1
+power_block,Силовой блок,Power Block,1
+propulsion_block,Ходовой блок,Propulsion Block,1
+instrument_block,Приборный блок,Instrument Block,1
+weapon_block,Орудийный блок,Weapon Block,1
+defense_block,Защитный блок,Defense Block,1
+cargo_block,Грузовой блок,Cargo Block,1
+industry_block,Промысловый блок,Industry Block,1
+hangar_block,Ангарный блок,Hangar Block,1
+capital_flagship_license,Флагманская лицензия Империи,Capital Flagship License,1
+wind_houses_flagship_license,Флагманская лицензия Ветровых Домов,Wind Houses Flagship License,1
+mist_synod_flagship_license,Флагманская лицензия Туманного Синода,Mist Synod Flagship License,1
+stone_vault_flagship_license,Флагманская лицензия Каменного Свода,Stone Vault Flagship License,1
+factory_ark_flagship_license,Флагманская лицензия Заводных Ковчегов,Clockwork Ark Flagship License,1
+devourers_flagship_license,Флагманская лицензия Пожирателей,Devourers Flagship License,1
+capital_ordnance_blank,Ордонансная заготовка,Ordnance Blank,1
+capital_turret_ring,Башенный погон,Turret Ring,1
+capital_breech_group,Затворная группа,Breech Group,1
+capital_rangefinder_prism,Дальномерная призма,Rangefinder Prism,1
+capital_casemate_insert,Казематный вкладыш,Casemate Insert,1
+wind_magnetic_coil,Магнитная катушка,Magnetic Coil,1
+wind_turbine_blade,Турбинная лопатка,Turbine Blade,1
+wind_cargo_sling,Грузовая стропа,Cargo Sling,1
+wind_course_gyro,Курсовой гироблок,Course Gyroblock,1
+wind_launch_cup,Пусковой стакан,Launch Cup,1
+mist_gas_membrane,Газовая мембрана,Gas Membrane,1
+mist_separator_cassette,Сепараторная кассета,Separator Cassette,1
+mist_polymer_cell,Полимерная сотка,Polymer Cell,1
+mist_pyrophoric_paste,Пирофорная паста,Pyrophoric Paste,1
+mist_cartridge,Туманный картридж,Mist Cartridge,1
+stone_crushing_crown,Дробильный венец,Crushing Crown,1
+stone_throat_grate,Жерловая решетка,Throat Grate,1
+stone_armor_wedge,Броневой клин,Armor Wedge,1
+stone_gun_cradle,Орудийная люлька,Gun Cradle,1
+stone_quarry_insert,Карьерный вкладыш,Quarry Insert,1
+ark_precision_drive,Точный привод,Precision Drive,1
+ark_servo_ring,Сервокольцо,Servo Ring,1
+ark_counting_cell,Счетная ячейка,Counting Cell,1
+ark_repair_lens,Ремонтная линза,Repair Lens,1
+ark_hangar_cradle,Ангарная люлька,Hangar Cradle,1
+dev_harpoon_winch,Гарпунная лебедка,Harpoon Winch,1
+dev_tension_drum,Натяжной барабан,Tension Drum,1
+dev_hook_chain,Крюковая цепь,Hook Chain,1
+dev_bone_cutter,Костяной резец,Bone Cutter,1
+dev_bomb_cowling,Бомбовый кожух,Bomb Cowling,1
+water,Вода,Water,1
+tools,Инструменты,Tools,1
+weapon,Оружие,Weapons,1
+paper,Бумага,Paper,1
+cloth,Ткань,Cloth,1
+mechanisms,Механизмы,Mechanisms,1
+design_experience,Очки освоения,Mastery Points,1
+fundamental_experience,Архивные фрагменты,Archive Fragments,1
+rock_info,Информация о глыбах,Rock Survey Data,1
 airframe_kit,Набор корпуса,Airframe Kit,1
-module_kit,Module Kit,Module Kit,1
-munition_bundle,Munition Bundle,Munition Bundle,1
+module_kit,Набор модуля,Module Kit,1
+munition_bundle,Боевой комплект,Munition Bundle,1
 chemical_batch,Химическая партия,Chemical Batch,1
+
+

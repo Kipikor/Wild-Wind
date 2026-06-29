@@ -1,0 +1,49 @@
+﻿activity_id,min_rating,source_kind,source_id,weight,notes_ru
+mining,1,ore,windshale,1.00,Starter adaptive ore for weak mining ships.
+mining,10,ore,dawnspar,1.00,Early ore once the ship has a real crusher.
+mining,18,ore,bluebrass,1.00,Low mid-tier metallic ore.
+mining,26,ore,rainroot,1.00,Useful mixed ore for early industrial ships.
+mining,34,ore,emberloam,1.00,Hot ore for stronger mining hulls.
+mining,42,ore,glassmire,1.00,Mid-tier glass-rich ore.
+mining,50,ore,stormcrust,1.00,Storm ore for proper mining cruisers.
+mining,58,ore,liftmarrow,1.00,Valuable lift-resource ore.
+mining,66,ore,mirrorbasalt,1.00,Hard valuable ore.
+mining,74,ore,crownstone,1.00,Late ore for dedicated mining ships.
+mining,82,ore,claudreef,1.00,High-grade claudium ore.
+mining,90,ore,nullcrust,1.00,Top adaptive quick-mission ore.
+harvesting,1,gas,dry_mist,1.00,Starter cloud condensate.
+harvesting,10,gas,common_cloud,1.00,Common cloud condensate.
+harvesting,18,gas,wet_cloud,1.00,Wet cloud condensate.
+harvesting,26,gas,storm_dense,1.00,Dense storm condensate.
+harvesting,34,gas,azure_veil,1.00,Ion-rich gas pocket.
+harvesting,42,gas,amber_haze,1.00,Nobel-oriented gas pocket.
+harvesting,50,gas,green_bloom,1.00,Green chemical gas pocket.
+harvesting,58,gas,ion_fog,1.00,Ion condensate pocket.
+harvesting,66,gas,thermal_breath,1.00,Thermal condensate pocket.
+harvesting,74,gas,crystal_mist,1.00,Gem-oriented condensate pocket.
+harvesting,82,gas,claudic_wisp,1.00,Claudic condensate pocket.
+harvesting,90,gas,void_smoke,1.00,Top adaptive gas pocket.
+hunting,1,leviathan,windminnow,1.00,Smallest leviathan remains.
+hunting,18,leviathan,windcalf,1.00,Small standard leviathan carcass.
+hunting,38,leviathan,sky_eel,1.00,Fast medium leviathan carcass.
+hunting,58,leviathan,mistwhale,1.00,Large valuable leviathan carcass.
+hunting,78,leviathan,stoneback,1.00,Heavy armored leviathan carcass.
+salvage,1,item,automaton_relay,1.00,Starter precision salvage from simple automaton wrecks.
+salvage,12,item,automaton_relay,1.00,Low-tier clockwork salvage.
+salvage,20,item,automaton_coil,1.00,Coil salvage from better wrecks.
+salvage,28,item,automaton_mainspring,1.00,Spring salvage.
+salvage,36,item,automaton_calibration_gear,1.00,Precision gear salvage.
+salvage,44,item,automaton_gyroscope,1.00,Navigation mechanism salvage.
+salvage,52,item,automaton_servo_joint,1.00,Servo joint salvage.
+salvage,60,item,automaton_logic_drum,1.00,Thinking-module salvage.
+salvage,70,item,automaton_command_cylinder,1.00,Command module salvage.
+salvage,82,item,automaton_servo_core,1.00,Top automaton core salvage.
+hacking,1,item,rock_info,1.00,Starter decoded survey information.
+hacking,20,item,fundamental_experience,1.00,Archive fragments from minor relics.
+hacking,40,item,paper,1.00,Recovered books and paper records.
+hacking,60,item,design_experience,1.00,Actionable ship-design archives.
+hacking,80,item,fundamental_experience,1.00,High-value archive fragments.
+survey,1,item,rock_info,1.00,General object survey data.
+survey,35,item,fundamental_experience,1.00,Deep survey archive fragments.
+survey,70,item,design_experience,1.00,Precise survey design insight.
+

@@ -17,16 +17,23 @@ public class PlayerProgress
     public List<string> completedTechnologyIds = new List<string>();
     public List<string> unlockedKnowledgeIds = new List<string>();
     public string activeResearchTechnologyId = "";
+    public List<string> activeResearchTechnologyIds = new List<string>();
     public List<TechnologyResearchProgress> technologyResearchProgress = new List<TechnologyResearchProgress>();
     public List<KnowledgeSpPackageState> knowledgeSpPackages = new List<KnowledgeSpPackageState>();
     public List<InstalledModuleState> installedModules = new List<InstalledModuleState>();
     public SortieSessionState activeSortie = new SortieSessionState();
     public BaseExtractionIndustryState baseIndustry = new BaseExtractionIndustryState();
     public CourierServiceState courierService = new CourierServiceState();
+    public CapitalAirplaneState capitalAirplane = new CapitalAirplaneState();
+    public RepairDockServiceState repairDockService = new RepairDockServiceState();
+    public List<FactionDailyTaskState> factionDailyTasks = new List<FactionDailyTaskState>();
+    public List<DockedDevelopmentShipState> dockedDevelopmentShips = new List<DockedDevelopmentShipState>();
     public List<QuestState> questStates = new List<QuestState>();
     public List<QuestMetricState> questMetrics = new List<QuestMetricState>();
     public List<BaseIslandExpansionRegionState> baseIslandExpansionRegions = new List<BaseIslandExpansionRegionState>();
     public string selectedSortieId = SessionExtractionConstants.DefaultSafeOreSortieId;
+    public int selectedDevelopmentDockSlot;
+    public string lastQuickSortieReport = "";
 
     public GameSessionMode currentMode = GameSessionMode.Docked;
     public string currentDockId = "capital";
@@ -40,6 +47,7 @@ public class PlayerProgress
     public bool receivedStartingProcessingSamples;
     public bool receivedStartingExpansionCurrency;
     public bool receivedStartingCourierSupplies;
+    public bool receivedStartingKnowledgePack;
     public float shipWeaponSpendBufferKg;
     public ShipConsumableTankState shipFuelTank = new ShipConsumableTankState { resourceId = "charcoal" };
     public ShipConsumableTankState shipClaudiumTank = new ShipConsumableTankState { resourceId = "claudium" };
@@ -66,12 +74,17 @@ public class PlayerProgress
 
         completedTechnologyIds ??= new List<string>();
         unlockedKnowledgeIds ??= new List<string>();
+        activeResearchTechnologyIds ??= new List<string>();
         technologyResearchProgress ??= new List<TechnologyResearchProgress>();
         knowledgeSpPackages ??= new List<KnowledgeSpPackageState>();
         installedModules ??= new List<InstalledModuleState>();
         activeSortie ??= new SortieSessionState();
         baseIndustry ??= new BaseExtractionIndustryState();
         courierService ??= new CourierServiceState();
+        capitalAirplane ??= new CapitalAirplaneState();
+        repairDockService ??= new RepairDockServiceState();
+        factionDailyTasks ??= new List<FactionDailyTaskState>();
+        dockedDevelopmentShips ??= new List<DockedDevelopmentShipState>();
         questStates ??= new List<QuestState>();
         questMetrics ??= new List<QuestMetricState>();
         baseIslandExpansionRegions ??= new List<BaseIslandExpansionRegionState>();
@@ -80,11 +93,48 @@ public class PlayerProgress
         inventory ??= new List<ResourceStack>();
         shipCargo ??= new List<ResourceStack>();
         portStorages ??= new List<PortStorageState>();
+        NormalizeActiveResearchSlots();
         activeSortie.Normalize();
         baseIndustry.Normalize();
         courierService.Normalize();
+        capitalAirplane.Normalize();
+        repairDockService.Normalize();
+        for (int i = factionDailyTasks.Count - 1; i >= 0; i--)
+        {
+            FactionDailyTaskState task = factionDailyTasks[i];
+            if (task == null)
+            {
+                factionDailyTasks.RemoveAt(i);
+                continue;
+            }
+
+            task.Normalize();
+            if (string.IsNullOrWhiteSpace(task.taskId))
+            {
+                factionDailyTasks.RemoveAt(i);
+            }
+        }
+
+        selectedDevelopmentDockSlot = Mathf.Max(0, selectedDevelopmentDockSlot);
+        lastQuickSortieReport ??= "";
         shipFuelTank.Normalize();
         shipClaudiumTank.Normalize();
+
+        for (int i = dockedDevelopmentShips.Count - 1; i >= 0; i--)
+        {
+            DockedDevelopmentShipState ship = dockedDevelopmentShips[i];
+            if (ship == null)
+            {
+                dockedDevelopmentShips.RemoveAt(i);
+                continue;
+            }
+
+            ship.Normalize();
+            if (ship.slotIndex < 0)
+            {
+                dockedDevelopmentShips.RemoveAt(i);
+            }
+        }
 
         for (int i = baseIslandExpansionRegions.Count - 1; i >= 0; i--)
         {
@@ -119,6 +169,8 @@ public class PlayerProgress
         {
             shipWeaponSpendBufferKg = 0f;
         }
+
+        NormalizeActiveResearchSlots();
 
         for (int i = installedModules.Count - 1; i >= 0; i--)
         {
@@ -200,6 +252,139 @@ public class PlayerProgress
             }
         }
 
+    }
+
+    private void NormalizeActiveResearchSlots()
+    {
+        activeResearchTechnologyIds ??= new List<string>();
+        HashSet<string> seenTechnologyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < activeResearchTechnologyIds.Count; i++)
+        {
+            string value = activeResearchTechnologyIds[i];
+            value = value == null ? "" : value.Trim();
+            if (!string.IsNullOrWhiteSpace(value) && !seenTechnologyIds.Add(value))
+            {
+                value = "";
+            }
+
+            activeResearchTechnologyIds[i] = value;
+        }
+
+        if (activeResearchTechnologyIds.Count == 0 && !string.IsNullOrWhiteSpace(activeResearchTechnologyId))
+        {
+            activeResearchTechnologyIds.Add(activeResearchTechnologyId.Trim());
+        }
+
+        activeResearchTechnologyId = activeResearchTechnologyIds.Count > 0
+            ? (activeResearchTechnologyIds[0] ?? "")
+            : (activeResearchTechnologyId ?? "");
+    }
+
+    public void EnsureResearchSlotCount(int slotCount)
+    {
+        slotCount = Mathf.Clamp(slotCount, 1, 12);
+        activeResearchTechnologyIds ??= new List<string>();
+        while (activeResearchTechnologyIds.Count < slotCount)
+        {
+            activeResearchTechnologyIds.Add("");
+        }
+
+        for (int i = 0; i < activeResearchTechnologyIds.Count; i++)
+        {
+            activeResearchTechnologyIds[i] = activeResearchTechnologyIds[i] == null ? "" : activeResearchTechnologyIds[i].Trim();
+        }
+
+        RemoveDuplicateResearchSlotTechnologies();
+        activeResearchTechnologyId = activeResearchTechnologyIds.Count > 0 ? activeResearchTechnologyIds[0] : "";
+    }
+
+    public string GetResearchSlotTechnologyId(int slotIndex)
+    {
+        if (slotIndex < 0 || activeResearchTechnologyIds == null || slotIndex >= activeResearchTechnologyIds.Count)
+        {
+            return "";
+        }
+
+        return activeResearchTechnologyIds[slotIndex] ?? "";
+    }
+
+    public void SetResearchSlotTechnologyId(int slotIndex, string technologyId, int slotCount)
+    {
+        EnsureResearchSlotCount(slotCount);
+        if (slotIndex < 0 || slotIndex >= activeResearchTechnologyIds.Count)
+        {
+            return;
+        }
+
+        activeResearchTechnologyIds[slotIndex] = technologyId ?? "";
+        activeResearchTechnologyId = activeResearchTechnologyIds.Count > 0 ? activeResearchTechnologyIds[0] : "";
+    }
+
+    public bool ClearResearchTechnologyFromSlots(string technologyId)
+    {
+        if (string.IsNullOrWhiteSpace(technologyId) || activeResearchTechnologyIds == null)
+        {
+            return false;
+        }
+
+        bool changed = false;
+        for (int i = 0; i < activeResearchTechnologyIds.Count; i++)
+        {
+            if (string.Equals(activeResearchTechnologyIds[i], technologyId, StringComparison.OrdinalIgnoreCase))
+            {
+                activeResearchTechnologyIds[i] = "";
+                changed = true;
+            }
+        }
+
+        activeResearchTechnologyId = activeResearchTechnologyIds.Count > 0 ? activeResearchTechnologyIds[0] : "";
+        return changed;
+    }
+
+    public bool IsResearchTechnologyActive(string technologyId)
+    {
+        if (string.IsNullOrWhiteSpace(technologyId) || activeResearchTechnologyIds == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < activeResearchTechnologyIds.Count; i++)
+        {
+            if (string.Equals(activeResearchTechnologyIds[i], technologyId, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return string.Equals(activeResearchTechnologyId, technologyId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void RemoveDuplicateResearchSlotTechnologies()
+    {
+        if (activeResearchTechnologyIds == null || activeResearchTechnologyIds.Count <= 1)
+        {
+            return;
+        }
+
+        HashSet<string> seenTechnologyIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < activeResearchTechnologyIds.Count; i++)
+        {
+            string value = activeResearchTechnologyIds[i];
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                activeResearchTechnologyIds[i] = "";
+                continue;
+            }
+
+            value = value.Trim();
+            if (!seenTechnologyIds.Add(value))
+            {
+                activeResearchTechnologyIds[i] = "";
+                continue;
+            }
+
+            activeResearchTechnologyIds[i] = value;
+        }
     }
 
     public void EnsureStarterHull(string hullId)
@@ -640,6 +825,31 @@ public class PlayerProgress
         return string.IsNullOrWhiteSpace(value) ? "any" : value.Trim().ToLowerInvariant();
     }
 
+    public FactionDailyTaskState GetFactionDailyTaskState(string taskId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(taskId)) return null;
+        taskId = taskId.Trim();
+        factionDailyTasks ??= new List<FactionDailyTaskState>();
+
+        for (int i = 0; i < factionDailyTasks.Count; i++)
+        {
+            FactionDailyTaskState state = factionDailyTasks[i];
+            if (state != null && state.taskId == taskId)
+            {
+                return state;
+            }
+        }
+
+        if (!createIfMissing)
+        {
+            return null;
+        }
+
+        FactionDailyTaskState newState = new FactionDailyTaskState { taskId = taskId };
+        factionDailyTasks.Add(newState);
+        return newState;
+    }
+
     public void RememberSortiePosition(Vector3 position)
     {
         if (activeSortie == null || !activeSortie.active) return;
@@ -931,15 +1141,249 @@ public class CourierServiceState
 }
 
 [Serializable]
+public class CapitalAirplaneState
+{
+    public int generation;
+    public int serviceLevel = 1;
+    public string planeId = "";
+    public string tierId = "";
+    public List<CascadeItemAmount> inputs = new List<CascadeItemAmount>();
+    public int solidReward;
+    public int freightReward;
+    public int designExperienceReward;
+    public string bonusSummary = "";
+    public bool sent;
+    public long openedUtcTicks;
+    public long expiresUtcTicks;
+    public long sentUtcTicks;
+
+    public bool HasPlane => !string.IsNullOrWhiteSpace(planeId)
+        && inputs != null
+        && inputs.Count > 0
+        && expiresUtcTicks > 0L;
+
+    public void Normalize()
+    {
+        generation = Mathf.Max(0, generation);
+        serviceLevel = Mathf.Clamp(serviceLevel, 1, 20);
+        planeId = string.IsNullOrWhiteSpace(planeId) ? "" : planeId.Trim();
+        tierId = string.IsNullOrWhiteSpace(tierId) ? "" : tierId.Trim();
+        inputs ??= new List<CascadeItemAmount>();
+        solidReward = Mathf.Max(0, solidReward);
+        freightReward = Mathf.Max(0, freightReward);
+        designExperienceReward = Mathf.Max(0, designExperienceReward);
+        bonusSummary = string.IsNullOrWhiteSpace(bonusSummary) ? "" : bonusSummary.Trim();
+        openedUtcTicks = Math.Max(0L, openedUtcTicks);
+        expiresUtcTicks = Math.Max(0L, expiresUtcTicks);
+        sentUtcTicks = Math.Max(0L, sentUtcTicks);
+
+        for (int i = inputs.Count - 1; i >= 0; i--)
+        {
+            CascadeItemAmount input = inputs[i];
+            if (input == null)
+            {
+                inputs.RemoveAt(i);
+                continue;
+            }
+
+            input.Normalize();
+            if (string.IsNullOrWhiteSpace(input.itemId) || input.amount <= 0)
+            {
+                inputs.RemoveAt(i);
+            }
+        }
+
+        if (!sent)
+        {
+            sentUtcTicks = 0L;
+        }
+    }
+
+    public void ClearPlane()
+    {
+        planeId = "";
+        tierId = "";
+        inputs ??= new List<CascadeItemAmount>();
+        inputs.Clear();
+        solidReward = 0;
+        freightReward = 0;
+        designExperienceReward = 0;
+        bonusSummary = "";
+        sent = false;
+        openedUtcTicks = 0L;
+        expiresUtcTicks = 0L;
+        sentUtcTicks = 0L;
+    }
+}
+
+[Serializable]
+public class RepairDockServiceState
+{
+    public List<RepairDockSlotState> slots = new List<RepairDockSlotState>();
+
+    public void Normalize()
+    {
+        slots ??= new List<RepairDockSlotState>();
+
+        for (int i = slots.Count - 1; i >= 0; i--)
+        {
+            RepairDockSlotState slot = slots[i];
+            if (slot == null)
+            {
+                slots.RemoveAt(i);
+                continue;
+            }
+
+            slot.Normalize();
+            if (slot.slotIndex < 0)
+            {
+                slots.RemoveAt(i);
+            }
+        }
+    }
+
+    public RepairDockSlotState GetSlot(int slotIndex, bool createIfMissing)
+    {
+        slots ??= new List<RepairDockSlotState>();
+        int normalizedIndex = Mathf.Max(0, slotIndex);
+        for (int i = 0; i < slots.Count; i++)
+        {
+            RepairDockSlotState slot = slots[i];
+            if (slot != null && slot.slotIndex == normalizedIndex)
+            {
+                return slot;
+            }
+        }
+
+        if (!createIfMissing)
+        {
+            return null;
+        }
+
+        RepairDockSlotState newSlot = new RepairDockSlotState { slotIndex = normalizedIndex };
+        slots.Add(newSlot);
+        return newSlot;
+    }
+}
+
+[Serializable]
+public class RepairDockSlotState
+{
+    public int slotIndex;
+    public int generation;
+    public int serviceLevel = 1;
+    public string wreckId = "";
+    public string shipId = "";
+    public int shipRank;
+    public int repairCostFe;
+    public int sellRewardFreight;
+    public int workStepCount;
+    public int completedWorkSteps;
+    public bool repaired;
+    public long generatedUtcTicks;
+    public List<CascadeItemAmount> inputs = new List<CascadeItemAmount>();
+    public string lastMessage = "";
+
+    public bool HasWreck => !string.IsNullOrWhiteSpace(shipId);
+    public bool NeedsWork => HasWreck && !repaired && completedWorkSteps < workStepCount;
+
+    public void Normalize()
+    {
+        slotIndex = Mathf.Max(0, slotIndex);
+        generation = Mathf.Max(0, generation);
+        serviceLevel = Mathf.Clamp(serviceLevel, 1, 70);
+        wreckId = string.IsNullOrWhiteSpace(wreckId) ? "" : wreckId.Trim();
+        shipId = string.IsNullOrWhiteSpace(shipId) ? "" : shipId.Trim();
+        shipRank = Mathf.Clamp(shipRank, 0, 10);
+        repairCostFe = Mathf.Max(0, repairCostFe);
+        sellRewardFreight = Mathf.Max(0, sellRewardFreight);
+        workStepCount = Mathf.Clamp(workStepCount, 1, 12);
+        completedWorkSteps = Mathf.Clamp(completedWorkSteps, 0, workStepCount);
+        repaired = HasWreck && (repaired || completedWorkSteps >= workStepCount);
+        generatedUtcTicks = Math.Max(0L, generatedUtcTicks);
+        lastMessage = string.IsNullOrWhiteSpace(lastMessage) ? "" : lastMessage.Trim();
+        inputs ??= new List<CascadeItemAmount>();
+
+        for (int i = inputs.Count - 1; i >= 0; i--)
+        {
+            CascadeItemAmount input = inputs[i];
+            if (input == null)
+            {
+                inputs.RemoveAt(i);
+                continue;
+            }
+
+            input.Normalize();
+            if (string.IsNullOrWhiteSpace(input.itemId) || input.amount <= 0)
+            {
+                inputs.RemoveAt(i);
+            }
+        }
+
+        if (!HasWreck)
+        {
+            ClearWreck();
+        }
+    }
+
+    public void ClearWreck()
+    {
+        wreckId = "";
+        shipId = "";
+        shipRank = 0;
+        repairCostFe = 0;
+        sellRewardFreight = 0;
+        workStepCount = 1;
+        completedWorkSteps = 0;
+        repaired = false;
+        generatedUtcTicks = 0L;
+        inputs ??= new List<CascadeItemAmount>();
+        inputs.Clear();
+        lastMessage = "";
+    }
+}
+
+[Serializable]
+public class DockedDevelopmentShipState
+{
+    public int slotIndex;
+    public string shipId = "";
+    public int sortiesRemaining;
+    public int generation;
+    public string lastRewardSummary = "";
+
+    public bool HasShip => !string.IsNullOrWhiteSpace(shipId);
+
+    public void Normalize()
+    {
+        slotIndex = Mathf.Max(0, slotIndex);
+        shipId = string.IsNullOrWhiteSpace(shipId) ? "" : shipId.Trim();
+        sortiesRemaining = Mathf.Clamp(sortiesRemaining, 0, MetaGameState.DevelopmentDockShipMaxSorties);
+        generation = Mathf.Max(0, generation);
+        lastRewardSummary ??= "";
+    }
+
+    public void ClearShip()
+    {
+        shipId = "";
+        sortiesRemaining = 0;
+        lastRewardSummary = "";
+    }
+}
+
+[Serializable]
 public class CourierOrderSlotState
 {
     public int slotIndex;
     public int generation;
     public string orderId = "";
     public string clientName = "";
+    public string customerFactionId = "";
+    public string customerFactionNameRu = "";
     public List<CascadeItemAmount> inputs = new List<CascadeItemAmount>();
     public int freightReward;
     public int designExperienceReward;
+    public int reputationReward;
     public long cooldownCompleteUtcTicks;
 
     public bool HasActiveOrder => cooldownCompleteUtcTicks <= 0L
@@ -958,9 +1402,12 @@ public class CourierOrderSlotState
         generation = Mathf.Max(0, generation);
         orderId = string.IsNullOrWhiteSpace(orderId) ? "" : orderId.Trim();
         clientName = string.IsNullOrWhiteSpace(clientName) ? "" : clientName.Trim();
+        customerFactionId = string.IsNullOrWhiteSpace(customerFactionId) ? "" : customerFactionId.Trim();
+        customerFactionNameRu = string.IsNullOrWhiteSpace(customerFactionNameRu) ? "" : customerFactionNameRu.Trim();
         inputs ??= new List<CascadeItemAmount>();
         freightReward = Mathf.Max(0, freightReward);
         designExperienceReward = Mathf.Max(0, designExperienceReward);
+        reputationReward = Mathf.Max(0, reputationReward);
         cooldownCompleteUtcTicks = Math.Max(0L, cooldownCompleteUtcTicks);
 
         for (int i = inputs.Count - 1; i >= 0; i--)
@@ -983,9 +1430,12 @@ public class CourierOrderSlotState
         {
             orderId = "";
             clientName = "";
+            customerFactionId = "";
+            customerFactionNameRu = "";
             inputs.Clear();
             freightReward = 0;
             designExperienceReward = 0;
+            reputationReward = 0;
         }
     }
 
@@ -993,10 +1443,13 @@ public class CourierOrderSlotState
     {
         orderId = "";
         clientName = "";
+        customerFactionId = "";
+        customerFactionNameRu = "";
         inputs ??= new List<CascadeItemAmount>();
         inputs.Clear();
         freightReward = 0;
         designExperienceReward = 0;
+        reputationReward = 0;
     }
 }
 
@@ -1131,6 +1584,28 @@ public class QuestMetricState
         metricType = PlayerProgress.NormalizeQuestMetricPart(metricType);
         targetId = PlayerProgress.NormalizeQuestMetricPart(targetId);
         value = Mathf.Max(0, value);
+    }
+}
+
+[Serializable]
+public class FactionDailyTaskState
+{
+    public string taskId = "";
+    public string factionId = "";
+    public long dayIndex;
+    public bool completed;
+    public long completedUtcTicks;
+
+    public void Normalize()
+    {
+        taskId = string.IsNullOrWhiteSpace(taskId) ? "" : taskId.Trim();
+        factionId = string.IsNullOrWhiteSpace(factionId) ? "" : factionId.Trim().ToLowerInvariant();
+        dayIndex = Math.Max(0L, dayIndex);
+        completedUtcTicks = Math.Max(0L, completedUtcTicks);
+        if (!completed)
+        {
+            completedUtcTicks = 0L;
+        }
     }
 }
 

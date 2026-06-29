@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -28,49 +28,351 @@ public class MetaGameProgressSaveData
     public PlayerProgress progress = new PlayerProgress();
 }
 
+public class FactionDefinitionView
+{
+    public string factionId = "";
+    public string displayNameRu = "";
+    public string currencyItemId = "";
+    public int reputationPoints;
+    public int reputationLevel;
+    public int nextLevelRequired;
+}
+
+public class FactionMarketItemOffer
+{
+    public string factionId = "";
+    public string itemId = "";
+    public string itemNameRu = "";
+    public string currencyItemId = "";
+    public int priceAmount;
+    public int minReputationLevel;
+    public int dailyLimit;
+    public string unlockQuestId = "";
+    public bool unlocked;
+    public string lockedReason = "";
+}
+
+public class FactionDailyTaskOffer
+{
+    public string taskId = "";
+    public string factionId = "";
+    public string titleRu = "";
+    public string inputItemId = "";
+    public int inputAmount;
+    public string rewardCurrencyItemId = "";
+    public int rewardCurrencyAmount;
+    public int reputationReward;
+    public int masteryReward;
+    public long dayIndex;
+    public bool completed;
+}
+
+public class FactionBuildingGateRequirement
+{
+    public string scopeId = "";
+    public string scopeNameRu = "";
+    public string factionId = "";
+    public string factionNameRu = "";
+    public int targetLevel;
+    public int requiredReputationLevel;
+}
+
 public partial class MetaGameState : MonoBehaviour
 {
     private const float ExtractionRunupOutwardDotThreshold = 0.9659258f;
     private const float SortieEntryApproachSeconds = 20f;
     private const float SortieEntryDefaultMaxSpeedMS = 120f;
-    private const string Cruiser203HullId = "cruiser203_hull";
     private const string PersistentProgressSaveFileName = "wildwind_meta_progress_v1.json";
     private const string PersistentProgressBigTestSaveFileName = "wildwind_meta_progress_bigtest_v1.json";
     private const float PersistentProgressAutosaveIntervalSeconds = 1f;
     private const int BaseCascadeQueueSlotCount = 5;
     public const int CourierOrderSlotCount = 8;
     public const int CourierCancelCooldownSeconds = 15 * 60;
+    public const int CapitalAirplaneCycleSeconds = 24 * 60 * 60;
+    public const int RepairDockSlotCount = 2;
     private const int KnowledgeMaxLevel = 5;
     private const float BaseArchiveKnowledgeSpPerMinute = 3f;
     private const string CourierFreightRewardItemId = "freight";
     private const string CourierExperienceRewardItemId = SessionExtractionConstants.DesignExperienceItemId;
-    private static readonly string[] CourierClientNames =
+    private const string CapitalAirplaneSolidRewardItemId = "solid";
+    private static readonly int[] FactionReputationThresholds = { 100, 500, 3000, 12000, 50000 };
+    private static readonly FactionDefinitionSpec[] FactionDefinitions =
     {
-        "Маяк Северный",
-        "Караванная пристань",
-        "Дом Вихря",
-        "Лоцманский двор",
-        "Бирюзовый причал",
-        "Штормовая почта",
-        "Станция Гребня",
-        "Южный буй"
+        new FactionDefinitionSpec("capital", "Империя", "solid"),
+        new FactionDefinitionSpec("wind_houses", "Ветровые Дома", "freight"),
+        new FactionDefinitionSpec("mist_synod", "Туманный Синод", "nobel"),
+        new FactionDefinitionSpec("stone_vault", "Каменный Свод", "gems"),
+        new FactionDefinitionSpec("factory_ark", "Заводные Ковчеги", "perfcards"),
+        new FactionDefinitionSpec("devourers", "Пожиратели", "amber")
+    };
+    private static readonly FactionMarketItemSpec[] FactionMarketItems =
+    {
+        new FactionMarketItemSpec("capital", "iron", 1, 1, 25, 200),
+        new FactionMarketItemSpec("capital", "steel", 1, 1, 3, 80),
+        new FactionMarketItemSpec("capital", "engine", 2, 3, 1, 12),
+        new FactionMarketItemSpec("capital", "weapon_block", 4, 16, 1, 4),
+        new FactionMarketItemSpec("capital", "capital_flagship_license", 5, 700, 1, 1, "fquest_capital_50", "solid"),
+        new FactionMarketItemSpec("capital", "capital_ordnance_blank", 1, 1, 2, 40),
+        new FactionMarketItemSpec("capital", "capital_turret_ring", 2, 2, 1, 24, "fquest_capital_10"),
+        new FactionMarketItemSpec("capital", "capital_breech_group", 3, 4, 1, 12, "fquest_capital_20"),
+        new FactionMarketItemSpec("capital", "capital_rangefinder_prism", 4, 7, 1, 8, "fquest_capital_35"),
+        new FactionMarketItemSpec("capital", "capital_casemate_insert", 5, 10, 1, 5, "fquest_capital_45"),
+
+        new FactionMarketItemSpec("wind_houses", "iron", 1, 80, 50, 300),
+        new FactionMarketItemSpec("wind_houses", "aerosil", 1, 70, 50, 300),
+        new FactionMarketItemSpec("wind_houses", "steel", 2, 1050, 10, 80),
+        new FactionMarketItemSpec("wind_houses", "cargo_block", 4, 52000, 1, 5),
+        new FactionMarketItemSpec("wind_houses", "wind_magnetic_coil", 1, 2600, 2, 60),
+        new FactionMarketItemSpec("wind_houses", "wind_turbine_blade", 2, 4600, 1, 35, "fquest_wind_houses_10"),
+        new FactionMarketItemSpec("wind_houses", "wind_cargo_sling", 2, 3900, 2, 45, "fquest_wind_houses_10"),
+        new FactionMarketItemSpec("wind_houses", "wind_course_gyro", 3, 7600, 1, 20, "fquest_wind_houses_20"),
+        new FactionMarketItemSpec("wind_houses", "wind_launch_cup", 4, 14500, 1, 12, "fquest_wind_houses_35"),
+        new FactionMarketItemSpec("wind_houses", "wind_houses_flagship_license", 5, 700, 1, 1, "fquest_wind_houses_50", "solid"),
+
+        new FactionMarketItemSpec("mist_synod", "aerosil", 1, 1, 30, 240),
+        new FactionMarketItemSpec("mist_synod", "vespar", 1, 1, 15, 160),
+        new FactionMarketItemSpec("mist_synod", "fulgur", 2, 1, 8, 90),
+        new FactionMarketItemSpec("mist_synod", "fluoroplastic", 3, 2, 3, 35),
+        new FactionMarketItemSpec("mist_synod", "mist_gas_membrane", 1, 2, 2, 50),
+        new FactionMarketItemSpec("mist_synod", "mist_separator_cassette", 2, 3, 1, 32, "fquest_mist_synod_10"),
+        new FactionMarketItemSpec("mist_synod", "mist_polymer_cell", 3, 5, 1, 22, "fquest_mist_synod_20"),
+        new FactionMarketItemSpec("mist_synod", "mist_pyrophoric_paste", 4, 8, 1, 12, "fquest_mist_synod_35"),
+        new FactionMarketItemSpec("mist_synod", "mist_cartridge", 4, 7, 1, 14, "fquest_mist_synod_35"),
+        new FactionMarketItemSpec("mist_synod", "mist_synod_flagship_license", 5, 700, 1, 1, "fquest_mist_synod_50", "solid"),
+
+        new FactionMarketItemSpec("stone_vault", "iron", 1, 1, 30, 260),
+        new FactionMarketItemSpec("stone_vault", "calcite", 1, 1, 20, 220),
+        new FactionMarketItemSpec("stone_vault", "monazite", 3, 2, 3, 40),
+        new FactionMarketItemSpec("stone_vault", "armor_plate", 3, 3, 2, 36),
+        new FactionMarketItemSpec("stone_vault", "stone_crushing_crown", 1, 2, 2, 55),
+        new FactionMarketItemSpec("stone_vault", "stone_throat_grate", 2, 3, 1, 40, "fquest_stone_vault_10"),
+        new FactionMarketItemSpec("stone_vault", "stone_armor_wedge", 3, 5, 1, 24, "fquest_stone_vault_20"),
+        new FactionMarketItemSpec("stone_vault", "stone_gun_cradle", 4, 8, 1, 14, "fquest_stone_vault_35"),
+        new FactionMarketItemSpec("stone_vault", "stone_quarry_insert", 4, 7, 1, 16, "fquest_stone_vault_35"),
+        new FactionMarketItemSpec("stone_vault", "stone_vault_flagship_license", 5, 700, 1, 1, "fquest_stone_vault_50", "solid"),
+
+        new FactionMarketItemSpec("factory_ark", "automaton_relay", 1, 1, 8, 120),
+        new FactionMarketItemSpec("factory_ark", "automaton_coil", 1, 1, 6, 110),
+        new FactionMarketItemSpec("factory_ark", "sensor", 2, 4, 1, 30),
+        new FactionMarketItemSpec("factory_ark", "calculator", 3, 5, 1, 20),
+        new FactionMarketItemSpec("factory_ark", "ark_precision_drive", 1, 2, 2, 55),
+        new FactionMarketItemSpec("factory_ark", "ark_servo_ring", 2, 3, 1, 40, "fquest_factory_ark_10"),
+        new FactionMarketItemSpec("factory_ark", "ark_counting_cell", 3, 5, 1, 24, "fquest_factory_ark_20"),
+        new FactionMarketItemSpec("factory_ark", "ark_repair_lens", 4, 8, 1, 14, "fquest_factory_ark_35"),
+        new FactionMarketItemSpec("factory_ark", "ark_hangar_cradle", 4, 7, 1, 16, "fquest_factory_ark_35"),
+        new FactionMarketItemSpec("factory_ark", "factory_ark_flagship_license", 5, 700, 1, 1, "fquest_factory_ark_50", "solid"),
+
+        new FactionMarketItemSpec("devourers", "leviathan_meat", 1, 1, 30, 260),
+        new FactionMarketItemSpec("devourers", "leviathan_fat", 1, 1, 16, 180),
+        new FactionMarketItemSpec("devourers", "leviathan_sinew", 2, 1, 8, 90),
+        new FactionMarketItemSpec("devourers", "leviathan_ichor", 3, 2, 3, 36),
+        new FactionMarketItemSpec("devourers", "dev_harpoon_winch", 1, 2, 2, 55),
+        new FactionMarketItemSpec("devourers", "dev_tension_drum", 2, 3, 1, 40, "fquest_devourers_10"),
+        new FactionMarketItemSpec("devourers", "dev_hook_chain", 3, 5, 1, 24, "fquest_devourers_20"),
+        new FactionMarketItemSpec("devourers", "dev_bone_cutter", 4, 8, 1, 14, "fquest_devourers_35"),
+        new FactionMarketItemSpec("devourers", "dev_bomb_cowling", 4, 7, 1, 16, "fquest_devourers_35"),
+        new FactionMarketItemSpec("devourers", "devourers_flagship_license", 5, 700, 1, 1, "fquest_devourers_50", "solid")
+    };
+    private static readonly FactionDailyTaskTemplateSpec[] FactionDailyTaskTemplates =
+    {
+        new FactionDailyTaskTemplateSpec("capital", "Столичная ведомость", "iron", 6, 14, 3, 7, 50, 35),
+        new FactionDailyTaskTemplateSpec("capital", "Сухой склад", "charcoal", 16, 36, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("capital", "Приемка механизмов", "mechanisms", 1, 3, 4, 8, 50, 35),
+        new FactionDailyTaskTemplateSpec("capital", "Пакет боекомплекта", "munition_bundle", 1, 2, 5, 10, 50, 35),
+        new FactionDailyTaskTemplateSpec("capital", "Архивная посылка", SessionExtractionConstants.FundamentalExperienceItemId, 2, 6, 4, 8, 50, 35),
+
+        new FactionDailyTaskTemplateSpec("wind_houses", "Грузовой рейс", "iron", 8, 20, 600, 1400, 50, 35),
+        new FactionDailyTaskTemplateSpec("wind_houses", "Срочная почта", "paper", 2, 6, 700, 1600, 50, 35),
+        new FactionDailyTaskTemplateSpec("wind_houses", "Летучая мелочь", "aerosil", 10, 24, 550, 1200, 50, 35),
+        new FactionDailyTaskTemplateSpec("wind_houses", "Ременные поставки", "cloth", 8, 18, 650, 1500, 50, 35),
+        new FactionDailyTaskTemplateSpec("wind_houses", "Малый транзит", SessionExtractionConstants.LeviathanMeatItemId, 6, 14, 600, 1300, 50, 35),
+
+        new FactionDailyTaskTemplateSpec("mist_synod", "Сухая проба", "aerosil", 8, 18, 3, 7, 50, 35),
+        new FactionDailyTaskTemplateSpec("mist_synod", "Веспарная партия", "vespar", 3, 9, 3, 7, 50, 35),
+        new FactionDailyTaskTemplateSpec("mist_synod", "Грозовой образец", "fulgur", 2, 5, 3, 7, 50, 35),
+        new FactionDailyTaskTemplateSpec("mist_synod", "Ионная склянка", "ionide", 1, 4, 4, 8, 50, 35),
+        new FactionDailyTaskTemplateSpec("mist_synod", "Герметик", "resin", 2, 6, 3, 7, 50, 35),
+
+        new FactionDailyTaskTemplateSpec("stone_vault", "Железная накладная", "iron", 8, 20, 3, 7, 50, 35),
+        new FactionDailyTaskTemplateSpec("stone_vault", "Меловая проба", "calcite", 4, 12, 3, 7, 50, 35),
+        new FactionDailyTaskTemplateSpec("stone_vault", "Сильвиновая лента", "sylvine", 3, 9, 3, 7, 50, 35),
+        new FactionDailyTaskTemplateSpec("stone_vault", "Броневой металл", "steel", 2, 8, 4, 8, 50, 35),
+        new FactionDailyTaskTemplateSpec("stone_vault", "Костяная присадка", SessionExtractionConstants.BoneGritItemId, 4, 12, 3, 7, 50, 35),
+
+        new FactionDailyTaskTemplateSpec("factory_ark", "Контактная ревизия", "automaton_relay", 1, 4, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("factory_ark", "Катушечный ящик", "automaton_coil", 1, 4, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("factory_ark", "Пружинная партия", "automaton_mainspring", 1, 3, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("factory_ark", "Линзовая проба", "automaton_optic_lens", 1, 3, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("factory_ark", "Манометрический набор", "automaton_pressure_gauge", 1, 3, 2, 5, 50, 35),
+
+        new FactionDailyTaskTemplateSpec("devourers", "Свежее мясо", SessionExtractionConstants.LeviathanMeatItemId, 8, 20, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("devourers", "Ворванная бочка", SessionExtractionConstants.LeviathanFatItemId, 2, 7, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("devourers", "Шкурная мера", SessionExtractionConstants.LeviathanHideItemId, 1, 3, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("devourers", "Сухожильный жгут", SessionExtractionConstants.LeviathanSinewItemId, 1, 4, 2, 5, 50, 35),
+        new FactionDailyTaskTemplateSpec("devourers", "Кислотная склянка", SessionExtractionConstants.AcidItemId, 1, 4, 2, 5, 50, 35)
+    };
+    private static readonly FactionBuildingGateSpec[] FactionBuildingGates =
+    {
+        new FactionBuildingGateSpec("processing:ore", "Рудная очистка", "stone_vault", 5, 2),
+        new FactionBuildingGateSpec("processing:ore", "Рудная очистка", "stone_vault", 9, 3),
+        new FactionBuildingGateSpec("processing:ore", "Рудная очистка", "stone_vault", 14, 4),
+        new FactionBuildingGateSpec("processing:ore", "Рудная очистка", "stone_vault", 20, 5),
+        new FactionBuildingGateSpec("processing:gas", "Газоразделение", "mist_synod", 5, 2),
+        new FactionBuildingGateSpec("processing:gas", "Газоразделение", "mist_synod", 9, 3),
+        new FactionBuildingGateSpec("processing:gas", "Газоразделение", "mist_synod", 14, 4),
+        new FactionBuildingGateSpec("processing:gas", "Газоразделение", "mist_synod", 20, 5),
+        new FactionBuildingGateSpec("processing:automatondismantling", "Разбор автоматонов", "factory_ark", 5, 2),
+        new FactionBuildingGateSpec("processing:automatondismantling", "Разбор автоматонов", "factory_ark", 10, 3),
+        new FactionBuildingGateSpec("processing:leviathanprocessing", "Разделка левиафанов", "devourers", 5, 2),
+        new FactionBuildingGateSpec("processing:leviathanprocessing", "Разделка левиафанов", "devourers", 10, 3),
+        new FactionBuildingGateSpec("cascade:metallurgy", "Металлургия", "stone_vault", 6, 2),
+        new FactionBuildingGateSpec("cascade:chemicalreactor", "Химический реактор", "mist_synod", 6, 2),
+        new FactionBuildingGateSpec("cascade:mechanical", "Механический цех", "factory_ark", 6, 2),
+        new FactionBuildingGateSpec("cascade:instrumentation", "Приборный цех", "factory_ark", 8, 3),
+        new FactionBuildingGateSpec("cascade:assembly", "Сборочный цех", "wind_houses", 8, 3),
+        new FactionBuildingGateSpec("cascade:construction", "Строительный цех", "capital", 10, 3),
+        new FactionBuildingGateSpec("cascade:electrical", "Электрический цех", "mist_synod", 10, 3),
+        new FactionBuildingGateSpec("cascade:automaton", "Автоматонный цех", "factory_ark", 12, 4)
+    };
+    private static readonly CourierCustomerSpec[] CourierCustomers =
+    {
+        new CourierCustomerSpec("capital", "Империя", "Портовая канцелярия"),
+        new CourierCustomerSpec("wind_houses", "Ветровые Дома", "Дом Вихря"),
+        new CourierCustomerSpec("mist_synod", "Туманный Синод", "Бирюзовый причал"),
+        new CourierCustomerSpec("stone_vault", "Каменный Свод", "Станция Гребня"),
+        new CourierCustomerSpec("factory_ark", "Заводные Ковчеги", "Механический двор"),
+        new CourierCustomerSpec("devourers", "Пожиратели", "Южный буй"),
+        new CourierCustomerSpec("wind_houses", "Ветровые Дома", "Штормовая почта"),
+        new CourierCustomerSpec("capital", "Империя", "Лоцманский двор")
+    };
+    private static readonly CourierResourceSpec[] CourierStarterResourceCatalog =
+    {
+        new CourierResourceSpec("iron", 1, 1, 2400),
+        new CourierResourceSpec("calcite", 1, 1, 1900),
+        new CourierResourceSpec("aerosil", 2, 5, 130),
+        new CourierResourceSpec("charcoal", 8, 16, 35),
+        new CourierResourceSpec("copper", 2, 5, 210),
+        new CourierResourceSpec(SessionExtractionConstants.LeviathanMeatItemId, 1, 4, 260)
     };
     private static readonly CourierResourceSpec[] CourierResourceCatalog =
     {
-        new CourierResourceSpec("windshale_ore", 18, 34, 3),
-        new CourierResourceSpec("dawnspar_ore", 12, 24, 4),
-        new CourierResourceSpec("cloud_condensate", 18, 36, 4),
-        new CourierResourceSpec(SessionExtractionConstants.BrokenAutomatonItemId, 8, 18, 7),
-        new CourierResourceSpec("windcalf_carcass", 10, 22, 6),
-        new CourierResourceSpec(SessionExtractionConstants.RockInfoItemId, 8, 16, 9),
-        new CourierResourceSpec("ferron", 6, 14, 12),
-        new CourierResourceSpec("silvate", 4, 10, 18),
-        new CourierResourceSpec("cloth", 8, 18, 10),
-        new CourierResourceSpec("tools", 3, 8, 26),
-        new CourierResourceSpec("charcoal", 12, 28, 4),
-        new CourierResourceSpec("claudium", 6, 14, 16),
-        new CourierResourceSpec("metal", 6, 16, 12),
-        new CourierResourceSpec("mechanisms", 3, 8, 30)
+        new CourierResourceSpec("iron", 5, 14, 230),
+        new CourierResourceSpec("calcite", 2, 8, 330),
+        new CourierResourceSpec("copper", 2, 7, 360),
+        new CourierResourceSpec("magnesium", 2, 7, 390),
+        new CourierResourceSpec("quartz", 1, 5, 470),
+        new CourierResourceSpec("aerosil", 4, 12, 120),
+        new CourierResourceSpec("vespar", 2, 8, 210),
+        new CourierResourceSpec("fulgur", 1, 5, 360),
+        new CourierResourceSpec("ionide", 1, 4, 520),
+        new CourierResourceSpec(SessionExtractionConstants.LeviathanFatItemId, 1, 5, 420),
+        new CourierResourceSpec("leviathan_hide", 1, 4, 520),
+        new CourierResourceSpec(SessionExtractionConstants.LeviathanSinewItemId, 1, 4, 590),
+        new CourierResourceSpec(SessionExtractionConstants.AutomatonCoreItemId, 1, 4, 560),
+        new CourierResourceSpec("automaton_relay", 1, 6, 260),
+        new CourierResourceSpec("tools", 1, 5, 300),
+        new CourierResourceSpec("mechanisms", 1, 5, 420),
+        new CourierResourceSpec("claudium", 2, 7, 320),
+        new CourierResourceSpec("steel", 4, 12, 190),
+        new CourierResourceSpec("cloth", 5, 14, 95),
+        new CourierResourceSpec(SessionExtractionConstants.RockInfoItemId, 4, 12, 160)
+    };
+    private static readonly CapitalAirplaneTierSpec[] CapitalAirplaneTiers =
+    {
+        new CapitalAirplaneTierSpec("capital_plane_l01", 1, 2, 3, 9000, 24, 450, 110, "малый купон; общий контейнер"),
+        new CapitalAirplaneTierSpec("capital_plane_l05", 5, 3, 3, 28000, 55, 1500, 260, "купон; архивный пакет"),
+        new CapitalAirplaneTierSpec("capital_plane_l09", 9, 3, 3, 76000, 105, 3800, 520, "ключ; фракционный ящик"),
+        new CapitalAirplaneTierSpec("capital_plane_l13", 13, 4, 3, 180000, 180, 9000, 920, "редкий купон; пакет ключей"),
+        new CapitalAirplaneTierSpec("capital_plane_l17", 17, 5, 3, 420000, 285, 18000, 1450, "премиум контейнер; фракционный ордер"),
+        new CapitalAirplaneTierSpec("capital_plane_l20", 20, 5, 3, 680000, 420, 30000, 2100, "крупный столичный пакет; редкий ордер")
+    };
+    private static readonly CapitalAirplaneCargoSpec[] CapitalAirplaneCargoCatalog =
+    {
+        new CapitalAirplaneCargoSpec("iron", 1, 230),
+        new CapitalAirplaneCargoSpec("calcite", 1, 330),
+        new CapitalAirplaneCargoSpec("copper", 1, 360),
+        new CapitalAirplaneCargoSpec("aerosil", 1, 120),
+        new CapitalAirplaneCargoSpec("charcoal", 1, 90),
+        new CapitalAirplaneCargoSpec(SessionExtractionConstants.LeviathanMeatItemId, 1, 260),
+        new CapitalAirplaneCargoSpec("automaton_relay", 1, 260),
+        new CapitalAirplaneCargoSpec("magnesium", 2, 390),
+        new CapitalAirplaneCargoSpec("quartz", 2, 470),
+        new CapitalAirplaneCargoSpec("vespar", 2, 210),
+        new CapitalAirplaneCargoSpec("fulgur", 2, 360),
+        new CapitalAirplaneCargoSpec("ionide", 2, 520),
+        new CapitalAirplaneCargoSpec(SessionExtractionConstants.LeviathanFatItemId, 2, 420),
+        new CapitalAirplaneCargoSpec(SessionExtractionConstants.AutomatonCoreItemId, 2, 560),
+        new CapitalAirplaneCargoSpec("steel", 3, 1250),
+        new CapitalAirplaneCargoSpec("bronze", 3, 1420),
+        new CapitalAirplaneCargoSpec("brass", 3, 1320),
+        new CapitalAirplaneCargoSpec("resin", 3, 1180),
+        new CapitalAirplaneCargoSpec("rubber", 3, 1360),
+        new CapitalAirplaneCargoSpec("bakelite", 3, 1680),
+        new CapitalAirplaneCargoSpec("beam", 4, 3600),
+        new CapitalAirplaneCargoSpec("plating", 4, 3400),
+        new CapitalAirplaneCargoSpec("bulkhead", 4, 4200),
+        new CapitalAirplaneCargoSpec("engine", 4, 7200),
+        new CapitalAirplaneCargoSpec("pump", 4, 5400),
+        new CapitalAirplaneCargoSpec("sensor", 4, 6800),
+        new CapitalAirplaneCargoSpec("power_block", 5, 24000),
+        new CapitalAirplaneCargoSpec("propulsion_block", 5, 26000),
+        new CapitalAirplaneCargoSpec("cargo_block", 5, 22000),
+        new CapitalAirplaneCargoSpec("industry_block", 5, 28000),
+        new CapitalAirplaneCargoSpec("airframe_kit", 5, 14000),
+        new CapitalAirplaneCargoSpec("module_kit", 5, 11000),
+        new CapitalAirplaneCargoSpec("munition_bundle", 5, 9000),
+        new CapitalAirplaneCargoSpec("gems", 5, 8000),
+        new CapitalAirplaneCargoSpec("nobel", 5, 9000),
+        new CapitalAirplaneCargoSpec("perfcards", 5, 9000),
+        new CapitalAirplaneCargoSpec("amber", 5, 10000)
+    };
+    private static readonly RepairDockResourceSpec[] RepairDockResourceCatalog =
+    {
+        new RepairDockResourceSpec("iron", 1, 20),
+        new RepairDockResourceSpec("charcoal", 1, 10),
+        new RepairDockResourceSpec("copper", 1, 30),
+        new RepairDockResourceSpec("magnesium", 1, 40),
+        new RepairDockResourceSpec("calcite", 1, 40),
+        new RepairDockResourceSpec("aerosil", 1, 20),
+        new RepairDockResourceSpec(SessionExtractionConstants.LeviathanMeatItemId, 1, 15),
+        new RepairDockResourceSpec("automaton_relay", 1, 200),
+
+        new RepairDockResourceSpec("steel", 2, 180),
+        new RepairDockResourceSpec("bronze", 2, 240),
+        new RepairDockResourceSpec("brass", 2, 260),
+        new RepairDockResourceSpec("resin", 2, 220),
+        new RepairDockResourceSpec("rubber", 2, 300),
+        new RepairDockResourceSpec("bakelite", 2, 240),
+        new RepairDockResourceSpec("leviathan_fat", 2, 80),
+        new RepairDockResourceSpec("acid", 2, 180),
+        new RepairDockResourceSpec("automaton_coil", 2, 280),
+        new RepairDockResourceSpec("automaton_brass_valve", 2, 380),
+
+        new RepairDockResourceSpec("beam", 3, 3600),
+        new RepairDockResourceSpec("plating", 3, 3400),
+        new RepairDockResourceSpec("armor_plate", 3, 4800),
+        new RepairDockResourceSpec("bulkhead", 3, 4200),
+        new RepairDockResourceSpec("deck_section", 3, 3900),
+        new RepairDockResourceSpec("airlock", 3, 5200),
+        new RepairDockResourceSpec("hatch", 3, 3000),
+        new RepairDockResourceSpec("engine", 3, 7200),
+        new RepairDockResourceSpec("actuator", 3, 5600),
+        new RepairDockResourceSpec("pump", 3, 5400),
+        new RepairDockResourceSpec("sensor", 3, 6800),
+        new RepairDockResourceSpec("calculator", 3, 7600),
+        new RepairDockResourceSpec("automaton_servo_joint", 3, 800),
+        new RepairDockResourceSpec("automaton_calibration_gear", 3, 700),
+
+        new RepairDockResourceSpec("bulat", 4, 700),
+        new RepairDockResourceSpec("invar", 4, 780),
+        new RepairDockResourceSpec("orkit", 4, 960),
+        new RepairDockResourceSpec("textolite", 4, 380),
+        new RepairDockResourceSpec("glass_ceramic", 4, 640),
+        new RepairDockResourceSpec("fluoroplastic", 4, 820),
+        new RepairDockResourceSpec("automaton_logic_drum", 4, 1100),
+        new RepairDockResourceSpec("automaton_command_cylinder", 4, 1300),
+        new RepairDockResourceSpec("automaton_servo_core", 4, 1600),
+        new RepairDockResourceSpec("automaton_core", 4, 2400)
     };
 
     [Header("Связи")]
@@ -120,6 +422,7 @@ public partial class MetaGameState : MonoBehaviour
 
     public GameSessionMode CurrentMode => progress != null ? progress.currentMode : startingMode;
     public bool IsDocked => CurrentMode == GameSessionMode.Docked;
+    public string LastAccountMessage => lastAccountMessage ?? "";
     public bool HasActiveSortie => progress != null && progress.HasActiveSortie;
     public SortieSessionState ActiveSortie => progress != null ? progress.activeSortie : null;
     public string ActiveSortieExtractionRunupStatus => activeSortieExtractionRunupStatus;
@@ -130,7 +433,7 @@ public partial class MetaGameState : MonoBehaviour
     public bool CanCatchStarterSortieFragmentsInCargo => HasActiveSortie
         && ActiveSortie != null
         && ActiveSortie.zone != null
-        && IsDefaultSessionSortieId(ActiveSortie.zone.sortieId);
+        && (IsDefaultSessionSortieId(ActiveSortie.zone.sortieId) || ActiveSortie.zone.HasPayloadRewards);
     public string RuntimeAccountId => string.IsNullOrWhiteSpace(runtimeAccountId)
         ? GameplaySessionAccountData.DefaultAccountId
         : runtimeAccountId.Trim();
@@ -180,6 +483,278 @@ public partial class MetaGameState : MonoBehaviour
         EnsureProgressInitialized();
         RefreshQuestProgress(false);
         return progress.GetQuestState(questId, false);
+    }
+
+    public IReadOnlyList<FactionDefinitionView> GetFactionDefinitions()
+    {
+        EnsureProgressInitialized();
+        List<FactionDefinitionView> views = new List<FactionDefinitionView>(FactionDefinitions.Length);
+        for (int i = 0; i < FactionDefinitions.Length; i++)
+        {
+            FactionDefinitionSpec spec = FactionDefinitions[i];
+            int points = GetFactionReputationPoints(spec.factionId);
+            int level = GetFactionReputationLevel(spec.factionId);
+            views.Add(new FactionDefinitionView
+            {
+                factionId = spec.factionId,
+                displayNameRu = spec.displayNameRu,
+                currencyItemId = spec.currencyItemId,
+                reputationPoints = points,
+                reputationLevel = level,
+                nextLevelRequired = level >= FactionReputationThresholds.Length
+                    ? 0
+                    : FactionReputationThresholds[Mathf.Clamp(level, 0, FactionReputationThresholds.Length - 1)]
+            });
+        }
+
+        return views;
+    }
+
+    public int GetFactionReputationPoints(string factionId)
+    {
+        EnsureProgressInitialized();
+        return progress != null
+            ? progress.GetQuestMetricValue("faction_reputation", NormalizeFactionId(factionId))
+            : 0;
+    }
+
+    public int GetFactionReputationLevel(string factionId)
+    {
+        int reputation = GetFactionReputationPoints(factionId);
+        int level = 0;
+        for (int i = 0; i < FactionReputationThresholds.Length; i++)
+        {
+            if (reputation >= FactionReputationThresholds[i])
+            {
+                level = i + 1;
+            }
+        }
+
+        return level;
+    }
+
+    public int GetFactionReputationRequiredForLevel(int level)
+    {
+        int index = Mathf.Clamp(level, 1, FactionReputationThresholds.Length) - 1;
+        return FactionReputationThresholds[index];
+    }
+
+    public IReadOnlyList<FactionMarketItemOffer> GetFactionMarketOffers(string factionId)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        string normalizedFactionId = NormalizeFactionId(factionId);
+        List<FactionMarketItemOffer> offers = new List<FactionMarketItemOffer>();
+        for (int i = 0; i < FactionMarketItems.Length; i++)
+        {
+            FactionMarketItemSpec spec = FactionMarketItems[i];
+            if (!string.Equals(spec.factionId, normalizedFactionId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            offers.Add(CreateFactionMarketOffer(spec));
+        }
+
+        return offers;
+    }
+
+    public bool TryBuyFactionMarketItem(string factionId, string itemId, int amount, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        string normalizedFactionId = NormalizeFactionId(factionId);
+        string normalizedItemId = string.IsNullOrWhiteSpace(itemId) ? "" : itemId.Trim();
+        amount = Mathf.Max(1, amount);
+
+        FactionMarketItemSpec? spec = FindFactionMarketItemSpec(normalizedFactionId, normalizedItemId);
+        if (!spec.HasValue)
+        {
+            message = "У этой фракции нет такого товара: " + normalizedItemId + ".";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        FactionMarketItemOffer offer = CreateFactionMarketOffer(spec.Value);
+        if (!offer.unlocked)
+        {
+            message = offer.lockedReason;
+            lastAccountMessage = message;
+            return false;
+        }
+
+        PortStorageState storage = GetCapitalStorageState();
+        int totalPrice = Mathf.Max(0, offer.priceAmount) * amount;
+        int available = storage != null ? storage.GetResourceAmount(offer.currencyItemId) : 0;
+        if (available < totalPrice)
+        {
+            message = "Не хватает валюты фракции: " + sessionConfig.GetItemNameRu(offer.currencyItemId)
+                + " " + available + "/" + totalPrice + ".";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (totalPrice > 0)
+        {
+            storage.TrySpendResource(offer.currencyItemId, totalPrice);
+            AddQuestEventMetric("resource_spent", offer.currencyItemId, totalPrice);
+        }
+
+        int purchasedAmount = amount * Mathf.Max(1, spec.Value.unitAmount);
+        storage.AddResource(offer.itemId, purchasedAmount);
+        AddQuestEventMetric("resource_acquired", offer.itemId, purchasedAmount);
+        AddQuestEventMetric("faction_market_purchase", normalizedFactionId, purchasedAmount);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+
+        message = "Куплено у фракции " + GetFactionDisplayName(normalizedFactionId)
+            + ": " + offer.itemNameRu + " x" + purchasedAmount
+            + " за " + sessionConfig.GetItemNameRu(offer.currencyItemId) + " x" + totalPrice + ".";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public IReadOnlyList<FactionDailyTaskOffer> GetFactionDailyTasks(string factionId)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        long dayIndex = GetFactionDailyDayIndex(GetProcessUtcNow());
+        string normalizedFactionId = NormalizeFactionId(factionId);
+        List<FactionDailyTaskOffer> offers = new List<FactionDailyTaskOffer>(5);
+        int slot = 0;
+        for (int i = 0; i < FactionDailyTaskTemplates.Length && slot < 5; i++)
+        {
+            FactionDailyTaskTemplateSpec template = FactionDailyTaskTemplates[i];
+            if (!string.Equals(template.factionId, normalizedFactionId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            offers.Add(CreateFactionDailyTaskOffer(template, dayIndex, slot));
+            slot++;
+        }
+
+        return offers;
+    }
+
+    public bool TryCompleteFactionDailyTask(string taskId, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        FactionDailyTaskOffer offer = FindFactionDailyTaskOffer(taskId);
+        if (offer == null)
+        {
+            message = "Ежедневное задание не найдено: " + taskId + ".";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        FactionDailyTaskState state = progress.GetFactionDailyTaskState(offer.taskId, true);
+        state.factionId = offer.factionId;
+        state.dayIndex = offer.dayIndex;
+        if (state.completed)
+        {
+            message = "Ежедневное задание уже выполнено.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        PortStorageState storage = GetCapitalStorageState();
+        int available = storage != null ? storage.GetResourceAmount(offer.inputItemId) : 0;
+        if (available < offer.inputAmount)
+        {
+            message = "Не хватает груза для задания: " + sessionConfig.GetItemNameRu(offer.inputItemId)
+                + " " + available + "/" + offer.inputAmount + ".";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        storage.TrySpendResource(offer.inputItemId, offer.inputAmount);
+        storage.AddResource(offer.rewardCurrencyItemId, offer.rewardCurrencyAmount);
+        storage.AddResource(SessionExtractionConstants.DesignExperienceItemId, offer.masteryReward);
+        state.completed = true;
+        state.completedUtcTicks = GetProcessUtcNow().Ticks;
+        state.Normalize();
+
+        AddQuestEventMetric("resource_spent", offer.inputItemId, offer.inputAmount);
+        AddQuestEventMetric("resource_acquired", offer.rewardCurrencyItemId, offer.rewardCurrencyAmount);
+        AddQuestEventMetric("resource_acquired", SessionExtractionConstants.DesignExperienceItemId, offer.masteryReward);
+        AddQuestEventMetric("faction_reputation", offer.factionId, offer.reputationReward);
+        AddQuestEventMetric("faction_reputation", "any", offer.reputationReward);
+        AddQuestEventMetric("faction_daily_completed", offer.factionId, 1);
+        AddQuestEventMetric("faction_daily_completed", offer.taskId, 1);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+
+        message = "Ежедневное задание выполнено: " + offer.titleRu
+            + ". Награда: " + sessionConfig.GetItemNameRu(offer.rewardCurrencyItemId)
+            + " x" + offer.rewardCurrencyAmount
+            + ", репутация +" + offer.reputationReward + ".";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public IReadOnlyList<FactionBuildingGateRequirement> GetFactionBuildingGateRequirements()
+    {
+        List<FactionBuildingGateRequirement> requirements = new List<FactionBuildingGateRequirement>(FactionBuildingGates.Length);
+        for (int i = 0; i < FactionBuildingGates.Length; i++)
+        {
+            FactionBuildingGateSpec gate = FactionBuildingGates[i];
+            requirements.Add(new FactionBuildingGateRequirement
+            {
+                scopeId = gate.scopeId,
+                scopeNameRu = gate.scopeNameRu,
+                factionId = gate.factionId,
+                factionNameRu = GetFactionDisplayName(gate.factionId),
+                targetLevel = gate.targetLevel,
+                requiredReputationLevel = gate.requiredReputationLevel
+            });
+        }
+
+        return requirements;
+    }
+
+    public bool CanPassFactionGateForUpgrade(string scopeId, int targetLevel, out string message)
+    {
+        EnsureProgressInitialized();
+        scopeId = string.IsNullOrWhiteSpace(scopeId) ? "" : scopeId.Trim().ToLowerInvariant();
+        targetLevel = Mathf.Max(1, targetLevel);
+        FactionBuildingGateSpec? strictest = null;
+        for (int i = 0; i < FactionBuildingGates.Length; i++)
+        {
+            FactionBuildingGateSpec gate = FactionBuildingGates[i];
+            if (!string.Equals(gate.scopeId, scopeId, StringComparison.OrdinalIgnoreCase)
+                || targetLevel < gate.targetLevel)
+            {
+                continue;
+            }
+
+            if (!strictest.HasValue || gate.requiredReputationLevel > strictest.Value.requiredReputationLevel)
+            {
+                strictest = gate;
+            }
+        }
+
+        if (!strictest.HasValue)
+        {
+            message = "";
+            return true;
+        }
+
+        FactionBuildingGateSpec requirement = strictest.Value;
+        int currentLevel = GetFactionReputationLevel(requirement.factionId);
+        if (currentLevel >= requirement.requiredReputationLevel)
+        {
+            message = "";
+            return true;
+        }
+
+        message = requirement.scopeNameRu + " L" + targetLevel
+            + " требует репутацию " + GetFactionDisplayName(requirement.factionId)
+            + " " + requirement.requiredReputationLevel + " зв.";
+        return false;
     }
 
     public int GetQuestCompletedCountForTests()
@@ -387,16 +962,202 @@ public partial class MetaGameState : MonoBehaviour
         state.completed = true;
         state.claimedUtcTicks = DateTime.UtcNow.Ticks;
 
-        if (!string.IsNullOrWhiteSpace(quest.rewardItemId) && quest.rewardAmount > 0)
+        GrantQuestRewardItem(quest.rewardItemId, quest.rewardAmount);
+        GrantQuestRewardItem(quest.rewardItem2Id, quest.rewardItem2Amount);
+        GrantQuestRewardItem(CourierFreightRewardItemId, quest.rewardFreightAmount);
+        GrantQuestRewardItem(SessionExtractionConstants.DesignExperienceItemId, quest.rewardMasteryAmount);
+        if (quest.rewardReputationAmount > 0)
         {
-            PortStorageState storage = GetCapitalStorageStateForQuestRuntime();
-            storage?.AddResource(quest.rewardItemId, quest.rewardAmount);
-            progress.AddQuestMetric("resource_acquired", quest.rewardItemId, quest.rewardAmount);
-            progress.AddQuestMetric("resource_acquired", "any", quest.rewardAmount);
+            string reputationFactionId = string.IsNullOrWhiteSpace(quest.rewardReputationFactionId)
+                ? quest.factionId
+                : quest.rewardReputationFactionId;
+            if (!string.IsNullOrWhiteSpace(reputationFactionId))
+            {
+                AddQuestEventMetric("faction_reputation", reputationFactionId, quest.rewardReputationAmount);
+                AddQuestEventMetric("faction_reputation", "any", quest.rewardReputationAmount);
+            }
         }
 
         lastAccountMessage = (automatic ? "Квест выполнен: " : "Награда получена: ") + quest.DisplayNameRu + ".";
         MarkPersistentProgressDirty();
+    }
+
+    private void GrantQuestRewardItem(string itemId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        {
+            return;
+        }
+
+        PortStorageState storage = GetCapitalStorageStateForQuestRuntime();
+        storage?.AddResource(itemId, amount);
+        progress.AddQuestMetric("resource_acquired", itemId, amount);
+        progress.AddQuestMetric("resource_acquired", "any", amount);
+    }
+
+    private FactionMarketItemOffer CreateFactionMarketOffer(FactionMarketItemSpec spec)
+    {
+        FactionMarketItemOffer offer = new FactionMarketItemOffer
+        {
+            factionId = spec.factionId,
+            itemId = spec.itemId,
+            itemNameRu = sessionConfig != null ? sessionConfig.GetItemNameRu(spec.itemId) : spec.itemId,
+            currencyItemId = string.IsNullOrWhiteSpace(spec.currencyItemId) ? GetFactionCurrency(spec.factionId) : spec.currencyItemId,
+            priceAmount = Mathf.Max(0, spec.priceAmount),
+            minReputationLevel = Mathf.Clamp(spec.minReputationLevel, 0, FactionReputationThresholds.Length),
+            dailyLimit = Mathf.Max(0, spec.dailyLimit),
+            unlockQuestId = spec.unlockQuestId
+        };
+
+        int currentLevel = GetFactionReputationLevel(spec.factionId);
+        if (currentLevel < offer.minReputationLevel)
+        {
+            offer.unlocked = false;
+            offer.lockedReason = GetFactionDisplayName(spec.factionId)
+                + ": нужен уровень репутации " + offer.minReputationLevel + " зв.";
+            return offer;
+        }
+
+        if (!string.IsNullOrWhiteSpace(spec.unlockQuestId) && !IsQuestClaimed(spec.unlockQuestId))
+        {
+            QuestDefinitionConfig quest = sessionConfig != null ? sessionConfig.GetQuestDefinition(spec.unlockQuestId) : null;
+            offer.unlocked = false;
+            offer.lockedReason = "Нужно завершить цепочку: " + (quest != null ? quest.DisplayNameRu : spec.unlockQuestId) + ".";
+            return offer;
+        }
+
+        offer.unlocked = true;
+        offer.lockedReason = "";
+        return offer;
+    }
+
+    private FactionMarketItemSpec? FindFactionMarketItemSpec(string factionId, string itemId)
+    {
+        for (int i = 0; i < FactionMarketItems.Length; i++)
+        {
+            FactionMarketItemSpec spec = FactionMarketItems[i];
+            if (string.Equals(spec.factionId, factionId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(spec.itemId, itemId, StringComparison.OrdinalIgnoreCase))
+            {
+                return spec;
+            }
+        }
+
+        return null;
+    }
+
+    private FactionDailyTaskOffer FindFactionDailyTaskOffer(string taskId)
+    {
+        if (string.IsNullOrWhiteSpace(taskId))
+        {
+            return null;
+        }
+
+        for (int i = 0; i < FactionDefinitions.Length; i++)
+        {
+            IReadOnlyList<FactionDailyTaskOffer> offers = GetFactionDailyTasks(FactionDefinitions[i].factionId);
+            for (int j = 0; j < offers.Count; j++)
+            {
+                FactionDailyTaskOffer offer = offers[j];
+                if (offer != null && string.Equals(offer.taskId, taskId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return offer;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private FactionDailyTaskOffer CreateFactionDailyTaskOffer(FactionDailyTaskTemplateSpec template, long dayIndex, int slot)
+    {
+        int seed = BuildFactionDailyTaskSeed(template.factionId, dayIndex, slot);
+        System.Random random = new System.Random(seed);
+        int inputAmount = template.minInputAmount + random.Next(0, Mathf.Max(1, template.maxInputAmount - template.minInputAmount + 1));
+        int rewardAmount = template.minRewardCurrency + random.Next(0, Mathf.Max(1, template.maxRewardCurrency - template.minRewardCurrency + 1));
+        string taskId = template.factionId + "_daily_" + dayIndex.ToString() + "_" + slot.ToString();
+        FactionDailyTaskState state = progress != null ? progress.GetFactionDailyTaskState(taskId, false) : null;
+        return new FactionDailyTaskOffer
+        {
+            taskId = taskId,
+            factionId = template.factionId,
+            titleRu = template.titleRu,
+            inputItemId = template.inputItemId,
+            inputAmount = Mathf.Max(1, inputAmount),
+            rewardCurrencyItemId = GetFactionCurrency(template.factionId),
+            rewardCurrencyAmount = Mathf.Max(1, rewardAmount),
+            reputationReward = Mathf.Max(1, template.reputationReward),
+            masteryReward = Mathf.Max(0, template.masteryReward),
+            dayIndex = dayIndex,
+            completed = state != null && state.completed
+        };
+    }
+
+    private static int BuildFactionDailyTaskSeed(string factionId, long dayIndex, int slot)
+    {
+        unchecked
+        {
+            int seed = 211;
+            string normalized = NormalizeFactionId(factionId);
+            for (int i = 0; i < normalized.Length; i++)
+            {
+                seed = seed * 31 + normalized[i];
+            }
+
+            seed = seed * 31 + (int)(dayIndex & 0x7fffffff);
+            seed = seed * 31 + slot * 7919;
+            return seed;
+        }
+    }
+
+    private static long GetFactionDailyDayIndex(DateTime utcNow)
+    {
+        DateTime normalized = utcNow.Kind == DateTimeKind.Utc ? utcNow : utcNow.ToUniversalTime();
+        return normalized.Ticks / TimeSpan.TicksPerDay;
+    }
+
+    private bool IsQuestClaimed(string questId)
+    {
+        if (string.IsNullOrWhiteSpace(questId) || progress == null)
+        {
+            return false;
+        }
+
+        QuestState state = progress.GetQuestState(questId, false);
+        return state != null && state.claimed;
+    }
+
+    private static string NormalizeFactionId(string factionId)
+    {
+        return string.IsNullOrWhiteSpace(factionId) ? "" : factionId.Trim().ToLowerInvariant();
+    }
+
+    private static string GetFactionCurrency(string factionId)
+    {
+        factionId = NormalizeFactionId(factionId);
+        for (int i = 0; i < FactionDefinitions.Length; i++)
+        {
+            if (string.Equals(FactionDefinitions[i].factionId, factionId, StringComparison.OrdinalIgnoreCase))
+            {
+                return FactionDefinitions[i].currencyItemId;
+            }
+        }
+
+        return CourierFreightRewardItemId;
+    }
+
+    private static string GetFactionDisplayName(string factionId)
+    {
+        factionId = NormalizeFactionId(factionId);
+        for (int i = 0; i < FactionDefinitions.Length; i++)
+        {
+            if (string.Equals(FactionDefinitions[i].factionId, factionId, StringComparison.OrdinalIgnoreCase))
+            {
+                return FactionDefinitions[i].displayNameRu;
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(factionId) ? "фракция" : factionId;
     }
 
     private int GetQuestObjectiveRawAmount(QuestDefinitionConfig quest)
@@ -586,6 +1347,18 @@ public partial class MetaGameState : MonoBehaviour
         {
             this.itemId = itemId ?? "";
             this.share = Mathf.Max(0f, share);
+        }
+    }
+
+    private readonly struct QuickSortieRewardCandidate
+    {
+        public readonly QuickSortieRewardSourceConfig source;
+        public readonly float weight;
+
+        public QuickSortieRewardCandidate(QuickSortieRewardSourceConfig source, float weight)
+        {
+            this.source = source;
+            this.weight = Mathf.Max(0f, weight);
         }
     }
 
@@ -795,10 +1568,20 @@ public partial class MetaGameState : MonoBehaviour
     {
         progress ??= new PlayerProgress();
         progress.Normalize();
+        if (NormalizeActiveSortieFlightPose())
+        {
+            MarkPersistentProgressDirty();
+        }
+
         EnsureSessionConfigLoaded();
         EnsureEconomyRuntimeStates();
 
         if (EnsureStartingCourierSuppliesGranted())
+        {
+            MarkPersistentProgressDirty();
+        }
+
+        if (EnsureStartingKnowledgePackGranted())
         {
             MarkPersistentProgressDirty();
         }
@@ -862,10 +1645,58 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         EnsureCourierServiceReady(progress.lastProcessUtcTicks > 0 ? progress.lastProcessUtcTicks : nowTicks);
+        EnsureCapitalAirplaneReady(progress.lastProcessUtcTicks > 0 ? progress.lastProcessUtcTicks : nowTicks, 1);
         ApplyStartingTechnologies();
         ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, progress, out _);
         RefreshQuestProgress(true);
         initialized = true;
+    }
+
+    private bool NormalizeActiveSortieFlightPose()
+    {
+        if (progress == null || !progress.HasActiveSortie || progress.currentMode != GameSessionMode.Flight)
+        {
+            return false;
+        }
+
+        SortieSessionState sortie = progress.activeSortie;
+        if (sortie == null || sortie.zone == null)
+        {
+            return false;
+        }
+
+        sortie.Normalize();
+        SortieZoneDefinition zone = sortie.zone;
+        float minimumY = zone.stormFloorY + SessionExtractionConstants.DefaultSortieEntryAltitudeMeters;
+        bool changed = false;
+
+        if (zone.entryPosition.y < minimumY)
+        {
+            zone.entryPosition = new Vector3(zone.entryPosition.x, minimumY, zone.entryPosition.z);
+            changed = true;
+        }
+
+        Vector3 pose = progress.hasCurrentFlightPose ? progress.currentFlightPosition : sortie.lastKnownPosition;
+        if (pose == Vector3.zero)
+        {
+            pose = zone.entryPosition;
+        }
+
+        if (pose.y < minimumY)
+        {
+            pose = new Vector3(pose.x, minimumY, pose.z);
+            progress.SetFlightPose(pose, progress.currentFlightRotation);
+            changed = true;
+        }
+
+        if (sortie.lastKnownPosition == Vector3.zero || sortie.lastKnownPosition.y < minimumY)
+        {
+            Vector3 lastKnown = sortie.lastKnownPosition == Vector3.zero ? pose : sortie.lastKnownPosition;
+            sortie.lastKnownPosition = new Vector3(lastKnown.x, minimumY, lastKnown.z);
+            changed = true;
+        }
+
+        return changed;
     }
 
     public PlayerProgress CreateProgressSnapshot()
@@ -896,21 +1727,9 @@ public partial class MetaGameState : MonoBehaviour
             return false;
         }
 
-        storage.AddResource("windshale_ore", 260);
-        storage.AddResource("dawnspar_ore", 160);
-        storage.AddResource("cloud_condensate", 260);
-        storage.AddResource(SessionExtractionConstants.BrokenAutomatonItemId, 140);
-        storage.AddResource("windcalf_carcass", 220);
-        storage.AddResource(SessionExtractionConstants.RockInfoItemId, 140);
-        storage.AddResource("ferron", 140);
-        storage.AddResource("silvate", 90);
-        storage.AddResource("cloth", 90);
-        storage.AddResource("tools", 56);
-        storage.AddResource("charcoal", 260);
-        storage.AddResource("claudium", 180);
-        storage.AddResource("metal", 120);
-        storage.AddResource("mechanisms", 56);
-        storage.AddResource("weapon", 32);
+        storage.AddResource("charcoal", 35);
+        storage.AddResource("claudium", 110);
+        storage.AddResource("tools", 2);
         progress.receivedStartingCourierSupplies = true;
         return true;
     }
@@ -966,6 +1785,7 @@ public partial class MetaGameState : MonoBehaviour
             }
 
             progress = data.progress.Clone();
+            bool recoveredPersistedFlight = RecoverPersistedFlightToDock();
             if (!string.IsNullOrWhiteSpace(data.runtimeAccountId))
             {
                 runtimeAccountId = data.runtimeAccountId.Trim();
@@ -973,7 +1793,7 @@ public partial class MetaGameState : MonoBehaviour
 
             initialized = false;
             persistentProgressLoadedThisSession = true;
-            lastPersistentProgressFingerprint = BuildPersistentProgressFingerprint();
+            lastPersistentProgressFingerprint = recoveredPersistedFlight ? "" : BuildPersistentProgressFingerprint();
             nextPersistentProgressAutosaveTime = Time.unscaledTime + PersistentProgressAutosaveIntervalSeconds;
             Debug.Log("[MetaGameState] Loaded persistent progress: " + path, this);
         }
@@ -981,6 +1801,35 @@ public partial class MetaGameState : MonoBehaviour
         {
             Debug.LogWarning("[MetaGameState] Could not load persistent progress from " + path + ": " + exception.Message, this);
         }
+    }
+
+    private bool RecoverPersistedFlightToDock()
+    {
+        if (progress == null || progress.currentMode != GameSessionMode.Flight)
+        {
+            return false;
+        }
+
+        SortieSessionState sortie = progress.activeSortie;
+        string dockId = sortie != null && !string.IsNullOrWhiteSpace(sortie.launchedFromDockId)
+            ? sortie.launchedFromDockId.Trim()
+            : !string.IsNullOrWhiteSpace(progress.currentDockId) ? progress.currentDockId.Trim() : startingDockId;
+
+        if (sortie != null && sortie.launchPosition != Vector3.zero)
+        {
+            progress.SetDocked(dockId, sortie.launchPosition);
+        }
+        else if (progress.hasCurrentDockPosition)
+        {
+            progress.SetDocked(dockId, progress.currentDockPosition);
+        }
+        else
+        {
+            progress.SetDocked(dockId, GetDockPositionOrFallback(dockId));
+        }
+
+        lastAccountMessage = "Saved flight state was reset to dock on scene load.";
+        return true;
     }
 
     private void AutoSavePersistentProgressIfNeeded()
@@ -1300,6 +2149,18 @@ public partial class MetaGameState : MonoBehaviour
         return true;
     }
 
+    private bool EnsureStartingKnowledgePackGranted()
+    {
+        if (progress == null || progress.receivedStartingKnowledgePack)
+        {
+            return false;
+        }
+
+        progress.AddKnowledgeSpPackage("starter_archive_sp_01", "universal", "", 720);
+        progress.receivedStartingKnowledgePack = true;
+        return true;
+    }
+
     private bool CanInstallSessionCoreFittingModule(string slotId, string moduleId, out string reason)
     {
         reason = "";
@@ -1571,10 +2432,18 @@ public partial class MetaGameState : MonoBehaviour
         storage.AddResource(CourierExperienceRewardItemId, slot.designExperienceReward);
         AddQuestEventMetric("resource_acquired", CourierFreightRewardItemId, slot.freightReward);
         AddQuestEventMetric("resource_acquired", CourierExperienceRewardItemId, slot.designExperienceReward);
+        if (!string.IsNullOrWhiteSpace(slot.customerFactionId) && slot.reputationReward > 0)
+        {
+            AddQuestEventMetric("faction_reputation", slot.customerFactionId, slot.reputationReward);
+            AddQuestEventMetric("faction_reputation", "any", slot.reputationReward);
+        }
+
         AddQuestEventMetric("courier_sent", "any", 1);
         string completedClient = slot.clientName;
+        string completedFaction = slot.customerFactionNameRu;
         int freightReward = slot.freightReward;
         int experienceReward = slot.designExperienceReward;
+        int reputationReward = slot.reputationReward;
         GenerateCourierOrder(slot, nowTicks);
         MarkPersistentProgressDirty();
         RefreshRuntimeAccountIfDocked();
@@ -1582,7 +2451,11 @@ public partial class MetaGameState : MonoBehaviour
 
         message = "Курьер отправлен: " + completedClient
             + ". Награда: фрахт x" + freightReward
-            + ", очки освоения x" + experienceReward + ".";
+            + ", очки освоения x" + experienceReward
+            + (reputationReward > 0
+                ? ", репутация " + (string.IsNullOrWhiteSpace(completedFaction) ? "фракции" : completedFaction) + " +" + reputationReward
+                : "")
+            + ".";
         lastAccountMessage = message;
         return true;
     }
@@ -1669,6 +2542,11 @@ public partial class MetaGameState : MonoBehaviour
         return EnsureCourierServiceReady(utcTicks);
     }
 
+    private int AdvanceCapitalAirplane(long utcTicks)
+    {
+        return EnsureCapitalAirplaneReady(utcTicks, 1) ? 1 : 0;
+    }
+
     private int EnsureCourierServiceReady(long utcTicks)
     {
         if (progress == null)
@@ -1685,6 +2563,11 @@ public partial class MetaGameState : MonoBehaviour
             CourierOrderSlotState slot = progress.courierService.GetSlot(i, true);
             slot.slotIndex = i;
             slot.Normalize();
+            if (slot.HasActiveOrder && BackfillCourierOrderIdentity(slot))
+            {
+                changed++;
+            }
+
             if (slot.IsCoolingDownAt(utcTicks))
             {
                 continue;
@@ -1695,6 +2578,48 @@ public partial class MetaGameState : MonoBehaviour
                 GenerateCourierOrder(slot, utcTicks);
                 changed++;
             }
+        }
+
+        return changed;
+    }
+
+    private static bool BackfillCourierOrderIdentity(CourierOrderSlotState slot)
+    {
+        if (slot == null || !slot.HasActiveOrder)
+        {
+            return false;
+        }
+
+        bool changed = false;
+        int seed = BuildCourierOrderSeed(slot.slotIndex, slot.generation);
+        CourierCustomerSpec customer = CourierCustomers[PositiveMod(seed, CourierCustomers.Length)];
+        if (string.IsNullOrWhiteSpace(slot.clientName))
+        {
+            slot.clientName = customer.clientName;
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(slot.customerFactionId))
+        {
+            slot.customerFactionId = customer.factionId;
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(slot.customerFactionNameRu))
+        {
+            slot.customerFactionNameRu = customer.factionNameRu;
+            changed = true;
+        }
+
+        if (slot.reputationReward <= 0)
+        {
+            slot.reputationReward = CalculateCourierReputationReward(slot.freightReward, slot.inputs != null ? slot.inputs.Count : 1, slot.generation <= 3 && slot.slotIndex < 3);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            slot.Normalize();
         }
 
         return changed;
@@ -1714,22 +2639,77 @@ public partial class MetaGameState : MonoBehaviour
         slot.orderId = "wind_houses_courier_" + (slot.slotIndex + 1) + "_" + slot.generation;
 
         int seed = BuildCourierOrderSeed(slot.slotIndex, slot.generation);
-        slot.clientName = CourierClientNames[PositiveMod(seed, CourierClientNames.Length)];
-        int inputCount = 1 + PositiveMod(seed / 7, 3);
+        System.Random random = new System.Random(seed);
+        CourierCustomerSpec customer = CourierCustomers[PositiveMod(seed, CourierCustomers.Length)];
+        slot.clientName = customer.clientName;
+        slot.customerFactionId = customer.factionId;
+        slot.customerFactionNameRu = customer.factionNameRu;
+        bool starterOrder = slot.generation <= 3 && slot.slotIndex < 3;
+        CourierResourceSpec[] catalog = starterOrder ? CourierStarterResourceCatalog : CourierResourceCatalog;
+        int inputCount = starterOrder ? 1 + PositiveMod(slot.slotIndex, 2) : 1 + random.Next(0, 3);
         int totalValue = 0;
+        HashSet<string> usedItems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < inputCount; i++)
         {
-            CourierResourceSpec spec = CourierResourceCatalog[PositiveMod(seed + i * 13, CourierResourceCatalog.Length)];
+            CourierResourceSpec spec = PickCourierResourceSpec(catalog, usedItems, random, starterOrder ? slot.slotIndex + i : -1);
             int amountRange = Mathf.Max(1, spec.maxAmount - spec.minAmount + 1);
-            int amount = spec.minAmount + PositiveMod(seed / (i + 3) + i * 17 + slot.slotIndex, amountRange);
+            int amount = spec.minAmount + random.Next(0, amountRange);
+            if (starterOrder)
+            {
+                amount = Mathf.Clamp(amount, spec.minAmount, Mathf.Max(spec.minAmount, Mathf.CeilToInt((spec.minAmount + spec.maxAmount) * 0.55f)));
+            }
+
             AddCourierInput(slot.inputs, spec.itemId, amount);
             totalValue += amount * spec.freightValue;
         }
 
-        float payoutMultiplier = 1.18f + 0.03f * PositiveMod(seed / 11, 7);
+        float payoutMultiplier = starterOrder
+            ? 1.34f + (float)random.NextDouble() * 0.08f
+            : 1.20f + (float)random.NextDouble() * 0.24f;
         slot.freightReward = Mathf.Max(100, Mathf.RoundToInt(totalValue * payoutMultiplier / 10f) * 10);
-        slot.designExperienceReward = Mathf.Max(2, Mathf.RoundToInt(slot.freightReward / 90f) + inputCount);
+        slot.designExperienceReward = Mathf.Max(3, Mathf.RoundToInt(slot.freightReward / 65f) + inputCount * 2);
+        slot.reputationReward = CalculateCourierReputationReward(slot.freightReward, inputCount, starterOrder);
         slot.Normalize();
+    }
+
+    private static int CalculateCourierReputationReward(int freightReward, int inputCount, bool starterOrder)
+    {
+        int baseReward = Mathf.RoundToInt(Mathf.Max(0, freightReward) / (starterOrder ? 950f : 800f));
+        return Mathf.Clamp(baseReward + Mathf.Max(0, inputCount - 1), 1, starterOrder ? 4 : 12);
+    }
+
+    private static CourierResourceSpec PickCourierResourceSpec(
+        CourierResourceSpec[] catalog,
+        HashSet<string> usedItems,
+        System.Random random,
+        int preferredIndex)
+    {
+        if (catalog == null || catalog.Length == 0)
+        {
+            return new CourierResourceSpec("iron", 1, 1, 100);
+        }
+
+        if (preferredIndex >= 0)
+        {
+            CourierResourceSpec preferred = catalog[PositiveMod(preferredIndex, catalog.Length)];
+            usedItems?.Add(preferred.itemId);
+            return preferred;
+        }
+
+        random ??= new System.Random(17);
+        for (int attempt = 0; attempt < 16; attempt++)
+        {
+            CourierResourceSpec candidate = catalog[random.Next(0, catalog.Length)];
+            if (usedItems == null || !usedItems.Contains(candidate.itemId))
+            {
+                usedItems?.Add(candidate.itemId);
+                return candidate;
+            }
+        }
+
+        CourierResourceSpec fallback = catalog[random.Next(0, catalog.Length)];
+        usedItems?.Add(fallback.itemId);
+        return fallback;
     }
 
     private bool CanSendCourierOrder(CourierOrderSlotState slot, PortStorageState storage, out string reason)
@@ -1806,6 +2786,801 @@ public partial class MetaGameState : MonoBehaviour
         }
     }
 
+    public CapitalAirplaneState GetCapitalAirplaneState(int buildingLevel)
+    {
+        EnsureProgressInitialized();
+        if (EnsureCapitalAirplaneReady(GetProcessUtcNow().Ticks, buildingLevel))
+        {
+            MarkPersistentProgressDirty();
+        }
+
+        return progress.capitalAirplane;
+    }
+
+    public int GetCapitalAirplaneRemainingSeconds(int buildingLevel)
+    {
+        CapitalAirplaneState state = GetCapitalAirplaneState(buildingLevel);
+        if (state == null || state.expiresUtcTicks <= 0L)
+        {
+            return 0;
+        }
+
+        long remainingTicks = state.expiresUtcTicks - GetProcessUtcNow().Ticks;
+        return Mathf.Max(0, Mathf.CeilToInt((float)(remainingTicks / (double)TimeSpan.TicksPerSecond)));
+    }
+
+    public bool CanSendCapitalAirplane(int buildingLevel, out string reason)
+    {
+        EnsureProgressInitialized();
+        EnsureCapitalAirplaneReady(GetProcessUtcNow().Ticks, buildingLevel);
+        return CanSendCapitalAirplane(progress.capitalAirplane, GetCapitalStorageState(), out reason);
+    }
+
+    public bool TrySendCapitalAirplane(int buildingLevel, out string message)
+    {
+        EnsureProgressInitialized();
+        long nowTicks = GetProcessUtcNow().Ticks;
+        EnsureCapitalAirplaneReady(nowTicks, buildingLevel);
+        CapitalAirplaneState state = progress.capitalAirplane;
+        PortStorageState storage = GetCapitalStorageState();
+        if (!CanSendCapitalAirplane(state, storage, out message))
+        {
+            lastAccountMessage = message;
+            return false;
+        }
+
+        for (int i = 0; i < state.inputs.Count; i++)
+        {
+            CascadeItemAmount input = state.inputs[i];
+            if (input == null) continue;
+            storage.TrySpendResource(input.itemId, input.amount);
+            AddQuestEventMetric("resource_spent", input.itemId, input.amount);
+        }
+
+        storage.AddResource(CapitalAirplaneSolidRewardItemId, state.solidReward);
+        storage.AddResource(CourierFreightRewardItemId, state.freightReward);
+        storage.AddResource(CourierExperienceRewardItemId, state.designExperienceReward);
+        AddQuestEventMetric("resource_acquired", CapitalAirplaneSolidRewardItemId, state.solidReward);
+        AddQuestEventMetric("resource_acquired", CourierFreightRewardItemId, state.freightReward);
+        AddQuestEventMetric("resource_acquired", CourierExperienceRewardItemId, state.designExperienceReward);
+        AddQuestEventMetric("capital_planes_sent", "any", 1);
+        AddQuestEventMetric("send_full_capital_planes", "any", 1);
+
+        int solidReward = state.solidReward;
+        int freightReward = state.freightReward;
+        int experienceReward = state.designExperienceReward;
+        string bonusSummary = state.bonusSummary;
+        int remainingSeconds = GetCapitalAirplaneRemainingSeconds(buildingLevel);
+        state.sent = true;
+        state.sentUtcTicks = nowTicks;
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+
+        message = "Самолет отправлен полностью: солиды x" + solidReward
+            + ", фрахт x" + freightReward
+            + ", очки освоения x" + experienceReward
+            + (string.IsNullOrWhiteSpace(bonusSummary) ? "" : ", бонус: " + bonusSummary)
+            + ". Новый прилетит через " + FormatDurationShort(remainingSeconds) + ".";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    private bool EnsureCapitalAirplaneReady(long utcTicks, int buildingLevel)
+    {
+        if (progress == null)
+        {
+            return false;
+        }
+
+        progress.capitalAirplane ??= new CapitalAirplaneState();
+        progress.capitalAirplane.Normalize();
+        if (!progress.capitalAirplane.HasPlane || progress.capitalAirplane.expiresUtcTicks <= utcTicks)
+        {
+            GenerateCapitalAirplaneOrder(progress.capitalAirplane, utcTicks, buildingLevel);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void GenerateCapitalAirplaneOrder(CapitalAirplaneState state, long utcTicks, int buildingLevel)
+    {
+        if (state == null)
+        {
+            return;
+        }
+
+        state.inputs ??= new List<CascadeItemAmount>();
+        state.inputs.Clear();
+        state.generation = Mathf.Max(0, state.generation) + 1;
+        state.serviceLevel = GetCapitalAirplaneServiceLevel(buildingLevel);
+        CapitalAirplaneTierSpec tier = PickCapitalAirplaneTier(state.serviceLevel);
+        state.tierId = tier.tierId;
+        state.planeId = tier.tierId + "_" + state.generation;
+        state.sent = false;
+        state.sentUtcTicks = 0L;
+        state.openedUtcTicks = utcTicks;
+        state.expiresUtcTicks = utcTicks + TimeSpan.FromSeconds(CapitalAirplaneCycleSeconds).Ticks;
+
+        int seed = BuildCapitalAirplaneSeed(state.generation, state.serviceLevel);
+        System.Random random = new System.Random(seed);
+        int maxStage = GetCapitalAirplaneMaxCargoStage(state.serviceLevel);
+        int slotCount = Mathf.Max(1, tier.shelfCount * tier.shelfSize);
+        int targetFe = Mathf.RoundToInt(tier.fullInputFe * (0.90f + state.serviceLevel * 0.015f) * RandomRange(random, 0.93f, 1.08f));
+        HashSet<string> usedItems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < slotCount; i++)
+        {
+            CapitalAirplaneCargoSpec cargo = PickCapitalAirplaneCargoSpec(maxStage, usedItems, random);
+            float slotShare = RandomRange(random, 0.72f, 1.32f) / slotCount;
+            int amount = Mathf.Max(1, Mathf.RoundToInt(targetFe * slotShare / Mathf.Max(1, cargo.feValue)));
+            AddCapitalAirplaneInput(state.inputs, cargo.itemId, amount);
+        }
+
+        state.solidReward = Mathf.Max(1, Mathf.RoundToInt(tier.solidReward * (0.92f + state.serviceLevel * 0.006f) * RandomRange(random, 0.96f, 1.05f)));
+        state.freightReward = Mathf.Max(0, Mathf.RoundToInt(tier.freightReward * RandomRange(random, 0.92f, 1.08f) / 100f) * 100);
+        state.designExperienceReward = Mathf.Max(1, Mathf.RoundToInt(tier.masteryReward * RandomRange(random, 0.92f, 1.08f) / 10f) * 10);
+        state.bonusSummary = tier.bonusSummary;
+        state.Normalize();
+    }
+
+    private int GetCapitalAirplaneServiceLevel(int buildingLevel)
+    {
+        int levelFromBuilding = Mathf.Clamp(buildingLevel, 1, 20);
+        PortStorageState storage = progress != null ? progress.GetPortStorageState(GetCapitalPortId(), true) : null;
+        int masteryPoints = storage != null ? storage.GetResourceAmount(SessionExtractionConstants.DesignExperienceItemId) : 0;
+        int levelFromMastery = Mathf.Clamp(1 + Mathf.FloorToInt(masteryPoints / 900f), 1, 20);
+        return Mathf.Clamp(Mathf.Max(levelFromBuilding, levelFromMastery), 1, 20);
+    }
+
+    private static CapitalAirplaneTierSpec PickCapitalAirplaneTier(int serviceLevel)
+    {
+        CapitalAirplaneTierSpec selected = CapitalAirplaneTiers[0];
+        for (int i = 0; i < CapitalAirplaneTiers.Length; i++)
+        {
+            if (serviceLevel >= CapitalAirplaneTiers[i].minServiceLevel)
+            {
+                selected = CapitalAirplaneTiers[i];
+            }
+        }
+
+        return selected;
+    }
+
+    private static int GetCapitalAirplaneMaxCargoStage(int serviceLevel)
+    {
+        if (serviceLevel >= 17) return 5;
+        if (serviceLevel >= 13) return 4;
+        if (serviceLevel >= 9) return 3;
+        if (serviceLevel >= 5) return 2;
+        return 1;
+    }
+
+    private static CapitalAirplaneCargoSpec PickCapitalAirplaneCargoSpec(int maxStage, HashSet<string> usedItems, System.Random random)
+    {
+        random ??= new System.Random(41);
+        for (int attempt = 0; attempt < 48; attempt++)
+        {
+            CapitalAirplaneCargoSpec candidate = CapitalAirplaneCargoCatalog[random.Next(0, CapitalAirplaneCargoCatalog.Length)];
+            if (candidate.stage <= maxStage && (usedItems == null || !usedItems.Contains(candidate.itemId)))
+            {
+                usedItems?.Add(candidate.itemId);
+                return candidate;
+            }
+        }
+
+        for (int i = 0; i < CapitalAirplaneCargoCatalog.Length; i++)
+        {
+            if (CapitalAirplaneCargoCatalog[i].stage <= maxStage)
+            {
+                usedItems?.Add(CapitalAirplaneCargoCatalog[i].itemId);
+                return CapitalAirplaneCargoCatalog[i];
+            }
+        }
+
+        return CapitalAirplaneCargoCatalog[0];
+    }
+
+    private static bool CanSendCapitalAirplane(CapitalAirplaneState state, PortStorageState storage, out string reason)
+    {
+        reason = "";
+        if (state == null || !state.HasPlane)
+        {
+            reason = "Самолет столицы еще не прибыл.";
+            return false;
+        }
+
+        if (state.sent)
+        {
+            reason = "Самолет уже отправлен. Новый прилетит после дневного обновления.";
+            return false;
+        }
+
+        if (storage == null)
+        {
+            reason = "Склад столицы не найден.";
+            return false;
+        }
+
+        for (int i = 0; i < state.inputs.Count; i++)
+        {
+            CascadeItemAmount input = state.inputs[i];
+            if (input == null) continue;
+            int available = storage.GetResourceAmount(input.itemId);
+            if (available < input.amount)
+            {
+                reason = "Не хватает: " + input.itemId + " x" + (input.amount - available) + ".";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void AddCapitalAirplaneInput(List<CascadeItemAmount> inputs, string itemId, int amount)
+    {
+        if (inputs == null || string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < inputs.Count; i++)
+        {
+            CascadeItemAmount input = inputs[i];
+            if (input != null && input.itemId == itemId)
+            {
+                input.amount += amount;
+                return;
+            }
+        }
+
+        inputs.Add(new CascadeItemAmount { itemId = itemId, amount = amount });
+    }
+
+    private static int BuildCapitalAirplaneSeed(int generation, int serviceLevel)
+    {
+        unchecked
+        {
+            int seed = 97;
+            seed = seed * 31 + generation * 19349663;
+            seed = seed * 31 + serviceLevel * 83492791;
+            return seed;
+        }
+    }
+
+    public IReadOnlyList<RepairDockSlotState> GetRepairDockSlots(int buildingLevel)
+    {
+        EnsureProgressInitialized();
+        int changed = EnsureRepairDockReady(GetProcessUtcNow().Ticks, buildingLevel);
+        if (changed > 0)
+        {
+            MarkPersistentProgressDirty();
+        }
+
+        return progress.repairDockService.slots;
+    }
+
+    public RepairDockSlotState GetRepairDockSlot(int slotIndex, int buildingLevel)
+    {
+        EnsureProgressInitialized();
+        int changed = EnsureRepairDockReady(GetProcessUtcNow().Ticks, buildingLevel);
+        if (changed > 0)
+        {
+            MarkPersistentProgressDirty();
+        }
+
+        return progress.repairDockService.GetSlot(Mathf.Clamp(slotIndex, 0, RepairDockSlotCount - 1), false);
+    }
+
+    public List<CascadeItemAmount> GetRepairDockCurrentWorkInputs(int slotIndex, int buildingLevel)
+    {
+        EnsureProgressInitialized();
+        EnsureRepairDockReady(GetProcessUtcNow().Ticks, buildingLevel);
+        RepairDockSlotState slot = progress.repairDockService.GetSlot(Mathf.Clamp(slotIndex, 0, RepairDockSlotCount - 1), false);
+        return BuildRepairDockCurrentWorkInputs(slot);
+    }
+
+    public bool CanRunRepairDockWork(int slotIndex, int buildingLevel, out string reason)
+    {
+        EnsureProgressInitialized();
+        EnsureRepairDockReady(GetProcessUtcNow().Ticks, buildingLevel);
+        RepairDockSlotState slot = progress.repairDockService.GetSlot(Mathf.Clamp(slotIndex, 0, RepairDockSlotCount - 1), false);
+        PortStorageState storage = GetCapitalStorageState();
+        return CanRunRepairDockWork(slot, storage, out reason);
+    }
+
+    public bool TryRunRepairDockWork(int slotIndex, int buildingLevel, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        long nowTicks = GetProcessUtcNow().Ticks;
+        EnsureRepairDockReady(nowTicks, buildingLevel);
+        RepairDockSlotState slot = progress.repairDockService.GetSlot(Mathf.Clamp(slotIndex, 0, RepairDockSlotCount - 1), false);
+        PortStorageState storage = GetCapitalStorageState();
+        if (!CanRunRepairDockWork(slot, storage, out message))
+        {
+            lastAccountMessage = message;
+            return false;
+        }
+
+        List<CascadeItemAmount> workInputs = BuildRepairDockCurrentWorkInputs(slot);
+        for (int i = 0; i < workInputs.Count; i++)
+        {
+            CascadeItemAmount input = workInputs[i];
+            if (input == null || input.amount <= 0) continue;
+            storage.TrySpendResource(input.itemId, input.amount);
+            AddQuestEventMetric("resource_spent", input.itemId, input.amount);
+        }
+
+        slot.completedWorkSteps = Mathf.Clamp(slot.completedWorkSteps + 1, 0, Mathf.Max(1, slot.workStepCount));
+        ShipTreeEntryConfig ship = sessionConfig != null ? sessionConfig.GetShipTreeEntry(slot.shipId) : null;
+        string shipName = ship != null ? ship.DisplayNameRu : slot.shipId;
+        if (slot.completedWorkSteps >= slot.workStepCount)
+        {
+            slot.repaired = true;
+            int masteryReward = Mathf.Max(10, slot.shipRank * 35 + Mathf.RoundToInt(slot.repairCostFe / 5000f));
+            storage.AddResource(SessionExtractionConstants.DesignExperienceItemId, masteryReward);
+            AddQuestEventMetric("resource_acquired", SessionExtractionConstants.DesignExperienceItemId, masteryReward);
+            if (ship != null && !string.IsNullOrWhiteSpace(ship.factionId))
+            {
+                int reputationReward = Mathf.Clamp(1 + slot.shipRank / 2, 1, 8);
+                AddQuestEventMetric("faction_reputation", ship.factionId, reputationReward);
+                AddQuestEventMetric("faction_reputation", "any", reputationReward);
+            }
+
+            message = "Ремонт завершен: " + shipName + ". Корабль можно забрать в порт или продать.";
+            AddQuestEventMetric("repair_dock_completed", ship != null ? ship.shipId : "unknown", 1);
+        }
+        else
+        {
+            message = "Работа выполнена: " + shipName + " "
+                + slot.completedWorkSteps + "/" + slot.workStepCount + ".";
+        }
+
+        slot.lastMessage = message;
+        slot.Normalize();
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public bool TryClaimRepairedDockShip(int repairSlotIndex, int developmentDockSlotIndex, int buildingLevel, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureDevelopmentDockSlots();
+        EnsureRepairDockReady(GetProcessUtcNow().Ticks, buildingLevel);
+
+        RepairDockSlotState repairSlot = progress.repairDockService.GetSlot(Mathf.Clamp(repairSlotIndex, 0, RepairDockSlotCount - 1), false);
+        if (repairSlot == null || !repairSlot.HasWreck)
+        {
+            message = "В ремонтном слоте нет корабля.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (!repairSlot.repaired)
+        {
+            message = "Корабль еще не восстановлен.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        DockedDevelopmentShipState dockSlot = GetDevelopmentDockSlot(developmentDockSlotIndex, true);
+        if (dockSlot == null)
+        {
+            message = "Портовый слот не найден.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (dockSlot.HasShip)
+        {
+            ShipTreeEntryConfig existing = sessionConfig != null ? sessionConfig.GetShipTreeEntry(dockSlot.shipId) : null;
+            message = "Портовый слот занят: " + (existing != null ? existing.DisplayNameRu : dockSlot.shipId) + ".";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        ShipTreeEntryConfig ship = sessionConfig != null ? sessionConfig.GetShipTreeEntry(repairSlot.shipId) : null;
+        string claimedShipId = repairSlot.shipId;
+        string claimedShipName = ship != null ? ship.DisplayNameRu : claimedShipId;
+        dockSlot.shipId = claimedShipId;
+        dockSlot.sortiesRemaining = DevelopmentDockShipMaxSorties;
+        dockSlot.generation++;
+        dockSlot.lastRewardSummary = "Корабль восстановлен в ремонтном доке.";
+        progress.selectedDevelopmentDockSlot = Mathf.Clamp(developmentDockSlotIndex, 0, DevelopmentDockSlotCount - 1);
+        repairSlot.ClearWreck();
+        GenerateRepairDockWreck(repairSlot, GetProcessUtcNow().Ticks, buildingLevel);
+        progress.lastQuickSortieReport = "";
+
+        AddQuestEventMetric("repair_dock_claimed", claimedShipId, 1);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+
+        message = "В порт поставлен восстановленный корабль: " + claimedShipName + ".";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public bool TrySellRepairDockShip(int slotIndex, int buildingLevel, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureRepairDockReady(GetProcessUtcNow().Ticks, buildingLevel);
+        RepairDockSlotState slot = progress.repairDockService.GetSlot(Mathf.Clamp(slotIndex, 0, RepairDockSlotCount - 1), false);
+        if (slot == null || !slot.HasWreck)
+        {
+            message = "В ремонтном слоте нет корабля.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (!slot.repaired)
+        {
+            message = "Сначала восстанови корабль, потом его можно продать.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        ShipTreeEntryConfig ship = sessionConfig != null ? sessionConfig.GetShipTreeEntry(slot.shipId) : null;
+        string soldShipId = slot.shipId;
+        string shipName = ship != null ? ship.DisplayNameRu : soldShipId;
+        int freightReward = Mathf.Max(1, slot.sellRewardFreight);
+        PortStorageState storage = GetCapitalStorageState();
+        storage.AddResource(CourierFreightRewardItemId, freightReward);
+        AddQuestEventMetric("resource_acquired", CourierFreightRewardItemId, freightReward);
+        AddQuestEventMetric("repair_dock_sold", soldShipId, 1);
+
+        slot.ClearWreck();
+        GenerateRepairDockWreck(slot, GetProcessUtcNow().Ticks, buildingLevel);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        RefreshQuestProgress(true);
+
+        message = "Восстановленный корабль продан: " + shipName + ". Получено: фрахт x" + freightReward + ".";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    private int EnsureRepairDockReady(long utcTicks, int buildingLevel)
+    {
+        if (progress == null)
+        {
+            return 0;
+        }
+
+        progress.repairDockService ??= new RepairDockServiceState();
+        progress.repairDockService.Normalize();
+        int changed = 0;
+        for (int i = progress.repairDockService.slots.Count - 1; i >= 0; i--)
+        {
+            RepairDockSlotState slot = progress.repairDockService.slots[i];
+            if (slot == null || slot.slotIndex < 0 || slot.slotIndex >= RepairDockSlotCount)
+            {
+                progress.repairDockService.slots.RemoveAt(i);
+                changed++;
+            }
+        }
+
+        for (int i = 0; i < RepairDockSlotCount; i++)
+        {
+            RepairDockSlotState slot = progress.repairDockService.GetSlot(i, true);
+            slot.slotIndex = i;
+            slot.Normalize();
+            if (!slot.HasWreck)
+            {
+                GenerateRepairDockWreck(slot, utcTicks, buildingLevel);
+                changed++;
+            }
+        }
+
+        return changed;
+    }
+
+    private void GenerateRepairDockWreck(RepairDockSlotState slot, long utcTicks, int buildingLevel)
+    {
+        if (slot == null)
+        {
+            return;
+        }
+
+        EnsureSessionConfigLoaded();
+        slot.inputs ??= new List<CascadeItemAmount>();
+        slot.inputs.Clear();
+        slot.generation = Mathf.Max(0, slot.generation) + 1;
+        slot.serviceLevel = GetRepairDockServiceLevel(buildingLevel);
+        int seed = BuildRepairDockSeed(slot.slotIndex, slot.generation, slot.serviceLevel);
+        System.Random random = new System.Random(seed);
+        int rank = PickRepairDockRank(slot.serviceLevel, random);
+        ShipTreeEntryConfig ship = PickRepairDockShip(rank, random);
+        if (ship == null)
+        {
+            ship = PickRepairDockShip(2, random);
+        }
+
+        if (ship == null)
+        {
+            slot.ClearWreck();
+            return;
+        }
+
+        rank = Mathf.Clamp(ship.rank > 0 ? ship.rank : ship.treeTier, 2, 10);
+        int buyFe = Mathf.Max(1000, ship.costAmount);
+        float repairRatio = Mathf.Clamp(0.34f + rank * 0.017f + RandomRange(random, -0.035f, 0.035f), 0.34f, 0.54f);
+        slot.wreckId = "repair_wreck_" + (slot.slotIndex + 1) + "_" + slot.generation;
+        slot.shipId = ship.shipId;
+        slot.shipRank = rank;
+        slot.repairCostFe = RoundRepairDockAmount(buyFe * repairRatio);
+        slot.sellRewardFreight = RoundRepairDockAmount(buyFe * Mathf.Clamp(0.22f + rank * 0.012f, 0.24f, 0.36f));
+        slot.workStepCount = Mathf.Clamp(2 + rank / 2 + random.Next(0, 3), 3, 8);
+        slot.completedWorkSteps = 0;
+        slot.repaired = false;
+        slot.generatedUtcTicks = utcTicks;
+        BuildRepairDockInputs(slot.inputs, rank, slot.repairCostFe, random);
+        slot.lastMessage = "";
+        slot.Normalize();
+    }
+
+    private int GetRepairDockServiceLevel(int buildingLevel)
+    {
+        int levelFromBuilding = Mathf.Clamp(1 + (Mathf.Max(1, buildingLevel) - 1) * 3, 1, 70);
+        PortStorageState storage = progress != null ? progress.GetPortStorageState(GetCapitalPortId(), true) : null;
+        int masteryPoints = storage != null ? storage.GetResourceAmount(SessionExtractionConstants.DesignExperienceItemId) : 0;
+        int levelFromMastery = Mathf.Clamp(1 + Mathf.FloorToInt(masteryPoints / 450f), 1, 70);
+        return Mathf.Clamp(Mathf.Max(levelFromBuilding, levelFromMastery), 1, 70);
+    }
+
+    private static int PickRepairDockRank(int serviceLevel, System.Random random)
+    {
+        int targetRank = GetRepairDockTargetRank(serviceLevel);
+        random ??= new System.Random(17);
+        double roll = random.NextDouble();
+        int offset;
+        if (targetRank >= 10)
+        {
+            if (roll < 0.06) offset = 0;
+            else if (roll < 0.28) offset = 1;
+            else if (roll < 0.66) offset = 2;
+            else offset = 3;
+        }
+        else if (targetRank <= 3)
+        {
+            offset = roll < 0.55 ? 0 : 1;
+        }
+        else
+        {
+            if (roll < 0.12) offset = 0;
+            else if (roll < 0.46) offset = 1;
+            else if (roll < 0.78) offset = 2;
+            else offset = 3;
+        }
+
+        return Mathf.Clamp(targetRank - offset, 2, 10);
+    }
+
+    private static int GetRepairDockTargetRank(int serviceLevel)
+    {
+        serviceLevel = Mathf.Clamp(serviceLevel, 1, 70);
+        if (serviceLevel >= 70) return 10;
+        if (serviceLevel >= 54) return 9;
+        if (serviceLevel >= 38) return 8;
+        if (serviceLevel >= 27) return 7;
+        if (serviceLevel >= 19) return 6;
+        if (serviceLevel >= 10) return 5;
+        if (serviceLevel >= 6) return 4;
+        if (serviceLevel >= 3) return 3;
+        return 2;
+    }
+
+    private ShipTreeEntryConfig PickRepairDockShip(int rank, System.Random random)
+    {
+        EnsureSessionConfigLoaded();
+        if (sessionConfig == null || sessionConfig.shipTreeEntries == null || sessionConfig.shipTreeEntries.Count == 0)
+        {
+            return null;
+        }
+
+        random ??= new System.Random(17);
+        List<ShipTreeEntryConfig> candidates = new List<ShipTreeEntryConfig>();
+        for (int i = 0; i < sessionConfig.shipTreeEntries.Count; i++)
+        {
+            ShipTreeEntryConfig entry = sessionConfig.shipTreeEntries[i];
+            if (entry == null || !entry.IsDevelopmentRosterShip || string.IsNullOrWhiteSpace(entry.factionId))
+            {
+                continue;
+            }
+
+            int entryRank = Mathf.Clamp(entry.rank > 0 ? entry.rank : entry.treeTier, 1, 10);
+            if (entryRank == rank && entry.costAmount > 0)
+            {
+                candidates.Add(entry);
+            }
+        }
+
+        return candidates.Count > 0 ? candidates[random.Next(0, candidates.Count)] : null;
+    }
+
+    private static void BuildRepairDockInputs(List<CascadeItemAmount> inputs, int rank, int repairCostFe, System.Random random)
+    {
+        if (inputs == null)
+        {
+            return;
+        }
+
+        inputs.Clear();
+        random ??= new System.Random(17);
+        int maxStage = rank >= 8 ? 4 : rank >= 6 ? 3 : rank >= 4 ? 2 : 1;
+        int lineCount = Mathf.Clamp(3 + rank / 2 + random.Next(0, 2), 3, 8);
+        HashSet<string> usedItems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < lineCount; i++)
+        {
+            RepairDockResourceSpec spec = PickRepairDockResourceSpec(maxStage, usedItems, random);
+            float share = RandomRange(random, 0.62f, 1.46f) / lineCount;
+            if (i == lineCount - 1)
+            {
+                share *= 1.10f;
+            }
+
+            int amount = Mathf.Max(1, Mathf.RoundToInt(repairCostFe * share / Mathf.Max(1, spec.feValue)));
+            AddRepairDockInput(inputs, spec.itemId, amount);
+        }
+    }
+
+    private static RepairDockResourceSpec PickRepairDockResourceSpec(int maxStage, HashSet<string> usedItems, System.Random random)
+    {
+        random ??= new System.Random(17);
+        for (int attempt = 0; attempt < 48; attempt++)
+        {
+            RepairDockResourceSpec candidate = RepairDockResourceCatalog[random.Next(0, RepairDockResourceCatalog.Length)];
+            if (candidate.stage <= maxStage && (usedItems == null || !usedItems.Contains(candidate.itemId)))
+            {
+                usedItems?.Add(candidate.itemId);
+                return candidate;
+            }
+        }
+
+        for (int i = 0; i < RepairDockResourceCatalog.Length; i++)
+        {
+            if (RepairDockResourceCatalog[i].stage <= maxStage)
+            {
+                usedItems?.Add(RepairDockResourceCatalog[i].itemId);
+                return RepairDockResourceCatalog[i];
+            }
+        }
+
+        return RepairDockResourceCatalog[0];
+    }
+
+    private static void AddRepairDockInput(List<CascadeItemAmount> inputs, string itemId, int amount)
+    {
+        if (inputs == null || string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < inputs.Count; i++)
+        {
+            CascadeItemAmount input = inputs[i];
+            if (input != null && string.Equals(input.itemId, itemId, StringComparison.OrdinalIgnoreCase))
+            {
+                input.amount += amount;
+                return;
+            }
+        }
+
+        inputs.Add(new CascadeItemAmount { itemId = itemId, amount = amount });
+    }
+
+    private bool CanRunRepairDockWork(RepairDockSlotState slot, PortStorageState storage, out string reason)
+    {
+        reason = "";
+        if (slot == null || !slot.HasWreck)
+        {
+            reason = "В ремонтном слоте нет подбитого корабля.";
+            return false;
+        }
+
+        if (slot.repaired)
+        {
+            reason = "Корабль уже восстановлен.";
+            return false;
+        }
+
+        if (storage == null)
+        {
+            reason = "Склад столицы не найден.";
+            return false;
+        }
+
+        List<CascadeItemAmount> workInputs = BuildRepairDockCurrentWorkInputs(slot);
+        if (workInputs.Count == 0)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < workInputs.Count; i++)
+        {
+            CascadeItemAmount input = workInputs[i];
+            if (input == null) continue;
+            int available = storage.GetResourceAmount(input.itemId);
+            if (available < input.amount)
+            {
+                string itemName = sessionConfig != null ? sessionConfig.GetItemNameRu(input.itemId) : input.itemId;
+                reason = "Не хватает: " + itemName + " x" + (input.amount - available) + ".";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static List<CascadeItemAmount> BuildRepairDockCurrentWorkInputs(RepairDockSlotState slot)
+    {
+        List<CascadeItemAmount> result = new List<CascadeItemAmount>();
+        if (slot == null || !slot.HasWreck || slot.repaired || slot.inputs == null || slot.inputs.Count == 0)
+        {
+            return result;
+        }
+
+        int steps = Mathf.Max(1, slot.workStepCount);
+        int completed = Mathf.Clamp(slot.completedWorkSteps, 0, steps - 1);
+        for (int i = 0; i < slot.inputs.Count; i++)
+        {
+            CascadeItemAmount input = slot.inputs[i];
+            if (input == null || input.amount <= 0 || string.IsNullOrWhiteSpace(input.itemId)) continue;
+            int before = Mathf.FloorToInt(input.amount * (completed / (float)steps));
+            int after = completed + 1 >= steps
+                ? input.amount
+                : Mathf.FloorToInt(input.amount * ((completed + 1) / (float)steps));
+            int delta = Mathf.Max(0, after - before);
+            if (delta > 0)
+            {
+                result.Add(new CascadeItemAmount { itemId = input.itemId, amount = delta });
+            }
+        }
+
+        return result;
+    }
+
+    private static int BuildRepairDockSeed(int slotIndex, int generation, int serviceLevel)
+    {
+        unchecked
+        {
+            int seed = 57203;
+            seed = seed * 31 + (slotIndex + 1) * 73856093;
+            seed = seed * 31 + (generation + 1) * 19349663;
+            seed = seed * 31 + serviceLevel * 83492791;
+            return seed == int.MinValue ? 57203 : Mathf.Abs(seed);
+        }
+    }
+
+    private static int RoundRepairDockAmount(float value)
+    {
+        int amount = Mathf.Max(1, Mathf.RoundToInt(value));
+        if (amount >= 1000000) return Mathf.RoundToInt(amount / 10000f) * 10000;
+        if (amount >= 100000) return Mathf.RoundToInt(amount / 1000f) * 1000;
+        if (amount >= 10000) return Mathf.RoundToInt(amount / 100f) * 100;
+        if (amount >= 1000) return Mathf.RoundToInt(amount / 50f) * 50;
+        return Mathf.RoundToInt(amount / 10f) * 10;
+    }
+
+    private static string FormatDurationShort(int totalSeconds)
+    {
+        totalSeconds = Mathf.Max(0, totalSeconds);
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        if (hours > 0)
+        {
+            return hours + "ч " + minutes + "м";
+        }
+
+        return minutes + "м";
+    }
+
     private static int PositiveMod(int value, int divisor)
     {
         if (divisor <= 0)
@@ -1843,17 +3618,84 @@ public partial class MetaGameState : MonoBehaviour
 
     public bool TrySelectResearchTechnology(string technologyId)
     {
+        return TrySelectResearchTechnologyInSlot(technologyId, 0, 1);
+    }
+
+    public bool CanSelectResearchTechnology(TechnologyConfig technology, out string reason)
+    {
+        return CanSelectResearchTechnologyInSlot(technology, 0, 1, out reason);
+    }
+
+    public int GetArchiveResearchSlotCount(int archiveBuildingCount)
+    {
+        return Mathf.Clamp(Mathf.Max(1, archiveBuildingCount), 1, 12);
+    }
+
+    public int GetFirstAvailableResearchSlotIndex(int archiveBuildingCount)
+    {
+        EnsureProgressInitialized();
+        int slotCount = GetArchiveResearchSlotCount(archiveBuildingCount);
+        progress.EnsureResearchSlotCount(slotCount);
+
+        for (int i = 0; i < slotCount; i++)
+        {
+            if (string.IsNullOrWhiteSpace(progress.GetResearchSlotTechnologyId(i)))
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    public IReadOnlyList<string> GetActiveResearchTechnologyIdsForUi(int archiveBuildingCount)
+    {
+        EnsureProgressInitialized();
+        progress.EnsureResearchSlotCount(GetArchiveResearchSlotCount(archiveBuildingCount));
+        return progress.activeResearchTechnologyIds;
+    }
+
+    public bool IsTechnologyActivelyResearched(string technologyId)
+    {
+        EnsureProgressInitialized();
+        return progress.IsResearchTechnologyActive(technologyId);
+    }
+
+    public int GetActiveResearchSlotIndex(string technologyId, int archiveBuildingCount)
+    {
+        EnsureProgressInitialized();
+        if (string.IsNullOrWhiteSpace(technologyId)) return -1;
+
+        int slotCount = GetArchiveResearchSlotCount(archiveBuildingCount);
+        progress.EnsureResearchSlotCount(slotCount);
+        for (int i = 0; i < slotCount; i++)
+        {
+            if (string.Equals(progress.GetResearchSlotTechnologyId(i), technologyId, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    public bool TrySelectResearchTechnologyInSlot(string technologyId, int slotIndex, int archiveBuildingCount)
+    {
         EnsureProgressInitialized();
         EnsureSessionConfigLoaded();
 
+        int slotCount = GetArchiveResearchSlotCount(archiveBuildingCount);
+        progress.EnsureResearchSlotCount(slotCount);
+        slotIndex = Mathf.Clamp(slotIndex, 0, slotCount - 1);
+
         TechnologyConfig technology = sessionConfig != null ? sessionConfig.GetTechnology(technologyId) : null;
-        if (!CanSelectResearchTechnology(technology, out string reason))
+        if (!CanSelectResearchTechnologyInSlot(technology, slotIndex, slotCount, out string reason))
         {
             lastAccountMessage = reason;
             return false;
         }
 
-        progress.activeResearchTechnologyId = technology.id;
+        progress.SetResearchSlotTechnologyId(slotIndex, technology.id, slotCount);
         TechnologyResearchProgress state = progress.GetTechnologyProgress(technology.id, true);
         state.completedCycles = Mathf.Clamp(state.completedCycles, 0, GetTechnologyMaxLevel(technology));
         state.activeCycleStartUtcTicks = 0;
@@ -1861,13 +3703,13 @@ public partial class MetaGameState : MonoBehaviour
 
         if (!EnsureTechnologyLevelRequirementsPaid(technology, state, out reason))
         {
-            progress.activeResearchTechnologyId = "";
+            progress.SetResearchSlotTechnologyId(slotIndex, "", slotCount);
             lastAccountMessage = reason;
             return false;
         }
 
         MarkPersistentProgressDirty();
-        string researchMessage = "Архивы вливают SP в знание: " + GetTechnologyDisplayName(technology)
+        string researchMessage = "Архив " + (slotIndex + 1).ToString() + " исследует: " + GetTechnologyDisplayName(technology)
             + " L" + GetTechnologyNextLevel(technology).ToString()
             + " (" + GetArchiveKnowledgeSpPerMinute(technology.categoryId).ToString("0.##") + " SP/мин).";
         lastAccountMessage = researchMessage;
@@ -1878,9 +3720,15 @@ public partial class MetaGameState : MonoBehaviour
         return true;
     }
 
-    public bool CanSelectResearchTechnology(TechnologyConfig technology, out string reason)
+    public bool CanSelectResearchTechnologyInSlot(TechnologyConfig technology, int slotIndex, int archiveBuildingCount, out string reason)
     {
         reason = "";
+        EnsureProgressInitialized();
+
+        int slotCount = GetArchiveResearchSlotCount(archiveBuildingCount);
+        progress.EnsureResearchSlotCount(slotCount);
+        slotIndex = Mathf.Clamp(slotIndex, 0, slotCount - 1);
+
         if (technology == null)
         {
             reason = "Технология не найдена.";
@@ -1910,13 +3758,20 @@ public partial class MetaGameState : MonoBehaviour
             return false;
         }
 
-        string activeId = progress.activeResearchTechnologyId;
+        int activeSlot = GetActiveResearchSlotIndex(technology.id, slotCount);
+        if (activeSlot >= 0 && activeSlot != slotIndex)
+        {
+            reason = "Это знание уже исследует Архив " + (activeSlot + 1).ToString() + ".";
+            return false;
+        }
+
+        string activeId = progress.GetResearchSlotTechnologyId(slotIndex);
         if (!string.IsNullOrWhiteSpace(activeId) && activeId != technology.id)
         {
             TechnologyResearchProgress activeState = progress.GetTechnologyProgress(activeId, false);
             if (activeState != null && activeState.currentLevelSpProgress > 0.001f)
             {
-                reason = "Архивы уже вливают SP в другое знание; свободное перекладывание после старта запрещено.";
+                reason = "Этот Архив уже вливает SP в другое знание; свободное перекладывание после старта запрещено.";
                 return false;
             }
         }
@@ -2026,6 +3881,116 @@ public partial class MetaGameState : MonoBehaviour
         return true;
     }
 
+    public IReadOnlyList<KnowledgeSpPackageState> GetKnowledgeSpPackagesForUi()
+    {
+        EnsureProgressInitialized();
+        return progress.knowledgeSpPackages;
+    }
+
+    public KnowledgeSpPackageState GetBestKnowledgeSpPackageForTechnology(TechnologyConfig technology)
+    {
+        EnsureProgressInitialized();
+        if (technology == null || progress.knowledgeSpPackages == null)
+        {
+            return null;
+        }
+
+        KnowledgeSpPackageState best = null;
+        for (int i = 0; i < progress.knowledgeSpPackages.Count; i++)
+        {
+            KnowledgeSpPackageState package = progress.knowledgeSpPackages[i];
+            if (package == null || package.amountSp <= 0) continue;
+            if (!CanApplyKnowledgeSpPackage(package, technology, out _)) continue;
+
+            if (best == null || package.amountSp > best.amountSp)
+            {
+                best = package;
+            }
+        }
+
+        return best;
+    }
+
+    public bool TryApplyBestKnowledgeSpPackage(string technologyId, out int appliedSp, out int burnedSp, out string reason)
+    {
+        appliedSp = 0;
+        burnedSp = 0;
+        reason = "";
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+
+        TechnologyConfig technology = sessionConfig != null ? sessionConfig.GetTechnology(technologyId) : null;
+        KnowledgeSpPackageState package = GetBestKnowledgeSpPackageForTechnology(technology);
+        if (package == null)
+        {
+            reason = "Нет подходящего SP-пакета для выбранного знания.";
+            return false;
+        }
+
+        return TryApplyKnowledgeSpPackage(package.packageId, technologyId, out appliedSp, out burnedSp, out reason);
+    }
+
+    public string FormatKnowledgeSpPackageForUi(KnowledgeSpPackageState package)
+    {
+        if (package == null)
+        {
+            return "-";
+        }
+
+        string scope = string.IsNullOrWhiteSpace(package.scopeKind) ? "universal" : package.scopeKind;
+        string scopeText = scope == "universal"
+            ? "любой раздел"
+            : scope == "category"
+            ? "раздел " + (string.IsNullOrWhiteSpace(package.scopeId) ? "-" : package.scopeId)
+            : scope + " " + (string.IsNullOrWhiteSpace(package.scopeId) ? "-" : package.scopeId);
+        return package.amountSp.ToString() + " SP, " + scopeText;
+    }
+
+    public string GetKnowledgeSpPackageSummaryForUi(TechnologyConfig technology)
+    {
+        EnsureProgressInitialized();
+        KnowledgeSpPackageState best = GetBestKnowledgeSpPackageForTechnology(technology);
+        if (best != null)
+        {
+            return "Лучший пакет: " + FormatKnowledgeSpPackageForUi(best);
+        }
+
+        int count = progress.knowledgeSpPackages != null ? progress.knowledgeSpPackages.Count : 0;
+        return count > 0 ? "SP-пакеты есть, но этот узел им не подходит." : "SP-пакетов нет.";
+    }
+
+    public string GetTechnologyResearchEtaText(TechnologyConfig technology, int archiveBuildingCount)
+    {
+        if (technology == null) return "-";
+        EnsureProgressInitialized();
+
+        int completed = GetTechnologyCompletedLevel(technology);
+        int maxLevel = GetTechnologyMaxLevel(technology);
+        if (completed >= maxLevel)
+        {
+            return "изучено";
+        }
+
+        int nextLevel = Mathf.Clamp(completed + 1, 1, maxLevel);
+        int levelCost = GetTechnologyLevelSpCost(technology, nextLevel);
+        float progressSp = GetTechnologyCurrentLevelSpProgress(technology);
+        float remaining = Mathf.Max(0f, levelCost - progressSp);
+        float spPerMinute = GetArchiveKnowledgeSpPerMinute(technology.categoryId);
+        if (spPerMinute <= 0.001f)
+        {
+            return "нет выработки SP";
+        }
+
+        float minutes = remaining / spPerMinute;
+        int totalMinutes = Mathf.CeilToInt(minutes);
+        if (totalMinutes <= 1) return "около 1 мин";
+        int hours = totalMinutes / 60;
+        int mins = totalMinutes % 60;
+        if (hours <= 0) return totalMinutes.ToString() + " мин";
+        if (mins == 0) return hours.ToString() + " ч";
+        return hours.ToString() + " ч " + mins.ToString() + " мин";
+    }
+
     public string GetTechnologyDisplayName(TechnologyConfig technology)
     {
         if (technology == null) return "";
@@ -2073,7 +4038,7 @@ public partial class MetaGameState : MonoBehaviour
         string levelText = completedLevels + "/" + GetTechnologyMaxLevel(technology);
         string spText = Mathf.FloorToInt(spProgress).ToString() + "/" + levelCost.ToString() + " SP";
 
-        if (progress.activeResearchTechnologyId != technology.id)
+        if (!progress.IsResearchTechnologyActive(technology.id))
         {
             return IsKnowledgeAvailableForResearch(technology)
                 ? "доступно, уровни " + levelText + ", текущий " + spText
@@ -2461,7 +4426,7 @@ public partial class MetaGameState : MonoBehaviour
         return (value >= 0f ? "+" : "") + value.ToString("0.##");
     }
 
-    private bool TryEnterFlightForSessionSortie()
+    private bool TryEnterFlightForSessionSortie(bool useDockShipLaunch = false)
     {
         EnsureProgressInitialized();
 
@@ -2475,20 +4440,20 @@ public partial class MetaGameState : MonoBehaviour
             return false;
         }
 
-        if (!AutoInstallRequiredModules(false, out string autoInstallReason))
+        if (!useDockShipLaunch && !AutoInstallRequiredModules(false, out string autoInstallReason))
         {
             lastAccountMessage = "Нельзя вылететь: " + autoInstallReason;
             return false;
         }
 
-        if (!CanAssembleCurrentShip(out string assemblyReason))
+        if (!useDockShipLaunch && !CanAssembleCurrentShip(out string assemblyReason))
         {
             lastAccountMessage = "Нельзя вылететь: " + assemblyReason;
             return false;
         }
 
-        CargoCapacityInfo capacity = CalculateCargoCapacity();
-        if (!capacity.canFly)
+        CargoCapacityInfo capacity = useDockShipLaunch ? default : CalculateCargoCapacity();
+        if (!useDockShipLaunch && !capacity.canFly)
         {
             lastAccountMessage = "Нельзя вылететь: " + capacity.reason;
             return false;
@@ -2496,7 +4461,7 @@ public partial class MetaGameState : MonoBehaviour
 
         progress.SetFlight();
         ApplySelectedShip();
-        ApplySessionModeToShip();
+        ApplySessionModeToShip(false);
         lastAccountMessage = "Sortie flight started. Extraction returns cargo home.";
         return true;
     }
@@ -2509,22 +4474,19 @@ public partial class MetaGameState : MonoBehaviour
             sortieId = SessionExtractionConstants.DefaultSafeOreSortieId,
             displayName = SessionExtractionConstants.DefaultSafeOreSortieName,
             primaryBranch = BaseProcessingBranch.Ore,
-            recommendedSlotBand = ShipFittingSlotBand.High,
-            requiredFittingSummary = "No required High module",
             starterResourceItemId = "windshale_ore",
             starterResourceChunkMin = 2,
             starterResourceChunkMax = 5,
             starterResourceShedIntervalSeconds = 1.75f,
             starterResourceColor = new Color(0.55f, 0.50f, 0.45f, 1f),
             centerPosition = center,
-            entryPosition = GetDefaultSortiePocketEntry(center, 350f),
+            entryPosition = GetDefaultSortiePocketEntry(center, SessionExtractionConstants.DefaultSortieEntryAltitudeMeters),
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 150f,
             distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
-            returnPowerLever = 0.7f,
-            returnReserveMultiplier = 1.15f
+            returnPowerLever = 0.7f
         };
     }
 
@@ -2555,23 +4517,19 @@ public partial class MetaGameState : MonoBehaviour
             sortieId = SessionExtractionConstants.DefaultSafeGasSortieId,
             displayName = SessionExtractionConstants.DefaultSafeGasSortieName,
             primaryBranch = BaseProcessingBranch.Gas,
-            recommendedSlotBand = ShipFittingSlotBand.High,
-            requiredFittingSummary = "High gas extractor",
-            requiredModuleIds = new List<string> { SessionExtractionConstants.StarterGasExtractorModuleId },
             starterResourceItemId = "cloud_condensate",
             starterResourceChunkMin = 2,
             starterResourceChunkMax = 4,
             starterResourceShedIntervalSeconds = 2.1f,
             starterResourceColor = new Color(0.65f, 0.82f, 1f, 1f),
             centerPosition = center,
-            entryPosition = GetDefaultSortiePocketEntry(center, 360f),
+            entryPosition = GetDefaultSortiePocketEntry(center, SessionExtractionConstants.DefaultSortieEntryAltitudeMeters),
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 150f,
             distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
-            returnPowerLever = 0.7f,
-            returnReserveMultiplier = 1.15f
+            returnPowerLever = 0.7f
         };
     }
 
@@ -2583,23 +4541,19 @@ public partial class MetaGameState : MonoBehaviour
             sortieId = SessionExtractionConstants.DefaultSafeAutomatonSortieId,
             displayName = SessionExtractionConstants.DefaultSafeAutomatonSortieName,
             primaryBranch = BaseProcessingBranch.AutomatonDismantling,
-            recommendedSlotBand = ShipFittingSlotBand.High,
-            requiredFittingSummary = "High impact wreck collector",
-            requiredModuleIds = new List<string> { SessionExtractionConstants.StarterMiningHoldModuleId },
-            starterResourceItemId = SessionExtractionConstants.BrokenAutomatonItemId,
+            starterResourceItemId = SessionExtractionConstants.StarterAutomatonPartItemId,
             starterResourceChunkMin = 1,
             starterResourceChunkMax = 2,
             starterResourceShedIntervalSeconds = 3.0f,
             starterResourceColor = new Color(0.78f, 0.76f, 0.68f, 1f),
             centerPosition = center,
-            entryPosition = GetDefaultSortiePocketEntry(center, 340f),
+            entryPosition = GetDefaultSortiePocketEntry(center, SessionExtractionConstants.DefaultSortieEntryAltitudeMeters),
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 150f,
             distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
-            returnPowerLever = 0.7f,
-            returnReserveMultiplier = 1.15f
+            returnPowerLever = 0.7f
         };
     }
 
@@ -2611,23 +4565,19 @@ public partial class MetaGameState : MonoBehaviour
             sortieId = SessionExtractionConstants.DefaultSafeLeviathanSortieId,
             displayName = SessionExtractionConstants.DefaultSafeLeviathanSortieName,
             primaryBranch = BaseProcessingBranch.LeviathanProcessing,
-            recommendedSlotBand = ShipFittingSlotBand.High,
-            requiredFittingSummary = "High leviathan salvage rig",
-            requiredModuleIds = new List<string> { SessionExtractionConstants.StarterLeviathanSalvageModuleId },
             starterResourceItemId = "windcalf_carcass",
             starterResourceChunkMin = 2,
             starterResourceChunkMax = 5,
             starterResourceShedIntervalSeconds = 3.4f,
             starterResourceColor = new Color(0.56f, 0.78f, 0.74f, 1f),
             centerPosition = center,
-            entryPosition = GetDefaultSortiePocketEntry(center, 380f),
+            entryPosition = GetDefaultSortiePocketEntry(center, SessionExtractionConstants.DefaultSortieEntryAltitudeMeters),
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 160f,
             distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
-            returnPowerLever = 0.7f,
-            returnReserveMultiplier = 1.15f
+            returnPowerLever = 0.7f
         };
     }
 
@@ -2639,23 +4589,61 @@ public partial class MetaGameState : MonoBehaviour
             sortieId = SessionExtractionConstants.DefaultSafeSurveySortieId,
             displayName = SessionExtractionConstants.DefaultSafeSurveySortieName,
             primaryBranch = BaseProcessingBranch.CyberneticDeciphering,
-            recommendedSlotBand = ShipFittingSlotBand.Mid,
-            requiredFittingSummary = "Mid observation module",
-            requiredModuleIds = new List<string> { SessionExtractionConstants.StarterObservationPostModuleId },
             starterResourceItemId = SessionExtractionConstants.RockInfoItemId,
             starterResourceChunkMin = 1,
             starterResourceChunkMax = 3,
             starterResourceShedIntervalSeconds = 2.8f,
             starterResourceColor = new Color(0.72f, 0.88f, 0.92f, 1f),
             centerPosition = center,
-            entryPosition = GetDefaultSortiePocketEntry(center, 370f),
+            entryPosition = GetDefaultSortiePocketEntry(center, SessionExtractionConstants.DefaultSortieEntryAltitudeMeters),
             radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
             stormFloorY = 0f,
             extractionBoundaryToleranceMeters = 140f,
             distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
             returnCruiseSpeedMS = 35f,
-            returnPowerLever = 0.7f,
-            returnReserveMultiplier = 1.15f
+            returnPowerLever = 0.7f
+        };
+    }
+
+    public SortieZoneDefinition CreateCoreTacticalIntroCombatSortieDefinition()
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+
+        DockedDevelopmentShipState dockSlot = GetManualQuickDevelopmentDockSlot(false);
+        ShipTreeEntryConfig ship = ResolveCurrentSessionShipTreeEntry(dockSlot);
+        Vector3 center = GetDefaultSortiePocketCenter(
+            -SessionExtractionConstants.DefaultSortiePocketSpacingMeters * 0.85f,
+            -SessionExtractionConstants.DefaultSortiePocketSpacingMeters * 0.85f);
+        return new SortieZoneDefinition
+        {
+            sortieId = SessionExtractionConstants.CoreTacticalIntroCombatSortieId,
+            displayName = ship != null
+                ? SessionExtractionConstants.CoreTacticalIntroCombatSortieName + ": " + ship.DisplayNameRu
+                : SessionExtractionConstants.CoreTacticalIntroCombatSortieName,
+            primaryBranch = BaseProcessingBranch.AutomatonDismantling,
+            sourceShipId = ship != null ? ship.shipId : "",
+            sourceShipDisplayNameRu = ship != null ? ship.DisplayNameRu : "",
+            starterResourceItemId = "",
+            starterResourceChunkMin = 1,
+            starterResourceChunkMax = 1,
+            starterResourceShedIntervalSeconds = 3.0f,
+            starterResourceColor = new Color(0.78f, 0.22f, 0.18f, 1f),
+            centerPosition = center,
+            entryPosition = new Vector3(center.x, 80f, center.z - 4200f),
+            radiusMeters = 6500f,
+            stormFloorY = -2500f,
+            extractionBoundaryToleranceMeters = 950f,
+            distanceToBaseKm = 18f,
+            returnCruiseSpeedMS = 180f,
+            returnPowerLever = 1.0f,
+            extractionRunupRequiredSeconds = 3.5f,
+            extractionRunupSpeedRatio = 0.35f,
+            completionFreightAward = 10000,
+            missionProfile = "core_tactical",
+            missionArchetype = "intro_combat",
+            primaryActivity = "combat",
+            primaryActivityRu = "Combat"
         };
     }
 
@@ -2667,7 +4655,10 @@ public partial class MetaGameState : MonoBehaviour
 
     private static Vector3 GetDefaultSortiePocketEntry(Vector3 center, float altitudeMeters)
     {
-        return new Vector3(center.x, Mathf.Max(50f, altitudeMeters), center.z);
+        return new Vector3(
+            center.x,
+            Mathf.Max(SessionExtractionConstants.DefaultSortieEntryAltitudeMeters, altitudeMeters),
+            center.z);
     }
 
     public SortieZoneDefinition GetSelectedSessionSortieDefinition()
@@ -2716,12 +4707,6 @@ public partial class MetaGameState : MonoBehaviour
         if (!IsDockedAtCapital())
         {
             reason = "Session sortie can start only from the base.";
-            return false;
-        }
-
-        if (!HasRequiredSortieModule(zone, out string moduleReason))
-        {
-            reason = moduleReason;
             return false;
         }
 
@@ -2774,6 +4759,100 @@ public partial class MetaGameState : MonoBehaviour
         return SelectSessionSortie(sorties[index].sortieId, out message);
     }
 
+    public SortieZoneDefinition CreateQuickAdaptiveManualSortieDefinition()
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+
+        DockedDevelopmentShipState dockSlot = GetManualQuickDevelopmentDockSlot(false);
+        ShipTreeEntryConfig ship = ResolveCurrentSessionShipTreeEntry(dockSlot);
+        if (ship == null)
+        {
+            return CreateDefaultSafeOreSortieDefinition();
+        }
+
+        SortieMissionOffer offer = SortieRewardGenerator.CreateQuickOffer(ship, dockSlot, sessionConfig, GetProcessUtcNow());
+        SortieMissionResult result = SortieRewardGenerator.GenerateSortie(ship, offer, sessionConfig);
+        string activity = result != null && !string.IsNullOrWhiteSpace(result.primaryActivity)
+            ? result.primaryActivity
+            : offer != null ? offer.primaryActivity : "";
+
+        Vector3 center = GetDefaultSortiePocketCenter(
+            SessionExtractionConstants.DefaultSortiePocketSpacingMeters * 0.55f,
+            -SessionExtractionConstants.DefaultSortiePocketSpacingMeters * 0.55f);
+        List<SortiePayloadRewardLine> payloadRewards = BuildManualSortiePayloadRewards(result, activity);
+        SortieZoneDefinition zone = new SortieZoneDefinition
+        {
+            sortieId = SessionExtractionConstants.QuickAdaptiveManualSortieId,
+            displayName = "Manual quick sortie: " + ship.DisplayNameRu,
+            primaryBranch = GetProcessingBranchForQuickActivity(activity),
+            sourceShipId = ship.shipId,
+            sourceShipDisplayNameRu = ship.DisplayNameRu,
+            missionProfile = result != null ? result.missionProfile : offer != null ? offer.missionProfile : "quick",
+            missionArchetype = result != null ? result.missionArchetype : offer != null ? offer.missionArchetype : "quick_adaptive",
+            primaryActivity = activity,
+            primaryActivityRu = result != null ? result.primaryActivityRu : offer != null ? offer.primaryActivityRu : "",
+            missionSeed = offer != null ? offer.seed : "",
+            payloadRewards = payloadRewards,
+            starterResourceChunkMin = 1,
+            starterResourceChunkMax = 6,
+            starterResourceShedIntervalSeconds = 1.8f,
+            starterResourceColor = ResolveManualSortiePayloadColor(activity, ""),
+            completionFreightAward = result != null ? Mathf.Max(0, result.freightAward) : 0,
+            completionDesignExperienceAward = result != null ? Mathf.Max(0, result.designExperienceAward) : 0,
+            centerPosition = center,
+            entryPosition = GetDefaultSortiePocketEntry(center, SessionExtractionConstants.DefaultSortieEntryAltitudeMeters),
+            radiusMeters = SessionExtractionConstants.DefaultSortieRadiusMeters,
+            stormFloorY = 0f,
+            extractionBoundaryToleranceMeters = 150f,
+            distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm,
+            returnCruiseSpeedMS = 35f,
+            returnPowerLever = 0.7f
+        };
+        zone.Normalize();
+        return zone;
+    }
+
+    public bool BeginQuickAdaptiveManualSessionSortie()
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureDevelopmentDockSlots();
+
+        DockedDevelopmentShipState dockSlot = GetManualQuickDevelopmentDockSlot(false);
+        bool consumeDockSortie = dockSlot != null && dockSlot.HasShip;
+        if (consumeDockSortie && dockSlot.sortiesRemaining <= 0)
+        {
+            ShipTreeEntryConfig exhaustedShip = sessionConfig != null ? sessionConfig.GetShipTreeEntry(dockSlot.shipId) : null;
+            lastAccountMessage = "Manual sortie blocked: "
+                + (exhaustedShip != null ? exhaustedShip.DisplayNameRu : dockSlot.shipId)
+                + " has no sorties remaining.";
+            return false;
+        }
+
+        bool started = BeginSessionExtractionSortie(CreateQuickAdaptiveManualSortieDefinition());
+        if (!started)
+        {
+            return false;
+        }
+
+        if (consumeDockSortie)
+        {
+            dockSlot.sortiesRemaining = Mathf.Max(0, dockSlot.sortiesRemaining - 1);
+            dockSlot.lastRewardSummary = lastAccountMessage;
+            AddQuestEventMetric("manual_sortie_started", dockSlot.shipId, 1);
+            MarkPersistentProgressDirty();
+
+            lastAccountMessage += " Dock ship sorties remaining: "
+                + dockSlot.sortiesRemaining
+                + "/"
+                + DevelopmentDockShipMaxSorties
+                + ".";
+        }
+
+        return true;
+    }
+
     public bool BeginSelectedSessionSortie()
     {
         return BeginSessionExtractionSortie(GetSelectedSessionSortieDefinition());
@@ -2782,6 +4861,211 @@ public partial class MetaGameState : MonoBehaviour
     public bool BeginSafeOreSortie()
     {
         return BeginSessionExtractionSortie(CreateDefaultSafeOreSortieDefinition());
+    }
+
+    public bool BeginCoreTacticalIntroCombatSortie()
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureDevelopmentDockSlots();
+
+        DockedDevelopmentShipState dockSlot = GetManualQuickDevelopmentDockSlot(false);
+        if (dockSlot == null || !dockSlot.HasShip)
+        {
+            lastAccountMessage = "Core combat blocked: buy or select a dock ship first.";
+            return false;
+        }
+
+        if (dockSlot.sortiesRemaining <= 0)
+        {
+            lastAccountMessage = "Core combat blocked: selected dock ship has no sorties remaining.";
+            return false;
+        }
+
+        ShipTreeEntryConfig ship = sessionConfig != null ? sessionConfig.GetShipTreeEntry(dockSlot.shipId) : null;
+        if (ship == null)
+        {
+            lastAccountMessage = "Core combat blocked: dock ship is missing from Ship_tree.csv: " + dockSlot.shipId + ".";
+            return false;
+        }
+
+        bool started = BeginSessionExtractionSortie(CreateCoreTacticalIntroCombatSortieDefinition(), true);
+        if (!started)
+        {
+            return false;
+        }
+
+        dockSlot.sortiesRemaining = Mathf.Max(0, dockSlot.sortiesRemaining - 1);
+        AddQuestEventMetric("sortie_started", SessionExtractionConstants.CoreTacticalIntroCombatSortieId, 1);
+        AddQuestEventMetric("core_tactical_sortie_started", ship.shipId, 1);
+
+        lastAccountMessage += " Dock ship sorties remaining: "
+            + dockSlot.sortiesRemaining
+            + "/"
+            + DevelopmentDockShipMaxSorties
+            + ".";
+        dockSlot.lastRewardSummary = lastAccountMessage;
+        MarkPersistentProgressDirty();
+        return true;
+    }
+
+    private DockedDevelopmentShipState GetManualQuickDevelopmentDockSlot(bool requireSorties)
+    {
+        EnsureProgressInitialized();
+        EnsureDevelopmentDockSlots();
+
+        DockedDevelopmentShipState slot = GetDevelopmentDockSlot(progress.selectedDevelopmentDockSlot, true);
+        if (slot == null || !slot.HasShip)
+        {
+            return null;
+        }
+
+        if (requireSorties && slot.sortiesRemaining <= 0)
+        {
+            return null;
+        }
+
+        return slot;
+    }
+
+    private ShipTreeEntryConfig ResolveCurrentSessionShipTreeEntry(DockedDevelopmentShipState preferredDockSlot = null)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+
+        if (preferredDockSlot != null && preferredDockSlot.HasShip && sessionConfig != null)
+        {
+            ShipTreeEntryConfig dockShip = sessionConfig.GetShipTreeEntry(preferredDockSlot.shipId);
+            if (dockShip != null)
+            {
+                return dockShip;
+            }
+        }
+
+        ShipPartDefinitionSO hull = null;
+        ShipCatalogSO activeCatalog = ActiveCatalog;
+        if (activeCatalog != null)
+        {
+            string selectedHullId = progress != null ? progress.selectedHullId : "";
+            hull = !string.IsNullOrWhiteSpace(selectedHullId)
+                ? activeCatalog.GetPartById(selectedHullId)
+                : null;
+            if (hull == null || !hull.IsHull)
+            {
+                hull = activeCatalog.GetStarterHull();
+            }
+
+            if (hull != null && !string.IsNullOrWhiteSpace(hull.runtimeShipTreeId))
+            {
+                ShipTreeEntryConfig mapped = sessionConfig != null
+                    ? sessionConfig.GetShipTreeEntry(hull.runtimeShipTreeId)
+                    : null;
+                if (mapped != null)
+                {
+                    return mapped;
+                }
+            }
+        }
+
+        string hullId = hull != null ? hull.partId : progress != null ? progress.selectedHullId : "";
+        if (!string.IsNullOrWhiteSpace(hullId) && sessionConfig != null && sessionConfig.shipTreeEntries != null)
+        {
+            for (int i = 0; i < sessionConfig.shipTreeEntries.Count; i++)
+            {
+                ShipTreeEntryConfig entry = sessionConfig.shipTreeEntries[i];
+                if (entry != null
+                    && entry.catalogScope == "session_core"
+                    && entry.hullId == hullId)
+                {
+                    return entry;
+                }
+            }
+        }
+
+        return sessionConfig != null ? sessionConfig.GetShipTreeEntry("pioneer") : null;
+    }
+
+    private List<SortiePayloadRewardLine> BuildManualSortiePayloadRewards(SortieMissionResult result, string activity)
+    {
+        List<SortiePayloadRewardLine> payloadRewards = new List<SortiePayloadRewardLine>();
+        if (result == null || result.materialRewards == null)
+        {
+            return payloadRewards;
+        }
+
+        for (int i = 0; i < result.materialRewards.Count; i++)
+        {
+            SortieRewardLine reward = result.materialRewards[i];
+            if (reward == null || string.IsNullOrWhiteSpace(reward.itemId) || reward.amount <= 0)
+            {
+                continue;
+            }
+
+            payloadRewards.Add(new SortiePayloadRewardLine
+            {
+                itemId = reward.itemId,
+                displayNameRu = string.IsNullOrWhiteSpace(reward.displayNameRu)
+                    ? sessionConfig != null ? sessionConfig.GetItemNameRu(reward.itemId) : reward.itemId
+                    : reward.displayNameRu,
+                amount = reward.amount,
+                color = ResolveManualSortiePayloadColor(activity, reward.itemId)
+            });
+        }
+
+        return payloadRewards;
+    }
+
+    private static BaseProcessingBranch GetProcessingBranchForQuickActivity(string activity)
+    {
+        switch ((activity ?? "").Trim().ToLowerInvariant())
+        {
+            case "mining":
+                return BaseProcessingBranch.Ore;
+            case "gas":
+                return BaseProcessingBranch.Gas;
+            case "hunting":
+                return BaseProcessingBranch.LeviathanProcessing;
+            case "relic":
+            case "survey":
+                return BaseProcessingBranch.CyberneticDeciphering;
+            case "combat":
+            case "repair":
+            case "salvage":
+            default:
+                return BaseProcessingBranch.AutomatonDismantling;
+        }
+    }
+
+    private static Color ResolveManualSortiePayloadColor(string activity, string itemId)
+    {
+        string normalizedActivity = (activity ?? "").Trim().ToLowerInvariant();
+        string normalizedItem = (itemId ?? "").Trim().ToLowerInvariant();
+        if (normalizedActivity == "gas" || normalizedItem.Contains("gas") || normalizedItem.Contains("condensate"))
+        {
+            return new Color(0.55f, 0.82f, 1f, 1f);
+        }
+
+        if (normalizedActivity == "mining" || normalizedItem.Contains("ore"))
+        {
+            return new Color(0.62f, 0.56f, 0.48f, 1f);
+        }
+
+        if (normalizedActivity == "hunting" || normalizedItem.Contains("leviathan") || normalizedItem.Contains("ichor"))
+        {
+            return new Color(0.52f, 0.78f, 0.70f, 1f);
+        }
+
+        if (normalizedActivity == "relic" || normalizedActivity == "survey" || normalizedItem.Contains("relic") || normalizedItem.Contains("rock_info"))
+        {
+            return new Color(0.70f, 0.90f, 0.94f, 1f);
+        }
+
+        if (normalizedActivity == "courier" || normalizedItem == CourierFreightRewardItemId)
+        {
+            return new Color(0.92f, 0.76f, 0.34f, 1f);
+        }
+
+        return new Color(0.78f, 0.76f, 0.68f, 1f);
     }
 
     private SortieZoneDefinition FindDefaultSessionSortieDefinition(string sortieId)
@@ -2810,81 +5094,14 @@ public partial class MetaGameState : MonoBehaviour
             || sortieId == SessionExtractionConstants.DefaultSafeSurveySortieId;
     }
 
-    private bool HasRequiredSortieModule(SortieZoneDefinition zone, out string reason)
-    {
-        reason = "";
-        if (zone == null) return true;
-
-        zone.Normalize();
-        if (zone.requiredModuleIds == null || zone.requiredModuleIds.Count == 0)
-        {
-            return true;
-        }
-
-        if (!ShipAssemblyBuilder.TryBuild(ActiveCatalog, progress, out ShipAssemblyResult assembly))
-        {
-            reason = "Sortie blocked: ship assembly is invalid. " + (assembly != null ? assembly.message : "");
-            return false;
-        }
-
-        string requiredSlotTypeId = SessionExtractionFitting.GetSlotTypeId(zone.recommendedSlotBand);
-        for (int installedIndex = 0; installedIndex < assembly.installedModules.Count; installedIndex++)
-        {
-            InstalledModuleState installed = assembly.installedModules[installedIndex];
-            if (installed == null || string.IsNullOrWhiteSpace(installed.moduleId)) continue;
-            if (!AssemblySlotMatchesType(assembly, installed.slotId, requiredSlotTypeId)) continue;
-
-            for (int requiredIndex = 0; requiredIndex < zone.requiredModuleIds.Count; requiredIndex++)
-            {
-                if (installed.moduleId == zone.requiredModuleIds[requiredIndex])
-                {
-                    return true;
-                }
-            }
-        }
-
-        reason = "Sortie blocked: " + zone.displayName + " requires " + GetSortieRequirementText(zone) + ".";
-        return false;
-    }
-
-    private static bool AssemblySlotMatchesType(ShipAssemblyResult assembly, string slotId, string slotTypeId)
-    {
-        if (assembly == null || string.IsNullOrWhiteSpace(slotId) || string.IsNullOrWhiteSpace(slotTypeId))
-        {
-            return false;
-        }
-
-        for (int i = 0; i < assembly.slots.Count; i++)
-        {
-            ShipSlotDefinition slot = assembly.slots[i];
-            if (slot != null && slot.slotId == slotId)
-            {
-                return slot.slotTypeId == slotTypeId;
-            }
-        }
-
-        return false;
-    }
-
     private static string GetSortieRequirementText(SortieZoneDefinition zone)
     {
         if (zone == null) return "";
 
-        zone.Normalize();
-        if (!string.IsNullOrWhiteSpace(zone.requiredFittingSummary))
-        {
-            return zone.requiredFittingSummary;
-        }
-
-        if (zone.requiredModuleIds == null || zone.requiredModuleIds.Count == 0)
-        {
-            return "no required module";
-        }
-
-        return string.Join("/", zone.requiredModuleIds);
+        return "built-in ship systems";
     }
 
-    public bool BeginSessionExtractionSortie(SortieZoneDefinition zone)
+    public bool BeginSessionExtractionSortie(SortieZoneDefinition zone, bool useDockShipLaunch = false)
     {
         EnsureProgressInitialized();
         EnsureSessionConfigLoaded();
@@ -2902,7 +5119,7 @@ public partial class MetaGameState : MonoBehaviour
             ? progress.currentDockPosition
             : GetCurrentShipPosition();
 
-        if (!TryEnterFlightForSessionSortie())
+        if (!TryEnterFlightForSessionSortie(useDockShipLaunch))
         {
             return false;
         }
@@ -2911,9 +5128,20 @@ public partial class MetaGameState : MonoBehaviour
         sortieZone.entryPosition = entryState.position;
         progress.BeginSortie(sortieZone, GetProcessUtcNow().Ticks, launchDockId, launchDockPosition);
         PlaceShipAtSortieEntry(sortieZone, entryState);
+        RefreshGameplaySessionFromProgress();
+        CoreTacticalCombatSortieController.EnsureForActiveSortie(this);
 
         lastAccountMessage = "Session sortie started: " + sortieZone.displayName + ".";
         return true;
+    }
+
+    private void RefreshGameplaySessionFromProgress()
+    {
+        WildWindGameplaySession gameplaySession = WildWindGameplaySession.EnsureSessionForLoadedGameplayScene(this, RuntimeAccountId);
+        if (gameplaySession != null)
+        {
+            gameplaySession.RefreshFromMetaProgress(true);
+        }
     }
 
     public SortieReturnEstimate GetActiveSortieReturnEstimate()
@@ -3004,8 +5232,6 @@ public partial class MetaGameState : MonoBehaviour
         bool movingToBase = velocityToBase || facingToBase;
         bool canBuildRunup = !estimate.isInsideCylinder
             && estimate.isAboveStorm
-            && estimate.hasEnoughCoal
-            && estimate.hasEnoughClaudium
             && claudiumSlipstreamActive
             && movingToBase;
 
@@ -3054,19 +5280,6 @@ public partial class MetaGameState : MonoBehaviour
             return "Slip blocked: leave cylinder.";
         }
 
-        if (!estimate.hasEnoughCoal || !estimate.hasEnoughClaudium)
-        {
-            return "Slip blocked: reserves coal "
-                + estimate.currentCoalKg.ToString("0.#")
-                + "/"
-                + estimate.requiredCoalKg.ToString("0.#")
-                + ", claudium "
-                + estimate.currentClaudiumKg.ToString("0.#")
-                + "/"
-                + estimate.requiredClaudiumKg.ToString("0.#")
-                + ".";
-        }
-
         if (!claudiumSlipstreamActive)
         {
             return "Slip blocked: slipstream off.";
@@ -3112,9 +5325,7 @@ public partial class MetaGameState : MonoBehaviour
         {
             if (estimate.isInsideCylinder
                 || !estimate.isNearBoundary
-                || !estimate.isAboveStorm
-                || !estimate.hasEnoughCoal
-                || !estimate.hasEnoughClaudium)
+                || !estimate.isAboveStorm)
             {
                 progress.activeSortie.ResetExtractionRunup();
             }
@@ -3124,22 +5335,12 @@ public partial class MetaGameState : MonoBehaviour
             return false;
         }
 
-        string fuelId = string.IsNullOrWhiteSpace(profile.coalResourceId) ? GetStartingFuelId() : profile.coalResourceId;
-        string claudiumId = string.IsNullOrWhiteSpace(profile.claudiumResourceId) ? "claudium" : profile.claudiumResourceId;
-        if (progress.shipFuelTank.GetAmount(fuelId) + 0.001f < estimate.requiredCoalKg
-            || progress.shipClaudiumTank.GetAmount(claudiumId) + 0.001f < estimate.requiredClaudiumKg)
-        {
-            message = estimate.status;
-            lastAccountMessage = message;
-            return false;
-        }
-
-        progress.shipFuelTank.TrySpend(fuelId, estimate.requiredCoalKg);
-        progress.shipClaudiumTank.TrySpend(claudiumId, estimate.requiredClaudiumKg);
         string completedSortieId = progress.activeSortie != null && progress.activeSortie.zone != null
             ? progress.activeSortie.zone.sortieId
             : "any";
+        SortieZoneDefinition completedZone = progress.activeSortie != null ? progress.activeSortie.zone : null;
         int transferred = TransferShipCargoToCapital();
+        int completionRewards = ApplySortieCompletionRewards(completedZone);
         progress.ClearShipCargo();
 
         string baseDockId = GetCapitalPortId();
@@ -3148,13 +5349,48 @@ public partial class MetaGameState : MonoBehaviour
         ApplySessionModeToShip();
         AddQuestEventMetric("sortie_completed", completedSortieId, 1);
         RefreshQuestProgress(true);
+        MarkPersistentProgressDirty();
 
         message = "Extraction complete: transferred " + transferred
-            + " cargo units to base. Return cost: "
-            + estimate.requiredCoalKg.ToString("F0") + " kg coal, "
-            + estimate.requiredClaudiumKg.ToString("F0") + " kg claudium.";
+            + " cargo units to base"
+            + (completionRewards > 0 ? " and " + completionRewards + " completion rewards" : "")
+            + ". No external coal or claudium spent.";
         lastAccountMessage = message;
         return true;
+    }
+
+    private int ApplySortieCompletionRewards(SortieZoneDefinition zone)
+    {
+        if (zone == null)
+        {
+            return 0;
+        }
+
+        zone.Normalize();
+        int awarded = 0;
+        PortStorageState storage = GetCapitalStorageState();
+        if (storage == null)
+        {
+            return 0;
+        }
+
+        if (zone.completionFreightAward > 0)
+        {
+            storage.AddResource(CourierFreightRewardItemId, zone.completionFreightAward);
+            AddQuestEventMetric("resource_acquired", CourierFreightRewardItemId, zone.completionFreightAward);
+            AddQuestEventMetric("resource_acquired", "any", zone.completionFreightAward);
+            awarded++;
+        }
+
+        if (zone.completionDesignExperienceAward > 0)
+        {
+            storage.AddResource(SessionExtractionConstants.DesignExperienceItemId, zone.completionDesignExperienceAward);
+            AddQuestEventMetric("resource_acquired", SessionExtractionConstants.DesignExperienceItemId, zone.completionDesignExperienceAward);
+            AddQuestEventMetric("resource_acquired", "any", zone.completionDesignExperienceAward);
+            awarded++;
+        }
+
+        return awarded;
     }
 
     public bool LoseActiveSortieShipAndReturnToBase(string reason = "")
@@ -3188,17 +5424,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureProgressInitialized();
         EnsureSessionConfigLoaded();
 
-        ShipCatalogSO activeCatalog = ActiveCatalog;
-        if (activeCatalog == null)
-        {
-            return "Fit: no catalog";
-        }
-
-        List<ShipSlotDefinition> slots = GetAssemblySlotsForUi(activeCatalog);
-        return "Fit H " + CountFittingBandText(slots, activeCatalog, SessionExtractionConstants.HighSlotTypeId)
-            + " M " + CountFittingBandText(slots, activeCatalog, SessionExtractionConstants.MidSlotTypeId)
-            + " L " + CountFittingBandText(slots, activeCatalog, SessionExtractionConstants.LowSlotTypeId)
-            + " R " + CountFittingBandText(slots, activeCatalog, SessionExtractionConstants.RigSlotTypeId);
+        return "Built-in kit: guns/crusher/sensors/hold";
     }
 
     public string GetCoreFittingSummaryText()
@@ -3206,17 +5432,7 @@ public partial class MetaGameState : MonoBehaviour
         EnsureProgressInitialized();
         EnsureSessionConfigLoaded();
 
-        ShipCatalogSO activeCatalog = ActiveCatalog;
-        if (activeCatalog == null)
-        {
-            return "Fitting: no catalog";
-        }
-
-        List<ShipSlotDefinition> slots = GetAssemblySlotsForUi(activeCatalog);
-        return "High: " + BuildFittingBandSummary(slots, activeCatalog, SessionExtractionConstants.HighSlotTypeId)
-            + " | Mid: " + BuildFittingBandSummary(slots, activeCatalog, SessionExtractionConstants.MidSlotTypeId)
-            + " | Low: " + BuildFittingBandSummary(slots, activeCatalog, SessionExtractionConstants.LowSlotTypeId)
-            + " | Rig: " + BuildFittingBandSummary(slots, activeCatalog, SessionExtractionConstants.RigSlotTypeId);
+        return "Ship kit is built in: guns, ore crusher, sensors, hold, armor, engine.";
     }
 
     public string GetBaseProcessingOverviewText()
@@ -3454,90 +5670,17 @@ public partial class MetaGameState : MonoBehaviour
     {
         EnsureProgressInitialized();
         EnsureSessionConfigLoaded();
-        message = "";
-
-        if (!IsDockedAtCapital())
-        {
-            message = "Refuel is available only at the base.";
-            return false;
-        }
-
-        PortStorageState storage = GetCapitalStorageState();
-        if (storage == null)
-        {
-            message = "Base storage is missing.";
-            return false;
-        }
-
-        if (EnsureStarterPioneerRecoveryHullSelectedForCore())
-        {
-            ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, progress, out _);
-            ApplySelectedShip();
-        }
-
-        CargoCapacityInfo capacity = CalculateCargoCapacity();
-        if (!capacity.assemblyValid)
-        {
-            message = "Refuel blocked: " + capacity.reason;
-            return false;
-        }
-
-        ResolveCurrentTankResourceIds(out string fuelId, out string claudiumId);
-        bool canFuel = storage.GetResourceAmount(fuelId) > 0
-            && progress.shipFuelTank.GetAmount(fuelId) < capacity.fuelTankCapacityKg - 0.001f;
-        bool canClaudium = storage.GetResourceAmount(claudiumId) > 0
-            && progress.shipClaudiumTank.GetAmount(claudiumId) < capacity.claudiumTankCapacityKg - 0.001f;
-        bool canFreePioneerRefuel = CanFreeRefuelStarterPioneerRecovery(fuelId, claudiumId, capacity);
-
-        if (!canFuel && !canClaudium && !canFreePioneerRefuel)
-        {
-            message = "Refuel blocked: tanks are full or base has no matching coal/claudium.";
-            return false;
-        }
-
-        message = canFreePioneerRefuel && !canFuel && !canClaudium
-            ? "Pioneer free refuel ready: " + GetBaseRefuelStatusText() + "."
-            : "Refuel ready: " + GetBaseRefuelStatusText() + ".";
-        return true;
+        message = "Refuel retired: sorties use built-in autonomy and have no coal/claudium launch or return cost.";
+        return false;
     }
 
     public bool TryRefuelBaseShip(out string message)
     {
         EnsureProgressInitialized();
         EnsureSessionConfigLoaded();
-        message = "";
-
-        if (!CanRefuelBaseShip(out message))
-        {
-            lastAccountMessage = message;
-            return false;
-        }
-
-        PortStorageState storage = GetCapitalStorageState();
-        CargoCapacityInfo capacity = CalculateCargoCapacity();
-        ResolveCurrentTankResourceIds(out string fuelId, out string claudiumId);
-
-        int fuelMoved = RefillTankFromStorage(progress.shipFuelTank, fuelId, capacity.fuelTankCapacityKg, storage);
-        int claudiumMoved = RefillTankFromStorage(progress.shipClaudiumTank, claudiumId, capacity.claudiumTankCapacityKg, storage);
-        FreeRefuelStarterPioneerRecovery(fuelId, claudiumId, capacity, out float freeFuelKg, out float freeClaudiumKg);
-        if (fuelMoved <= 0 && claudiumMoved <= 0 && freeFuelKg <= 0f && freeClaudiumKg <= 0f)
-        {
-            message = "Refuel blocked: no resources moved.";
-            lastAccountMessage = message;
-            return false;
-        }
-
-        SyncShipConsumablesWithCargo(true);
-        RefreshRuntimeAccountIfDocked();
-
-        message = "Refueled: " + fuelMoved + " kg " + fuelId
-            + ", " + claudiumMoved + " kg " + claudiumId
-            + (freeFuelKg > 0f || freeClaudiumKg > 0f
-                ? " Pioneer free reserve: " + freeFuelKg.ToString("F0") + " kg " + fuelId
-                    + ", " + freeClaudiumKg.ToString("F0") + " kg " + claudiumId + "."
-                : ".");
+        CanRefuelBaseShip(out message);
         lastAccountMessage = message;
-        return true;
+        return false;
     }
 
     private static int RefillTankFromStorage(ShipConsumableTankState tank, string resourceId, float capacityKg, PortStorageState storage)
@@ -3692,11 +5835,12 @@ public partial class MetaGameState : MonoBehaviour
 
         BaseProcessingLineState line = progress.baseIndustry.GetProcessing(branch);
         BaseProcessingFacilityState facility = GetBaseProcessingFacilityState("legacy_batch_" + branch, branch, line.level);
-        int neededForCycle = Mathf.Max(0, facility.cycleInputUnits - facility.BunkerLoadUnits);
+        int targetTickInput = Mathf.Max(1, Mathf.CeilToInt(facility.processingUnitsPerMinute / 60f));
+        int neededForTick = Mathf.Max(0, targetTickInput - facility.BunkerLoadUnits);
         int moved = 0;
-        if (neededForCycle > 0)
+        if (neededForTick > 0)
         {
-            moved = Mathf.Min(Mathf.Min(neededForCycle, available), facility.BunkerFreeUnits);
+            moved = Mathf.Min(Mathf.Min(neededForTick, available), facility.BunkerFreeUnits);
             if (moved > 0 && storage.TrySpendResource(inputItemId, moved))
             {
                 AddQuestEventMetric("resource_spent", inputItemId, moved);
@@ -3710,9 +5854,9 @@ public partial class MetaGameState : MonoBehaviour
             }
         }
 
-        if (facility.BunkerLoadUnits < facility.cycleInputUnits)
+        if (facility.BunkerLoadUnits <= 0)
         {
-            message = "Loaded " + moved + " input units, waiting for " + facility.cycleInputUnits + " units in the bunker.";
+            message = "Loaded " + moved + " input units, waiting for processing input in the bunker.";
             lastAccountMessage = message;
             RefreshRuntimeAccountIfDocked();
             RefreshQuestProgress(true);
@@ -3724,7 +5868,7 @@ public partial class MetaGameState : MonoBehaviour
         RefreshRuntimeAccountIfDocked();
         RefreshQuestProgress(true);
 
-        message = "Processed " + processed + " units in "
+        message = "Processed " + processed + " input units in "
             + SessionExtractionIndustry.GetProcessingDisplayName(branch)
             + ". Collected whole outputs: " + collected + ".";
         lastAccountMessage = message;
@@ -3791,7 +5935,14 @@ public partial class MetaGameState : MonoBehaviour
         EnsureSessionConfigLoaded();
         progress.baseIndustry ??= new BaseExtractionIndustryState();
         progress.baseIndustry.Normalize();
-        return progress.baseIndustry.GetProcessingFacility(facilityId, branch, buildingLevel);
+        BaseProcessingFacilityState facility = progress.baseIndustry.GetProcessingFacility(facilityId, branch, buildingLevel);
+        BaseProcessingLineState line = progress.baseIndustry.GetProcessing(branch);
+        if (facility != null && line != null)
+        {
+            facility.processingUnitsPerMinute = Mathf.Max(0.1f, line.capacityUnitsPerMinute);
+        }
+
+        return facility;
     }
 
     public List<string> GetBaseProcessingInputItemIds(BaseProcessingBranch branch)
@@ -3820,7 +5971,7 @@ public partial class MetaGameState : MonoBehaviour
                 }
                 break;
             case BaseProcessingBranch.AutomatonDismantling:
-                AddUniqueItemId(itemIds, SessionExtractionConstants.BrokenAutomatonItemId);
+                AddUniqueItemId(itemIds, SessionExtractionConstants.StarterAutomatonPartItemId);
                 break;
             case BaseProcessingBranch.LeviathanProcessing:
                 if (sessionConfig != null && sessionConfig.leviathanTypes != null)
@@ -3966,6 +6117,93 @@ public partial class MetaGameState : MonoBehaviour
         return totalMoved > 0;
     }
 
+    public bool TrySetBaseProcessingBunkerAmount(
+        string facilityId,
+        BaseProcessingBranch branch,
+        int buildingLevel,
+        string itemId,
+        int desiredBunkerAmount,
+        out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        message = "";
+
+        if (!IsDockedAtCapital())
+        {
+            message = "Переработка доступна только в городе.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(itemId) || GetProcessingComposition(branch, itemId).Count == 0)
+        {
+            message = "Этот ресурс не подходит для выбранной переработки.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        PortStorageState storage = GetCapitalStorageState();
+        BaseProcessingFacilityState facility = GetBaseProcessingFacilityState(facilityId, branch, buildingLevel);
+        if (storage == null || facility == null)
+        {
+            message = "Нет склада или здания переработки.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        int currentBunkerAmount = facility.GetBunkerAmount(itemId);
+        int storedAmount = storage.GetResourceAmount(itemId);
+        int totalAvailableForItem = Mathf.Max(0, currentBunkerAmount + storedAmount);
+        int maxByCapacity = currentBunkerAmount + facility.BunkerFreeUnits;
+        int clampedDesired = Mathf.Clamp(desiredBunkerAmount, 0, Mathf.Min(totalAvailableForItem, maxByCapacity));
+
+        if (clampedDesired > currentBunkerAmount)
+        {
+            int requestedMove = clampedDesired - currentBunkerAmount;
+            int moved = Mathf.Min(requestedMove, storedAmount);
+            if (moved <= 0 || !storage.TrySpendResource(itemId, moved))
+            {
+                message = "На складе нет выбранного сырья.";
+                lastAccountMessage = message;
+                return false;
+            }
+
+            int loaded = facility.AddBunker(itemId, moved);
+            AddQuestEventMetric("resource_spent", itemId, loaded);
+            if (loaded < moved)
+            {
+                storage.AddResource(itemId, moved - loaded);
+            }
+
+            message = "В здании: " + (currentBunkerAmount + loaded) + " / " + totalAvailableForItem + ".";
+            lastAccountMessage = message;
+            RefreshRuntimeAccountIfDocked();
+            RefreshQuestProgress(true);
+            return loaded > 0;
+        }
+
+        if (clampedDesired < currentBunkerAmount)
+        {
+            int returned = facility.RemoveBunker(itemId, currentBunkerAmount - clampedDesired);
+            if (returned > 0)
+            {
+                storage.AddResource(itemId, returned);
+            }
+
+            message = returned > 0
+                ? "Возвращено на склад: " + returned + "."
+                : "Количество не изменилось.";
+            lastAccountMessage = message;
+            RefreshRuntimeAccountIfDocked();
+            return returned > 0;
+        }
+
+        message = "Количество не изменилось.";
+        lastAccountMessage = message;
+        return true;
+    }
+
     public bool TryClearBaseProcessingBunker(
         string facilityId,
         BaseProcessingBranch branch,
@@ -4000,6 +6238,8 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         facility.cycleElapsedSeconds = 0f;
+        facility.processingTickElapsedSeconds = 0f;
+        facility.processingUnitAccumulator = 0f;
         message = returned > 0 ? "Бункер очищен, возвращено: " + returned + "." : "Бункер пуст.";
         lastAccountMessage = message;
         RefreshRuntimeAccountIfDocked();
@@ -4092,7 +6332,7 @@ public partial class MetaGameState : MonoBehaviour
                 break;
             }
             case BaseProcessingBranch.AutomatonDismantling:
-                if (inputItemId == SessionExtractionConstants.BrokenAutomatonItemId)
+                if (inputItemId == SessionExtractionConstants.StarterAutomatonPartItemId)
                 {
                     outputs.Add(new ProcessingOutputShare(SessionExtractionConstants.MechanismsItemId, 0.40f));
                     outputs.Add(new ProcessingOutputShare(SessionExtractionConstants.ToolsItemId, 0.20f));
@@ -4258,43 +6498,66 @@ public partial class MetaGameState : MonoBehaviour
     {
         if (facility == null || elapsedSeconds <= 0f) return 0;
         facility.Normalize();
-        if (facility.BunkerLoadUnits < facility.cycleInputUnits)
+        if (facility.BunkerLoadUnits <= 0)
         {
-            facility.cycleElapsedSeconds = 0f;
+            facility.processingTickElapsedSeconds = 0f;
+            facility.processingUnitAccumulator = 0f;
             return 0;
         }
 
-        facility.cycleElapsedSeconds += elapsedSeconds;
-        int completedCycles = 0;
+        facility.processingTickElapsedSeconds += elapsedSeconds;
+        int processedUnits = 0;
         int guard = 0;
-        while (guard < 1000
-            && facility.cycleElapsedSeconds >= facility.cycleDurationSeconds
-            && facility.BunkerLoadUnits >= facility.cycleInputUnits)
+        while (guard < 100000
+            && facility.processingTickElapsedSeconds >= 1f
+            && facility.BunkerLoadUnits > 0)
         {
             guard++;
-            facility.cycleElapsedSeconds -= facility.cycleDurationSeconds;
-            if (CompleteBaseProcessingFacilityCycle(facility) <= 0)
+            facility.processingTickElapsedSeconds -= 1f;
+            float unitsThisSecond = Mathf.Max(0.1f, facility.processingUnitsPerMinute) / 60f + facility.processingUnitAccumulator;
+            int unitsToProcess = Mathf.FloorToInt(unitsThisSecond + 0.0001f);
+            facility.processingUnitAccumulator = Mathf.Max(0f, unitsThisSecond - unitsToProcess);
+            if (unitsToProcess <= 0)
             {
-                break;
+                continue;
             }
 
-            completedCycles++;
+            int processedThisSecond = ProcessBaseProcessingFacilityUnits(facility, unitsToProcess);
+            processedUnits += processedThisSecond;
+            if (processedThisSecond < unitsToProcess)
+            {
+                facility.processingUnitAccumulator = 0f;
+                facility.processingTickElapsedSeconds = 0f;
+                break;
+            }
         }
 
-        if (facility.BunkerLoadUnits < facility.cycleInputUnits)
+        if (facility.BunkerLoadUnits <= 0)
         {
-            facility.cycleElapsedSeconds = 0f;
+            facility.processingTickElapsedSeconds = 0f;
+            facility.processingUnitAccumulator = 0f;
         }
 
-        return completedCycles;
+        facility.cycleElapsedSeconds = facility.processingTickElapsedSeconds;
+        return processedUnits;
     }
 
     private int CompleteBaseProcessingFacilityCycle(BaseProcessingFacilityState facility)
     {
         if (facility == null) return 0;
         facility.Normalize();
-        int batch = Mathf.Min(facility.cycleInputUnits, facility.BunkerLoadUnits);
-        if (batch <= 0 || facility.BunkerLoadUnits < facility.cycleInputUnits) return 0;
+        float unitsThisSecond = Mathf.Max(0.1f, facility.processingUnitsPerMinute) / 60f + facility.processingUnitAccumulator;
+        int unitsToProcess = Mathf.Max(1, Mathf.FloorToInt(unitsThisSecond + 0.0001f));
+        facility.processingUnitAccumulator = Mathf.Max(0f, unitsThisSecond - unitsToProcess);
+        return ProcessBaseProcessingFacilityUnits(facility, unitsToProcess);
+    }
+
+    private int ProcessBaseProcessingFacilityUnits(BaseProcessingFacilityState facility, int requestedUnits)
+    {
+        if (facility == null) return 0;
+        facility.Normalize();
+        int batch = Mathf.Min(Mathf.Max(0, requestedUnits), facility.BunkerLoadUnits);
+        if (batch <= 0) return 0;
 
         int seed = CreateProcessingSeed(facility);
         System.Random random = new System.Random(seed);
@@ -4540,7 +6803,7 @@ public partial class MetaGameState : MonoBehaviour
         fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanHideItemId, batch, 0.20f);
         fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.ClaudiumItemId, batch, 0.08f);
         fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.LeviathanSinewItemId, batch, 0.10f);
-        fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.BonePlateItemId, batch, 0.07f);
+        fallbackTotal += AddScaledProcessingOutput(storage, SessionExtractionConstants.BoneGritItemId, batch, 0.07f);
         return fallbackTotal;
     }
 
@@ -5204,6 +7467,13 @@ public partial class MetaGameState : MonoBehaviour
         progress.baseIndustry ??= new BaseExtractionIndustryState();
         progress.baseIndustry.Normalize();
         line = progress.baseIndustry.GetProcessing(branch);
+        int nextLevel = line.level + 1;
+        if (!CanPassFactionGateForUpgrade(GetProcessingGateScope(branch), nextLevel, out string gateMessage))
+        {
+            message = "Processing upgrade blocked: " + gateMessage;
+            return false;
+        }
+
         cost = CreateProcessingUpgradeCost(line.level);
         if (!CanSpendBaseIndustryUpgradeCost(storage, cost, out string blockedReason))
         {
@@ -5212,7 +7482,7 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         message = "Processing upgrade ready: " + SessionExtractionIndustry.GetProcessingDisplayName(branch)
-            + " L" + line.level + " -> L" + (line.level + 1)
+            + " L" + line.level + " -> L" + nextLevel
             + ", cost " + BuildItemCostText(cost) + ".";
         return true;
     }
@@ -5243,6 +7513,13 @@ public partial class MetaGameState : MonoBehaviour
         progress.baseIndustry ??= new BaseExtractionIndustryState();
         progress.baseIndustry.Normalize();
         line = progress.baseIndustry.GetProduction(type);
+        int nextLevel = line.level + 1;
+        if (!CanPassFactionGateForUpgrade(GetCascadeGateScope(type), nextLevel, out string gateMessage))
+        {
+            message = "Cascade upgrade blocked: " + gateMessage;
+            return false;
+        }
+
         cost = CreateCascadeUpgradeCost(line.level);
         if (!CanSpendBaseIndustryUpgradeCost(storage, cost, out string blockedReason))
         {
@@ -5251,9 +7528,19 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         message = "Cascade upgrade ready: " + SessionExtractionIndustry.GetProductionDisplayName(type)
-            + " L" + line.level + " -> L" + (line.level + 1)
+            + " L" + line.level + " -> L" + nextLevel
             + ", cost " + BuildItemCostText(cost) + ".";
         return true;
+    }
+
+    private static string GetProcessingGateScope(BaseProcessingBranch branch)
+    {
+        return "processing:" + branch.ToString().Trim().ToLowerInvariant();
+    }
+
+    private static string GetCascadeGateScope(CascadeProductionType type)
+    {
+        return "cascade:" + type.ToString().Trim().ToLowerInvariant();
     }
 
     private bool TryResolveNextBaseIndustryUpgrade(
@@ -5391,8 +7678,8 @@ public partial class MetaGameState : MonoBehaviour
         int level = Mathf.Max(1, currentLevel);
         return new List<CascadeItemAmount>
         {
-            new CascadeItemAmount { itemId = "ferron", amount = 4 * level },
-            new CascadeItemAmount { itemId = "silvate", amount = 1 * level },
+            new CascadeItemAmount { itemId = "iron", amount = 4 * level },
+            new CascadeItemAmount { itemId = "calcite", amount = 1 * level },
             new CascadeItemAmount { itemId = "charcoal", amount = 1 * level }
         };
     }
@@ -5402,8 +7689,8 @@ public partial class MetaGameState : MonoBehaviour
         int level = Mathf.Max(1, currentLevel);
         return new List<CascadeItemAmount>
         {
-            new CascadeItemAmount { itemId = "ferron", amount = 6 * level },
-            new CascadeItemAmount { itemId = "silvate", amount = 2 * level },
+            new CascadeItemAmount { itemId = "iron", amount = 6 * level },
+            new CascadeItemAmount { itemId = "calcite", amount = 2 * level },
             new CascadeItemAmount { itemId = "charcoal", amount = 2 * level }
         };
     }
@@ -5515,7 +7802,7 @@ public partial class MetaGameState : MonoBehaviour
             SessionExtractionConstants.StarterLowSlotId,
             SessionExtractionConstants.LowSlotTypeId,
             "Starter cargo rack is already installed.",
-            "Installed first Low upgrade",
+            "Upgraded built-in cargo hold",
             out message);
     }
 
@@ -5540,7 +7827,7 @@ public partial class MetaGameState : MonoBehaviour
             SessionExtractionConstants.StarterHighSlotId,
             SessionExtractionConstants.HighSlotTypeId,
             "Starter gas extractor is already installed.",
-            "Installed High gas extractor",
+            "Upgraded built-in gas extractor",
             out message);
     }
 
@@ -5565,7 +7852,7 @@ public partial class MetaGameState : MonoBehaviour
             SessionExtractionConstants.StarterSecondHighSlotId,
             SessionExtractionConstants.HighSlotTypeId,
             "Starter mining hold is already installed.",
-            "Installed High impact wreck collector",
+            "Upgraded built-in wreck collector",
             out message);
     }
 
@@ -5590,7 +7877,7 @@ public partial class MetaGameState : MonoBehaviour
             SessionExtractionConstants.StarterThirdHighSlotId,
             SessionExtractionConstants.HighSlotTypeId,
             "Starter leviathan salvage rig is already installed.",
-            "Installed High leviathan salvage rig",
+            "Upgraded built-in leviathan salvage",
             out message);
     }
 
@@ -5615,7 +7902,7 @@ public partial class MetaGameState : MonoBehaviour
             SessionExtractionConstants.StarterMidSlotId,
             SessionExtractionConstants.MidSlotTypeId,
             "Starter observation post is already installed.",
-            "Installed Mid observation module",
+            "Upgraded built-in observation suite",
             out message);
     }
 
@@ -5644,12 +7931,12 @@ public partial class MetaGameState : MonoBehaviour
 
     public string GetNextStarterFittingUpgradeActionLabel()
     {
-        if (CanInstallStarterCargoRackUpgrade(out _)) return "Install Low rack";
-        if (CanInstallStarterGasExtractorUpgrade(out _)) return "Install High gas";
-        if (CanInstallStarterMiningHoldUpgrade(out _)) return "Install High wreck";
-        if (CanInstallStarterLeviathanSalvageUpgrade(out _)) return "Install High salvage";
-        if (CanInstallStarterObservationUpgrade(out _)) return "Install Mid scout";
-        return "Install module";
+        if (CanInstallStarterCargoRackUpgrade(out _)) return "Upgrade hold";
+        if (CanInstallStarterGasExtractorUpgrade(out _)) return "Upgrade gas tools";
+        if (CanInstallStarterMiningHoldUpgrade(out _)) return "Upgrade wreck tools";
+        if (CanInstallStarterLeviathanSalvageUpgrade(out _)) return "Upgrade salvage";
+        if (CanInstallStarterObservationUpgrade(out _)) return "Upgrade sensors";
+        return "Upgrade built-in kit";
     }
 
     public bool AutoInstallRequiredModules(bool applyToRuntime, out string message)
@@ -5764,6 +8051,7 @@ public partial class MetaGameState : MonoBehaviour
             completedCycles += AdvanceBaseProcessingFacilities(elapsedSeconds);
             completedCycles += AdvanceBaseCascadeProduction(utcNow);
             completedCycles += AdvanceCourierServiceOrders(utcNow.Ticks);
+            completedCycles += AdvanceCapitalAirplane(utcNow.Ticks);
 
             progress.lastProcessUtcTicks = utcNow.Ticks;
         }
@@ -5860,19 +8148,40 @@ public partial class MetaGameState : MonoBehaviour
     }
     private int AdvanceTechnologyResearch(DateTime utcNow)
     {
-        if (progress == null || sessionConfig == null || !sessionConfig.isLoaded) return 0;
-        if (string.IsNullOrWhiteSpace(progress.activeResearchTechnologyId)) return 0;
+        return AdvanceTechnologyResearchSlots(utcNow);
+    }
 
-        TechnologyConfig technology = sessionConfig.GetTechnology(progress.activeResearchTechnologyId);
+    private int AdvanceTechnologyResearchSlots(DateTime utcNow)
+    {
+        if (progress == null || sessionConfig == null || !sessionConfig.isLoaded) return 0;
+
+        int slotCount = Mathf.Max(1, progress.activeResearchTechnologyIds != null ? progress.activeResearchTechnologyIds.Count : 1);
+        progress.EnsureResearchSlotCount(slotCount);
+
+        int advancedSlots = 0;
+        for (int slotIndex = 0; slotIndex < slotCount; slotIndex++)
+        {
+            advancedSlots += AdvanceTechnologyResearchSlot(utcNow, slotIndex, slotCount);
+        }
+
+        return advancedSlots;
+    }
+
+    private int AdvanceTechnologyResearchSlot(DateTime utcNow, int slotIndex, int slotCount)
+    {
+        string technologyId = progress.GetResearchSlotTechnologyId(slotIndex);
+        if (string.IsNullOrWhiteSpace(technologyId)) return 0;
+
+        TechnologyConfig technology = sessionConfig.GetTechnology(technologyId);
         if (technology == null)
         {
-            progress.activeResearchTechnologyId = "";
+            progress.SetResearchSlotTechnologyId(slotIndex, "", slotCount);
             return 0;
         }
 
         if (progress.IsTechnologyCompleted(technology.id))
         {
-            progress.activeResearchTechnologyId = "";
+            progress.SetResearchSlotTechnologyId(slotIndex, "", slotCount);
             return 0;
         }
 
@@ -5912,7 +8221,7 @@ public partial class MetaGameState : MonoBehaviour
             return 1;
         }
 
-        lastAccountMessage = "Архивы добавили " + generatedSp.ToString("0.#") + " SP в " + GetTechnologyDisplayName(technology) + ".";
+        lastAccountMessage = "Архив " + (slotIndex + 1).ToString() + " добавил " + generatedSp.ToString("0.#") + " SP в " + GetTechnologyDisplayName(technology) + ".";
         return 1;
     }
 
@@ -5932,6 +8241,7 @@ public partial class MetaGameState : MonoBehaviour
         {
             progress.activeResearchTechnologyId = "";
         }
+        progress.ClearResearchTechnologyFromSlots(technology.id);
 
         ShipAssemblyBuilder.AutoInstallRequiredModules(ActiveCatalog, progress, out _);
         ApplySelectedShip();
@@ -5961,6 +8271,7 @@ public partial class MetaGameState : MonoBehaviour
         {
             progress.activeResearchTechnologyId = "";
         }
+        progress.ClearResearchTechnologyFromSlots(technology.id);
 
         MarkPersistentProgressDirty();
         lastAccountMessage = "Уровень знания изучен: " + GetTechnologyDisplayName(technology)
@@ -6197,18 +8508,18 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         zone.Normalize();
-        if (string.IsNullOrWhiteSpace(zone.starterResourceItemId))
+        if (zone.AcceptsResource(resourceId))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(zone.starterResourceItemId) && !zone.HasPayloadRewards)
         {
             reason = "Active sortie has no collectible resource configured.";
             return false;
         }
 
-        if (resourceId == zone.starterResourceItemId)
-        {
-            return true;
-        }
-
-        reason = "Active sortie accepts only " + zone.starterResourceItemId + ", not " + resourceId + ".";
+        reason = "Active sortie accepts only " + zone.GetAcceptedResourceSummary() + ", not " + resourceId + ".";
         return false;
     }
 
@@ -6297,7 +8608,9 @@ public partial class MetaGameState : MonoBehaviour
         outward.Normalize();
         Vector3 inbound = -outward;
         float spawnRadius = Mathf.Max(0f, zone.radiusMeters) + entrySpeedMS * SortieEntryApproachSeconds;
-        float altitude = Mathf.Max(zone.entryPosition.y, zone.stormFloorY + 50f);
+        float altitude = Mathf.Max(
+            zone.entryPosition.y,
+            zone.stormFloorY + SessionExtractionConstants.DefaultSortieEntryAltitudeMeters);
         Vector3 position = new Vector3(
             zone.centerPosition.x + outward.x * spawnRadius,
             altitude,
@@ -6362,6 +8675,7 @@ public partial class MetaGameState : MonoBehaviour
             ship.turnInput = 0f;
             ship.claudiumSlipstreamEnabled = true;
             ship.claudiumSlipstreamCharge01 = 1f;
+            ApplyBuiltInSortieAutonomy(ship);
         }
 
         WildWindFlightControlBridge controls = WildWindFlightControlBridge.EnsureInstance();
@@ -6372,6 +8686,19 @@ public partial class MetaGameState : MonoBehaviour
         }
 
         progress.SetFlightPose(entryState.position, entryState.rotation);
+    }
+
+    private static void ApplyBuiltInSortieAutonomy(ShipPhysics ship)
+    {
+        if (ship == null)
+        {
+            return;
+        }
+
+        ship.fuelConsumptionKgPerMinute = 0f;
+        ship.fuelConsumptionKgPerSecond = 0f;
+        ship.fuelStockKg = Mathf.Max(1f, ship.fuelStockKg);
+        ship.hasFuel = true;
     }
 
     private SortieReturnProfile BuildCurrentSortieReturnProfile()
@@ -6537,11 +8864,11 @@ public partial class MetaGameState : MonoBehaviour
         availableWrecks = 0;
         if (storage == null) return "";
 
-        int brokenAutomatons = storage.GetResourceAmount(SessionExtractionConstants.BrokenAutomatonItemId);
-        if (brokenAutomatons > 0)
+        int starterAutomatonParts = storage.GetResourceAmount(SessionExtractionConstants.StarterAutomatonPartItemId);
+        if (starterAutomatonParts > 0)
         {
-            availableWrecks = brokenAutomatons;
-            return SessionExtractionConstants.BrokenAutomatonItemId;
+            availableWrecks = starterAutomatonParts;
+            return SessionExtractionConstants.StarterAutomatonPartItemId;
         }
 
         return "";
@@ -6696,6 +9023,182 @@ public partial class MetaGameState : MonoBehaviour
             this.minAmount = Mathf.Max(1, minAmount);
             this.maxAmount = Mathf.Max(this.minAmount, maxAmount);
             this.freightValue = Mathf.Max(1, freightValue);
+        }
+    }
+
+    private readonly struct CourierCustomerSpec
+    {
+        public readonly string factionId;
+        public readonly string factionNameRu;
+        public readonly string clientName;
+
+        public CourierCustomerSpec(string factionId, string factionNameRu, string clientName)
+        {
+            this.factionId = string.IsNullOrWhiteSpace(factionId) ? "wind_houses" : factionId.Trim();
+            this.factionNameRu = string.IsNullOrWhiteSpace(factionNameRu) ? "Ветровые Дома" : factionNameRu.Trim();
+            this.clientName = string.IsNullOrWhiteSpace(clientName) ? this.factionNameRu : clientName.Trim();
+        }
+    }
+
+    private readonly struct FactionDefinitionSpec
+    {
+        public readonly string factionId;
+        public readonly string displayNameRu;
+        public readonly string currencyItemId;
+
+        public FactionDefinitionSpec(string factionId, string displayNameRu, string currencyItemId)
+        {
+            this.factionId = string.IsNullOrWhiteSpace(factionId) ? "" : factionId.Trim().ToLowerInvariant();
+            this.displayNameRu = string.IsNullOrWhiteSpace(displayNameRu) ? this.factionId : displayNameRu.Trim();
+            this.currencyItemId = string.IsNullOrWhiteSpace(currencyItemId) ? CourierFreightRewardItemId : currencyItemId.Trim();
+        }
+    }
+
+    private readonly struct FactionMarketItemSpec
+    {
+        public readonly string factionId;
+        public readonly string itemId;
+        public readonly int minReputationLevel;
+        public readonly int priceAmount;
+        public readonly int unitAmount;
+        public readonly int dailyLimit;
+        public readonly string unlockQuestId;
+        public readonly string currencyItemId;
+
+        public FactionMarketItemSpec(
+            string factionId,
+            string itemId,
+            int minReputationLevel,
+            int priceAmount,
+            int unitAmount,
+            int dailyLimit,
+            string unlockQuestId = "",
+            string currencyItemId = "")
+        {
+            this.factionId = string.IsNullOrWhiteSpace(factionId) ? "" : factionId.Trim().ToLowerInvariant();
+            this.itemId = string.IsNullOrWhiteSpace(itemId) ? "" : itemId.Trim();
+            this.minReputationLevel = Mathf.Clamp(minReputationLevel, 0, 5);
+            this.priceAmount = Mathf.Max(0, priceAmount);
+            this.unitAmount = Mathf.Max(1, unitAmount);
+            this.dailyLimit = Mathf.Max(0, dailyLimit);
+            this.unlockQuestId = string.IsNullOrWhiteSpace(unlockQuestId) ? "" : unlockQuestId.Trim();
+            this.currencyItemId = string.IsNullOrWhiteSpace(currencyItemId) ? "" : currencyItemId.Trim();
+        }
+    }
+
+    private readonly struct FactionDailyTaskTemplateSpec
+    {
+        public readonly string factionId;
+        public readonly string titleRu;
+        public readonly string inputItemId;
+        public readonly int minInputAmount;
+        public readonly int maxInputAmount;
+        public readonly int minRewardCurrency;
+        public readonly int maxRewardCurrency;
+        public readonly int reputationReward;
+        public readonly int masteryReward;
+
+        public FactionDailyTaskTemplateSpec(
+            string factionId,
+            string titleRu,
+            string inputItemId,
+            int minInputAmount,
+            int maxInputAmount,
+            int minRewardCurrency,
+            int maxRewardCurrency,
+            int reputationReward,
+            int masteryReward)
+        {
+            this.factionId = string.IsNullOrWhiteSpace(factionId) ? "" : factionId.Trim().ToLowerInvariant();
+            this.titleRu = string.IsNullOrWhiteSpace(titleRu) ? "Фракционное поручение" : titleRu.Trim();
+            this.inputItemId = string.IsNullOrWhiteSpace(inputItemId) ? "iron" : inputItemId.Trim();
+            this.minInputAmount = Mathf.Max(1, minInputAmount);
+            this.maxInputAmount = Mathf.Max(this.minInputAmount, maxInputAmount);
+            this.minRewardCurrency = Mathf.Max(1, minRewardCurrency);
+            this.maxRewardCurrency = Mathf.Max(this.minRewardCurrency, maxRewardCurrency);
+            this.reputationReward = Mathf.Max(1, reputationReward);
+            this.masteryReward = Mathf.Max(0, masteryReward);
+        }
+    }
+
+    private readonly struct FactionBuildingGateSpec
+    {
+        public readonly string scopeId;
+        public readonly string scopeNameRu;
+        public readonly string factionId;
+        public readonly int targetLevel;
+        public readonly int requiredReputationLevel;
+
+        public FactionBuildingGateSpec(string scopeId, string scopeNameRu, string factionId, int targetLevel, int requiredReputationLevel)
+        {
+            this.scopeId = string.IsNullOrWhiteSpace(scopeId) ? "" : scopeId.Trim().ToLowerInvariant();
+            this.scopeNameRu = string.IsNullOrWhiteSpace(scopeNameRu) ? this.scopeId : scopeNameRu.Trim();
+            this.factionId = string.IsNullOrWhiteSpace(factionId) ? "" : factionId.Trim().ToLowerInvariant();
+            this.targetLevel = Mathf.Max(1, targetLevel);
+            this.requiredReputationLevel = Mathf.Clamp(requiredReputationLevel, 1, 5);
+        }
+    }
+
+    private readonly struct CapitalAirplaneTierSpec
+    {
+        public readonly string tierId;
+        public readonly int minServiceLevel;
+        public readonly int shelfCount;
+        public readonly int shelfSize;
+        public readonly int fullInputFe;
+        public readonly int solidReward;
+        public readonly int freightReward;
+        public readonly int masteryReward;
+        public readonly string bonusSummary;
+
+        public CapitalAirplaneTierSpec(
+            string tierId,
+            int minServiceLevel,
+            int shelfCount,
+            int shelfSize,
+            int fullInputFe,
+            int solidReward,
+            int freightReward,
+            int masteryReward,
+            string bonusSummary)
+        {
+            this.tierId = string.IsNullOrWhiteSpace(tierId) ? "capital_plane" : tierId.Trim();
+            this.minServiceLevel = Mathf.Clamp(minServiceLevel, 1, 20);
+            this.shelfCount = Mathf.Max(1, shelfCount);
+            this.shelfSize = Mathf.Max(1, shelfSize);
+            this.fullInputFe = Mathf.Max(1, fullInputFe);
+            this.solidReward = Mathf.Max(1, solidReward);
+            this.freightReward = Mathf.Max(0, freightReward);
+            this.masteryReward = Mathf.Max(0, masteryReward);
+            this.bonusSummary = string.IsNullOrWhiteSpace(bonusSummary) ? "" : bonusSummary.Trim();
+        }
+    }
+
+    private readonly struct CapitalAirplaneCargoSpec
+    {
+        public readonly string itemId;
+        public readonly int stage;
+        public readonly int feValue;
+
+        public CapitalAirplaneCargoSpec(string itemId, int stage, int feValue)
+        {
+            this.itemId = string.IsNullOrWhiteSpace(itemId) ? "iron" : itemId.Trim();
+            this.stage = Mathf.Clamp(stage, 1, 5);
+            this.feValue = Mathf.Max(1, feValue);
+        }
+    }
+
+    private readonly struct RepairDockResourceSpec
+    {
+        public readonly string itemId;
+        public readonly int stage;
+        public readonly int feValue;
+
+        public RepairDockResourceSpec(string itemId, int stage, int feValue)
+        {
+            this.itemId = string.IsNullOrWhiteSpace(itemId) ? "iron" : itemId.Trim();
+            this.stage = Mathf.Clamp(stage, 1, 4);
+            this.feValue = Mathf.Max(1, feValue);
         }
     }
 
@@ -7217,11 +9720,11 @@ public partial class MetaGameState : MonoBehaviour
         if (storage == null) return;
 
         storage.AddResource("windshale_ore", 90);
-        storage.AddResource("dawnspar_ore", 45);
-        storage.AddResource("cloud_condensate", 90);
-        storage.AddResource(SessionExtractionConstants.BrokenAutomatonItemId, 45);
-        storage.AddResource("windcalf_carcass", 75);
-        storage.AddResource(SessionExtractionConstants.RockInfoItemId, 45);
+        storage.AddResource("dawnspar_ore", 25);
+        storage.AddResource("cloud_condensate", 45);
+        storage.AddResource(SessionExtractionConstants.StarterAutomatonPartItemId, 12);
+        storage.AddResource("windcalf_carcass", 16);
+        storage.AddResource(SessionExtractionConstants.RockInfoItemId, 10);
     }
 
     private void AddStartingBaseExpansionCurrency()
@@ -7231,7 +9734,7 @@ public partial class MetaGameState : MonoBehaviour
         PortStorageState storage = progress.GetPortStorageState(GetCapitalPortId(), true);
         if (storage == null) return;
 
-        storage.AddResource("freight", 125480);
+        storage.AddResource("freight", 4000);
     }
 
     private string GetStartingFuelId()
@@ -7268,10 +9771,16 @@ public partial class MetaGameState : MonoBehaviour
             dock.targetShip = ship;
         }
 
+        SessionAtmosphereTuner atmosphere = FindFirstObjectByType<SessionAtmosphereTuner>();
+        if (atmosphere != null)
+        {
+            atmosphere.SetAltitudeSource(ship.transform);
+        }
+
         InstallCrashDetectorIfNeeded(ship);
     }
 
-    private void ApplySessionModeToShip()
+    private void ApplySessionModeToShip(bool restoreFlightPose = true)
     {
         ShipPhysics ship = GetActiveShip();
         if (ship == null) return;
@@ -7314,7 +9823,7 @@ public partial class MetaGameState : MonoBehaviour
         }
         else
         {
-            if (progress.hasCurrentFlightPose)
+            if (restoreFlightPose && progress.hasCurrentFlightPose)
             {
                 body.position = progress.currentFlightPosition;
                 body.rotation = progress.currentFlightRotation;
@@ -7507,5 +10016,741 @@ public partial class MetaGameState : MonoBehaviour
         return $"{remaining.Minutes:D2}:{remaining.Seconds:D2}";
     }
 
+    public const int DevelopmentDockSlotCount = 1;
+    public const int DevelopmentDockShipMaxSorties = 10;
+
+    private const string QuickSortieId = "quick_adaptive";
+
+    public IReadOnlyList<DockedDevelopmentShipState> GetDevelopmentDockShipSlots()
+    {
+        EnsureProgressInitialized();
+        EnsureDevelopmentDockSlots();
+        return progress.dockedDevelopmentShips;
+    }
+
+    public DockedDevelopmentShipState GetSelectedDevelopmentDockShipSlot()
+    {
+        EnsureProgressInitialized();
+        EnsureDevelopmentDockSlots();
+        return GetDevelopmentDockSlot(progress.selectedDevelopmentDockSlot, true);
+    }
+
+    public string LastQuickSortieReport => progress != null ? progress.lastQuickSortieReport ?? "" : "";
+
+    public List<SortieMissionOffer> GetDevelopmentDockOrdinaryMissionOffers(int slotIndex)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureDevelopmentDockSlots();
+
+        DockedDevelopmentShipState slot = GetDevelopmentDockSlot(slotIndex, true);
+        ShipTreeEntryConfig ship = slot != null && slot.HasShip && sessionConfig != null
+            ? sessionConfig.GetShipTreeEntry(slot.shipId)
+            : null;
+        return SortieRewardGenerator.BuildOrdinaryOffers(ship, sessionConfig, GetProcessUtcNow());
+    }
+
+    public bool SelectDevelopmentDockSlot(int slotIndex)
+    {
+        EnsureProgressInitialized();
+        EnsureDevelopmentDockSlots();
+        progress.selectedDevelopmentDockSlot = Mathf.Clamp(slotIndex, 0, DevelopmentDockSlotCount - 1);
+        return true;
+    }
+
+    public bool TryBuyDevelopmentShipToDock(string shipId, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureDevelopmentDockSlots();
+
+        ShipTreeEntryConfig ship = sessionConfig != null ? sessionConfig.GetShipTreeEntry(shipId) : null;
+        if (ship == null || !ship.IsDevelopmentRosterShip || string.IsNullOrWhiteSpace(ship.factionId))
+        {
+            message = "Корабль развития не найден: " + shipId + ".";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        DockedDevelopmentShipState slot = GetDevelopmentDockSlot(progress.selectedDevelopmentDockSlot, true);
+        if (slot == null)
+        {
+            message = "Слот дока не найден.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (slot.HasShip)
+        {
+            ShipTreeEntryConfig existing = sessionConfig.GetShipTreeEntry(slot.shipId);
+            message = "Слот занят: " + (existing != null ? existing.DisplayNameRu : slot.shipId) + ". Продай корабль перед покупкой нового.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        PortStorageState storage = GetCapitalStorageState();
+        string currencyId = string.IsNullOrWhiteSpace(ship.costCurrencyItemId) ? CourierFreightRewardItemId : ship.costCurrencyItemId;
+        int cost = Mathf.Max(0, ship.costAmount);
+        int available = storage != null ? storage.GetResourceAmount(currencyId) : 0;
+        if (available < cost)
+        {
+            message = "Не хватает для покупки: " + currencyId + " x" + (cost - available)
+                + " (" + available + "/" + cost + ").";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        int spent = cost;
+        if (spent > 0)
+        {
+            storage.TrySpendResource(currencyId, spent);
+            AddQuestEventMetric("resource_spent", currencyId, spent);
+        }
+
+        slot.shipId = ship.shipId;
+        slot.sortiesRemaining = DevelopmentDockShipMaxSorties;
+        slot.generation++;
+        slot.lastRewardSummary = "";
+        progress.lastQuickSortieReport = "";
+
+        AddQuestEventMetric("ship_purchased", ship.shipId, 1);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+
+        message = "Куплен в тестовый док: " + ship.DisplayNameRu
+            + " (" + spent + "/" + cost + " " + currencyId + ").";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public bool TrySellDevelopmentDockShip(int slotIndex, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureDevelopmentDockSlots();
+
+        DockedDevelopmentShipState slot = GetDevelopmentDockSlot(slotIndex, true);
+        if (slot == null || !slot.HasShip)
+        {
+            message = "В этом слоте нет корабля.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        ShipTreeEntryConfig ship = sessionConfig != null ? sessionConfig.GetShipTreeEntry(slot.shipId) : null;
+        string shipName = ship != null ? ship.DisplayNameRu : slot.shipId;
+        int usedSorties = Mathf.Clamp(DevelopmentDockShipMaxSorties - slot.sortiesRemaining, 0, DevelopmentDockShipMaxSorties);
+        int freightRefund = ship != null ? Mathf.Max(0, Mathf.RoundToInt(ship.costAmount * 0.18f)) : 0;
+        int experienceRefund = ship != null
+            ? Mathf.Max(10, Mathf.RoundToInt(ship.costAmount * 0.08f + usedSorties * Mathf.Max(10, ship.rank * 14)))
+            : 10;
+
+        PortStorageState storage = GetCapitalStorageState();
+        if (storage != null)
+        {
+            if (freightRefund > 0)
+            {
+                storage.AddResource(CourierFreightRewardItemId, freightRefund);
+                AddQuestEventMetric("resource_acquired", CourierFreightRewardItemId, freightRefund);
+            }
+
+            if (experienceRefund > 0)
+            {
+                storage.AddResource(SessionExtractionConstants.DesignExperienceItemId, experienceRefund);
+                AddQuestEventMetric("resource_acquired", SessionExtractionConstants.DesignExperienceItemId, experienceRefund);
+            }
+        }
+
+        slot.ClearShip();
+        progress.lastQuickSortieReport = "";
+        AddQuestEventMetric("ship_sold", ship != null ? ship.shipId : "unknown", 1);
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+
+        message = "Корабль продан: " + shipName
+            + ". Возврат: фрахт x" + freightRefund
+            + ", опыт x" + experienceRefund + ".";
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public bool TryRunQuickDevelopmentSortie(int slotIndex, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureDevelopmentDockSlots();
+
+        DockedDevelopmentShipState slot = GetDevelopmentDockSlot(slotIndex, true);
+        if (slot == null || !slot.HasShip)
+        {
+            message = "Сначала купи корабль в док.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (slot.sortiesRemaining <= 0)
+        {
+            message = "У корабля закончились вылеты. Продай его или поставь новый.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        ShipTreeEntryConfig ship = sessionConfig != null ? sessionConfig.GetShipTreeEntry(slot.shipId) : null;
+        if (ship == null)
+        {
+            message = "Корабль в доке отсутствует в Ship_tree.csv: " + slot.shipId + ".";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        SortieMissionOffer offer = SortieRewardGenerator.CreateQuickOffer(ship, slot, sessionConfig, GetProcessUtcNow());
+        SortieMissionResult result = SortieRewardGenerator.GenerateSortie(ship, offer, sessionConfig);
+        if (result == null)
+        {
+            message = "Быстрый вылет не удалось рассчитать.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        ApplyDevelopmentSortieResultRewards(result);
+        slot.sortiesRemaining = Mathf.Max(0, slot.sortiesRemaining - 1);
+        AddQuestEventMetric("sortie_completed", QuickSortieId, 1);
+        AddQuestEventMetric("quick_sortie_completed", ship.shipId, 1);
+        RefreshQuestProgress(true);
+
+        message = result.reportText
+            + "\nОсталось вылетов: " + slot.sortiesRemaining
+            + "/" + DevelopmentDockShipMaxSorties
+            + ".";
+        slot.lastRewardSummary = message;
+        progress.lastQuickSortieReport = message;
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        lastAccountMessage = message;
+        return true;
+    }
+
+    public bool TryRunDevelopmentDockOrdinaryMission(int slotIndex, string offerId, out string message)
+    {
+        EnsureProgressInitialized();
+        EnsureSessionConfigLoaded();
+        EnsureDevelopmentDockSlots();
+
+        DockedDevelopmentShipState slot = GetDevelopmentDockSlot(slotIndex, true);
+        if (slot == null || !slot.HasShip)
+        {
+            message = "Сначала купи корабль в док.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        if (slot.sortiesRemaining <= 0)
+        {
+            message = "У корабля закончились вылеты. Продай его или поставь новый.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        ShipTreeEntryConfig ship = sessionConfig != null ? sessionConfig.GetShipTreeEntry(slot.shipId) : null;
+        if (ship == null)
+        {
+            message = "Корабль в доке отсутствует в Ship_tree.csv: " + slot.shipId + ".";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        List<SortieMissionOffer> offers = SortieRewardGenerator.BuildOrdinaryOffers(ship, sessionConfig, GetProcessUtcNow());
+        SortieMissionOffer selected = null;
+        for (int i = 0; i < offers.Count; i++)
+        {
+            SortieMissionOffer offer = offers[i];
+            if (offer != null && string.Equals(offer.offerId, offerId, StringComparison.OrdinalIgnoreCase))
+            {
+                selected = offer;
+                break;
+            }
+        }
+
+        if (selected == null)
+        {
+            selected = offers.Count > 0 ? offers[0] : null;
+        }
+
+        if (selected == null)
+        {
+            message = "Обычные миссии не сгенерированы.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        SortieMissionResult result = SortieRewardGenerator.GenerateSortie(ship, selected, sessionConfig);
+        if (result == null)
+        {
+            message = "Миссию не удалось рассчитать.";
+            lastAccountMessage = message;
+            return false;
+        }
+
+        ApplyDevelopmentSortieResultRewards(result);
+        slot.sortiesRemaining = Mathf.Max(0, slot.sortiesRemaining - 1);
+        AddQuestEventMetric("sortie_completed", selected.missionProfile, 1);
+        AddQuestEventMetric("ordinary_sortie_completed", ship.shipId, 1);
+        AddQuestEventMetric(selected.missionProfile + "_sortie_completed", selected.primaryActivity, 1);
+        RefreshQuestProgress(true);
+
+        message = result.reportText
+            + "\nОсталось вылетов: " + slot.sortiesRemaining
+            + "/" + DevelopmentDockShipMaxSorties
+            + ".";
+        slot.lastRewardSummary = message;
+        progress.lastQuickSortieReport = message;
+        MarkPersistentProgressDirty();
+        RefreshRuntimeAccountIfDocked();
+        lastAccountMessage = message;
+        return true;
+    }
+
+    private void ApplyDevelopmentSortieResultRewards(SortieMissionResult result)
+    {
+        if (result == null)
+        {
+            return;
+        }
+
+        PortStorageState storage = GetCapitalStorageState();
+        if (storage != null && result.Extracted && result.materialRewards != null)
+        {
+            for (int i = 0; i < result.materialRewards.Count; i++)
+            {
+                SortieRewardLine reward = result.materialRewards[i];
+                if (reward == null || string.IsNullOrWhiteSpace(reward.itemId) || reward.amount <= 0)
+                {
+                    continue;
+                }
+
+                storage.AddResource(reward.itemId, reward.amount);
+                AddQuestEventMetric("resource_acquired", reward.itemId, reward.amount);
+                AddQuestEventMetric("resource_acquired", "any", reward.amount);
+            }
+        }
+
+        if (storage != null && result.freightAward > 0)
+        {
+            storage.AddResource(CourierFreightRewardItemId, result.freightAward);
+            AddQuestEventMetric("resource_acquired", CourierFreightRewardItemId, result.freightAward);
+            AddQuestEventMetric("resource_acquired", "any", result.freightAward);
+        }
+
+        if (storage != null && result.designExperienceAward > 0)
+        {
+            storage.AddResource(SessionExtractionConstants.DesignExperienceItemId, result.designExperienceAward);
+            AddQuestEventMetric("resource_acquired", SessionExtractionConstants.DesignExperienceItemId, result.designExperienceAward);
+            AddQuestEventMetric("resource_acquired", "any", result.designExperienceAward);
+        }
+    }
+
+    private void EnsureDevelopmentDockSlots()
+    {
+        progress.dockedDevelopmentShips ??= new List<DockedDevelopmentShipState>();
+        for (int i = progress.dockedDevelopmentShips.Count - 1; i >= 0; i--)
+        {
+            DockedDevelopmentShipState slot = progress.dockedDevelopmentShips[i];
+            if (slot == null || slot.slotIndex < 0 || slot.slotIndex >= DevelopmentDockSlotCount)
+            {
+                progress.dockedDevelopmentShips.RemoveAt(i);
+                continue;
+            }
+
+            slot.Normalize();
+        }
+
+        for (int i = 0; i < DevelopmentDockSlotCount; i++)
+        {
+            GetDevelopmentDockSlot(i, true);
+        }
+
+        progress.selectedDevelopmentDockSlot = Mathf.Clamp(progress.selectedDevelopmentDockSlot, 0, DevelopmentDockSlotCount - 1);
+    }
+
+    private DockedDevelopmentShipState GetDevelopmentDockSlot(int slotIndex, bool createIfMissing)
+    {
+        if (progress == null)
+        {
+            return null;
+        }
+
+        int normalizedIndex = Mathf.Clamp(slotIndex, 0, DevelopmentDockSlotCount - 1);
+        progress.dockedDevelopmentShips ??= new List<DockedDevelopmentShipState>();
+        for (int i = 0; i < progress.dockedDevelopmentShips.Count; i++)
+        {
+            DockedDevelopmentShipState slot = progress.dockedDevelopmentShips[i];
+            if (slot != null && slot.slotIndex == normalizedIndex)
+            {
+                return slot;
+            }
+        }
+
+        if (!createIfMissing)
+        {
+            return null;
+        }
+
+        DockedDevelopmentShipState newSlot = new DockedDevelopmentShipState { slotIndex = normalizedIndex };
+        progress.dockedDevelopmentShips.Add(newSlot);
+        return newSlot;
+    }
+
+    private List<ResourceStack> BuildQuickDevelopmentSortieRewards(ShipTreeEntryConfig ship, DockedDevelopmentShipState slot)
+    {
+        List<ResourceStack> rewards = new List<ResourceStack>();
+        if (ship == null)
+        {
+            return rewards;
+        }
+
+        System.Random random = new System.Random(CreateQuickSortieSeed(ship, slot));
+        int rank = Mathf.Clamp(ship.rank > 0 ? ship.rank : ship.treeTier, 1, 10);
+        float cargoKg = Mathf.Max(500f, ship.cargoCapacityTons * 1000f);
+        int mining = ClampQuickActivityRating(ship.miningRating);
+        int harvesting = ClampQuickActivityRating(ship.harvestingRating);
+        int hunting = ClampQuickActivityRating(ship.huntingRating);
+        int salvage = ClampQuickActivityRating(ship.salvageRating);
+        int hacking = ClampQuickActivityRating(ship.hackingRating);
+        int survey = ClampQuickActivityRating(ship.surveyRating);
+        int warfare = Mathf.Clamp(ship.warfareRating >= 0 ? ship.warfareRating : ship.firepower, 0, 100);
+        int repair = ClampQuickActivityRating(ship.repairRating);
+        float sortieQuality = RandomRange(random, 0.78f, 1.26f);
+
+        float cargoActivityWeight = mining + harvesting + hunting * 0.82f + salvage * 0.70f;
+        if (cargoActivityWeight > 0.01f)
+        {
+            AddQuickCargoActivityReward(rewards, "mining", mining, rank, cargoKg, cargoActivityWeight, 1.00f, random, sortieQuality);
+            AddQuickCargoActivityReward(rewards, "harvesting", harvesting, rank, cargoKg, cargoActivityWeight, 0.92f, random, sortieQuality);
+            AddQuickCargoActivityReward(rewards, "hunting", hunting, rank, cargoKg, cargoActivityWeight, 0.78f, random, sortieQuality);
+            AddQuickCargoActivityReward(rewards, "salvage", salvage, rank, cargoKg, cargoActivityWeight, 0.66f, random, sortieQuality);
+        }
+
+        if (hacking > 0)
+        {
+            QuickSortieRewardSourceConfig source = SelectQuickSortieSourceWeighted("hacking", EffectiveQuickSourceRating(hacking, rank), random);
+            int amount = Mathf.Max(1, Mathf.RoundToInt(Mathf.Pow(hacking, 1.08f) * (rank + 1) * 0.55f * sortieQuality * RandomRange(random, 0.72f, 1.32f)));
+            AddQuickReward(rewards, ResolveQuickSortieSourceItemId(source), amount);
+        }
+
+        if (survey > 0)
+        {
+            QuickSortieRewardSourceConfig source = SelectQuickSortieSourceWeighted("survey", EffectiveQuickSourceRating(survey, rank), random);
+            int amount = Mathf.Max(1, Mathf.RoundToInt(Mathf.Pow(survey, 1.04f) * (rank + 1) * 0.42f * sortieQuality * RandomRange(random, 0.72f, 1.30f)));
+            AddQuickReward(rewards, ResolveQuickSortieSourceItemId(source), amount);
+        }
+
+        if (warfare > 0)
+        {
+            float combatQuality = sortieQuality * RandomRange(random, 0.80f, 1.28f);
+            int freight = RoundQuickRewardAmount((warfare * warfare * 0.58f + GetQuickDefense(ship) * 18f + GetQuickMobility(ship) * 8f) * (0.72f + rank * 0.24f) * combatQuality);
+            int experience = RoundQuickRewardAmount((warfare * rank * 18f + repair * rank * 10f + survey * rank * 5f) * RandomRange(random, 0.82f, 1.26f));
+            AddQuickReward(rewards, CourierFreightRewardItemId, freight);
+            AddQuickReward(rewards, SessionExtractionConstants.DesignExperienceItemId, experience);
+        }
+        else if (repair > 0)
+        {
+            AddQuickReward(rewards, SessionExtractionConstants.DesignExperienceItemId, RoundQuickRewardAmount(repair * rank * 18f * sortieQuality * RandomRange(random, 0.82f, 1.26f)));
+        }
+
+        rewards.Sort((left, right) => string.Compare(left.resourceId, right.resourceId, StringComparison.OrdinalIgnoreCase));
+        return rewards;
+    }
+
+    private void AddQuickCargoActivityReward(
+        List<ResourceStack> rewards,
+        string activityId,
+        int rating,
+        int rank,
+        float cargoKg,
+        float totalWeight,
+        float activityMultiplier,
+        System.Random random,
+        float sortieQuality)
+    {
+        if (rating <= 0 || totalWeight <= 0.01f)
+        {
+            return;
+        }
+
+        float activityShare = (rating * activityMultiplier) / totalWeight;
+        float efficiency = Mathf.Clamp(0.18f + Mathf.Sqrt(rating / 100f) * 0.58f + rank * 0.012f, 0.16f, 0.92f);
+        float activityCargo = Mathf.Max(1f, cargoKg * activityShare * efficiency * sortieQuality);
+        int sourceRating = EffectiveQuickSourceRating(rating, rank);
+        int findCount = Mathf.Clamp(1 + rating / 34 + rank / 4 + (random != null ? random.Next(0, 2) : 0), 1, 5);
+        float[] findWeights = new float[findCount];
+        float totalFindWeight = 0f;
+        for (int i = 0; i < findWeights.Length; i++)
+        {
+            findWeights[i] = RandomRange(random, 0.55f, 1.55f);
+            totalFindWeight += findWeights[i];
+        }
+
+        for (int i = 0; i < findCount; i++)
+        {
+            QuickSortieRewardSourceConfig source = SelectQuickSortieSourceWeighted(activityId, sourceRating, random);
+            string itemId = ResolveQuickSortieSourceItemId(source);
+            if (string.IsNullOrWhiteSpace(itemId))
+            {
+                continue;
+            }
+
+            float localQuality = RandomRange(random, 0.72f, 1.30f);
+            float amount = activityCargo * (findWeights[i] / Mathf.Max(0.001f, totalFindWeight)) * localQuality;
+            AddQuickReward(rewards, itemId, RoundQuickRewardAmount(amount));
+        }
+    }
+
+    private QuickSortieRewardSourceConfig SelectQuickSortieSource(string activityId, int rating)
+    {
+        if (sessionConfig == null || sessionConfig.quickSortieRewardSources == null)
+        {
+            return null;
+        }
+
+        QuickSortieRewardSourceConfig best = null;
+        for (int i = 0; i < sessionConfig.quickSortieRewardSources.Count; i++)
+        {
+            QuickSortieRewardSourceConfig source = sessionConfig.quickSortieRewardSources[i];
+            if (source == null || !string.Equals(source.activityId, activityId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (source.minRating <= rating)
+            {
+                if (best == null || source.minRating > best.minRating)
+                {
+                    best = source;
+                }
+            }
+            else if (best == null)
+            {
+                best = source;
+            }
+        }
+
+        return best;
+    }
+
+    private QuickSortieRewardSourceConfig SelectQuickSortieSourceWeighted(string activityId, int rating, System.Random random)
+    {
+        if (sessionConfig == null || sessionConfig.quickSortieRewardSources == null)
+        {
+            return null;
+        }
+
+        random ??= new System.Random(17);
+        rating = Mathf.Clamp(rating, 1, 100);
+        List<QuickSortieRewardCandidate> candidates = new List<QuickSortieRewardCandidate>();
+        float totalWeight = 0f;
+        int overreach = 5 + Mathf.RoundToInt(rating * 0.10f) + random.Next(0, 7);
+        for (int i = 0; i < sessionConfig.quickSortieRewardSources.Count; i++)
+        {
+            QuickSortieRewardSourceConfig source = sessionConfig.quickSortieRewardSources[i];
+            if (source == null || !string.Equals(source.activityId, activityId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            float baseWeight = source.weight > 0f ? source.weight : 1f;
+            int distance = Mathf.Abs(source.minRating - rating);
+            float weight = 0f;
+            if (source.minRating <= rating)
+            {
+                weight = baseWeight / (1f + distance / 18f);
+            }
+            else if (source.minRating <= rating + overreach)
+            {
+                weight = baseWeight * 0.16f / (1f + distance / 7f);
+            }
+
+            if (weight <= 0f)
+            {
+                continue;
+            }
+
+            candidates.Add(new QuickSortieRewardCandidate(source, weight));
+            totalWeight += weight;
+        }
+
+        if (candidates.Count == 0 || totalWeight <= 0f)
+        {
+            return SelectQuickSortieSource(activityId, rating);
+        }
+
+        double roll = random.NextDouble() * totalWeight;
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            roll -= candidates[i].weight;
+            if (roll <= 0d)
+            {
+                return candidates[i].source;
+            }
+        }
+
+        return candidates[candidates.Count - 1].source;
+    }
+
+    private string ResolveQuickSortieSourceItemId(QuickSortieRewardSourceConfig source)
+    {
+        if (source == null || string.IsNullOrWhiteSpace(source.sourceId))
+        {
+            return "";
+        }
+
+        switch (source.sourceKind)
+        {
+            case "ore":
+                OreTypeConfig oreType = sessionConfig != null ? sessionConfig.GetOreType(source.sourceId) : null;
+                return oreType != null ? oreType.oreItemId : "";
+            case "gas":
+                GasCondensateTypeConfig gasType = sessionConfig != null ? sessionConfig.GetGasCondensateType(source.sourceId) : null;
+                return gasType != null ? gasType.condensateItemId : "";
+            case "leviathan":
+                LeviathanTypeConfig leviathanType = sessionConfig != null ? sessionConfig.GetLeviathanType(source.sourceId) : null;
+                return leviathanType != null ? leviathanType.carcassItemId : "";
+            case "item":
+                return sessionConfig != null && sessionConfig.GetItem(source.sourceId) != null ? source.sourceId : "";
+            default:
+                return "";
+        }
+    }
+
+    private static void AddQuickReward(List<ResourceStack> rewards, string itemId, int amount)
+    {
+        if (rewards == null || string.IsNullOrWhiteSpace(itemId) || amount <= 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < rewards.Count; i++)
+        {
+            ResourceStack existing = rewards[i];
+            if (existing != null && existing.resourceId == itemId)
+            {
+                existing.amount += amount;
+                return;
+            }
+        }
+
+        rewards.Add(new ResourceStack { resourceId = itemId, amount = amount });
+    }
+
+    private string BuildQuickRewardSummaryText(List<ResourceStack> rewards, int maxItems)
+    {
+        if (rewards == null || rewards.Count == 0)
+        {
+            return "-";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int count = Mathf.Clamp(maxItems, 1, 32);
+        for (int i = 0; i < rewards.Count && i < count; i++)
+        {
+            ResourceStack reward = rewards[i];
+            if (reward == null)
+            {
+                continue;
+            }
+
+            if (builder.Length > 0)
+            {
+                builder.Append(", ");
+            }
+
+            builder.Append(sessionConfig != null ? sessionConfig.GetItemNameRu(reward.resourceId) : reward.resourceId);
+            builder.Append(" x");
+            builder.Append(reward.amount);
+        }
+
+        if (rewards.Count > count)
+        {
+            builder.Append(", +");
+            builder.Append(rewards.Count - count);
+        }
+
+        return builder.ToString();
+    }
+
+    private static int ClampQuickActivityRating(int rating)
+    {
+        return rating > 0 ? Mathf.Clamp(rating, 1, 100) : 0;
+    }
+
+    private static int EffectiveQuickSourceRating(int rating, int rank)
+    {
+        return Mathf.Clamp(Mathf.RoundToInt(rating * 0.82f + rank * 3.4f), 1, 100);
+    }
+
+    private static int GetQuickDefense(ShipTreeEntryConfig ship)
+    {
+        if (ship == null) return 0;
+        return Mathf.Clamp(ship.defenseRating >= 0 ? ship.defenseRating : Mathf.RoundToInt((ship.armor + ship.durability) * 0.5f), 0, 100);
+    }
+
+    private static int GetQuickMobility(ShipTreeEntryConfig ship)
+    {
+        if (ship == null) return 0;
+        return Mathf.Clamp(ship.mobilityRating >= 0 ? ship.mobilityRating : Mathf.RoundToInt((ship.speed + ship.maneuverability) * 0.5f), 0, 100);
+    }
+
+    private int CreateQuickSortieSeed(ShipTreeEntryConfig ship, DockedDevelopmentShipState slot)
+    {
+        unchecked
+        {
+            int seed = 14621;
+            seed = AddStringToSeed(seed, ship != null ? ship.shipId : "");
+            seed = seed * 31 + (ship != null ? Mathf.Clamp(ship.rank > 0 ? ship.rank : ship.treeTier, 1, 10) : 1);
+            seed = seed * 31 + Mathf.RoundToInt((ship != null ? ship.cargoCapacityTons : 0f) * 10f);
+            seed = seed * 31 + (slot != null ? slot.slotIndex + 1 : 1) * 73856093;
+            seed = seed * 31 + (slot != null ? slot.generation + 1 : 1) * 19349663;
+            seed = seed * 31 + (slot != null ? slot.sortiesRemaining + 1 : 1) * 83492791;
+            seed = seed * 31 + (progress != null ? progress.selectedDevelopmentDockSlot + 1 : 1);
+            return seed == int.MinValue ? 14621 : Mathf.Abs(seed);
+        }
+    }
+
+    private static int AddStringToSeed(int seed, string value)
+    {
+        unchecked
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return seed * 31 + 7;
+            }
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                seed = seed * 31 + value[i];
+            }
+
+            return seed;
+        }
+    }
+
+    private static float RandomRange(System.Random random, float minInclusive, float maxInclusive)
+    {
+        if (maxInclusive <= minInclusive)
+        {
+            return minInclusive;
+        }
+
+        random ??= new System.Random(17);
+        return minInclusive + (float)random.NextDouble() * (maxInclusive - minInclusive);
+    }
+
+    private static int RoundQuickRewardAmount(float value)
+    {
+        int amount = Mathf.Max(1, Mathf.RoundToInt(value));
+        if (amount >= 10000) return Mathf.RoundToInt(amount / 100f) * 100;
+        if (amount >= 1000) return Mathf.RoundToInt(amount / 50f) * 50;
+        if (amount >= 100) return Mathf.RoundToInt(amount / 10f) * 10;
+        return amount;
+    }
 
 }

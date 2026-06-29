@@ -8,7 +8,7 @@ public sealed class GameplaySessionAccountData
     public const int CurrentVersion = 1;
     public const string DefaultAccountId = "runtime_account";
     public const string DefaultPlayerShipId = "player_ship";
-    public const string DefaultStarterHullId = "starter_hull";
+    public const string DefaultStarterHullId = "";
     public const string DefaultDockId = "capital";
 
     private static readonly Vector3 StarterDockPosition = new Vector3(-520f, 2615f, -360f);
@@ -172,6 +172,7 @@ public sealed class WildWindGameplaySession : MonoBehaviour
 
         session.Configure(metaGameState, accountId);
         session.InitializeFromCurrentStateIfNeeded();
+        session.RefreshFromMetaProgress();
         return session;
     }
 
@@ -336,9 +337,22 @@ public sealed class WildWindGameplaySession : MonoBehaviour
         meta.progress.SetFlightPose(PlayerPosition, PlayerRotation);
     }
 
-    public void RefreshFromMetaProgress()
+    public void RefreshFromMetaProgress(bool applyPose = false)
     {
+        ResolveReferences();
+        EnsurePlayerShipRoot();
         SyncFromMetaProgress();
+        if (applyPose && meta != null && meta.progress != null)
+        {
+            if (mode == GameSessionMode.Flight && meta.progress.hasCurrentFlightPose)
+            {
+                ApplyPose(meta.progress.currentFlightPosition, meta.progress.currentFlightRotation);
+            }
+            else if (mode == GameSessionMode.Docked && meta.progress.hasCurrentDockPosition)
+            {
+                ApplyPose(meta.progress.currentDockPosition, PlayerRotation);
+            }
+        }
     }
 
     public void RefreshRuntimeBubble()

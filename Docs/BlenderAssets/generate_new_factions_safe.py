@@ -11,7 +11,9 @@ from mathutils import Vector
 # Usage:
 # blender -b SOURCE.blend --python generate_new_factions_safe.py -- OUTPUT.blend
 #
-# Forward direction is negative X. The generator keeps object count low:
+# Local ship forward is negative X, then each root is rotated +90 degrees
+# around Z so final scene forward is negative Y like the older ships.
+# The generator keeps object count low:
 # each ship has a root empty plus 3-4 mesh objects, with attached modules
 # built into those meshes to avoid loose floating micro-parts.
 
@@ -207,7 +209,39 @@ class MeshKit:
         obj.scale = (1, 1, 1)
         bm = bmesh.new()
         bm.from_mesh(mesh)
-        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bm.faces.ensure_lookup_table()
+        for face in bm.faces:
+            face.tag = False
+        islands = []
+        for face in bm.faces:
+            if face.tag:
+                continue
+            stack = [face]
+            face.tag = True
+            island = []
+            while stack:
+                current = stack.pop()
+                island.append(current)
+                for edge in current.edges:
+                    for neighbor in edge.link_faces:
+                        if not neighbor.tag:
+                            neighbor.tag = True
+                            stack.append(neighbor)
+            islands.append(island)
+        for island in islands:
+            bmesh.ops.recalc_face_normals(bm, faces=island)
+            volume = 0.0
+            for face in island:
+                verts = face.verts
+                if len(verts) < 3:
+                    continue
+                v0 = verts[0].co
+                for i in range(1, len(verts) - 1):
+                    v1 = verts[i].co
+                    v2 = verts[i + 1].co
+                    volume += v0.dot(v1.cross(v2)) / 6.0
+            if volume < -1e-7:
+                bmesh.ops.reverse_faces(bm, faces=island)
         bm.to_mesh(mesh)
         bm.free()
         mesh.update()
@@ -245,6 +279,7 @@ def root(coll, name, loc, faction, branch=None, rank=None):
     obj.empty_display_type = "PLAIN_AXES"
     obj.empty_display_size = 4
     obj.location = loc
+    obj.rotation_euler[2] = math.radians(90)
     obj["ULP_NewFactionSet_SAFE"] = True
     obj["ULP_Faction"] = faction
     if branch:
@@ -503,8 +538,8 @@ def build_stone_ship(parent, coll, name, cls, branch, rank):
 def build_all():
     ranks = range(2, 11)
     start_y = 3150
-    faction_gap = 1820
-    row_gap = 175
+    faction_gap = 3300
+    row_gap = 360
     spacing = {"frigate": 112, "cruiser": 220, "battleship": 380}
     specs = [
         (

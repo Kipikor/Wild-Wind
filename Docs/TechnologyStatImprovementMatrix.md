@@ -86,7 +86,7 @@ ship_stats:
   hunting_power: "сила охоты/гарпунов"
   sensor_range: "дальность обнаружения"
   navigation_error: "ошибка маршрута"
-  stealth_signature: "заметность"
+  stealth: "скрытность"
 ```
 
 ### Производства

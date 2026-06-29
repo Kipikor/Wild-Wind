@@ -1,0 +1,7 @@
+activity_id,local_name_ru,primary_reward,secondary_reward,minor_reward,should_not_reward,design_rule_ru
+capital_airplane,Столичный самолет,solid,freight;mastery_point;full_bonus_items,,raw_resources,Главный регулярный источник солида; очень плохой ресурсный курс компенсируется hard currency и полной наградой за заполненный самолет.
+port_courier,Портовая курьерка,freight,reputation;mastery_point,ship_xp,solid;large_ship_xp,Курьерство - только портовая служба: конвертирует складские космические ресурсы во фрахт, дает немного освоения и небольшую репутацию фракции-заказчика.
+mission_logistics,Логистика в вылете,reputation,freight;mastery_point,ship_xp,solid;large_ship_xp,Вылетная доставка называется логистикой, а не курьеркой; основной смысл - репутация за услугу фракции или поселению, фрахт остается оплатой маршрута.
+combat,Бой в вылете,ship_xp,freight;loot,mastery_point,reputation_as_primary;solid,Лучший регулярный источник корабельного опыта; фрахт платится за уничтожение угроз.
+repair_dock,Ремонтный док,reputation,repaired_ship_value;mastery_point,freight,solid,Выгодно восстанавливает найденный корабль и качает репутацию; не должен становиться источником солида.
+extraction,Промысловая добыча,raw_resources,profile_currency;mastery_point,ship_xp,solid,Руда газ автоматоны левиафаны и реликты кормят производство и профильные магазины.

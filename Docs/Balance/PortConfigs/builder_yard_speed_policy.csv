@@ -1,0 +1,2 @@
+policy_id,speed_source_building_id,source_config,applies_to,has_individual_recipe_time_upgrade,has_individual_recipe_economy_upgrade,can_use_outputs_from_same_building,notes_ru
+building_upgrade_speed,builder_yard,builder_queue.csv,all_building_upgrades,no,no,yes,"Строительный двор ускоряет все улучшения зданий и дает строительные слоты. Само улучшение здания не имеет личной прокачки рецепта, но может требовать ресурсы, которые производит это же здание."

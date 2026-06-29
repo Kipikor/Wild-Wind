@@ -125,15 +125,6 @@ public class DamageableShip : MonoBehaviour
         recentEvents.Clear();
         lastDamageMessage = "Повреждения сброшены.";
 
-        PaintedArmorBody[] armorBodies = GetComponentsInChildren<PaintedArmorBody>();
-        for (int i = 0; i < armorBodies.Length; i++)
-        {
-            if (armorBodies[i] != null)
-            {
-                armorBodies[i].ResetArmorState();
-            }
-        }
-
         MeshArmorBody[] meshArmorBodies = GetComponentsInChildren<MeshArmorBody>();
         for (int i = 0; i < meshArmorBodies.Length; i++)
         {
@@ -342,8 +333,17 @@ public class DamageableShip : MonoBehaviour
         }
 
         explosiveSplashCount++;
+        float penetrationRatio = effectiveArmor > 0.001f
+            ? Mathf.Clamp01(Mathf.Max(0f, context.penetrationMm) / effectiveArmor)
+            : 1f;
+        float damageRatio = penetrationRatio * penetrationRatio;
+        float partialHullDamage = ApplyHullDamage(
+            context.hullDamageOnPenetration
+            * damageRatio
+            * Mathf.Max(0f, surface.structureDamageMultiplier));
+        result.structureDamage = partialHullDamage;
         result.outcome = DamageHitOutcome.ExplosiveSplash;
-        result.message = $"[Урон] Фугас разорвался на {surface.displayNameRu}: броня удержала.";
+        result.message = $"[Урон] Фугас разорвался на {surface.displayNameRu}: корпус -{partialHullDamage:0.0} ({damageRatio:P0} урона при {penetrationRatio:P0} пробития).";
     }
 
     private void ResolveImpactHit(

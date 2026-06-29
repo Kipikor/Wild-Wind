@@ -5,8 +5,7 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 public sealed class SessionAtmosphereTuner : MonoBehaviour
 {
-    private const int DefaultRendererIndex = 0;
-    private const int AeroRendererIndex = 1;
+    private const int UniversalSkyboxRendererIndex = 1;
     private const string DeadlyStormSurfaceObjectName = "Deadly Storm Surface Local Bubble";
     private const string LegacyCloudSeaObjectName = "Cloud Sea";
 
@@ -137,7 +136,8 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
             return cameraData != null && cameraData.renderPostProcessing;
         }
     }
-    public bool IsCameraUsingLeanRendererForTests => IsCameraUsingRenderer2D(visualCamera);
+    public bool IsCameraUsingLeanRendererForTests => IsCameraUsingUniversalRenderer(visualCamera);
+    public bool IsDockedCityMeshRendererOverrideActiveForTests => ShouldUseDockedCityMeshRenderer();
     public string CameraRendererNameForTests => GetCameraRendererName(visualCamera);
 
     public void ConfigureReferences(
@@ -164,17 +164,28 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
 
     public void SetRuntimeView(Transform newAltitudeSource, Vector3 newCameraPosition, Vector3 newCameraTarget, float newCameraFov)
     {
-        altitudeSource = newAltitudeSource;
-        if (newAltitudeSource != null)
-        {
-            fallbackAltitudeMeters = Mathf.Max(0f, newAltitudeSource.position.y);
-        }
+        SetAltitudeSourceInternal(newAltitudeSource);
 
         cameraPosition = newCameraPosition;
         cameraTarget = newCameraTarget;
         cameraFov = Mathf.Clamp(newCameraFov, 20f, 70f);
         ApplyRendererSelection();
         ApplyNow();
+    }
+
+    public void SetAltitudeSource(Transform newAltitudeSource)
+    {
+        SetAltitudeSourceInternal(newAltitudeSource);
+        ApplyNow();
+    }
+
+    private void SetAltitudeSourceInternal(Transform newAltitudeSource)
+    {
+        altitudeSource = newAltitudeSource;
+        if (newAltitudeSource != null)
+        {
+            fallbackAltitudeMeters = Mathf.Max(0f, newAltitudeSource.position.y);
+        }
     }
 
     public void ApplyNow()
@@ -310,9 +321,7 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
             cachedRendererIndex = -1;
         }
 
-        int rendererIndex = Application.isBatchMode || ShouldUseLeanRuntimeAtmosphere()
-            ? DefaultRendererIndex
-            : AeroRendererIndex;
+        int rendererIndex = ResolveRuntimeRendererIndex();
         if (cachedRendererIndex == rendererIndex)
         {
             return;
@@ -327,6 +336,7 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
         Material activeSkyboxMaterial = ResolveSkyboxMaterial();
         if (visualCamera != null)
         {
+            ApplyRendererSelection();
             visualCamera.clearFlags = activeSkyboxMaterial != null
                 ? CameraClearFlags.Skybox
                 : CameraClearFlags.SolidColor;
@@ -392,6 +402,12 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
 
         if (ShouldUseLeanRuntimeAtmosphere())
         {
+            if (useAltitudeAtmosphere && atmosphere.altitudeAboveStorm >= calmStormCeiling + altitudeTransitionHalfWidth)
+            {
+                RenderSettings.fog = false;
+                return;
+            }
+
             ApplyUnityFogFallback(appliedColor, appliedAlpha, appliedMaxDistance);
             return;
         }
@@ -577,9 +593,9 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
         return new AltitudeAtmosphere(
             altitude,
             "Зона обитания",
-            habitationVisibility,
-            0.0065f,
-            0.20f,
+            Mathf.Max(habitationVisibility, 12000f),
+            0.0012f,
+            0.055f,
             habitationFogColor,
             false);
     }
@@ -589,9 +605,9 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
         return new AltitudeAtmosphere(
             altitude,
             "Разреженная зона",
-            upperTechnicalVisibility,
-            0.0035f,
-            0.12f,
+            Mathf.Max(upperTechnicalVisibility, 18000f),
+            0.00055f,
+            0.03f,
             upperFogColor,
             false);
     }
@@ -640,10 +656,26 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
         return Application.isPlaying && leanRuntimeAtmosphere;
     }
 
-    private static bool IsCameraUsingRenderer2D(Camera camera)
+    private int ResolveRuntimeRendererIndex()
+    {
+        return UniversalSkyboxRendererIndex;
+    }
+
+    private static bool ShouldUseDockedCityMeshRenderer()
+    {
+        if (!Application.isPlaying)
+        {
+            return false;
+        }
+
+        WildWindBaseIslandView island = FindFirstObjectByType<WildWindBaseIslandView>();
+        return island != null && island.IsCityVisibleForTests;
+    }
+
+    private static bool IsCameraUsingUniversalRenderer(Camera camera)
     {
         string rendererName = GetCameraRendererName(camera);
-        return rendererName.IndexOf("Renderer2D", StringComparison.OrdinalIgnoreCase) >= 0;
+        return rendererName.IndexOf("UniversalRenderer", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static string GetCameraRendererName(Camera camera)
@@ -677,8 +709,9 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
             {
                 cameraData.requiresDepthTexture = false;
                 cameraData.requiresColorTexture = false;
-                cameraData.SetRenderer(DefaultRendererIndex);
-                cachedRendererIndex = DefaultRendererIndex;
+                int rendererIndex = ResolveRuntimeRendererIndex();
+                cameraData.SetRenderer(rendererIndex);
+                cachedRendererIndex = rendererIndex;
             }
         }
 

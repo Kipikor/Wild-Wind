@@ -1,7 +1,8 @@
-template_id,unlock_mastery_level,slots_available,resource_lines,input_fe_min,input_fe_max,reward_freight_multiplier,mastery_points,reputation_wind,reroll_cooldown_min,spawn_weight,notes_ru
-courier_t1_single,2,2,1,80,180,1.28,8,0,15,35,Один простой ресурс; раннее обучение.
-courier_t1_double,4,3,2,160,360,1.30,14,0,15,30,Две позиции обычных ресурсов.
-courier_t2_single_processed,8,4,1,300,700,1.32,22,1,15,18,Просит простой переработанный товар.
-courier_t2_triple,12,5,3,550,1200,1.34,35,1,15,10,Три позиции; хороший фрахт.
-courier_t3_special,18,6,2,1400,3200,1.38,60,2,15,5,Может просить редкую но не стратегическую позицию.
-courier_t4_bulk,25,8,3,3500,9000,1.42,110,3,15,2,Поздний дорогой заказ; редкий вес.
+template_id,building_level_min,unlock_mastery_level,rarity,slots_available,resource_lines,input_stage,input_fe_min,input_fe_max,reward_freight_multiplier,mastery_points,reputation_min,reputation_max,customer_faction_pool,reroll_cooldown_min,spawn_weight,notes_ru
+courier_l01_raw_small,1,2,ordinary,2,1,raw_cosmic,80,180,1.16,8,1,2,any,15,36,Ранний заказ просит одну простую космическую позицию: мягкую руду газовый конденсат или кусок левиафана.
+courier_l03_raw_double,3,4,ordinary,3,2,raw_cosmic,160,360,1.20,14,1,3,any,15,30,Две сырые позиции; все еще плохой курс но уже заметный фрахт и маленькая репутация заказчика.
+courier_l06_cleaned,6,8,unusual,4,1,cleaned_resources,300,700,1.27,22,2,5,any,15,18,Служба начинает просить очищенные минералы и первичные продукты переработки.
+courier_l09_mixed,9,12,unusual,5,3,cleaned_and_basic_materials,550,1200,1.34,35,3,7,any,15,10,Смешанная заявка: часть сырья часть материалов; прибыльность растет за счет лучшего договора.
+courier_l13_materials,13,18,rare,6,2,prepared_materials,1400,3200,1.45,60,5,10,any,15,5,Редкая заявка просит подготовленные материалы которые игрок уже умеет производить сам.
+courier_l17_components,17,25,epic,7,3,components,3500,9000,1.60,110,8,16,any,15,2,Эпическая заявка забирает детали и сложные компоненты; курс уже хороший но требуется развитая база.
+courier_l20_legendary,20,32,legendary,8,4,blocks_and_rare_components,9000,22000,1.78,180,14,28,any,15,1,Легендарная портовая отправка просит блоки и редкие компоненты; максимальная служба дает лучший регулярный курс во фрахт.

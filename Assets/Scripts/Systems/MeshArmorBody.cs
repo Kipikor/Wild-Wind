@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 [Serializable]
@@ -41,6 +44,8 @@ public class MeshArmorPlate
 [RequireComponent(typeof(MeshFilter))]
 public class MeshArmorBody : MonoBehaviour
 {
+    private static readonly Regex ArmorValueRegex = new Regex(@"(?<value>\d+(?:[\.,]\d+)?)", RegexOptions.Compiled);
+
     [Header("Броневая mesh-оболочка")]
     [InspectorName("Корабль-владелец")]
     public DamageableShip owner;
@@ -67,6 +72,8 @@ public class MeshArmorBody : MonoBehaviour
     [Min(0.001f)] public float planeDistanceThreshold = 0.05f;
     [InspectorName("Броня по умолчанию, мм")]
     [Min(0f)] public float defaultArmorMm = 40f;
+    [InspectorName("Use material armor names")]
+    public bool useMaterialArmorNames = true;
 
     [Header("Отладка")]
     [InspectorName("Показывать бронелисты")]
@@ -77,6 +84,9 @@ public class MeshArmorBody : MonoBehaviour
     [Min(1)] public int maxDrawnTriangles = 180;
 
     private MeshFilter meshFilter;
+    [NonSerialized] private bool lastRebuildUsedMaterialArmorNames;
+
+    public bool LastRebuildUsedMaterialArmorNames => lastRebuildUsedMaterialArmorNames;
 
     private void Reset()
     {
@@ -158,10 +168,24 @@ public class MeshArmorBody : MonoBehaviour
 
     public void RebuildPlatesFromMesh()
     {
+        lastRebuildUsedMaterialArmorNames = false;
         Mesh mesh = GetMesh();
         if (mesh == null)
         {
             plates = new List<MeshArmorPlate>();
+            return;
+        }
+
+        if (!mesh.isReadable)
+        {
+            plates = new List<MeshArmorPlate>();
+            Debug.LogWarning($"{name}: mesh '{mesh.name}' is not readable. Enable Read/Write on the model import settings before rebuilding mesh armor.", this);
+            return;
+        }
+
+        if (useMaterialArmorNames && TryRebuildPlatesFromMaterials(mesh))
+        {
+            lastRebuildUsedMaterialArmorNames = true;
             return;
         }
 
@@ -240,7 +264,7 @@ public class MeshArmorBody : MonoBehaviour
         MeshArmorPlate plate = FindPlate(triangleIndex);
         if (plate == null)
         {
-            plate = FindPlateByNormal(context.hitNormal);
+            plate = FindPlateByNormal(context.hitNormal, context.hitPoint);
         }
 
         if (plate == null)
@@ -286,24 +310,36 @@ public class MeshArmorBody : MonoBehaviour
         return null;
     }
 
-    private MeshArmorPlate FindPlateByNormal(Vector3 worldNormal)
+    private MeshArmorPlate FindPlateByNormal(Vector3 worldNormal, Vector3 worldPoint)
     {
         Mesh mesh = GetMesh();
-        if (mesh == null || plates == null || worldNormal.sqrMagnitude <= 0.001f) return null;
+        if (mesh == null || !mesh.isReadable || plates == null || worldNormal.sqrMagnitude <= 0.001f) return null;
 
         Vector3 localNormal = transform.InverseTransformDirection(worldNormal.normalized);
+        Vector3 localPoint = transform.InverseTransformPoint(worldPoint);
+        bool hasPoint = worldPoint.sqrMagnitude > 0.000001f;
         MeshArmorPlate best = null;
-        float bestAngle = float.PositiveInfinity;
+        float bestScore = float.PositiveInfinity;
         for (int i = 0; i < plates.Count; i++)
         {
             MeshArmorPlate plate = plates[i];
             if (plate == null || plate.triangleIndices == null || plate.triangleIndices.Count == 0) continue;
 
             Vector3 plateNormal = CalculateTriangleNormal(mesh, plate.triangleIndices[0]);
-            float angle = Vector3.Angle(localNormal, plateNormal);
-            if (angle < bestAngle)
+            float angle = Mathf.Min(
+                Vector3.Angle(localNormal, plateNormal),
+                Vector3.Angle(-localNormal, plateNormal));
+            float planeDistance = 0f;
+            if (hasPoint)
             {
-                bestAngle = angle;
+                Vector3 plateCenter = CalculateTriangleCenter(mesh, plate.triangleIndices[0]);
+                planeDistance = Mathf.Abs(Vector3.Dot(localPoint - plateCenter, plateNormal));
+            }
+
+            float score = angle * 10f + planeDistance;
+            if (score < bestScore)
+            {
+                bestScore = score;
                 best = plate;
             }
         }
@@ -314,7 +350,7 @@ public class MeshArmorBody : MonoBehaviour
     private Vector3 EstimateWorldNormal(int triangleIndex)
     {
         Mesh mesh = GetMesh();
-        if (mesh == null) return transform.forward;
+        if (mesh == null || !mesh.isReadable) return transform.forward;
 
         Vector3 localNormal = CalculateTriangleNormal(mesh, triangleIndex);
         return transform.TransformDirection(localNormal).normalized;
@@ -328,6 +364,155 @@ public class MeshArmorBody : MonoBehaviour
         }
 
         return meshFilter != null ? meshFilter.sharedMesh : null;
+    }
+
+    private bool TryRebuildPlatesFromMaterials(Mesh mesh)
+    {
+        Renderer meshRenderer = GetComponent<Renderer>();
+        if (meshRenderer == null || mesh.subMeshCount <= 0)
+        {
+            return false;
+        }
+
+        Material[] materials = meshRenderer.sharedMaterials;
+        List<MeshArmorPlate> materialPlates = new List<MeshArmorPlate>();
+        bool foundArmorMaterial = false;
+        int triangleIndex = 0;
+
+        for (int subMesh = 0; subMesh < mesh.subMeshCount; subMesh++)
+        {
+            int[] subMeshTriangles = mesh.GetTriangles(subMesh);
+            int triangleCount = subMeshTriangles.Length / 3;
+            if (triangleCount <= 0)
+            {
+                continue;
+            }
+
+            Material material = subMesh < materials.Length ? materials[subMesh] : null;
+            string materialName = CleanMaterialName(material != null ? material.name : string.Empty);
+            float armorMm;
+            string zoneId;
+            string displayName;
+            bool parsed = TryParseArmorMaterialName(materialName, out armorMm, out zoneId, out displayName);
+            if (parsed)
+            {
+                foundArmorMaterial = true;
+            }
+            else
+            {
+                armorMm = defaultArmorMm;
+                zoneId = MakeSafeZoneId(string.IsNullOrWhiteSpace(materialName) ? $"submesh_{subMesh + 1:00}" : materialName);
+                displayName = string.IsNullOrWhiteSpace(materialName) ? $"Submesh {subMesh + 1:00}" : materialName;
+            }
+
+            List<int> subMeshTriangleIndices = new List<int>(triangleCount);
+            for (int i = 0; i < triangleCount; i++)
+            {
+                subMeshTriangleIndices.Add(triangleIndex + i);
+            }
+
+            triangleIndex += triangleCount;
+            Color color = Color.HSVToRGB((materialPlates.Count * 0.137f) % 1f, 0.7f, 1f);
+            materialPlates.Add(new MeshArmorPlate
+            {
+                plateId = zoneId,
+                displayNameRu = displayName,
+                armorMm = Mathf.Max(0f, armorMm),
+                triangleIndices = subMeshTriangleIndices,
+                debugColor = new Color(color.r, color.g, color.b, 0.35f)
+            });
+        }
+
+        if (!foundArmorMaterial)
+        {
+            return false;
+        }
+
+        plates = materialPlates;
+        return true;
+    }
+
+    private static bool TryParseArmorMaterialName(string materialName, out float armorMm, out string zoneId, out string displayName)
+    {
+        armorMm = 0f;
+        zoneId = string.Empty;
+        displayName = materialName;
+        if (string.IsNullOrWhiteSpace(materialName))
+        {
+            return false;
+        }
+
+        string lowerName = materialName.ToLowerInvariant();
+        bool hasArmorMarker = lowerName.Contains("armor")
+            || lowerName.Contains("armour")
+            || lowerName.Contains("bron")
+            || lowerName.StartsWith("br_", StringComparison.Ordinal)
+            || lowerName.Contains("_br_");
+        if (!hasArmorMarker)
+        {
+            return false;
+        }
+
+        Match match = ArmorValueRegex.Match(materialName);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        string valueText = match.Groups["value"].Value.Replace(',', '.');
+        if (!float.TryParse(valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out armorMm))
+        {
+            return false;
+        }
+
+        zoneId = MakeSafeZoneId(materialName);
+        displayName = materialName;
+        return true;
+    }
+
+    private static string CleanMaterialName(string materialName)
+    {
+        if (string.IsNullOrWhiteSpace(materialName))
+        {
+            return string.Empty;
+        }
+
+        return materialName.Replace(" (Instance)", string.Empty).Trim();
+    }
+
+    private static string MakeSafeZoneId(string source)
+    {
+        string value = CleanMaterialName(source).ToLowerInvariant();
+        StringBuilder builder = new StringBuilder(value.Length + 8);
+        bool lastWasSeparator = false;
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            char c = value[i];
+            if (char.IsLetterOrDigit(c))
+            {
+                builder.Append(c);
+                lastWasSeparator = false;
+            }
+            else if (!lastWasSeparator)
+            {
+                builder.Append('_');
+                lastWasSeparator = true;
+            }
+        }
+
+        string id = builder.ToString().Trim('_');
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return "armor_material";
+        }
+
+        if (char.IsDigit(id[0]))
+        {
+            return "armor_" + id;
+        }
+
+        return id;
     }
 
     private BuildPlateGroup FindBuildGroup(List<BuildPlateGroup> groups, Vector3 normal, float plane)
@@ -402,6 +587,18 @@ public class MeshArmorBody : MonoBehaviour
         return normal.sqrMagnitude > 0.000001f ? normal.normalized : Vector3.forward;
     }
 
+    private static Vector3 CalculateTriangleCenter(Mesh mesh, int triangleIndex)
+    {
+        int[] triangles = mesh.triangles;
+        Vector3[] vertices = mesh.vertices;
+        int offset = triangleIndex * 3;
+        if (offset < 0 || offset + 2 >= triangles.Length) return Vector3.zero;
+
+        return (vertices[triangles[offset]]
+            + vertices[triangles[offset + 1]]
+            + vertices[triangles[offset + 2]]) / 3f;
+    }
+
     private static string GuessPlateName(Vector3 normal, int index)
     {
         Vector3 abs = new Vector3(Mathf.Abs(normal.x), Mathf.Abs(normal.y), Mathf.Abs(normal.z));
@@ -437,7 +634,7 @@ public class MeshArmorBody : MonoBehaviour
     private void DrawPlateGizmos()
     {
         Mesh mesh = GetMesh();
-        if (mesh == null || plates == null) return;
+        if (mesh == null || !mesh.isReadable || plates == null) return;
 
         int drawn = 0;
         int[] triangles = mesh.triangles;

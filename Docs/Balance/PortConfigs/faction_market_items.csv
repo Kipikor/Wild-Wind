@@ -1,0 +1,31 @@
+faction_id,currency_id,min_reputation_level,item_id,item_name_ru,price_amount,package_amount,daily_limit,unlock_quest_id,role_ru
+capital,solid,1,capital_ordnance_blank,Ордонансная заготовка,1,2,40,,ранний имперский компонент
+capital,solid,2,capital_turret_ring,Башенный погон,2,1,24,fquest_capital_10,средний имперский компонент
+capital,solid,3,capital_breech_group,Затворная группа,4,1,12,fquest_capital_20,продвинутый имперский компонент
+capital,solid,4,capital_rangefinder_prism,Дальномерная призма,7,1,8,fquest_capital_35,редкий имперский компонент
+capital,solid,5,capital_casemate_insert,Казематный вкладыш,10,1,5,fquest_capital_45,поздний имперский компонент
+wind_houses,freight,1,wind_magnetic_coil,Магнитная катушка,2600,2,60,,ранний компонент магнитов и грузовых систем
+wind_houses,freight,2,wind_turbine_blade,Турбинная лопатка,4600,1,35,fquest_wind_houses_10,ходовой компонент быстрых кораблей
+wind_houses,freight,2,wind_cargo_sling,Грузовая стропа,3900,2,45,fquest_wind_houses_10,грузовой компонент
+wind_houses,freight,3,wind_course_gyro,Курсовой гироблок,7600,1,20,fquest_wind_houses_20,навигационный компонент
+wind_houses,freight,4,wind_launch_cup,Пусковой стакан,14500,1,12,fquest_wind_houses_35,пусковой компонент
+mist_synod,nobel,1,mist_gas_membrane,Газовая мембрана,2,2,50,,ранний газовый компонент
+mist_synod,nobel,2,mist_separator_cassette,Сепараторная кассета,3,1,32,fquest_mist_synod_10,компонент сепарации
+mist_synod,nobel,3,mist_polymer_cell,Полимерная сотка,5,1,22,fquest_mist_synod_20,корпусно-полимерный компонент
+mist_synod,nobel,4,mist_pyrophoric_paste,Пирофорная паста,8,1,12,fquest_mist_synod_35,химический компонент
+mist_synod,nobel,4,mist_cartridge,Туманный картридж,7,1,14,fquest_mist_synod_35,дымовой компонент
+stone_vault,gems,1,stone_crushing_crown,Дробильный венец,2,2,55,,ранний рудный компонент
+stone_vault,gems,2,stone_throat_grate,Жерловая решетка,3,1,40,fquest_stone_vault_10,компонент рудного жерла
+stone_vault,gems,3,stone_armor_wedge,Броневой клин,5,1,24,fquest_stone_vault_20,броневой компонент
+stone_vault,gems,4,stone_gun_cradle,Орудийная люлька,8,1,14,fquest_stone_vault_35,тяжелый орудийный компонент
+stone_vault,gems,4,stone_quarry_insert,Карьерный вкладыш,7,1,16,fquest_stone_vault_35,поздний добычный компонент
+factory_ark,perfcards,1,ark_precision_drive,Точный привод,2,2,55,,ранний точный компонент
+factory_ark,perfcards,2,ark_servo_ring,Сервокольцо,3,1,40,fquest_factory_ark_10,сервокомпонент
+factory_ark,perfcards,3,ark_counting_cell,Счетная ячейка,5,1,24,fquest_factory_ark_20,вычислительный компонент
+factory_ark,perfcards,4,ark_repair_lens,Ремонтная линза,8,1,14,fquest_factory_ark_35,ремонтно-оптический компонент
+factory_ark,perfcards,4,ark_hangar_cradle,Ангарная люлька,7,1,16,fquest_factory_ark_35,ангарный компонент
+devourers,amber,1,dev_harpoon_winch,Гарпунная лебедка,2,2,55,,ранний охотничий компонент
+devourers,amber,2,dev_tension_drum,Натяжной барабан,3,1,40,fquest_devourers_10,тросовый компонент
+devourers,amber,3,dev_hook_chain,Крюковая цепь,5,1,24,fquest_devourers_20,захватный компонент
+devourers,amber,4,dev_bone_cutter,Костяной резец,8,1,14,fquest_devourers_35,разделочный компонент
+devourers,amber,4,dev_bomb_cowling,Бомбовый кожух,7,1,16,fquest_devourers_35,ударный компонент

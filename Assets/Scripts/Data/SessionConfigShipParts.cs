@@ -137,14 +137,28 @@ public partial class SessionConfigDatabase
                 visualColor = ParseColor(Get(row, "visual_color_hex"), new Color(0.42f, 0.62f, 0.78f, 1f)),
                 costCurrencyItemId = Get(row, "cost_currency_item"),
                 costAmount = Mathf.Max(0, ParseInt(Get(row, "cost_amount"), 0)),
+                researchCostAmount = Mathf.Max(0, ParseInt(Get(row, "research_cost_amount"), 0)),
                 firepower = Mathf.Max(0, ParseInt(Get(row, "firepower"), 0)),
                 armor = Mathf.Max(0, ParseInt(Get(row, "armor"), 0)),
                 durability = Mathf.Max(0, ParseInt(Get(row, "durability"), 0)),
                 speed = Mathf.Max(0, ParseInt(Get(row, "speed"), 0)),
                 maneuverability = Mathf.Max(0, ParseInt(Get(row, "maneuverability"), 0)),
                 cargo = Mathf.Max(0, ParseInt(Get(row, "cargo"), 0)),
+                cargoCapacityTons = Mathf.Max(0f, ParseFloat(Get(row, "cargo_capacity_tons"), 0f)),
                 utility = Mathf.Max(0, ParseInt(Get(row, "utility"), 0)),
-                summaryRu = Get(row, "summary_ru")
+                defenseRating = ParseInt(Get(row, "defense"), -1),
+                mobilityRating = ParseInt(Get(row, "mobility"), -1),
+                stealthRating = ParseInt(Get(row, "stealth"), -1),
+                warfareRating = ParseInt(Get(row, "warfare"), -1),
+                miningRating = ParseInt(Get(row, "mining"), -1),
+                harvestingRating = ParseInt(Get(row, "harvesting"), -1),
+                huntingRating = ParseInt(Get(row, "hunting"), -1),
+                hackingRating = ParseInt(Get(row, "hacking"), -1),
+                salvageRating = ParseInt(Get(row, "salvage"), -1),
+                surveyRating = ParseInt(Get(row, "survey"), -1),
+                repairRating = ParseInt(Get(row, "repair"), -1),
+                summaryRu = Get(row, "summary_ru"),
+                loreRu = Get(row, "lore_ru")
             };
 
             if (string.IsNullOrWhiteSpace(entry.shipClassNameRu))
@@ -267,19 +281,34 @@ public class ShipTreeEntryConfig
     public Color visualColor = Color.white;
     public string costCurrencyItemId = "";
     public int costAmount;
+    public int researchCostAmount;
     public int firepower;
     public int armor;
     public int durability;
     public int speed;
     public int maneuverability;
     public int cargo;
+    public float cargoCapacityTons;
     public int utility;
+    public int defenseRating = -1;
+    public int mobilityRating = -1;
+    public int stealthRating = -1;
+    public int warfareRating = -1;
+    public int miningRating = -1;
+    public int harvestingRating = -1;
+    public int huntingRating = -1;
+    public int hackingRating = -1;
+    public int salvageRating = -1;
+    public int surveyRating = -1;
+    public int repairRating = -1;
     public string summaryRu = "";
+    public string loreRu = "";
 
     public string DisplayNameRu => string.IsNullOrWhiteSpace(localNameRu) ? shipId : localNameRu;
     public string FactionDisplayNameRu => string.IsNullOrWhiteSpace(factionNameRu) ? factionId : factionNameRu;
     public string ClassDisplayNameRu => string.IsNullOrWhiteSpace(shipClassNameRu) ? classNameRu : shipClassNameRu;
     public string BranchDisplayNameRu => string.IsNullOrWhiteSpace(branchNameRu) ? ClassDisplayNameRu : branchNameRu;
+    public string LoreDisplayRu => string.IsNullOrWhiteSpace(loreRu) ? summaryRu : loreRu;
     public bool IsDevelopmentRosterShip => !string.IsNullOrWhiteSpace(factionId) || catalogScope == "development";
     public bool HasRuntimeHull => !string.IsNullOrWhiteSpace(hullId);
     public int TotalStatScore => firepower + armor + durability + speed + maneuverability + cargo + utility;

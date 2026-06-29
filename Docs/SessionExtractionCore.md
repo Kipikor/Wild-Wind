@@ -32,6 +32,10 @@ There are two main tension flavors:
 
 Density reference: `Helldivers 2`. The relevant lesson is not shooter controls or direct stratagem copying. It is the mission texture: a main objective, many points of interest, constant enemy pressure, some non-combat tasks, and simple high-impact tools that visibly change the situation on screen.
 
+Resource motive rule: like in `EVE Online`, almost every conflict exists because someone is extracting, protecting, scouting, claiming, denying, or preparing to extract resources. A mission can ask the player to mine directly, escort an allied extractor, defend a survey team, clear enemies before a later industrial operation, recover wreckage, hunt leviathans for materials, or raid automatons for parts. Pure combat missions are allowed, but their narrative reason should still be resource pressure: after the fight, someone can mine, salvage, process, occupy, or trade because the area was secured. Fighting for no material reason should be rare and intentional.
+
+Pirate reuse rule: pirates are a hostile content layer, not a separate shipbuilding school. They reuse hulls from the existing factions, with enemy paint, decals, rough add-ons, contraband cargo, and more reckless AI/loadouts. This lets the game field many pirate opponents without creating a full extra pirate tech tree. The readable promise is simple: the silhouette tells the player which faction hull this originally was, while the color/markings make it clear that this specific ship is hostile.
+
 The main loop is:
 
 ```text
@@ -187,6 +191,7 @@ Inter-island logistics, social needs, passenger traffic, and visible ship compar
 - Узлы: ядра, сенсоры, сервоприводы, оружейные блоки, память, редкие регуляторы и другие ценные сборки.
 - Малые узлы лучше по ценности на тонну; фрегат охотится за ними, потому что быстро облетает много мест.
 - Большие узлы тяжелее и хуже по концентрации ценности, но суммарно дороже; крейсер и линкор могут брать их нормально.
+- Узлы можно снять магнитом, манипулятором, грузовым автоматоном или другим сальважным инструментом.
 - На базе разборка автоматонов перерабатывает привезенные узлы в материалы, механизмы, инструменты, ядра и опыт.
 - Вылет решает, что игрок сумел снять под угрозой; база решает, во что это будет разобрано.
 
@@ -214,6 +219,176 @@ Inter-island logistics, social needs, passenger traffic, and visible ship compar
 Аэролит и Горизонт не одно и то же. Аэролит про мобильность и смену дистанции. Горизонт про дальность и точность применения систем.
 
 Дроны есть в игре как общий инструмент, но Каптаж использует их активнее остальных: для работы из облака, подсветки, сброса захвата, отвлечения и поддержки модулей.
+
+## Courier Pickup Missions
+
+Courier pickup missions are sortie contracts where the cargo is not the player's property. The player is paid for retrieving and delivering it, not for keeping the items.
+
+Typical setup:
+
+- goods, containers, parcels, samples, tools, or other чужие грузы are scattered on stable floating islands or around island-like debris fields;
+- the mission can ask the player to collect cargo from several points or pick up a specific object from a dangerous area;
+- the player flies to the pickup point, loads the cargo, returns/extracts, and the cargo is immediately removed by the contract owner;
+- the reward is freight, ship/account progress, mastery points, reputation, or other contract payout;
+- the retrieved cargo usually does not enter normal base storage, because it belongs to someone else.
+
+Loading methods:
+
+- proximity loading: the ship comes very close, stays near the object for a short time, and the cargo loads slowly;
+- magnetic loading: a magnet can start from a longer range and loads/pulls the target much faster;
+- stronger magnets improve courier missions because they reduce approach risk and pickup time.
+
+Magnets also help collect small falling ore fragments and compact salvage during ordinary sorties. If a fragment is light enough, the magnet can grab it before it falls away.
+
+This mission type fits the Wind Houses especially well: their courier identity, fast hulls, and stronger magnets make them naturally good at "arrive, grab, leave" gameplay.
+
+## X-Ray, разведка и взлом
+
+`X-Ray` - рабочее название активного исследования цели. Разведка раскрывает не только факт наличия объекта, а практическую информацию, которая помогает добыче, бою и взлому.
+
+Что может дать успешное исследование:
+
+- состав руды/глыбы и примерный объем полезных фракций;
+- состав облака или конденсата;
+- здоровье Левиафана, его состояние и ценность добычи;
+- здоровье врага, броневые/мягкие зоны, перезарядку и опасные модули;
+- расчет упреждения по движущейся цели: куда стрелять, чтобы оружие с заданной скоростью снаряда/ракеты попало;
+- наведение для торпед, ракет или других систем, если конкретное оружие умеет использовать исследованную цель;
+- уязвимости, требования или прогресс объекта перед взломом.
+
+Взлом связан с разведкой:
+
+- перед первой попыткой взлома объект нужно исследовать;
+- после каждой неуспешной попытки взлома нужно повторить исследование;
+- разные фракции могут иметь разные типы `X-Ray`: направленный дальний луч, всенаправленный ближний излучатель, точный архивный сканер, массовая подсветка и так далее.
+
+Это делает разведку не косметическим режимом, а частью экономики вылета: хороший скан повышает качество добычи, точность боя, безопасность решения и доступ к информационным наградам.
+
+## Visibility, Clouds And Gas Damage
+
+Each ship has a baseline visibility radius: inside that radius enemies can reliably detect it and aim at it as a concrete target.
+
+Visibility can change during a sortie:
+
+- firing the main battery increases the visibility radius to a larger combat circle;
+- natural clouds reduce detection and aiming quality;
+- artificial clouds created by ship consumables also reduce detection and aiming quality;
+- a ship inside a cloud can still be shot at, but enemies aim into the cloud volume instead of precisely at the hull;
+- larger clouds make blind fire less reliable because the target could be anywhere inside the volume.
+
+Clouds are not all the same:
+
+- resource clouds are harvested by siphons and become cloud condensate or gas-related raw cargo;
+- artificial combat clouds are consumables and cannot be harvested back into resources;
+- a ship has a limited number of cloud capsules for a sortie;
+- cloud capsules are not refilled during combat unless a specific future mechanic says otherwise;
+- basic artificial clouds are masking tools;
+- advanced artificial clouds can be caustic/toxic and deal damage to enemies inside them.
+
+Aggressive natural clouds are both valuable and dangerous. They contain better gas-related resources, but most ships take damage while operating inside them. Gas-protected factions and hulls can ignore or heavily reduce this environmental damage.
+
+The Mist Synod is the baseline specialist for this system:
+
+- Synod ships do not take damage from gas clouds by default;
+- their siphon ships can safely harvest aggressive clouds;
+- their cloud consumables support concealment, retreat, approach, hacking setup, and area denial;
+- early Synod clouds are mostly stationary, while later/recon-focused ships can lay repeated clouds and move under their own cover.
+
+## Fire And Repair Baseline
+
+Fire is a common damage-over-time status caused mostly by explosive, HE, rocket, bomb, chemical, and similar weapons. Exact chances are configured per weapon, but the baseline rules are:
+
+- a frigate-sized ship can have up to `2` simultaneous fires;
+- a cruiser-sized ship can have up to `3` simultaneous fires;
+- a battleship-sized ship can have up to `4` simultaneous fires;
+- similar-size special ships use roughly the same limits;
+- one fire lasts about `40 s`;
+- one full-duration fire deals about `15%` of the target's maximum health as damage over time.
+
+Damage control works similarly to the familiar Warships-style consumable:
+
+- it has an active duration and a cooldown;
+- activating it clears negative effects such as fire;
+- while it is active, new negative effects of the cleared type cannot be applied;
+- after the active window ends, the ship can be set on fire again, and the consumable enters its longer cooldown.
+
+This makes fire dangerous but readable: the player can save damage control for a bad moment, but spending it too early opens a window where the next fire wave matters.
+
+Terminology note:
+
+- damage control / repair of defects clears fires, disables, broken weapons, jammed launchers, damaged catapults and similar malfunctions;
+- hull restoration / combat healing restores lost health;
+- a ship can have damage control without having combat healing;
+- some faction schools, such as the Stone Vault, rely on armor and health and do not restore hull health in combat.
+
+## Module Damage And Damage Control
+
+Weapons and external systems can be disabled by direct fire.
+
+Examples:
+
+- gun turrets;
+- torpedo launchers;
+- bomb catapults;
+- rocket launchers;
+- exposed working modules;
+- other visible external devices.
+
+If a module is damaged enough, it becomes disabled for a time. It can recover by itself after a delay, but damage control can repair it immediately. While damage control is active, protected modules should not be disabled again by the same kind of incoming malfunction.
+
+Faction and hull rules can modify this. For example, Stone Vault turrets are built extremely tough and are much harder to disable than ordinary exposed weapons.
+
+## Field Repair Beams
+
+Some ships can mount repair beams: close-range directed systems that work like remote welding, emergency sealing, and hull restoration.
+
+Basic behavior:
+
+- if the beam is aimed at an allied or protected target, it repairs that target;
+- the repair ship does not spend its own health to repair an ally;
+- if the beam is aimed at an enemy, it becomes a cutting/draining tool: the enemy takes damage, and the repair ship can restore a smaller share of that damage as self-healing;
+- baseline drain conversion: about `25%` of damage dealt returns as self-heal, with exact numbers configured per weapon.
+
+Repair beams have a simple skill layer:
+
+- broad aiming repairs slowly;
+- when the beam starts repairing, special repair points can appear on the target;
+- holding the beam on the marked point repairs faster;
+- when one point is completed, a new point can appear nearby;
+- this creates a small "hit the marked spot" loop, similar in spirit to gathering weak points in survival games, but used for repair.
+
+This mechanic supports escort and defense missions. If a contract says "protect this ship", the player needs tools not only to kill attackers but also to keep the protected ship alive while it is being damaged.
+
+On some hulls, especially Clockwork Ark ships, repair beams can be part of the actual weapon layout:
+
+- as a main battery, they define a support/escort hull;
+- as secondaries, they create a brawler that cuts nearby enemies and keeps itself alive through drain;
+- they can still repair allies when aimed or assigned to an allied target.
+- carrier automatons/drones count as repairable allied targets, so repair beams and repair secondaries can keep friendly wings alive.
+
+## Carrier Automatons And Drone Wings
+
+Carrier automatons are large clockwork drone-machines launched by a ship during a sortie. They use the same broad visual family as enemy automatons, but are controlled by the player ship or its systems.
+
+They are not tiny cosmetic drones. A basic combat automaton can be roughly `10 x 10 m`, large enough to read as a real threat and a real piece of machinery on the battlefield.
+
+Common automaton roles:
+
+- combat automaton: carries a gun and attacks enemies;
+- cargo automaton: collects ore fragments, gas samples, salvage, cargo, and mission objects;
+- repair automaton: supports repairs or projects repair beams;
+- survey automaton: can support scanning, hacking setup, or target identification if a future hull needs it.
+
+Baseline launch cycle:
+
+- the ship launches an automaton or a wing of automatons;
+- the automaton acts automatically for a limited duration, baseline about `50 s`;
+- after the duration ends, it returns to the carrier;
+- the player can recall it early;
+- if it lands safely on the carrier, the next preparation/cooldown is reduced, baseline about `50%`;
+- if it is destroyed, the ship pays the full cooldown/replacement timer.
+
+This creates a simple carrier decision: keep the automaton working longer for more value, or recall it early to preserve the machine and cycle the wing faster.
 
 ## Sortie Zone
 
@@ -394,7 +569,7 @@ Current runtime rule:
 - this mode syncs into `PlayerProgress.sessionExtractionCoreMode`;
 - new saves and default gameplay sessions start docked at `capital`;
 - legacy free flight and legacy flight missions are blocked while core mode is active; flight begins through sorties;
-- the old starter food/aerolite delivery seed is not created for core-mode new games;
+- the old starter delivery seed is not created for core-mode new games;
 - core runtime spawns only the base/capital dock from config islands and suppresses legacy free-world gas clouds, mining rocks, and leviathans; sortie resources are spawned by sortie controllers instead;
 - legacy island production/consumption, island social needs, passenger traffic, inter-island logistics, autonomous scout/gas/mining fleets, ambient mining world spawning, and direct flagship social/expedition APIs do not advance in the core runtime;
 - public legacy flagship expedition return is also blocked in core mode and clears stale expedition state instead of teleporting the player to a legacy dock;
@@ -439,13 +614,13 @@ Current runtime rule:
 - starter resource caches shed collectible fragments in non-ore starter sorties, while the safe ore sortie keeps the overhead boulder behavior;
 - ore processing consumes extracted ore from base storage and outputs minerals from `Ore_type.csv`;
 - gas processing consumes cloud condensates and outputs gas/material fractions from `Gas_cloud_type.csv`;
-- automaton dismantling consumes `broken_automaton` salvage and outputs mechanisms, tools, automaton cores, and design experience;
+- automaton dismantling starts from simple precision salvage such as `automaton_relay` and outputs mechanisms, tools, automaton cores, and design experience;
 - leviathan processing consumes carcasses and outputs configured butchery materials: meat, fat, hide, mineral shell, direct claudium, ichor, leviathan sinew, nerve substrate, and bone plates;
 - cybernetic deciphering consumes `rock_info`, `cloud_info`, or `leviathan_info` and outputs research experience;
 - starter cascade orders are represented as production orders with inputs, outputs, load per production type, estimated bottleneck, and estimated time;
 - the starter catalog currently includes legacy airframe/module/munition orders; active design should translate these into ship improvements, rigs, or loadout support rather than High/Mid/Low modules;
 - the base overview exposes all five processing branches, all eight cascade production lines, and the next cascade order/bottleneck to make the home layer read as the main progression machine;
-- base processing and cascade production lines have levels and upgradeable capacity; upgrades spend processed base materials such as ferron, silvate, and charcoal, then raise the line level and throughput;
+- base processing and cascade production lines have levels and upgradeable capacity; upgrades spend processed base materials such as iron, calcite, and charcoal, then raise the line level and throughput;
 - the starter airframe order consumes minerals and charcoal, produces `airframe_kit`, and records load against all eight production types.
 - the legacy starter module order should be replaced or reinterpreted as starter rigs/loadout unlocks for gas, automaton salvage, leviathan, and survey branches.
 - the starter munition bundle can remain as an industrial output only if it supports the combat loop without becoming a pre-sortie loading gate.
@@ -463,6 +638,33 @@ Processing branches turn extracted raw resources into usable industrial inputs.
 
 Processing is a flow layer. It feeds storage and cascade production.
 
+## In-sortie Raw Concentration
+
+Full resource processing happens at the base, not during the sortie. A ship in flight should not turn ore into final metals, condensate into finished gas products, or carcasses into full industrial outputs.
+
+However, some ships and rigs can concentrate raw cargo during a sortie. Concentration means the ship discards ballast, waste, water, useless rock, unneeded tissue, or other low-value mass, leaving a denser cargo item:
+
+- ore -> ore concentrate;
+- cloud condensate -> condensate concentrate;
+- automaton salvage -> selected intact modules only; destroyed automatons are not compacted or size-reduced in flight;
+- leviathan carcass -> dressed leviathan carcass;
+- similar concentrated versions can exist for almost every physical добыча branch.
+
+Information is the main exception: books, data, maps, relic texts, coupons, and other information loot do not have a serious cargo-volume problem, so they usually do not need a concentrated version.
+
+Concentration does not create final value from nothing. It improves cargo density: the player carries less useless material and more useful material per ton/slot of cargo. The concentrated item still goes through the same base processing branch after extraction.
+
+Baseline rules:
+
+- a concentrator is a ship system, rig, built-in hull feature, or industrial module;
+- it has an on/off toggle;
+- when active, it consumes ship power/attention/capacity and reduces maximum speed by about `30%`;
+- while active, it ticks periodically, baseline about once per `5 s`;
+- each tick converts some amount of raw cargo into concentrated cargo and throws waste overboard;
+- a common baseline is about `2x` useful density, but exact ratios can vary by resource and hull.
+
+This creates a field decision: move quickly and extract sooner, or slow down, run the concentrator, reduce cargo waste, and stay longer in danger with better cargo efficiency.
+
 ## Eight Cascade Production Types
 
 Cascade production uses production orders and production capacities, not hand-run micro-recipes.
@@ -471,7 +673,7 @@ Cascade production uses production orders and production capacities, not hand-ru
    - Beams, panels, frames, armor plates, hull structures, cargo holds, tanks.
 
 2. Metallurgical production
-   - Alloys, treated metals, aerolite materials, wire, billets, metal stock.
+   - Alloys, treated metals, wire, billets, and prepared stock.
 
 3. Mechanical production
    - Drives, reducers, bearings, engines, pumps, drills, winches, harpoon mechanisms.

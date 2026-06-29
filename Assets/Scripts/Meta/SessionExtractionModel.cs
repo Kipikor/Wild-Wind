@@ -5,6 +5,7 @@ using UnityEngine;
 public static class SessionExtractionConstants
 {
     public const float DefaultSortieRadiusMeters = 1500f;
+    public const float DefaultSortieEntryAltitudeMeters = 2500f;
     public const float DefaultSafeSortieDistanceToBaseKm = 30f;
     public const float DefaultSortiePocketOriginMeters = 250000f;
     public const float DefaultSortiePocketMinimumDockSeparationMeters = 100000f;
@@ -24,6 +25,9 @@ public static class SessionExtractionConstants
     public const string DefaultSafeLeviathanSortieName = "Safe Leviathan Remains";
     public const string DefaultSafeSurveySortieId = "safe_survey_ruins";
     public const string DefaultSafeSurveySortieName = "Safe Survey Ruins";
+    public const string CoreTacticalIntroCombatSortieId = "core_tactical_intro_combat";
+    public const string CoreTacticalIntroCombatSortieName = "Core Tactical: First Contact";
+    public const string QuickAdaptiveManualSortieId = "quick_adaptive_manual";
     public const string StarterAirframeKitItemId = "airframe_kit";
     public const string StarterAirframeOrderId = "starter_airframe_kit";
     public const string StarterModuleKitItemId = "module_kit";
@@ -43,17 +47,16 @@ public static class SessionExtractionConstants
     public const string StarterSecondHighSlotId = "high_02";
     public const string StarterThirdHighSlotId = "high_03";
     public const string StarterMidSlotId = "mid_01";
-    public const string BrokenAutomatonItemId = "broken_automaton";
+    public const string StarterAutomatonPartItemId = "automaton_relay";
     public const string AutomatonCoreItemId = "automaton_core";
     public const string ClaudiumItemId = "claudium";
     public const string LeviathanMeatItemId = "leviathan_meat";
     public const string LeviathanFatItemId = "leviathan_fat";
     public const string LeviathanHideItemId = "leviathan_hide";
-    public const string MineralShellItemId = "mineral_shell";
     public const string LeviathanIchorItemId = "leviathan_ichor";
     public const string LeviathanSinewItemId = "leviathan_sinew";
-    public const string NerveSubstrateItemId = "nerve_substrate";
-    public const string BonePlateItemId = "bone_plate";
+    public const string BoneGritItemId = "bone_grit";
+    public const string AcidItemId = "acid";
     public const string RockInfoItemId = "rock_info";
     public const string FundamentalExperienceItemId = "fundamental_experience";
     public const string DesignExperienceItemId = "design_experience";
@@ -179,8 +182,8 @@ public static class SessionExtractionIndustry
             displayName = "Starter airframe kit"
         };
 
-        order.inputs.Add(new CascadeItemAmount { itemId = "ferron", amount = 12 });
-        order.inputs.Add(new CascadeItemAmount { itemId = "silvate", amount = 4 });
+        order.inputs.Add(new CascadeItemAmount { itemId = "iron", amount = 12 });
+        order.inputs.Add(new CascadeItemAmount { itemId = "calcite", amount = 4 });
         order.inputs.Add(new CascadeItemAmount { itemId = "charcoal", amount = 2 });
         order.outputs.Add(new CascadeItemAmount { itemId = SessionExtractionConstants.StarterAirframeKitItemId, amount = 1 });
 
@@ -214,8 +217,8 @@ public static class SessionExtractionIndustry
             displayName = "Starter module kit"
         };
 
-        order.inputs.Add(new CascadeItemAmount { itemId = "ferron", amount = 4 });
-        order.inputs.Add(new CascadeItemAmount { itemId = "silvate", amount = 1 });
+        order.inputs.Add(new CascadeItemAmount { itemId = "iron", amount = 4 });
+        order.inputs.Add(new CascadeItemAmount { itemId = "calcite", amount = 1 });
         order.inputs.Add(new CascadeItemAmount { itemId = "charcoal", amount = 2 });
         order.outputs.Add(new CascadeItemAmount { itemId = SessionExtractionConstants.StarterModuleKitItemId, amount = 1 });
 
@@ -237,8 +240,8 @@ public static class SessionExtractionIndustry
             displayName = "Starter munition bundle"
         };
 
-        order.inputs.Add(new CascadeItemAmount { itemId = SessionExtractionConstants.MineralShellItemId, amount = 2 });
-        order.inputs.Add(new CascadeItemAmount { itemId = "ferron", amount = 2 });
+        order.inputs.Add(new CascadeItemAmount { itemId = SessionExtractionConstants.BoneGritItemId, amount = 2 });
+        order.inputs.Add(new CascadeItemAmount { itemId = "iron", amount = 2 });
         order.inputs.Add(new CascadeItemAmount { itemId = "charcoal", amount = 2 });
         order.outputs.Add(new CascadeItemAmount { itemId = SessionExtractionConstants.StarterMunitionBundleItemId, amount = 4 });
 
@@ -284,6 +287,9 @@ public class BaseProcessingFacilityState
     public float efficiency = 0.12f;
     public float cycleDurationSeconds = 10f;
     public float cycleElapsedSeconds;
+    public float processingUnitsPerMinute = 10f;
+    public float processingTickElapsedSeconds;
+    public float processingUnitAccumulator;
     public float totalProcessedUnits;
     public List<ResourceStack> bunker = new List<ResourceStack>();
     public List<BaseProcessingOutputBufferState> outputBuffers = new List<BaseProcessingOutputBufferState>();
@@ -294,6 +300,9 @@ public class BaseProcessingFacilityState
         level = Mathf.Max(1, level);
         ConfigureForLevel(level);
         cycleElapsedSeconds = Mathf.Max(0f, cycleElapsedSeconds);
+        processingTickElapsedSeconds = Mathf.Max(0f, processingTickElapsedSeconds);
+        processingUnitAccumulator = Mathf.Max(0f, processingUnitAccumulator);
+        processingUnitsPerMinute = Mathf.Max(0.1f, processingUnitsPerMinute);
         totalProcessedUnits = Mathf.Max(0f, totalProcessedUnits);
         bunker ??= new List<ResourceStack>();
         outputBuffers ??= new List<BaseProcessingOutputBufferState>();
@@ -326,10 +335,14 @@ public class BaseProcessingFacilityState
     public void ConfigureForLevel(int sourceLevel)
     {
         level = Mathf.Max(1, sourceLevel);
-        cycleInputUnits = Mathf.Max(1, 5 + level * 2);
+        cycleInputUnits = 1;
         bunkerCapacityUnits = Mathf.Max(cycleInputUnits, 500 + level * 100);
         efficiency = Mathf.Clamp01(0.07f + level * 0.01f);
-        cycleDurationSeconds = 10f;
+        cycleDurationSeconds = 1f;
+        if (processingUnitsPerMinute <= 0f)
+        {
+            processingUnitsPerMinute = SessionExtractionIndustry.GetDefaultProcessingCapacity(branch);
+        }
     }
 
     public int BunkerLoadUnits
@@ -383,6 +396,22 @@ public class BaseProcessingFacilityState
         }
 
         return true;
+    }
+
+    public int RemoveBunker(string itemId, int amount)
+    {
+        if (string.IsNullOrWhiteSpace(itemId) || amount <= 0) return 0;
+        ResourceStack stack = GetBunkerStack(itemId, false);
+        if (stack == null || stack.amount <= 0) return 0;
+
+        int removed = Mathf.Min(amount, stack.amount);
+        stack.amount -= removed;
+        if (stack.amount <= 0)
+        {
+            bunker.Remove(stack);
+        }
+
+        return removed;
     }
 
     public BaseProcessingOutputBufferState GetOutputBuffer(string itemId, bool createIfMissing)
@@ -866,16 +895,37 @@ public static class SessionExtractionFitting
 }
 
 [Serializable]
+public class SortiePayloadRewardLine
+{
+    public string itemId = "";
+    public string displayNameRu = "";
+    public int amount;
+    public Color color = new Color(0.8f, 0.72f, 0.52f, 1f);
+
+    public void Normalize()
+    {
+        itemId = string.IsNullOrWhiteSpace(itemId) ? "" : itemId.Trim();
+        displayNameRu = string.IsNullOrWhiteSpace(displayNameRu) ? itemId : displayNameRu.Trim();
+        amount = Mathf.Max(0, amount);
+    }
+}
+
+[Serializable]
 public class SortieZoneDefinition
 {
-    public const float DefaultReturnCoalKgPerSecond = 0.0055f;
-
     public string sortieId = SessionExtractionConstants.DefaultSafeOreSortieId;
     public string displayName = SessionExtractionConstants.DefaultSafeOreSortieName;
     public BaseProcessingBranch primaryBranch = BaseProcessingBranch.Ore;
-    public ShipFittingSlotBand recommendedSlotBand = ShipFittingSlotBand.High;
-    public string requiredFittingSummary = "";
-    public List<string> requiredModuleIds = new List<string>();
+    public string sourceShipId = "";
+    public string sourceShipDisplayNameRu = "";
+    public string missionProfile = "";
+    public string missionArchetype = "";
+    public string primaryActivity = "";
+    public string primaryActivityRu = "";
+    public string missionSeed = "";
+    public List<SortiePayloadRewardLine> payloadRewards = new List<SortiePayloadRewardLine>();
+    public int completionFreightAward;
+    public int completionDesignExperienceAward;
     public string starterResourceItemId = "";
     public int starterResourceChunkMin = 1;
     public int starterResourceChunkMax = 4;
@@ -889,10 +939,8 @@ public class SortieZoneDefinition
     public float distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm;
     public float returnCruiseSpeedMS = 35f;
     public float returnPowerLever = 0.7f;
-    public float returnReserveMultiplier = 1.15f;
     public float extractionRunupRequiredSeconds = 12f;
     public float extractionRunupSpeedRatio = 0.9f;
-    public float fallbackCoalKgPerSecond = DefaultReturnCoalKgPerSecond;
 
     public void Normalize()
     {
@@ -910,33 +958,50 @@ public class SortieZoneDefinition
         distanceToBaseKm = Mathf.Max(0.1f, distanceToBaseKm);
         returnCruiseSpeedMS = Mathf.Max(0.1f, returnCruiseSpeedMS);
         returnPowerLever = Mathf.Clamp(returnPowerLever, 0.05f, 1.2f);
-        returnReserveMultiplier = Mathf.Max(1f, returnReserveMultiplier);
         extractionRunupRequiredSeconds = Mathf.Max(0f, extractionRunupRequiredSeconds);
         extractionRunupSpeedRatio = Mathf.Clamp01(extractionRunupSpeedRatio);
-        fallbackCoalKgPerSecond = fallbackCoalKgPerSecond <= 0f
-            ? DefaultReturnCoalKgPerSecond
-            : Mathf.Max(0f, fallbackCoalKgPerSecond);
-        starterResourceItemId ??= "";
-        starterResourceChunkMin = Mathf.Max(1, starterResourceChunkMin);
-        starterResourceChunkMax = Mathf.Max(starterResourceChunkMin, starterResourceChunkMax);
-        starterResourceShedIntervalSeconds = Mathf.Max(0.25f, starterResourceShedIntervalSeconds);
-        requiredFittingSummary ??= "";
-        requiredModuleIds ??= new List<string>();
-        for (int i = requiredModuleIds.Count - 1; i >= 0; i--)
+        sourceShipId = string.IsNullOrWhiteSpace(sourceShipId) ? "" : sourceShipId.Trim();
+        sourceShipDisplayNameRu = string.IsNullOrWhiteSpace(sourceShipDisplayNameRu) ? "" : sourceShipDisplayNameRu.Trim();
+        missionProfile = string.IsNullOrWhiteSpace(missionProfile) ? "" : missionProfile.Trim();
+        missionArchetype = string.IsNullOrWhiteSpace(missionArchetype) ? "" : missionArchetype.Trim();
+        primaryActivity = string.IsNullOrWhiteSpace(primaryActivity) ? "" : primaryActivity.Trim();
+        primaryActivityRu = string.IsNullOrWhiteSpace(primaryActivityRu) ? "" : primaryActivityRu.Trim();
+        missionSeed = string.IsNullOrWhiteSpace(missionSeed) ? "" : missionSeed.Trim();
+        completionFreightAward = Mathf.Max(0, completionFreightAward);
+        completionDesignExperienceAward = Mathf.Max(0, completionDesignExperienceAward);
+        payloadRewards ??= new List<SortiePayloadRewardLine>();
+        for (int i = payloadRewards.Count - 1; i >= 0; i--)
         {
-            string moduleId = requiredModuleIds[i];
-            if (string.IsNullOrWhiteSpace(moduleId))
+            SortiePayloadRewardLine reward = payloadRewards[i];
+            if (reward == null)
             {
-                requiredModuleIds.RemoveAt(i);
+                payloadRewards.RemoveAt(i);
                 continue;
             }
 
-            requiredModuleIds[i] = moduleId.Trim();
+            reward.Normalize();
+            if (string.IsNullOrWhiteSpace(reward.itemId) || reward.amount <= 0)
+            {
+                payloadRewards.RemoveAt(i);
+            }
         }
 
+        starterResourceItemId ??= "";
+        if (payloadRewards.Count > 0 && string.IsNullOrWhiteSpace(starterResourceItemId))
+        {
+            starterResourceItemId = payloadRewards[0].itemId;
+            starterResourceColor = payloadRewards[0].color;
+        }
+
+        starterResourceChunkMin = Mathf.Max(1, starterResourceChunkMin);
+        starterResourceChunkMax = Mathf.Max(starterResourceChunkMin, starterResourceChunkMax);
+        starterResourceShedIntervalSeconds = Mathf.Max(0.25f, starterResourceShedIntervalSeconds);
         if (entryPosition == Vector3.zero)
         {
-            entryPosition = centerPosition + new Vector3(0f, Mathf.Max(250f, stormFloorY + 250f), 0f);
+            entryPosition = centerPosition + new Vector3(
+                0f,
+                stormFloorY + SessionExtractionConstants.DefaultSortieEntryAltitudeMeters,
+                0f);
         }
     }
 
@@ -947,6 +1012,48 @@ public class SortieZoneDefinition
         if (clone == null) clone = new SortieZoneDefinition();
         clone.Normalize();
         return clone;
+    }
+
+    public bool HasPayloadRewards => payloadRewards != null && payloadRewards.Count > 0;
+
+    public bool AcceptsResource(string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(itemId)) return false;
+        Normalize();
+        if (HasPayloadRewards)
+        {
+            for (int i = 0; i < payloadRewards.Count; i++)
+            {
+                SortiePayloadRewardLine reward = payloadRewards[i];
+                if (reward != null && reward.itemId == itemId)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return !string.IsNullOrWhiteSpace(starterResourceItemId) && starterResourceItemId == itemId;
+    }
+
+    public string GetAcceptedResourceSummary()
+    {
+        Normalize();
+        if (!HasPayloadRewards)
+        {
+            return starterResourceItemId;
+        }
+
+        List<string> itemIds = new List<string>();
+        for (int i = 0; i < payloadRewards.Count; i++)
+        {
+            SortiePayloadRewardLine reward = payloadRewards[i];
+            if (reward != null && !string.IsNullOrWhiteSpace(reward.itemId) && !itemIds.Contains(reward.itemId))
+            {
+                itemIds.Add(reward.itemId);
+            }
+        }
+
+        return string.Join(", ", itemIds);
     }
 }
 
@@ -1116,25 +1223,16 @@ public static class SortieExtractionCalculator
         float returnDistanceMeters = zone.distanceToBaseKm * 1000f;
         estimate.returnTimeSeconds = Mathf.Max(1f, returnDistanceMeters / speed);
 
-        float reserve = Mathf.Max(1f, zone.returnReserveMultiplier);
-        float coalBurnKgPerSecond = profile.coalBurnKgPerSecond > 0f
-            ? profile.coalBurnKgPerSecond
-            : zone.fallbackCoalKgPerSecond;
-        float fuelKg = coalBurnKgPerSecond * estimate.returnTimeSeconds;
-        float claudiumKg = Mathf.Max(0f, profile.claudiumBurnKgPerSecond) * estimate.returnTimeSeconds;
-
-        estimate.requiredCoalKg = Mathf.Ceil(fuelKg * reserve);
-        estimate.requiredClaudiumKg = Mathf.Ceil(claudiumKg * reserve);
+        estimate.requiredCoalKg = 0f;
+        estimate.requiredClaudiumKg = 0f;
         estimate.currentCoalKg = Mathf.Max(0f, profile.currentCoalKg);
         estimate.currentClaudiumKg = Mathf.Max(0f, profile.currentClaudiumKg);
-        estimate.missingCoalKg = Mathf.Max(0f, estimate.requiredCoalKg - estimate.currentCoalKg);
-        estimate.missingClaudiumKg = Mathf.Max(0f, estimate.requiredClaudiumKg - estimate.currentClaudiumKg);
-        estimate.hasEnoughCoal = estimate.missingCoalKg <= 0.001f;
-        estimate.hasEnoughClaudium = estimate.missingClaudiumKg <= 0.001f;
+        estimate.missingCoalKg = 0f;
+        estimate.missingClaudiumKg = 0f;
+        estimate.hasEnoughCoal = true;
+        estimate.hasEnoughClaudium = true;
         estimate.canExtract = !estimate.isInsideCylinder
             && estimate.isAboveStorm
-            && estimate.hasEnoughCoal
-            && estimate.hasEnoughClaudium
             && estimate.hasExtractionRunup;
 
         if (!estimate.isAboveStorm)
@@ -1144,10 +1242,6 @@ public static class SortieExtractionCalculator
         else if (estimate.isInsideCylinder)
         {
             estimate.status = "Extraction blocked: leave the sortie cylinder.";
-        }
-        else if (!estimate.hasEnoughCoal || !estimate.hasEnoughClaudium)
-        {
-            estimate.status = $"Extraction blocked: missing {estimate.missingCoalKg:F1} kg coal and {estimate.missingClaudiumKg:F1} kg claudium.";
         }
         else if (!estimate.hasExtractionRunup)
         {

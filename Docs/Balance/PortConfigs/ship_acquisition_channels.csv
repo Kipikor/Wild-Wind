@@ -1,0 +1,11 @@
+rank,buy_fe,craft_fe_target,buy_to_craft_multiplier,repair_dock_effective_rank,repair_dock_discount_policy,notes_ru
+R1,0,0,1.0,R1,"free","Пионер бесплатный и не является экономическим bottleneck."
+R2,1000,770,1.3,R2,"repair about 50% of craft","Покупка и крафт близки; игрок учится системе."
+R3,2500,1670,1.5,R2,"repair one rank lower when possible","Крафт уже приятнее, но покупка еще нормальна."
+R4,6300,3500,1.8,R3,"repair one rank lower","Первый слой, где покупка начинает быть заметно дороже."
+R5,16000,7270,2.2,R4,"repair one rank lower plus discount","Крафт становится нормальным способом владения."
+R6,40000,15400,2.6,R5,"repair one rank lower plus discount","Покупка удобна, но уже плохо окупается без меты."
+R7,100000,31300,3.2,R5,"repair roughly two ranks lower","Ремдок R7 должен просить ресурсы примерно R5-слоя."
+R8,250000,65800,3.8,R6,"repair two ranks lower with rarity","Высокий ивентовый/фракционный корабль является импульсом."
+R9,625000,142000,4.4,R7,"repair two ranks lower with high rarity","Покупка почти роскошь; устойчивость через рецепты."
+R10,1560000,312000,5.0,R8,"repair two ranks lower; very rare","Топ T1 должен жить через крафт и открытые цепочки, а не через покупку."

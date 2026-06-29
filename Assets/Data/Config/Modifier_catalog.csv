@@ -1,4 +1,16 @@
 modifier_id,local_name_ru,local_name_en,category_id,value_kind,stacking_rule,default_operation,description_ru
+ore_processing_speed,Скорость рудной переработки,Ore Processing Speed,ore,percent,additive,add_percent,Ускоряет рудные производственные циклы.
+ore_processing_efficiency,Эффективность рудной переработки,Ore Processing Efficiency,ore,percent,additive,add_percent,Повышает выход минералов из руды.
+gas_processing_speed,Скорость газовой переработки,Gas Processing Speed,gas,percent,additive,add_percent,Ускоряет конденсацию и очистку газов.
+gas_processing_efficiency,Эффективность газовой переработки,Gas Processing Efficiency,gas,percent,additive,add_percent,Повышает выход материалов из газового сырья.
+salvage_detail_yield,Выход точных деталей,Salvage Detail Yield,salvage,percent,additive,add_percent,Повышает выход ценных деталей из автоматонов.
+salvage_speed,Скорость разборки автоматонов,Salvage Speed,salvage,percent,additive,add_percent,Ускоряет сальваж и разборку автоматонов.
+leviathan_butchery_yield,Выход разделки левиафанов,Leviathan Butchery Yield,leviathans,percent,additive,add_percent,Повышает выход полезных частей из туш левиафанов.
+leviathan_butchery_speed,Скорость разделки левиафанов,Leviathan Butchery Speed,leviathans,percent,additive,add_percent,Ускоряет разделку и подготовку туш к перевозке.
+faction_reputation_gain,Репутация фракций,Faction Reputation Gain,trade,percent,additive,add_percent,Повышает репутацию за поручения и сделки.
+faction_trade_discount,Скидка фракционных закупок,Faction Trade Discount,trade,percent,additive,add_percent,Снижает цену закупок у фракционных торговцев.
+cascade_recipe_speed,Скорость каскадных рецептов,Cascade Recipe Speed,cascade,percent,additive,add_percent,Ускоряет производство сложных деталей и блоков.
+cascade_recipe_efficiency,Экономия каскадных рецептов,Cascade Recipe Efficiency,cascade,percent,additive,add_percent,Снижает расход ресурсов в сложных рецептах.
 starter_airship_unlock,Стартовый дирижабль,Starter Airship Unlock,starter,unlock,unique,unlock,Открывает базовые правила стартового корабля.
 warehouse_capacity,Емкость складов,Warehouse Capacity,base,percent,additive,add_percent,Увеличивает объемы складов базы и будущих складских зданий.
 base_project_speed,Скорость базовых проектов,Base Project Speed,base,percent,additive,add_percent,Ускоряет расчистку и строительство базовых проектов.
