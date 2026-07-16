@@ -171,6 +171,12 @@ public class ShipLoader : MonoBehaviour
         }
 
         body.interpolation = RigidbodyInterpolation.Interpolate;
+        body.useGravity = false;
+
+        if (ship.GetComponent<CoreTacticalShipMotor>() == null)
+        {
+            ship.gameObject.AddComponent<CoreTacticalShipMotor>();
+        }
 
         if (ship.GetComponent<ShipAssemblyRuntime>() == null)
         {
@@ -224,6 +230,7 @@ public class ShipLoader : MonoBehaviour
 
             armorBody.owner = damageable;
             armorBody.defaultArmorMm = DefaultFallbackMeshArmorMm;
+            armorBody.defaultResistances = DamageResistanceUtility.DefaultShipResistances;
             armorBody.ricochetAngleDeg = 78f;
             armorBody.convexColliderForPhysics = true;
             armorBody.colliderIsTrigger = false;
@@ -248,6 +255,7 @@ public class ShipLoader : MonoBehaviour
             armor.zoneId = "hull";
             armor.displayNameRu = "Hull";
             armor.armorMm = DefaultFallbackMeshArmorMm;
+            armor.SetResistances(DamageResistanceUtility.DefaultShipResistances);
             armor.ricochetAngleDeg = 78f;
             armor.structureDamageMultiplier = 1f;
             armor.receiveRamDamage = true;

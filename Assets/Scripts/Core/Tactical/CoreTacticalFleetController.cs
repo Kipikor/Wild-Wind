@@ -7,10 +7,14 @@ using UnityEngine.InputSystem;
 
 public sealed class CoreTacticalFleetController : MonoBehaviour
 {
-    private const float MinCommandDragMeters = 8f;
+    private const float ScreenPointOutsideCameraTolerancePixels = 64f;
     private const float MouseClickMaxPixels = 4f;
     private const float SelectionDragPixels = 6f;
     private const float SelectionRaycastMaxDistanceMeters = 60000f;
+    private const float CommandGridTargetScreenPixels = 1.6f;
+    private const float CommandGridMinLineWidthMeters = 0.45f;
+    private const float CommandGridMaxLineWidthStepFraction = 0.07f;
+    private const float CommandGridLineWidthQuantizationMeters = 0.1f;
     private const int RoutePreviewPointCapacity = 24;
     private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
@@ -19,10 +23,13 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         CoreTacticalWeaponGroup.MainBattery,
         CoreTacticalWeaponGroup.Secondary76mm,
         CoreTacticalWeaponGroup.Secondary152mm,
+        CoreTacticalWeaponGroup.Torpedoes,
         CoreTacticalWeaponGroup.Missiles,
         CoreTacticalWeaponGroup.MachineGuns,
         CoreTacticalWeaponGroup.Autocannon30mm
     };
+
+    public static bool TacticalPointerInputBlocked { get; set; }
 
     [Header("Command Plane")]
     public float commandPlaneAltitudeMeters = 80f;
@@ -45,26 +52,26 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
     private readonly List<CoreTacticalShipMotor> ships = new List<CoreTacticalShipMotor>();
     private readonly List<LineRenderer> commandLines = new List<LineRenderer>();
     private readonly List<Vector3[]> commandRoutePointBuffers = new List<Vector3[]>();
-    private readonly List<GameObject> ghostShips = new List<GameObject>();
+    private LineRenderer commandPointMarker;
+    private LineRenderer commandPointCenterMarker;
     private MeshFilter gridMeshFilter;
     private MeshRenderer gridMeshRenderer;
     private Mesh gridMesh;
     private Material gridMaterial;
     private Material lineMaterial;
-    private Material ghostMaterial;
     private Camera mainCamera;
+    private CoreTacticalCameraRig inputCameraRig;
     private bool draftActive;
-    private bool draftHoldFacingMode;
     private bool leftMouseDownTracked;
     private bool selectionDragActive;
     private bool priorityTargetDragActive;
     private bool rightMouseDownTracked;
-    private bool rightMouseCommandGesture;
+    private bool commandGridWorldAnchorSet;
     private Vector2 leftMouseDownScreenPosition;
     private Vector2 leftMouseCurrentScreenPosition;
-    private Vector2 rightMouseDownScreenPosition;
     private Vector3 draftTarget;
     private Vector3 draftForward = Vector3.forward;
+    private Vector3 commandGridWorldAnchor;
     private float lastGridHalfSize = -1f;
     private float lastGridStep = -1f;
     private float lastGridLineWidth = -1f;
@@ -73,6 +80,138 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
 
     public IReadOnlyList<CoreTacticalShipMotor> Ships => ships;
     public float CommandPlaneAltitudeMeters => commandPlaneAltitudeMeters;
+    public bool HasSelectedShipsForInput => HasSelectedShips();
+    public bool IsCommandDraftActiveForInput => draftActive && rightMouseDownTracked;
+    public Camera InputCameraForTests => mainCamera;
+
+    public void SetInputCamera(Camera camera)
+    {
+        if (camera != null)
+        {
+            mainCamera = camera;
+            inputCameraRig = camera.GetComponent<CoreTacticalCameraRig>();
+        }
+    }
+
+    public void SetCommandGridWorldAnchor(Vector3 anchor)
+    {
+        commandGridWorldAnchor = anchor;
+        commandGridWorldAnchor.y = commandPlaneAltitudeMeters;
+        commandGridWorldAnchorSet = true;
+        if (gridMeshFilter != null)
+        {
+            UpdateGrid();
+        }
+    }
+
+    public bool TryProjectScreenPointToCommandPlaneForTests(Vector2 screenPosition, out Vector3 point)
+    {
+        return TryProjectMouseToCommandPlane(screenPosition, out point);
+    }
+
+    public static bool TryBuildCameraRayFromScreenPointForTests(Camera camera, Vector2 screenPosition, out Ray ray)
+    {
+        return TryBuildCameraRayFromScreenPoint(camera, screenPosition, out ray);
+    }
+
+    public static bool TryProjectCameraScreenPointToCommandPlane(
+        Camera camera,
+        Vector2 screenPosition,
+        float commandAltitudeMeters,
+        out Vector3 point)
+    {
+        return TryProjectCameraRayToCommandPlane(
+            camera,
+            screenPosition,
+            commandAltitudeMeters,
+            out point);
+    }
+
+    private static bool TryProjectCameraRayToCommandPlane(
+        Camera camera,
+        Vector2 screenPosition,
+        float commandAltitudeMeters,
+        out Vector3 point)
+    {
+        point = Vector3.zero;
+        if (!TryBuildCameraRayFromScreenPoint(camera, screenPosition, out Ray ray))
+        {
+            return false;
+        }
+
+        Plane plane = new Plane(Vector3.up, new Vector3(0f, commandAltitudeMeters, 0f));
+        if (!plane.Raycast(ray, out float enter) || enter < 0f || !IsFinite(enter))
+        {
+            return false;
+        }
+
+        point = ray.GetPoint(enter);
+        point.y = commandAltitudeMeters;
+        return IsFinite(point.x) && IsFinite(point.y) && IsFinite(point.z);
+    }
+
+    private static bool TryBuildCameraRayFromScreenPoint(Camera camera, Vector2 screenPosition, out Ray ray)
+    {
+        ray = default;
+        if (camera == null || !IsFinite(screenPosition.x) || !IsFinite(screenPosition.y))
+        {
+            return false;
+        }
+
+        Rect pixelRect = camera.pixelRect;
+        if (pixelRect.width <= 0.01f || pixelRect.height <= 0.01f)
+        {
+            pixelRect = new Rect(0f, 0f, Mathf.Max(1f, Screen.width), Mathf.Max(1f, Screen.height));
+        }
+
+        float toleranceX = ScreenPointOutsideCameraTolerancePixels / Mathf.Max(1f, pixelRect.width);
+        float toleranceY = ScreenPointOutsideCameraTolerancePixels / Mathf.Max(1f, pixelRect.height);
+        float viewportX = (screenPosition.x - pixelRect.xMin) / pixelRect.width;
+        float viewportY = (screenPosition.y - pixelRect.yMin) / pixelRect.height;
+        bool outsideCamera =
+            viewportX < -toleranceX ||
+            viewportX > 1f + toleranceX ||
+            viewportY < -toleranceY ||
+            viewportY > 1f + toleranceY;
+        if (outsideCamera)
+        {
+            return false;
+        }
+
+        float normalizedX = viewportX * 2f - 1f;
+        float normalizedY = viewportY * 2f - 1f;
+        float tangent = Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float aspect = pixelRect.width / Mathf.Max(1f, pixelRect.height);
+        Vector3 localDirection = new Vector3(normalizedX * aspect * tangent, normalizedY * tangent, 1f).normalized;
+        Vector3 worldDirection = camera.transform.rotation * localDirection;
+        ray = new Ray(camera.transform.position, worldDirection.normalized);
+        return IsFinite(ray.origin.x)
+            && IsFinite(ray.origin.y)
+            && IsFinite(ray.origin.z)
+            && IsFinite(ray.direction.x)
+            && IsFinite(ray.direction.y)
+            && IsFinite(ray.direction.z)
+            && ray.direction.sqrMagnitude > 0.000001f;
+    }
+
+    private static bool IsScreenPointInsideCamera(Camera camera, Vector2 screenPosition)
+    {
+        if (camera == null || !IsFinite(screenPosition.x) || !IsFinite(screenPosition.y))
+        {
+            return false;
+        }
+
+        Rect pixelRect = camera.pixelRect;
+        if (pixelRect.width > 0.01f && pixelRect.height > 0.01f)
+        {
+            return screenPosition.x >= pixelRect.xMin - ScreenPointOutsideCameraTolerancePixels
+                && screenPosition.x <= pixelRect.xMax + ScreenPointOutsideCameraTolerancePixels
+                && screenPosition.y >= pixelRect.yMin - ScreenPointOutsideCameraTolerancePixels
+                && screenPosition.y <= pixelRect.yMax + ScreenPointOutsideCameraTolerancePixels;
+        }
+
+        return IsScreenPositionInsideGameView(screenPosition);
+    }
 
     private void Awake()
     {
@@ -91,9 +230,14 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         ApplyCommandAltitudeToShips();
     }
 
+    private void OnDisable()
+    {
+        TacticalPointerInputBlocked = false;
+    }
+
     private void Update()
     {
-        if (mainCamera == null)
+        if (mainCamera == null || !mainCamera.isActiveAndEnabled)
         {
             mainCamera = Camera.main;
         }
@@ -111,11 +255,10 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         {
             string text =
                 "Wild Wind Core Tactical Prototype\n" +
-                "WASD / RMB drag: pan camera | MMB drag: tilt camera | Mouse wheel: zoom\n" +
+                "WASD / RMB drag on empty space: pan camera | MMB drag: tilt camera | Mouse wheel: zoom\n" +
                 "LMB click: select ship | LMB drag: box select | Shift+LMB: add/toggle\n" +
                 "Ctrl+LMB click/drag enemy: set priority target for selected ships\n" +
-                "RMB click: move selected ships nose-first on the command plane\n" +
-                "Shift+RMB hold/drag: command final facing and hold it during movement.\n" +
+                "RMB press/release: place the selected ships' move point on the command plane\n" +
                 "Q/E: lower/raise shared command plane | Altitude: " + commandPlaneAltitudeMeters.ToString("0") + " m\n" +
                 "The ships use Rigidbody forces for flat and altitude motion; yaw is rate-limited.";
             GUI.Label(new Rect(14f, 14f, 760f, 112f), text);
@@ -159,7 +302,7 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         float rowY = y + headerHeight + priorityHeight + padding;
         for (int i = 0; i < WeaponPanelGroups.Length; i++)
         {
-            if (weaponControl.GetCapacity(WeaponPanelGroups[i]) <= 0)
+            if (!weaponControl.IsWeaponGroupActive(WeaponPanelGroups[i]))
             {
                 continue;
             }
@@ -179,7 +322,7 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         int count = 0;
         for (int i = 0; i < WeaponPanelGroups.Length; i++)
         {
-            if (weaponControl.GetCapacity(WeaponPanelGroups[i]) > 0)
+            if (weaponControl.IsWeaponGroupActive(WeaponPanelGroups[i]))
             {
                 count++;
             }
@@ -197,21 +340,15 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         float height)
     {
         bool enabled = weaponControl.IsFireEnabled(group);
-        int remaining = weaponControl.GetRemaining(group);
-        int capacity = weaponControl.GetCapacity(group);
-        string ammoText = remaining + " / " + capacity;
+        string stateText = enabled ? "ready" : "held";
         GUI.Label(
             new Rect(x, y + 2f, width - 88f, height),
-            CoreTacticalWeaponControl.GetDisplayName(group) + ": " + ammoText);
+            weaponControl.GetRuntimeDisplayName(group) + ": " + stateText);
 
         Color oldColor = GUI.color;
         if (!enabled)
         {
             GUI.color = new Color(1f, 0.58f, 0.44f, 1f);
-        }
-        else if (remaining <= 0)
-        {
-            GUI.color = new Color(0.72f, 0.72f, 0.72f, 1f);
         }
         else
         {
@@ -283,7 +420,6 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         ships.Add(ship);
         ship.SetCommandPlaneAltitude(commandPlaneAltitudeMeters);
         EnsureCommandLineCapacity();
-        EnsureGhostCapacity();
     }
 
     public Vector3 GetFleetCenter()
@@ -332,6 +468,14 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
 
     private void HandleSelectionInput()
     {
+        if (TacticalPointerInputBlocked)
+        {
+            leftMouseDownTracked = false;
+            selectionDragActive = false;
+            priorityTargetDragActive = false;
+            return;
+        }
+
         if (WasSelectAllPressed())
         {
             SelectAll();
@@ -391,13 +535,19 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
 
         if (wasBoxSelection)
         {
+            Rect selectionRect = BuildScreenRect(leftMouseDownScreenPosition, mousePosition);
             if (wasPriorityTargetGesture)
             {
-                TryAssignPriorityTargetFromScreenRect(BuildScreenRect(leftMouseDownScreenPosition, mousePosition));
+                TryAssignPriorityTargetFromScreenRect(selectionRect);
                 return;
             }
 
-            ToggleOrSelectShipsInScreenRect(BuildScreenRect(leftMouseDownScreenPosition, mousePosition), IsMultiSelectPressed());
+            if (CoreTacticalCombatSortieController.TryInspectScreenRectFromSelection(selectionRect))
+            {
+                return;
+            }
+
+            ToggleOrSelectShipsInScreenRect(selectionRect, IsMultiSelectPressed());
             return;
         }
 
@@ -409,6 +559,11 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         Ray ray = mainCamera.ScreenPointToRay(mousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hit, SelectionRaycastMaxDistanceMeters, ~0, QueryTriggerInteraction.Ignore))
         {
+            if (CoreTacticalCombatSortieController.TryInspectScreenPointFromSelection(mousePosition))
+            {
+                return;
+            }
+
             if (!IsMultiSelectPressed())
             {
                 ClearSelection();
@@ -423,9 +578,29 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
             return;
         }
 
+        if (TryToggleOreBoulderPriorityTargetFromHit(hit))
+        {
+            return;
+        }
+
+        if (CoreTacticalCombatSortieController.TryInspectHitFromSelection(hit))
+        {
+            return;
+        }
+
         CoreTacticalShipMotor ship = hit.collider != null ? hit.collider.GetComponentInParent<CoreTacticalShipMotor>() : null;
         if (!CanSelectShip(ship))
         {
+            if (CoreTacticalCombatSortieController.TryInspectScreenPointFromSelection(mousePosition))
+            {
+                return;
+            }
+
+            if (ship != null && (ship.GetComponent<CoreTacticalOreBoulder>() != null || ship.GetComponent<CoreTacticalLeviathanController>() != null))
+            {
+                return;
+            }
+
             if (!IsMultiSelectPressed())
             {
                 ClearSelection();
@@ -446,80 +621,150 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
 
     private void HandleCommandInput()
     {
-        if (!TryReadMousePosition(out Vector2 mousePosition) || mainCamera == null)
+#if ENABLE_INPUT_SYSTEM
+        Mouse mouse = Mouse.current;
+        if (mouse == null || !TryReadInputSystemScreenPosition(out Vector2 screenPosition))
         {
-            HideGhosts();
-            draftActive = false;
-            rightMouseDownTracked = false;
-            rightMouseCommandGesture = false;
+            CancelCommandDraft();
             return;
         }
 
-        if (WasRightMousePressed())
-        {
-            rightMouseDownTracked = true;
-            rightMouseDownScreenPosition = mousePosition;
-            rightMouseCommandGesture = IsHoldFacingCommandPressed();
-            if (rightMouseCommandGesture && TryProjectMouseToCommandPlane(mousePosition, out Vector3 point))
-            {
-                BeginDraftCommand(point, true);
-            }
-        }
-
-        if (rightMouseDownTracked && IsRightMousePressed())
-        {
-            bool holdFacingCommand = IsHoldFacingCommandPressed();
-            if (rightMouseCommandGesture && draftActive)
-            {
-                draftHoldFacingMode = draftHoldFacingMode || holdFacingCommand;
-                if (TryProjectMouseToCommandPlane(mousePosition, out Vector3 dragPoint))
-                {
-                    Vector3 drag = dragPoint - draftTarget;
-                    drag.y = 0f;
-                    if (drag.magnitude >= MinCommandDragMeters)
-                    {
-                        draftForward = drag.normalized;
-                    }
-                }
-
-                UpdateDraftGhosts();
-            }
-        }
-
-        if (WasRightMouseReleased())
-        {
-            bool wasTrackedClick = rightMouseDownTracked
-                && Vector2.Distance(mousePosition, rightMouseDownScreenPosition) <= MouseClickMaxPixels;
-            rightMouseDownTracked = false;
-            rightMouseCommandGesture = false;
-            if (draftActive)
-            {
-                draftHoldFacingMode = draftHoldFacingMode || IsHoldFacingCommandPressed();
-                IssueDraftCommand();
-                HideGhosts();
-                draftActive = false;
-                return;
-            }
-
-            if (wasTrackedClick && TryProjectMouseToCommandPlane(mousePosition, out Vector3 clickPoint))
-            {
-                draftTarget = clickPoint;
-                draftForward = ResolveAverageSelectedForward();
-                draftHoldFacingMode = false;
-                IssueDraftCommand();
-            }
-
-            HideGhosts();
-        }
+        ProcessCommandPointer(
+            screenPosition,
+            mouse.rightButton.wasPressedThisFrame,
+            mouse.rightButton.isPressed,
+            mouse.rightButton.wasReleasedThisFrame,
+            true);
+#else
+        CancelCommandDraft();
+#endif
     }
 
-    private void BeginDraftCommand(Vector3 point, bool holdFacing)
+    public bool ProcessCommandPointerForTests(
+        Vector2 screenPosition,
+        bool wasPressed,
+        bool isPressed,
+        bool wasReleased,
+        out Vector3 commandTarget,
+        out Vector3 markerCenter)
     {
-        draftActive = true;
-        draftHoldFacingMode = holdFacing;
+        bool processed = ProcessCommandPointer(screenPosition, wasPressed, isPressed, wasReleased, false);
+        commandTarget = draftTarget;
+        markerCenter = GetCommandPointMarkerCenterForTests();
+        return processed;
+    }
+
+    public Vector3 GetCommandPointMarkerCenterForTests()
+    {
+        if (commandPointMarker != null && commandPointMarker.positionCount >= 4)
+        {
+            Vector3 markerCenter = (commandPointMarker.GetPosition(0)
+                + commandPointMarker.GetPosition(1)
+                + commandPointMarker.GetPosition(2)
+                + commandPointMarker.GetPosition(3)) * 0.25f;
+            markerCenter.y = commandPlaneAltitudeMeters;
+            return markerCenter;
+        }
+
+        return draftTarget;
+    }
+
+    private bool ProcessCommandPointer(
+        Vector2 screenPosition,
+        bool wasPressed,
+        bool isPressed,
+        bool wasReleased,
+        bool blockUi)
+    {
+        if (TacticalPointerInputBlocked
+            || !HasSelectedShips()
+            || !IsScreenPositionInsideGameView(screenPosition)
+            || !IsScreenPointInsideCamera(mainCamera, screenPosition))
+        {
+            CancelCommandDraft();
+            return false;
+        }
+
+        if (wasPressed)
+        {
+            if (blockUi && IsPointerOverWeaponControlPanel(screenPosition))
+            {
+                CancelCommandDraft();
+                return false;
+            }
+
+            rightMouseDownTracked = TryBeginScreenCommand(screenPosition);
+            return rightMouseDownTracked;
+        }
+
+        if (!rightMouseDownTracked || !draftActive)
+        {
+            return false;
+        }
+
+        if (wasReleased)
+        {
+            bool hasProjectedReleaseTarget = UpdateDraftTargetFromScreenProjection(screenPosition);
+            if (hasProjectedReleaseTarget)
+            {
+                IssueDraftCommand();
+            }
+
+            CancelCommandDraft();
+            return hasProjectedReleaseTarget;
+        }
+
+        if (isPressed)
+        {
+            bool hasProjectedHeldTarget = UpdateDraftTargetFromScreenProjection(screenPosition);
+            if (hasProjectedHeldTarget)
+            {
+                UpdateDraftPreview();
+            }
+
+            return hasProjectedHeldTarget;
+        }
+
+        CancelCommandDraft();
+        return false;
+    }
+
+    private void CancelCommandDraft()
+    {
+        HideDraftPreview();
+        draftActive = false;
+        rightMouseDownTracked = false;
+    }
+
+    private bool TryBeginScreenCommand(Vector2 screenPosition)
+    {
+        if (!TryProjectMouseToCommandPlane(screenPosition, out Vector3 point))
+        {
+            return false;
+        }
+
+        BeginDraftCommand(point);
+        return true;
+    }
+
+    private bool UpdateDraftTargetFromScreenProjection(Vector2 screenPosition)
+    {
+        if (!TryProjectMouseToCommandPlane(screenPosition, out Vector3 point))
+        {
+            return false;
+        }
+
         draftTarget = point;
         draftForward = ResolveAverageSelectedForward();
-        ShowDraftGhosts();
+        return true;
+    }
+
+    private void BeginDraftCommand(Vector3 point)
+    {
+        draftActive = true;
+        draftTarget = point;
+        draftForward = ResolveAverageSelectedForward();
+        ShowDraftPreview();
     }
 
     private void IssueDraftCommand()
@@ -534,21 +779,17 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
             }
 
             Vector3 formationPosition = GetFormationPosition(i, selectedShips.Count, draftTarget, draftForward);
-            Vector3 commandForward = draftForward;
-            if (!draftHoldFacingMode)
+            Vector3 commandForward = formationPosition - ship.transform.position;
+            commandForward.y = 0f;
+            if (commandForward.sqrMagnitude <= 0.0001f)
             {
-                commandForward = formationPosition - ship.transform.position;
-                commandForward.y = 0f;
-                if (commandForward.sqrMagnitude <= 0.0001f)
-                {
-                    commandForward = ship.transform.forward;
-                }
+                commandForward = ship.transform.forward;
             }
 
             ship.SetCommand(
                 formationPosition,
                 commandForward,
-                draftHoldFacingMode);
+                false);
         }
     }
 
@@ -565,22 +806,11 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
 
     private bool TryProjectMouseToCommandPlane(Vector2 mousePosition, out Vector3 point)
     {
-        point = Vector3.zero;
-        if (mainCamera == null)
-        {
-            return false;
-        }
-
-        Ray ray = mainCamera.ScreenPointToRay(mousePosition);
-        Plane plane = new Plane(Vector3.up, new Vector3(0f, commandPlaneAltitudeMeters, 0f));
-        if (!plane.Raycast(ray, out float enter))
-        {
-            return false;
-        }
-
-        point = ray.GetPoint(enter);
-        point.y = commandPlaneAltitudeMeters;
-        return true;
+        return TryProjectCameraScreenPointToCommandPlane(
+            mainCamera,
+            mousePosition,
+            commandPlaneAltitudeMeters,
+            out point);
     }
 
     private Vector3 GetFormationPosition(int index, int count, Vector3 center, Vector3 forward)
@@ -645,10 +875,32 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         }
 
         CoreTacticalShipMotor targetShip = hit.collider.GetComponentInParent<CoreTacticalShipMotor>();
-        CoreTacticalCombatant targetCombatant = targetShip != null ? targetShip.GetComponent<CoreTacticalCombatant>() : null;
-        if (targetShip == null || targetCombatant == null || !targetCombatant.IsAlive)
+        if (!CoreTacticalOreTargetingRules.IsValidExplicitTarget(targetShip, CoreTacticalCombatTeam.Enemy))
         {
             return false;
+        }
+
+        return AssignPriorityTargetToSelectedShips(targetShip);
+    }
+
+    private bool TryToggleOreBoulderPriorityTargetFromHit(RaycastHit hit)
+    {
+        CoreTacticalOreBoulder boulder = hit.collider != null ? hit.collider.GetComponentInParent<CoreTacticalOreBoulder>() : null;
+        if (boulder == null || !HasSelectedShips())
+        {
+            return false;
+        }
+
+        CoreTacticalShipMotor targetShip = boulder.GetComponent<CoreTacticalShipMotor>();
+        if (!CoreTacticalOreTargetingRules.IsValidExplicitTarget(targetShip, CoreTacticalCombatTeam.Enemy))
+        {
+            return false;
+        }
+
+        if (AreSelectedShipsTargeting(targetShip))
+        {
+            ClearPriorityTargetForSelectedShips();
+            return true;
         }
 
         return AssignPriorityTargetToSelectedShips(targetShip);
@@ -719,7 +971,7 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
     private bool AssignPriorityTargetToSelectedShips(CoreTacticalShipMotor targetShip)
     {
         CoreTacticalCombatant targetCombatant = targetShip != null ? targetShip.GetComponent<CoreTacticalCombatant>() : null;
-        if (targetShip == null || targetCombatant == null || !targetCombatant.IsAlive)
+        if (!CoreTacticalOreTargetingRules.IsValidExplicitTarget(targetShip, CoreTacticalCombatTeam.Enemy))
         {
             return false;
         }
@@ -735,7 +987,7 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
             }
 
             CoreTacticalCombatant selectedCombatant = selectedShip.GetComponent<CoreTacticalCombatant>();
-            if (selectedCombatant != null && selectedCombatant.team == targetCombatant.team)
+            if (targetCombatant != null && selectedCombatant != null && selectedCombatant.team == targetCombatant.team)
             {
                 continue;
             }
@@ -751,6 +1003,45 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         }
 
         return assigned;
+    }
+
+    private bool AreSelectedShipsTargeting(CoreTacticalShipMotor targetShip)
+    {
+        if (targetShip == null)
+        {
+            return false;
+        }
+
+        List<CoreTacticalShipMotor> selectedShips = GetSelectedShips();
+        bool hasAssignableShip = false;
+        for (int i = 0; i < selectedShips.Count; i++)
+        {
+            CoreTacticalShipMotor selectedShip = selectedShips[i];
+            if (selectedShip == null || selectedShip == targetShip)
+            {
+                continue;
+            }
+
+            hasAssignableShip = true;
+            CoreTacticalPriorityTargetControl priorityControl = selectedShip.GetComponent<CoreTacticalPriorityTargetControl>();
+            if (priorityControl == null
+                || !priorityControl.TryGetPriorityTarget(CoreTacticalCombatTeam.Enemy, out CoreTacticalShipMotor priorityTarget)
+                || priorityTarget != targetShip)
+            {
+                return false;
+            }
+        }
+
+        return hasAssignableShip;
+    }
+
+    private void ClearPriorityTargetForSelectedShips()
+    {
+        List<CoreTacticalShipMotor> selectedShips = GetSelectedShips();
+        for (int i = 0; i < selectedShips.Count; i++)
+        {
+            ClearPriorityTarget(selectedShips[i]);
+        }
     }
 
     private static string GetPriorityTargetName(CoreTacticalShipMotor ship)
@@ -993,12 +1284,13 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
     {
         if (gridMaterial == null)
         {
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
             if (shader == null) shader = Shader.Find("Unlit/Color");
-            if (shader == null) shader = Shader.Find("Sprites/Default");
             gridMaterial = new Material(shader);
             gridMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-            SetMaterialColor(gridMaterial, new Color(0.16f, 0.62f, 0.72f, 1f));
+            gridMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            SetMaterialColor(gridMaterial, new Color(0.12f, 0.55f, 0.64f, 0.42f));
         }
 
         if (lineMaterial == null)
@@ -1010,16 +1302,6 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
             SetMaterialColor(lineMaterial, new Color(0.30f, 0.74f, 0.95f, 0.72f));
         }
 
-        if (ghostMaterial == null)
-        {
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (shader == null) shader = Shader.Find("Sprites/Default");
-            if (shader == null) shader = Shader.Find("Unlit/Color");
-            ghostMaterial = new Material(shader);
-            ghostMaterial.SetFloat("_Surface", 1f);
-            ghostMaterial.renderQueue = 3000;
-            SetMaterialColor(ghostMaterial, new Color(0.95f, 0.78f, 0.26f, 0.34f));
-        }
     }
 
     private void EnsureGrid()
@@ -1058,7 +1340,7 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
 
         float safeHalfSize = Mathf.Max(20f, gridHalfSizeMeters);
         float safeStep = Mathf.Max(5f, gridStepMeters);
-        float safeLineWidth = Mathf.Clamp(gridLineWidthMeters, 0.05f, safeStep * 0.20f);
+        float safeLineWidth = ResolveGridLineWidth(safeStep);
         bool rebuild = !Mathf.Approximately(safeHalfSize, lastGridHalfSize)
             || !Mathf.Approximately(safeStep, lastGridStep)
             || !Mathf.Approximately(safeLineWidth, lastGridLineWidth);
@@ -1070,7 +1352,67 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
             lastGridLineWidth = safeLineWidth;
         }
 
-        gridMeshFilter.transform.position = new Vector3(0f, commandPlaneAltitudeMeters, 0f);
+        gridMeshFilter.transform.position = GetCommandGridCenter(safeStep);
+    }
+
+    private float ResolveGridLineWidth(float step)
+    {
+        float metersPerPixel = EstimateCommandPlaneMetersPerPixel();
+        float targetWidth = metersPerPixel * CommandGridTargetScreenPixels;
+        float maxWidth = Mathf.Max(CommandGridMinLineWidthMeters, step * CommandGridMaxLineWidthStepFraction);
+        float width = Mathf.Clamp(targetWidth, CommandGridMinLineWidthMeters, maxWidth);
+        return Mathf.Max(
+            CommandGridMinLineWidthMeters,
+            Mathf.Round(width / CommandGridLineWidthQuantizationMeters) * CommandGridLineWidthQuantizationMeters);
+    }
+
+    private float EstimateCommandPlaneMetersPerPixel()
+    {
+        if (mainCamera == null)
+        {
+            return Mathf.Max(CommandGridMinLineWidthMeters, gridLineWidthMeters);
+        }
+
+        Rect pixelRect = mainCamera.pixelRect;
+        Vector2 screenCenter = pixelRect.width > 0.01f && pixelRect.height > 0.01f
+            ? pixelRect.center
+            : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        Vector3 sample = GetFleetCenter();
+        if (TryProjectCameraScreenPointToCommandPlane(
+            mainCamera,
+            screenCenter,
+            commandPlaneAltitudeMeters,
+            out Vector3 cameraCenter))
+        {
+            sample = cameraCenter;
+        }
+
+        float distanceAlongForward = Vector3.Dot(sample - mainCamera.transform.position, mainCamera.transform.forward);
+        if (!IsFinite(distanceAlongForward) || distanceAlongForward <= 0.1f)
+        {
+            distanceAlongForward = Vector3.Distance(sample, mainCamera.transform.position);
+        }
+
+        if (!IsFinite(distanceAlongForward) || distanceAlongForward <= 0.1f)
+        {
+            return Mathf.Max(CommandGridMinLineWidthMeters, gridLineWidthMeters);
+        }
+
+        float screenHeight = pixelRect.height > 0.01f ? pixelRect.height : Screen.height;
+        float viewHeightMeters = 2f
+            * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad)
+            * distanceAlongForward;
+        return viewHeightMeters / Mathf.Max(1f, screenHeight);
+    }
+
+    private Vector3 GetCommandGridCenter(float step)
+    {
+        Vector3 center = commandGridWorldAnchorSet ? commandGridWorldAnchor : GetFleetCenter();
+        center.y = commandPlaneAltitudeMeters;
+        float safeStep = Mathf.Max(1f, step);
+        center.x = Mathf.Round(center.x / safeStep) * safeStep;
+        center.z = Mathf.Round(center.z / safeStep) * safeStep;
+        return center;
     }
 
     private void BuildGridMesh(float halfSize, float step, float lineWidth)
@@ -1184,69 +1526,86 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         }
     }
 
-    private void EnsureGhostCapacity()
+    private void ShowDraftPreview()
+    {
+        EnsureCommandPointMarker();
+        UpdateDraftPreview();
+    }
+
+    private void UpdateDraftPreview()
+    {
+        UpdateCommandPointMarker();
+    }
+
+    private void HideDraftPreview()
+    {
+        if (commandPointMarker != null)
+        {
+            commandPointMarker.enabled = false;
+        }
+
+        if (commandPointCenterMarker != null)
+        {
+            commandPointCenterMarker.enabled = false;
+        }
+    }
+
+    private void EnsureCommandPointMarker()
     {
         EnsureMaterials();
-        while (ghostShips.Count < ships.Count)
+        if (commandPointMarker != null && commandPointCenterMarker != null)
         {
-            GameObject ghost = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            ghost.name = "Core Tactical Command Ghost " + ghostShips.Count;
-            Collider collider = ghost.GetComponent<Collider>();
-            if (collider != null)
-            {
-                Destroy(collider);
-            }
+            return;
+        }
 
-            Renderer renderer = ghost.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                renderer.sharedMaterial = ghostMaterial;
-            }
+        if (commandPointMarker == null)
+        {
+            commandPointMarker = CreateLineRenderer("Core Tactical Command Point Marker", 2.6f);
+            commandPointMarker.positionCount = 5;
+            commandPointMarker.loop = false;
+            commandPointMarker.enabled = false;
+        }
 
-            ghost.SetActive(false);
-            ghostShips.Add(ghost);
+        if (commandPointCenterMarker == null)
+        {
+            commandPointCenterMarker = CreateLineRenderer("Core Tactical Command Point Center", 5.4f);
+            commandPointCenterMarker.positionCount = 5;
+            commandPointCenterMarker.loop = false;
+            commandPointCenterMarker.enabled = false;
         }
     }
 
-    private void ShowDraftGhosts()
+    private void UpdateCommandPointMarker()
     {
-        EnsureGhostCapacity();
-        UpdateDraftGhosts();
-    }
-
-    private void UpdateDraftGhosts()
-    {
-        List<CoreTacticalShipMotor> selectedShips = GetSelectedShips();
-        EnsureGhostCapacity();
-        for (int i = 0; i < ghostShips.Count; i++)
+        EnsureCommandPointMarker();
+        if (commandPointMarker == null)
         {
-            GameObject ghost = ghostShips[i];
-            CoreTacticalShipMotor ship = i < selectedShips.Count ? selectedShips[i] : null;
-            if (ghost == null)
-            {
-                continue;
-            }
-
-            ghost.SetActive(ship != null);
-            if (ship == null)
-            {
-                continue;
-            }
-
-            ghost.transform.position = GetFormationPosition(i, selectedShips.Count, draftTarget, draftForward);
-            ghost.transform.rotation = Quaternion.LookRotation(draftForward, Vector3.up);
-            ghost.transform.localScale = ship.hullSizeMeters;
+            return;
         }
-    }
 
-    private void HideGhosts()
-    {
-        for (int i = 0; i < ghostShips.Count; i++)
+        const float radiusMeters = 34f;
+        Vector3 center = draftTarget;
+        center.y = commandPlaneAltitudeMeters + 0.2f;
+        Vector3 forward = Vector3.forward * radiusMeters;
+        Vector3 right = Vector3.right * radiusMeters;
+        commandPointMarker.enabled = draftActive;
+        commandPointMarker.SetPosition(0, center + forward);
+        commandPointMarker.SetPosition(1, center + right);
+        commandPointMarker.SetPosition(2, center - forward);
+        commandPointMarker.SetPosition(3, center - right);
+        commandPointMarker.SetPosition(4, center + forward);
+
+        if (commandPointCenterMarker != null)
         {
-            if (ghostShips[i] != null)
-            {
-                ghostShips[i].SetActive(false);
-            }
+            const float centerRadiusMeters = 8f;
+            Vector3 centerForward = Vector3.forward * centerRadiusMeters;
+            Vector3 centerRight = Vector3.right * centerRadiusMeters;
+            commandPointCenterMarker.enabled = draftActive;
+            commandPointCenterMarker.SetPosition(0, center - centerRight);
+            commandPointCenterMarker.SetPosition(1, center + centerRight);
+            commandPointCenterMarker.SetPosition(2, center);
+            commandPointCenterMarker.SetPosition(3, center - centerForward);
+            commandPointCenterMarker.SetPosition(4, center + centerForward);
         }
     }
 
@@ -1376,18 +1735,42 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
         material.color = color;
     }
 
-    private static bool TryReadMousePosition(out Vector2 position)
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
+    }
+
+    private bool TryReadMousePosition(out Vector2 position)
+    {
+        return TryReadInputSystemScreenPosition(out position);
+    }
+
+    private static bool TryReadInputSystemScreenPosition(out Vector2 position)
     {
 #if ENABLE_INPUT_SYSTEM
         Mouse mouse = Mouse.current;
         if (mouse != null)
         {
             position = mouse.position.ReadValue();
-            return true;
+            return IsScreenPositionInsideGameView(position);
         }
 #endif
         position = default;
         return false;
+    }
+
+    private static bool IsScreenPositionInsideGameView(Vector2 position)
+    {
+        if (!IsFinite(position.x) || !IsFinite(position.y))
+        {
+            return false;
+        }
+
+        const float tolerancePixels = 8f;
+        return position.x >= -tolerancePixels
+            && position.x <= Screen.width + tolerancePixels
+            && position.y >= -tolerancePixels
+            && position.y <= Screen.height + tolerancePixels;
     }
 
     private static bool WasLeftMousePressed()
@@ -1485,16 +1868,6 @@ public sealed class CoreTacticalFleetController : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM
         Keyboard keyboard = Keyboard.current;
         return keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
-#else
-        return false;
-#endif
-    }
-
-    private static bool IsHoldFacingCommandPressed()
-    {
-#if ENABLE_INPUT_SYSTEM
-        Keyboard keyboard = Keyboard.current;
-        return keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
 #else
         return false;
 #endif

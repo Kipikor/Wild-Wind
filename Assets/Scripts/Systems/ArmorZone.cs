@@ -10,6 +10,11 @@ public class ArmorZone : MonoBehaviour
     public string displayNameRu = "Лобовая броня";
     [InspectorName("Толщина брони, мм")]
     [Min(0f)] public float armorMm = 40f;
+    [Header("Damage resistances")]
+    [Range(0f, 100f)] public float kineticResistancePercent = 48f;
+    [Range(0f, 100f)] public float thermalResistancePercent = 18f;
+    [Range(0f, 100f)] public float chemicalResistancePercent = 18f;
+    [Range(0f, 100f)] public float explosiveResistancePercent = 28f;
     [InspectorName("Угол рикошета, град")]
     [Range(0f, 89f)] public float ricochetAngleDeg = 70f;
     [InspectorName("Множитель overmatch")]
@@ -45,6 +50,38 @@ public class ArmorZone : MonoBehaviour
         {
             return GetComponentInParent<DamageableShip>();
         }
+    }
+
+    public CoreTacticalResistanceSet Resistances => new CoreTacticalResistanceSet(
+        kineticResistancePercent,
+        thermalResistancePercent,
+        chemicalResistancePercent,
+        explosiveResistancePercent);
+
+    public void SetResistances(CoreTacticalResistanceSet resistances)
+    {
+        resistances.Normalize();
+        kineticResistancePercent = resistances.kineticPercent;
+        thermalResistancePercent = resistances.thermalPercent;
+        chemicalResistancePercent = resistances.chemicalPercent;
+        explosiveResistancePercent = resistances.explosivePercent;
+    }
+
+    private void OnValidate()
+    {
+        armorMm = Mathf.Max(0f, armorMm);
+        kineticResistancePercent = Mathf.Clamp(kineticResistancePercent, 0f, 100f);
+        thermalResistancePercent = Mathf.Clamp(thermalResistancePercent, 0f, 100f);
+        chemicalResistancePercent = Mathf.Clamp(chemicalResistancePercent, 0f, 100f);
+        explosiveResistancePercent = Mathf.Clamp(explosiveResistancePercent, 0f, 100f);
+        ricochetAngleDeg = Mathf.Clamp(ricochetAngleDeg, 0f, 89f);
+        overmatchCaliberMultiplier = Mathf.Max(0f, overmatchCaliberMultiplier);
+        structureDamageMultiplier = Mathf.Clamp(structureDamageMultiplier, 0f, 3f);
+        highExplosiveSurfaceDamageMultiplier = Mathf.Clamp01(highExplosiveSurfaceDamageMultiplier);
+        ramDamageMultiplier = Mathf.Clamp(ramDamageMultiplier, 0f, 3f);
+        ramMinRelativeSpeedMS = Mathf.Max(0f, ramMinRelativeSpeedMS);
+        ramDamageScale = Mathf.Max(0f, ramDamageScale);
+        fallbackOtherMassKg = Mathf.Max(1f, fallbackOtherMassKg);
     }
 
     public DamageHitResult ReceiveHit(DamageHitContext context)
@@ -129,6 +166,7 @@ public class ArmorZone : MonoBehaviour
         DamageHitContext context = new DamageHitContext
         {
             shellType = DamageShellType.Impact,
+            damageType = CoreTacticalDamageType.Kinetic,
             shellName = "Таран",
             sourceName = collision.collider.name,
             damagePoints = 0f,

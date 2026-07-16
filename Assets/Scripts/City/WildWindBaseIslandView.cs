@@ -8,6 +8,10 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
@@ -22,8 +26,11 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private const string EventSystemName = "Base Island EventSystem";
     private const string BuildingPrefabResourceRoot = "BaseIsland/Buildings/";
     private const string BuildingCatalogResourcePath = "BaseIsland/City_building";
+    private const string PortDockShipModelResourceRoot = "ShipImports/Models/BlenderShips/";
+    private const string PortDockEquipmentModelResourceRoot = "ShipImports/Models/Turrets/";
     private const string CourierServiceBuildingId = "courier_service";
     private const string CapitalAirdockBuildingId = "capital_airdock";
+    private const string PveDockBuildingId = "pve_dock";
     private const string RepairDockBuildingId = "repair_dock";
     private const string FreightItemId = "freight";
     private const int LegacySeedOriginOffsetXCells = 0;
@@ -54,6 +61,12 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private const float CapitalAirplaneWindowRefreshSeconds = 0.2f;
     private const float RepairDockWindowRefreshSeconds = 0.2f;
     private const int BuildingWorkActionIndex = 1;
+    private const string PortDockShipPreviewRootName = "Port Dock Ship Previews";
+    private const float PortDockFrigateLengthMeters = 60f;
+    private const float PortDockCruiserLengthMeters = 150f;
+    private const float PortDockBattleshipLengthMeters = 330f;
+    private const float PortDockBattleshipDisplayLength = 10.4f;
+    private const float PortDockMetersToCityUnits = PortDockBattleshipDisplayLength / PortDockBattleshipLengthMeters;
 
     private static BaseBuildingDefinition[] cachedBuildingDefinitions;
     private static Sprite cachedCollectBubbleSprite;
@@ -75,6 +88,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         new BaseBuildingDefinition("trader_pavilion", "Торговый павильон", "", 3, 3, 1, 1, 1, 14, 12, new Color(0.76f, 0.60f, 0.33f, 1f), "trader", "service"),
         new BaseBuildingDefinition(CourierServiceBuildingId, "Курьерская служба", "", 4, 3, 1, 1, 1, 16, 4, new Color(0.18f, 0.56f, 0.58f, 1f), "courier", "service"),
         new BaseBuildingDefinition(CapitalAirdockBuildingId, "Столичный аэродром", "", 4, 3, 1, 1, 1, 16, 8, new Color(0.61f, 0.48f, 0.25f, 1f), "airdock", "service"),
+        new BaseBuildingDefinition(PveDockBuildingId, "ПВЕ-док", "", 5, 8, 1, 3, 3, -1, -1, new Color(0.32f, 0.39f, 0.42f, 1f), "pve_dock", "dock"),
         new BaseBuildingDefinition(RepairDockBuildingId, "Ремонтный док", "", 5, 8, 1, 2, 1, -1, -1, new Color(0.42f, 0.30f, 0.32f, 1f), "repair_dock", "dock")
     };
     private static readonly string[] BuildingActionLabels =
@@ -108,6 +122,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     };
 
     private readonly Dictionary<Renderer, bool> suppressedRendererStates = new Dictionary<Renderer, bool>();
+    private readonly Dictionary<int, GameObject> portDockShipPreviews = new Dictionary<int, GameObject>();
 
     private MetaGameState meta;
     private WildWindGameplaySession gameplaySession;
@@ -115,6 +130,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private WildWindSessionCameraController sessionCameraController;
     private IsoGridCityPrototype city;
     private Camera sceneCamera;
+    private Transform portDockShipPreviewRoot;
     private Canvas windowCanvas;
     private RectTransform overlayRoot;
     private Button buildingSelectionBackdropButton;
@@ -288,6 +304,8 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     private bool storedCityCameraRenderPostProcessing;
     private bool storedCityCameraRequiresDepthTexture;
     private bool storedCityCameraRequiresColorTexture;
+    private string focusedPortDockKey = "";
+    private int focusedPortDockSlotIndex = -1;
     private static Font cachedDefaultFont;
 
     public bool IsReadyForTests => built
@@ -366,6 +384,336 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     public int ExternalDockSlotCountForTests => city != null ? city.ExternalDockSlotCountForTests : 0;
     public int ExternalDockPlacedCountForTests => city != null ? city.ExternalDockPlacedCountForTests : 0;
     public int ExpectedExternalDockSlotCountForTests => ExpectedExternalDockSlotCount;
+    public int PortDockPreviewShipCountForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            int count = 0;
+            foreach (GameObject preview in portDockShipPreviews.Values)
+            {
+                if (preview != null && preview.activeInHierarchy)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+    }
+    public int PortDockAuthoredPreviewShipCountForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            int count = 0;
+            foreach (GameObject preview in portDockShipPreviews.Values)
+            {
+                if (preview == null || !preview.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                PortDockShipPreviewHandle handle = preview.GetComponent<PortDockShipPreviewHandle>();
+                if (handle != null && handle.usesAuthoredModel)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+    }
+    public string FocusedPortDockKeyForTests => focusedPortDockKey;
+    public int FocusedPortDockSlotIndexForTests => focusedPortDockSlotIndex;
+    public bool IsPortDockBackdropReadyForTests => IsCityVisibleForTests
+        && PortDockPreviewShipCountForTests > 0
+        && PortDockAuthoredPreviewShipCountForTests > 0
+        && !string.IsNullOrWhiteSpace(focusedPortDockKey);
+    public bool IsPortDockCameraOrbitActiveForTests => city != null && city.IsPortDockCameraOrbitActiveForTests;
+    public bool IsPortDockCameraOrbitLookingAtShipForTests => city != null && city.IsPortDockCameraOrbitLookingAtFocusForTests;
+    public bool IsCityCameraTransformBlendActiveForTests => city != null && city.IsCameraTransformBlendActiveForTests;
+    public bool IsCityCameraTransformBlendTargetingPortDockForTests => city != null && city.IsCameraTransformBlendTargetingPortDockForTests;
+    public bool IsCityCameraTransformBlendTargetingPreservedStateForTests => city != null && city.IsCameraTransformBlendTargetingPreservedStateForTests;
+    public bool IsPortDockWorldInteractionSuppressedForTests => city != null && city.IsPortDockWorldInteractionSuppressedForTests;
+    public bool PortDockBattleshipBerthFitsForTests => DoesPortDockBerthFitShipClass("battleship");
+    public string SelectedPortDockPreviewLoadoutSignatureForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+            PortDockShipPreviewHandle handle = selectedSlot != null ? GetPortDockPreviewHandle(selectedSlot.slotIndex) : null;
+            return handle != null ? handle.loadoutSignature : "";
+        }
+    }
+    public int SelectedPortDockPreviewGeneratedWeaponVisualCountForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+            PortDockShipPreviewHandle handle = selectedSlot != null ? GetPortDockPreviewHandle(selectedSlot.slotIndex) : null;
+            return handle != null ? handle.generatedWeaponVisualCount : 0;
+        }
+    }
+    public bool SelectedPortDockPreviewMainWeaponMountedForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+            PortDockShipPreviewHandle handle = selectedSlot != null ? GetPortDockPreviewHandle(selectedSlot.slotIndex) : null;
+            ShipTreeEntryConfig ship = selectedSlot != null && selectedSlot.HasShip ? GetShipTreeEntry(selectedSlot.shipId) : null;
+            if (handle == null || !IsKorshunPreviewShip(ship))
+            {
+                return true;
+            }
+
+            return IsPortDockKorshunMainWeaponMounted(handle.transform, selectedSlot);
+        }
+    }
+    public bool SelectedPortDockPreviewAuxiliaryWeaponMountedForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+            PortDockShipPreviewHandle handle = selectedSlot != null ? GetPortDockPreviewHandle(selectedSlot.slotIndex) : null;
+            ShipTreeEntryConfig ship = selectedSlot != null && selectedSlot.HasShip ? GetShipTreeEntry(selectedSlot.shipId) : null;
+            if (handle == null || !IsKorshunPreviewShip(ship))
+            {
+                return true;
+            }
+
+            return IsPortDockKorshunAuxiliaryWeaponMounted(handle.transform, selectedSlot);
+        }
+    }
+    public string SelectedPortDockPreviewMainWeaponMountDetailsForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+            PortDockShipPreviewHandle handle = selectedSlot != null ? GetPortDockPreviewHandle(selectedSlot.slotIndex) : null;
+            ShipTreeEntryConfig ship = selectedSlot != null && selectedSlot.HasShip ? GetShipTreeEntry(selectedSlot.shipId) : null;
+            if (handle == null || !IsKorshunPreviewShip(ship))
+            {
+                return "";
+            }
+
+            string mainPackageId = NormalizePortDockPackageId(selectedSlot.GetLoadoutPackageId("main"));
+            return TryResolvePortDockKorshunMainVisualSpec(mainPackageId, out PortDockKorshunWeaponVisualSpec spec)
+                ? BuildPortDockKorshunPlacementMountDetails(handle.transform, spec)
+                : "main spec missing for " + mainPackageId;
+        }
+    }
+    public string SelectedPortDockPreviewAuxiliaryWeaponMountDetailsForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+            PortDockShipPreviewHandle handle = selectedSlot != null ? GetPortDockPreviewHandle(selectedSlot.slotIndex) : null;
+            ShipTreeEntryConfig ship = selectedSlot != null && selectedSlot.HasShip ? GetShipTreeEntry(selectedSlot.shipId) : null;
+            if (handle == null || !IsKorshunPreviewShip(ship))
+            {
+                return "";
+            }
+
+            string auxiliaryPackageId = NormalizePortDockPackageId(selectedSlot.GetLoadoutPackageId("auxiliary"));
+            return TryResolvePortDockKorshunAuxiliaryVisualSpec(auxiliaryPackageId, out PortDockKorshunWeaponVisualSpec spec)
+                ? BuildPortDockKorshunPlacementMountDetails(handle.transform, spec)
+                : "aux spec missing for " + auxiliaryPackageId;
+        }
+    }
+    public bool SelectedPortDockPreviewKorshunLoadoutVisualsCleanForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+            PortDockShipPreviewHandle handle = selectedSlot != null ? GetPortDockPreviewHandle(selectedSlot.slotIndex) : null;
+            ShipTreeEntryConfig ship = selectedSlot != null && selectedSlot.HasShip ? GetShipTreeEntry(selectedSlot.shipId) : null;
+            if (handle == null || !IsKorshunPreviewShip(ship))
+            {
+                return true;
+            }
+
+            return IsPortDockKorshunLoadoutVisualsClean(handle.transform, selectedSlot);
+        }
+    }
+    public string SelectedPortDockPreviewKorshunLoadoutVisualCleanDetailsForTests
+    {
+        get
+        {
+            RefreshPortDockShipPreviews();
+            DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+            PortDockShipPreviewHandle handle = selectedSlot != null ? GetPortDockPreviewHandle(selectedSlot.slotIndex) : null;
+            ShipTreeEntryConfig ship = selectedSlot != null && selectedSlot.HasShip ? GetShipTreeEntry(selectedSlot.shipId) : null;
+            if (handle == null || !IsKorshunPreviewShip(ship))
+            {
+                return "";
+            }
+
+            return BuildPortDockKorshunLoadoutVisualCleanDetails(handle.transform, selectedSlot);
+        }
+    }
+    public bool KorshunMainLoadoutPreviewVisualMapCoversConfigForTests
+    {
+        get
+        {
+            SessionConfigDatabase config = meta != null ? meta.SessionConfig : null;
+            if (config == null || config.korshunWeaponPackages == null)
+            {
+                return false;
+            }
+
+            int configuredMainPackages = 0;
+            int mappedMainPackages = 0;
+            for (int i = 0; i < config.korshunWeaponPackages.Count; i++)
+            {
+                KorshunWeaponPackageConfig package = config.korshunWeaponPackages[i];
+                if (package == null
+                    || !string.Equals(package.shipId, "capital_patrol_frigate_r02", StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(package.slotRole, "main", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                configuredMainPackages++;
+                if (TryResolvePortDockKorshunMainVisualSpec(package.id, out _))
+                {
+                    mappedMainPackages++;
+                }
+            }
+
+            return configuredMainPackages >= 12 && mappedMainPackages == configuredMainPackages;
+        }
+    }
+    public bool KorshunAuxiliaryLoadoutPreviewVisualMapCoversConfigForTests
+    {
+        get
+        {
+            SessionConfigDatabase config = meta != null ? meta.SessionConfig : null;
+            if (config == null || config.korshunAuxiliaryPackages == null)
+            {
+                return false;
+            }
+
+            int configuredAuxiliaryPackages = 0;
+            int mappedAuxiliaryPackages = 0;
+            for (int i = 0; i < config.korshunAuxiliaryPackages.Count; i++)
+            {
+                KorshunAuxiliaryPackageConfig package = config.korshunAuxiliaryPackages[i];
+                if (package == null
+                    || !string.Equals(package.shipId, "capital_patrol_frigate_r02", StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(package.slotRole, "auxiliary", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                configuredAuxiliaryPackages++;
+                if (TryResolvePortDockKorshunAuxiliaryVisualSpec(package.id, out _))
+                {
+                    mappedAuxiliaryPackages++;
+                }
+            }
+
+            return configuredAuxiliaryPackages >= 10 && mappedAuxiliaryPackages == configuredAuxiliaryPackages;
+        }
+    }
+    public bool PortDockPreviewUsesRealShipLengthScaleForTests
+    {
+        get
+        {
+            if (meta == null)
+            {
+                return false;
+            }
+
+            PlayerProgress snapshot = meta.CreateProgressSnapshot();
+            try
+            {
+                meta.ReplaceProgress(new PlayerProgress());
+                meta.EnsureProgressInitialized();
+                meta.GetCapitalStorageState()?.AddResource(FreightItemId, 200000);
+
+                meta.SelectDevelopmentDockSlot(0);
+                bool boughtFrigate = meta.TryBuyDevelopmentShipToDock("capital_patrol_frigate_r02", out _);
+                meta.SelectDevelopmentDockSlot(1);
+                bool boughtCruiser = meta.TryBuyDevelopmentShipToDock("capital_artillery_cruiser_r02", out _);
+                meta.SelectDevelopmentDockSlot(2);
+                bool boughtBattleship = meta.TryBuyDevelopmentShipToDock("capital_heavy_battleship_r02", out _);
+                RefreshPortDockShipPreviews();
+
+                bool hasFrigate = TryGetPortDockPreviewDisplayLengthForTests("capital_patrol_frigate_r02", out float frigateLength);
+                bool hasCruiser = TryGetPortDockPreviewDisplayLengthForTests("capital_artillery_cruiser_r02", out float cruiserLength);
+                bool hasBattleship = TryGetPortDockPreviewDisplayLengthForTests("capital_heavy_battleship_r02", out float battleshipLength);
+                if (!boughtFrigate
+                    || !boughtCruiser
+                    || !boughtBattleship
+                    || !hasFrigate
+                    || !hasCruiser
+                    || !hasBattleship
+                    || battleshipLength <= 0.01f)
+                {
+                    return false;
+                }
+
+                return Mathf.Abs((frigateLength / battleshipLength) - (PortDockFrigateLengthMeters / PortDockBattleshipLengthMeters)) <= 0.035f
+                    && Mathf.Abs((cruiserLength / battleshipLength) - (PortDockCruiserLengthMeters / PortDockBattleshipLengthMeters)) <= 0.045f;
+            }
+            finally
+            {
+                meta.ReplaceProgress(snapshot);
+                RefreshPortDockShipPreviews();
+            }
+        }
+    }
+
+    private bool TryGetPortDockPreviewDisplayLengthForTests(string shipId, out float displayLength)
+    {
+        displayLength = 0f;
+        if (string.IsNullOrWhiteSpace(shipId))
+        {
+            return false;
+        }
+
+        foreach (GameObject preview in portDockShipPreviews.Values)
+        {
+            if (preview == null)
+            {
+                continue;
+            }
+
+            PortDockShipPreviewHandle handle = preview.GetComponent<PortDockShipPreviewHandle>();
+            if (handle != null
+                && string.Equals(handle.shipId, shipId, StringComparison.OrdinalIgnoreCase)
+                && handle.targetPortSize.z > 0.01f)
+            {
+                displayLength = handle.targetPortSize.z;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private PortDockShipPreviewHandle GetPortDockPreviewHandle(int slotIndex)
+    {
+        if (!portDockShipPreviews.TryGetValue(slotIndex, out GameObject preview) || preview == null)
+        {
+            return null;
+        }
+
+        return preview.GetComponent<PortDockShipPreviewHandle>();
+    }
+
+    public bool OffsetPortDockCameraOrbitForTests(float angleDeltaDegrees)
+    {
+        return city != null && city.OffsetPortDockCameraOrbitForTests(angleDeltaDegrees);
+    }
     public string ProcessingWindowContentForTests => string.Join("\n", new[]
     {
         processingStatsText != null ? processingStatsText.text : "",
@@ -571,6 +919,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
     private void OnDisable()
     {
+        SetPortDockShipPreviewsVisible(false);
         RestoreSessionWorldRenderers();
         RestoreSessionCameraController();
     }
@@ -586,6 +935,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
         RestoreSessionWorldRenderers();
         RestoreSessionCameraController();
+        ClearPortDockShipPreviews();
     }
 
     private void Update()
@@ -604,6 +954,16 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         }
 
         RefreshCityMode();
+        if (city != null && city.gameObject.activeInHierarchy)
+        {
+            EnsureDefaultBuildingsSeeded();
+            RefreshPortDockShipPreviews();
+        }
+        else
+        {
+            SetPortDockShipPreviewsVisible(false);
+        }
+
         RefreshExpansionRegionsIfDue();
         RefreshBuildingOverlay();
         HandleProcessingCollectBubblePointerInput();
@@ -653,6 +1013,17 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     public bool BuildingHasCameraVisibleVisualForTests(string buildingId)
     {
         return city != null && city.BuildingHasCameraVisibleRendererForTests(buildingId);
+    }
+
+    public bool DeactivateBuildingVisualForTests(string buildingId)
+    {
+        return city != null && city.DeactivateBuildingVisualForTests(buildingId);
+    }
+
+    public bool RecoverDefaultBuildingsForTests()
+    {
+        EnsureDefaultBuildingsSeeded();
+        return HasCompleteDefaultBuildingRuntime();
     }
 
     public bool BuildingPrefabHasPhysicalMaterialsForTests(string buildingId)
@@ -924,7 +1295,17 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
 
         return IsRepairDockKey(dockKey)
             ? OpenRepairDockWindowFromExternalDock(dockKey)
-            : OpenDockScreenFromExternalDock();
+            : OpenDockScreenFromExternalDock(dockKey);
+    }
+
+    public bool FocusDevelopmentDockSlotForTests(int slotIndex)
+    {
+        return FocusDevelopmentDockSlotForRuntime(slotIndex, true);
+    }
+
+    public bool FocusSelectedDevelopmentDockShipForTests()
+    {
+        return FocusSelectedDevelopmentDockShipForRuntime(true);
     }
 
     public bool ShowExternalDockHoverForTests(string dockKey)
@@ -932,9 +1313,21 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         return city != null && city.ShowExternalDockHoverForTests(dockKey);
     }
 
+    public void PreserveCityCameraForDockReturnForRuntime()
+    {
+        EnsureBuilt();
+        city?.PreserveCameraStateBeforePortDockForRuntime();
+    }
+
     public void FlyCityCameraHomeForRuntime()
     {
         EnsureBuilt();
+        RefreshPortDockWorldInteractionSuppression();
+        if (city != null && city.FlyCameraToPreservedCameraStateForRuntime())
+        {
+            return;
+        }
+
         city?.FlyCameraToDefaultViewForRuntime();
     }
 
@@ -1152,13 +1545,57 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
             return;
         }
 
-        if (defaultBuildingsSeeded && city.BuildingCountForTests >= GetInitialBuildingCountForTests())
+        if (city.gameObject != null && !city.gameObject.activeInHierarchy)
         {
             return;
         }
 
+        if (defaultBuildingsSeeded && HasCompleteDefaultBuildingRuntime())
+        {
+            return;
+        }
+
+        city.PruneInvalidBuildingsForRuntime();
         SeedDefaultBuildings();
-        defaultBuildingsSeeded = city.BuildingCountForTests >= GetInitialBuildingCountForTests();
+        defaultBuildingsSeeded = HasCompleteDefaultBuildingRuntime();
+    }
+
+    private bool HasCompleteDefaultBuildingRuntime()
+    {
+        if (city == null || city.BuildingCountForTests < GetInitialBuildingCountForTests())
+        {
+            return false;
+        }
+
+        BaseBuildingDefinition[] definitions = BuildingDefinitions;
+        for (int i = 0; i < definitions.Length; i++)
+        {
+            BaseBuildingDefinition definition = definitions[i];
+            if (IsDockDefinition(definition))
+            {
+                for (int instanceIndex = 1; instanceIndex <= definition.initialCount; instanceIndex++)
+                {
+                    string key = GetInstanceKey(definition, instanceIndex);
+                    if (!city.HasExternalDockKeyForTests(key))
+                    {
+                        return false;
+                    }
+                }
+
+                continue;
+            }
+
+            for (int instanceIndex = 1; instanceIndex <= definition.initialCount; instanceIndex++)
+            {
+                string key = GetInstanceKey(definition, instanceIndex);
+                if (!city.HasBuildingKeyForTests(key) || !city.BuildingHasEnabledRendererForTests(key))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private void SeedDefaultBuildings()
@@ -1221,6 +1658,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
     {
         bool cityVisible = ShouldShowCity();
         bool hiddenByDockScreen = gameplayHud != null && gameplayHud.IsMetaDockScreenActiveForRuntime;
+        ApplyPortDockWorldInteractionSuppression(hiddenByDockScreen);
         if (city != null && city.gameObject.activeSelf != cityVisible)
         {
             city.gameObject.SetActive(cityVisible);
@@ -1285,13 +1723,23 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         wasCityVisible = cityVisible;
     }
 
-    private bool ShouldShowCity()
+    private void RefreshPortDockWorldInteractionSuppression()
     {
-        if (gameplayHud != null && gameplayHud.IsMetaDockScreenActiveForRuntime)
+        if (gameplayHud == null)
         {
-            return false;
+            gameplayHud = FindFirstObjectByType<WildWindGameplayHud>();
         }
 
+        ApplyPortDockWorldInteractionSuppression(gameplayHud != null && gameplayHud.IsMetaDockScreenActiveForRuntime);
+    }
+
+    private void ApplyPortDockWorldInteractionSuppression(bool suppressed)
+    {
+        city?.SetPortDockWorldInteractionSuppressedForRuntime(suppressed);
+    }
+
+    private bool ShouldShowCity()
+    {
         if (meta != null)
         {
             return meta.CurrentMode == GameSessionMode.Docked;
@@ -1434,6 +1882,7 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         Transform activeShipRoot = GetActiveShipRoot();
         if (sessionWorldRenderersSuppressed && suppressedActiveShipRoot == activeShipRoot)
         {
+            SuppressNewSessionWorldRenderers();
             return;
         }
 
@@ -1461,6 +1910,24 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         }
 
         sessionWorldRenderersSuppressed = true;
+    }
+
+    private void SuppressNewSessionWorldRenderers()
+    {
+        Renderer[] renderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null
+                || renderer.transform.IsChildOf(transform)
+                || suppressedRendererStates.ContainsKey(renderer))
+            {
+                continue;
+            }
+
+            suppressedRendererStates.Add(renderer, renderer.enabled);
+            renderer.enabled = false;
+        }
     }
 
     private Transform GetActiveShipRoot()
@@ -1548,20 +2015,2135 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
             return;
         }
 
-        OpenDockScreenFromExternalDock();
+        OpenDockScreenFromExternalDock(dockKey);
     }
 
-    private bool OpenDockScreenFromExternalDock()
+    private bool OpenDockScreenFromExternalDock(string dockKey)
     {
         EnsureBuilt();
         ClearBuildingFocus();
         SetActiveIfNotNull(buildingCatalogPanel, false);
+        int focusedSlotIndex = TryGetDevelopmentDockSlotIndexForDockKey(dockKey, out int dockSlotIndex)
+            ? dockSlotIndex
+            : 0;
+        if (meta == null)
+        {
+            meta = FindFirstObjectByType<MetaGameState>();
+        }
+
+        meta?.SelectDevelopmentDockSlot(focusedSlotIndex);
         if (gameplayHud == null)
         {
             gameplayHud = FindFirstObjectByType<WildWindGameplayHud>();
         }
 
-        return gameplayHud != null && gameplayHud.OpenMetaDockScreenForRuntime();
+        bool opened = gameplayHud != null && gameplayHud.OpenMetaDockScreenForRuntime();
+        if (opened)
+        {
+            RefreshPortDockWorldInteractionSuppression();
+            FocusDevelopmentDockSlotForRuntime(focusedSlotIndex, false);
+        }
+
+        return opened;
+    }
+
+    public bool FocusSelectedDevelopmentDockShipForRuntime(bool snap = false)
+    {
+        EnsureBuilt();
+        if (meta == null)
+        {
+            meta = FindFirstObjectByType<MetaGameState>();
+        }
+
+        DockedDevelopmentShipState selectedSlot = meta != null ? meta.GetSelectedDevelopmentDockShipSlot() : null;
+        return FocusDevelopmentDockSlotForRuntime(selectedSlot != null ? selectedSlot.slotIndex : 0, snap);
+    }
+
+    public bool FocusDevelopmentDockSlotForRuntime(int slotIndex, bool snap = false)
+    {
+        EnsureBuilt();
+        if (city == null)
+        {
+            return false;
+        }
+
+        RefreshPortDockWorldInteractionSuppression();
+        RefreshPortDockShipPreviews();
+        int normalizedSlotIndex = Mathf.Clamp(slotIndex, 0, MetaGameState.DevelopmentDockSlotCount - 1);
+        if (!TryGetDevelopmentDockKeyForSlot(normalizedSlotIndex, out string dockKey))
+        {
+            return false;
+        }
+
+        float zoomSize = GetPortDockCameraZoomForSlot(normalizedSlotIndex);
+        DockedDevelopmentShipState slot = null;
+        if (meta != null)
+        {
+            IReadOnlyList<DockedDevelopmentShipState> slots = meta.GetDevelopmentDockShipSlots();
+            if (slots != null && normalizedSlotIndex >= 0 && normalizedSlotIndex < slots.Count)
+            {
+                slot = slots[normalizedSlotIndex];
+            }
+        }
+
+        ShipTreeEntryConfig ship = slot != null && slot.HasShip ? GetShipTreeEntry(slot.shipId) : null;
+        Vector3 shipSize = GetPortPreviewShipSize(ship, slot, ResolvePortPreviewShipLengthMeters(ship, slot));
+        bool focused = city.FlyCameraToExternalDockForRuntime(dockKey, zoomSize, shipSize, snap);
+        if (focused)
+        {
+            focusedPortDockKey = dockKey;
+            focusedPortDockSlotIndex = normalizedSlotIndex;
+        }
+
+        return focused;
+    }
+
+    public void RefreshDevelopmentDockShipPreviewsForRuntime()
+    {
+        EnsureBuilt();
+        if (meta == null)
+        {
+            meta = FindFirstObjectByType<MetaGameState>();
+        }
+
+        RefreshPortDockShipPreviews();
+    }
+
+    private void RefreshPortDockShipPreviews()
+    {
+        if (!built || city == null || meta == null)
+        {
+            SetPortDockShipPreviewsVisible(false);
+            return;
+        }
+
+        EnsurePortDockShipPreviewRoot();
+        bool visible = city.gameObject.activeInHierarchy;
+        SetPortDockShipPreviewsVisible(visible);
+        if (!visible)
+        {
+            return;
+        }
+
+        IReadOnlyList<DockedDevelopmentShipState> slots = meta.GetDevelopmentDockShipSlots();
+        HashSet<int> liveSlots = new HashSet<int>();
+        if (slots != null)
+        {
+            for (int i = 0; i < slots.Count; i++)
+            {
+                DockedDevelopmentShipState slot = slots[i];
+                if (slot == null || !slot.HasShip || !TryGetDevelopmentDockKeyForSlot(slot.slotIndex, out string dockKey))
+                {
+                    continue;
+                }
+
+                if (!city.TryGetExternalDockBerthPoseForRuntime(
+                        dockKey,
+                        out Vector3 berthPosition,
+                        out Quaternion berthRotation,
+                        out float berthLength,
+                        out float berthWidth,
+                        out _))
+                {
+                    continue;
+                }
+
+                ShipTreeEntryConfig ship = GetShipTreeEntry(slot.shipId);
+                GameObject preview = GetOrCreatePortDockShipPreview(slot.slotIndex);
+                UpdatePortDockShipPreview(preview, ship, slot, berthPosition, berthRotation, berthLength, berthWidth);
+                liveSlots.Add(slot.slotIndex);
+            }
+        }
+
+        List<int> staleSlots = null;
+        foreach (KeyValuePair<int, GameObject> pair in portDockShipPreviews)
+        {
+            if (!liveSlots.Contains(pair.Key))
+            {
+                staleSlots ??= new List<int>();
+                staleSlots.Add(pair.Key);
+            }
+        }
+
+        if (staleSlots == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < staleSlots.Count; i++)
+        {
+            RemovePortDockShipPreview(staleSlots[i]);
+        }
+    }
+
+    private void EnsurePortDockShipPreviewRoot()
+    {
+        if (portDockShipPreviewRoot != null)
+        {
+            return;
+        }
+
+        Transform existingRoot = transform.Find(PortDockShipPreviewRootName);
+        if (existingRoot != null)
+        {
+            portDockShipPreviewRoot = existingRoot;
+            return;
+        }
+
+        GameObject root = new GameObject(PortDockShipPreviewRootName);
+        root.transform.SetParent(transform, false);
+        portDockShipPreviewRoot = root.transform;
+    }
+
+    private void SetPortDockShipPreviewsVisible(bool visible)
+    {
+        if (portDockShipPreviewRoot != null && portDockShipPreviewRoot.gameObject.activeSelf != visible)
+        {
+            portDockShipPreviewRoot.gameObject.SetActive(visible);
+        }
+    }
+
+    private void ClearPortDockShipPreviews()
+    {
+        List<int> slotIndexes = new List<int>(portDockShipPreviews.Keys);
+        for (int i = 0; i < slotIndexes.Count; i++)
+        {
+            RemovePortDockShipPreview(slotIndexes[i]);
+        }
+
+        if (portDockShipPreviewRoot != null)
+        {
+            DestroyPortPreviewObject(portDockShipPreviewRoot.gameObject);
+            portDockShipPreviewRoot = null;
+        }
+    }
+
+    private GameObject GetOrCreatePortDockShipPreview(int slotIndex)
+    {
+        if (portDockShipPreviews.TryGetValue(slotIndex, out GameObject preview) && preview != null)
+        {
+            return preview;
+        }
+
+        EnsurePortDockShipPreviewRoot();
+        preview = new GameObject("Port Dock Ship Slot " + (slotIndex + 1).ToString());
+        preview.transform.SetParent(portDockShipPreviewRoot, false);
+        portDockShipPreviews[slotIndex] = preview;
+        return preview;
+    }
+
+    private void RemovePortDockShipPreview(int slotIndex)
+    {
+        if (!portDockShipPreviews.TryGetValue(slotIndex, out GameObject preview))
+        {
+            return;
+        }
+
+        portDockShipPreviews.Remove(slotIndex);
+        if (preview != null)
+        {
+            DestroyPortPreviewObject(preview);
+        }
+    }
+
+    private void UpdatePortDockShipPreview(
+        GameObject preview,
+        ShipTreeEntryConfig ship,
+        DockedDevelopmentShipState slot,
+        Vector3 berthPosition,
+        Quaternion berthRotation,
+        float berthLength,
+        float berthWidth)
+    {
+        if (preview == null)
+        {
+            return;
+        }
+
+        PortDockShipPreviewHandle handle = preview.GetComponent<PortDockShipPreviewHandle>();
+        if (handle == null)
+        {
+            handle = preview.AddComponent<PortDockShipPreviewHandle>();
+        }
+
+        string shipId = ship != null ? ship.shipId : slot != null ? slot.shipId : "";
+        string classId = ship != null ? ship.shipClassId : "";
+        string visualModelId = ship != null ? ship.visualModelId : "";
+        string loadoutSignature = BuildPortDockLoadoutSignature(ship, slot);
+        Color color = GetPortPreviewShipColor(ship);
+        float targetLengthMeters = ResolvePortPreviewShipLengthMeters(ship, slot);
+        Vector3 targetPortSize = GetPortPreviewShipSize(ship, slot, targetLengthMeters);
+        if (handle.shipId != shipId
+            || handle.shipClassId != classId
+            || handle.visualModelId != visualModelId
+            || handle.loadoutSignature != loadoutSignature
+            || handle.color != color
+            || (handle.targetPortSize - targetPortSize).sqrMagnitude > 0.000001f)
+        {
+            ClearPreviewChildren(preview.transform);
+            bool authoredModel = TryBuildPortDockShipAuthoredModel(preview.transform, ship, slot, color, out Vector3 authoredSize, out int generatedWeaponVisualCount);
+            if (!authoredModel)
+            {
+                authoredSize = BuildPortDockShipPreviewGeometry(preview.transform, ship, color, targetPortSize);
+                generatedWeaponVisualCount = 0;
+            }
+
+            handle.shipId = shipId;
+            handle.shipClassId = classId;
+            handle.visualModelId = visualModelId;
+            handle.loadoutSignature = loadoutSignature;
+            handle.color = color;
+            handle.usesAuthoredModel = authoredModel;
+            handle.generatedWeaponVisualCount = generatedWeaponVisualCount;
+            handle.localBoundsSize = authoredSize;
+            handle.targetPortSize = targetPortSize;
+            handle.targetLengthMeters = targetLengthMeters;
+        }
+
+        Vector3 size = handle.localBoundsSize.sqrMagnitude > 0.0001f
+            ? handle.localBoundsSize
+            : targetPortSize;
+        float displayScale = handle.usesAuthoredModel
+            ? targetPortSize.z / Mathf.Max(0.01f, size.z)
+            : 1f;
+        if (handle.usesAuthoredModel && berthWidth > 0f)
+        {
+            float displayWidth = size.x * displayScale;
+            if (displayWidth > berthWidth)
+            {
+                displayScale *= berthWidth / Mathf.Max(0.01f, displayWidth);
+            }
+        }
+
+        preview.transform.SetPositionAndRotation(berthPosition, berthRotation);
+        preview.transform.localScale = Vector3.one * Mathf.Max(0.001f, displayScale);
+        SetActiveIfNotNull(preview.transform, true);
+    }
+
+    private bool TryBuildPortDockShipAuthoredModel(
+        Transform root,
+        ShipTreeEntryConfig ship,
+        DockedDevelopmentShipState slot,
+        Color color,
+        out Vector3 localBoundsSize,
+        out int generatedWeaponVisualCount)
+    {
+        localBoundsSize = Vector3.zero;
+        generatedWeaponVisualCount = 0;
+        if (root == null || ship == null || string.IsNullOrWhiteSpace(ship.visualModelId))
+        {
+            return false;
+        }
+
+        GameObject prefab = LoadPortDockShipModelPrefab(ship.visualModelId);
+        if (prefab == null)
+        {
+            return false;
+        }
+
+        GameObject model = Instantiate(prefab, root);
+        model.name = ship.visualModelId + "_PortPreview";
+        model.transform.localPosition = Vector3.zero;
+        model.transform.localRotation = Quaternion.identity;
+        model.transform.localScale = Vector3.one;
+        DisablePortPreviewColliders(model.transform);
+        generatedWeaponVisualCount = ApplyPortDockImportedModelLoadoutVisibility(model.transform, ship, slot);
+
+        if (!TryCenterPortPreviewChildrenToLocalBounds(root, out Bounds bounds))
+        {
+            DestroyPortPreviewObject(model);
+            return false;
+        }
+
+        localBoundsSize = bounds.size;
+        return localBoundsSize.x > 0.01f && localBoundsSize.z > 0.01f;
+    }
+
+    private string BuildPortDockLoadoutSignature(ShipTreeEntryConfig ship, DockedDevelopmentShipState slot)
+    {
+        if (ship == null || slot == null || !slot.HasShip)
+        {
+            return "";
+        }
+
+        EnsurePortDockLoadoutDefaults(slot);
+        return "hull=" + NormalizePortDockPackageId(slot.GetLoadoutPackageId("hull"))
+            + "|power=" + NormalizePortDockPackageId(slot.GetLoadoutPackageId("power"))
+            + "|citadel=" + NormalizePortDockPackageId(slot.GetLoadoutPackageId("citadel"))
+            + "|main=" + NormalizePortDockPackageId(slot.GetLoadoutPackageId("main"))
+            + "|secondary=" + NormalizePortDockPackageId(slot.GetLoadoutPackageId("secondary"))
+            + "|small=" + NormalizePortDockPackageId(slot.GetLoadoutPackageId("small"))
+            + "|auxiliary=" + NormalizePortDockPackageId(slot.GetLoadoutPackageId("auxiliary"));
+    }
+
+    private void EnsurePortDockLoadoutDefaults(DockedDevelopmentShipState slot)
+    {
+        if (meta == null || slot == null || !slot.HasShip)
+        {
+            return;
+        }
+
+        meta.GetDevelopmentDockLoadoutSlotsForUi(slot.slotIndex);
+    }
+
+    private static bool TryCenterPortPreviewChildrenToLocalBounds(Transform root, out Bounds bounds)
+    {
+        bounds = default;
+        if (root == null || !TryCalculateLocalRendererBounds(root, out bounds))
+        {
+            return false;
+        }
+
+        Vector3 offset = new Vector3(-bounds.center.x, -bounds.min.y, -bounds.center.z);
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (child != null)
+            {
+                child.localPosition += offset;
+            }
+        }
+
+        return TryCalculateLocalRendererBounds(root, out bounds);
+    }
+
+    private static int ApplyPortDockImportedModelLoadoutVisibility(Transform modelRoot, ShipTreeEntryConfig ship, DockedDevelopmentShipState slot)
+    {
+        if (!IsKorshunPreviewShip(ship) || modelRoot == null || slot == null)
+        {
+            return 0;
+        }
+
+        int generatedWeaponVisualCount = ApplyPortDockKorshunMainLoadoutVisual(modelRoot, slot);
+        generatedWeaponVisualCount += ApplyPortDockKorshunAuxiliaryLoadoutVisual(modelRoot, slot);
+        return generatedWeaponVisualCount;
+    }
+
+    private static int ApplyPortDockKorshunMainLoadoutVisual(Transform modelRoot, DockedDevelopmentShipState slot)
+    {
+        string mainPackageId = NormalizePortDockPackageId(slot.GetLoadoutPackageId("main"));
+        if (!TryResolvePortDockKorshunMainVisualSpec(mainPackageId, out PortDockKorshunWeaponVisualSpec spec))
+        {
+            return 0;
+        }
+
+        HidePortDockKorshunAuthoredMainWeapons(modelRoot);
+        int shown = ShowPortDockKorshunAuthoredMainWeapon(modelRoot, spec);
+        return shown;
+    }
+
+    private static bool TryResolvePortDockKorshunMainVisualSpec(string packageId, out PortDockKorshunWeaponVisualSpec spec)
+    {
+        string normalizedId = NormalizePortDockPackageId(packageId);
+        if (string.IsNullOrWhiteSpace(normalizedId))
+        {
+            normalizedId = "korshun_main_76mm_twin";
+        }
+
+        if (normalizedId.Contains("37mm_mg_aura"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Turret_30mm_Single_Fore",
+                    "WW_Turret_30mm_Single",
+                    "Korshun_Base_M_76mm_Fore",
+                    0f,
+                    1f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Turret_30mm_Single_Aft",
+                    "WW_Turret_30mm_Single",
+                    "Korshun_Base_M_76mm_Aft",
+                    0f,
+                    1f));
+            return true;
+        }
+
+        if (normalizedId.Contains("57mm_triple_autocannon"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Autocannon_57mm_Triple_Fore",
+                    "WW_Turret_30mm_Single",
+                    "Korshun_Base_M_76mm_Fore",
+                    0f,
+                    1.35f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Autocannon_57mm_Triple_Aft",
+                    "WW_Turret_30mm_Single",
+                    "Korshun_Base_M_76mm_Aft",
+                    0f,
+                    1.35f));
+            return true;
+        }
+
+        if (normalizedId.Contains("76mm_twin"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Turret_76mm_Twin_Fore",
+                    "WW_Turret_76mm_Twin",
+                    "Korshun_Base_M_76mm_Fore",
+                    0f,
+                    1f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Turret_76mm_Twin_Aft",
+                    "WW_Turret_76mm_Twin",
+                    "Korshun_Base_M_76mm_Aft",
+                    0f,
+                    1f));
+            return true;
+        }
+
+        if (normalizedId.Contains("100mm_single"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Turret_100mm_Single_Fore",
+                    "WW_Turret_100mm_Single",
+                    "Korshun_Base_M_76mm_Fore",
+                    0f,
+                    1f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Turret_100mm_Single_Aft",
+                    "WW_Turret_100mm_Single",
+                    "Korshun_Base_M_76mm_Aft",
+                    0f,
+                    1f));
+            return true;
+        }
+
+        if (normalizedId.Contains("nurs_turret"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_RocketLauncher_Pod_Fore",
+                    "WW_Turret_RocketLauncher_Pod",
+                    "Korshun_Base_M_76mm_Fore",
+                    0f,
+                    1.2f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_RocketLauncher_Pod_Aft",
+                    "WW_Turret_RocketLauncher_Pod",
+                    "Korshun_Base_M_76mm_Aft",
+                    0f,
+                    1.2f));
+            return true;
+        }
+
+        if (normalizedId.Contains("200mm_mortar"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Mortar_200mm_Fore",
+                    "WW_Turret_200mm_Mortar",
+                    "Korshun_Base_M_76mm_Fore",
+                    0f,
+                    0.95f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortPreview_Mortar_200mm_Aft",
+                    "WW_Turret_200mm_Mortar",
+                    "Korshun_Base_M_76mm_Aft",
+                    0f,
+                    0.95f));
+            return true;
+        }
+
+        spec = default;
+        return false;
+    }
+
+    private static void HidePortDockKorshunAuthoredMainWeapons(Transform modelRoot)
+    {
+        SetDescendantActiveByNameContains(modelRoot, "Korshun_Turret_76mm_Twin", false);
+        SetDescendantActiveByNameContains(modelRoot, "Korshun_Autocannon_57mm_Triple", false);
+        SetDescendantActiveByNameContains(modelRoot, "Korshun_RocketLauncher_Pod_Preview", false);
+        SetDescendantActiveByNameContains(modelRoot, "Korshun_30mmSingle_Preview", false);
+        SetDescendantActiveByNameContains(modelRoot, "Korshun_100mm_Single_Blockout", false);
+        DestroyDescendantsByNameContains(modelRoot, "Korshun_PortPreview_");
+    }
+
+    private static int ShowPortDockKorshunAuthoredMainWeapon(Transform modelRoot, PortDockKorshunWeaponVisualSpec spec)
+    {
+        if (modelRoot == null)
+        {
+            return 0;
+        }
+
+        int shown = 0;
+        PortDockKorshunWeaponPlacement[] placements = spec.placements;
+        for (int i = 0; i < placements.Length; i++)
+        {
+            if (TryShowPortDockKorshunWeaponPlacement(modelRoot, placements[i]))
+            {
+                shown++;
+            }
+        }
+
+        return shown;
+    }
+
+    private static int ApplyPortDockKorshunAuxiliaryLoadoutVisual(Transform modelRoot, DockedDevelopmentShipState slot)
+    {
+        if (modelRoot == null || slot == null)
+        {
+            return 0;
+        }
+
+        HidePortDockKorshunAuxiliaryWeapons(modelRoot);
+        string auxiliaryPackageId = NormalizePortDockPackageId(slot.GetLoadoutPackageId("auxiliary"));
+        if (!TryResolvePortDockKorshunAuxiliaryVisualSpec(auxiliaryPackageId, out PortDockKorshunWeaponVisualSpec spec))
+        {
+            return 0;
+        }
+
+        int shown = 0;
+        PortDockKorshunWeaponPlacement[] placements = spec.placements;
+        for (int i = 0; i < placements.Length; i++)
+        {
+            if (TryShowPortDockKorshunWeaponPlacement(modelRoot, placements[i]))
+            {
+                shown++;
+            }
+        }
+
+        return shown;
+    }
+
+    private static bool TryResolvePortDockKorshunAuxiliaryVisualSpec(string packageId, out PortDockKorshunWeaponVisualSpec spec)
+    {
+        string normalizedId = NormalizePortDockPackageId(packageId);
+        if (string.IsNullOrWhiteSpace(normalizedId))
+        {
+            normalizedId = "korshun_aux_torpedo_triple_side";
+        }
+
+        if (normalizedId.Contains("torpedo_triple_side"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_TorpedoLauncher_3Tube_Left",
+                    "WW_Turret_TorpedoLauncher_3Tube",
+                    "Korshun_Base_S_Torpedo_Left",
+                    0f,
+                    1f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_TorpedoLauncher_3Tube_Right",
+                    "WW_Turret_TorpedoLauncher_3Tube",
+                    "Korshun_Base_S_Torpedo_Right",
+                    0f,
+                    1f));
+            return true;
+        }
+
+        if (normalizedId.Contains("side_nurs"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_RocketLauncher_Pod_Left",
+                    "WW_Turret_RocketLauncher_Pod",
+                    "Korshun_Base_S_Torpedo_Left",
+                    0f,
+                    1.05f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_RocketLauncher_Pod_Right",
+                    "WW_Turret_RocketLauncher_Pod",
+                    "Korshun_Base_S_Torpedo_Right",
+                    0f,
+                    1.05f));
+            return true;
+        }
+
+        if (normalizedId.Contains("harpoon"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.HarpoonPlaceholder(
+                    "Korshun_PortAuxPreview_HarpoonCannon_Left",
+                    "Korshun_Base_S_Torpedo_Left",
+                    -90f,
+                    1f),
+                PortDockKorshunWeaponPlacement.HarpoonPlaceholder(
+                    "Korshun_PortAuxPreview_HarpoonCannon_Right",
+                    "Korshun_Base_S_Torpedo_Right",
+                    90f,
+                    1f));
+            return true;
+        }
+
+        if (normalizedId.Contains("magnet"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_Magnet_Left",
+                    "WW_Turret_Magnet_Single",
+                    "Korshun_Base_S_Torpedo_Left",
+                    0f,
+                    0.9f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_Magnet_Right",
+                    "WW_Turret_Magnet_Single",
+                    "Korshun_Base_S_Torpedo_Right",
+                    0f,
+                    0.9f));
+            return true;
+        }
+
+        if (normalizedId.Contains("siphon"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_GasSiphon_Left",
+                    "WW_Turret_GasSiphon_Single",
+                    "Korshun_Base_S_Torpedo_Left",
+                    0f,
+                    0.82f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_GasSiphon_Right",
+                    "WW_Turret_GasSiphon_Single",
+                    "Korshun_Base_S_Torpedo_Right",
+                    0f,
+                    0.82f));
+            return true;
+        }
+
+        if (normalizedId.Contains("repair_beam"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_RepairBeam_Left",
+                    "WW_Turret_RepairBeam_Single",
+                    "Korshun_Base_S_Torpedo_Left",
+                    0f,
+                    0.8f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_RepairBeam_Right",
+                    "WW_Turret_RepairBeam_Single",
+                    "Korshun_Base_S_Torpedo_Right",
+                    0f,
+                    0.8f));
+            return true;
+        }
+
+        if (normalizedId.Contains("scanner_hacker"))
+        {
+            spec = new PortDockKorshunWeaponVisualSpec(
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_HackingDish_Left",
+                    "WW_Turret_HackingDish_Single",
+                    "Korshun_Base_S_Torpedo_Left",
+                    0f,
+                    0.68f),
+                PortDockKorshunWeaponPlacement.Equipment(
+                    "Korshun_PortAuxPreview_HackingDish_Right",
+                    "WW_Turret_HackingDish_Single",
+                    "Korshun_Base_S_Torpedo_Right",
+                    0f,
+                    0.68f));
+            return true;
+        }
+
+        spec = default;
+        return false;
+    }
+
+    private static void HidePortDockKorshunAuxiliaryWeapons(Transform modelRoot)
+    {
+        SetDescendantActiveByNameContains(modelRoot, "Korshun_TorpedoLauncher_3Tube", false);
+        DestroyDescendantsByNameContains(modelRoot, "Korshun_PortAuxPreview_");
+        DestroyDescendantsByNameContains(modelRoot, "ColorBeam_");
+    }
+
+    private static bool IsPortDockKorshunMainWeaponMounted(Transform previewRoot, DockedDevelopmentShipState slot)
+    {
+        if (previewRoot == null || slot == null)
+        {
+            return false;
+        }
+
+        string mainPackageId = NormalizePortDockPackageId(slot.GetLoadoutPackageId("main"));
+        if (!TryResolvePortDockKorshunMainVisualSpec(mainPackageId, out PortDockKorshunWeaponVisualSpec spec))
+        {
+            return false;
+        }
+
+        return IsPortDockKorshunPlacementSetMounted(previewRoot, spec, 2);
+    }
+
+    private static bool IsPortDockKorshunAuxiliaryWeaponMounted(Transform previewRoot, DockedDevelopmentShipState slot)
+    {
+        if (previewRoot == null || slot == null)
+        {
+            return false;
+        }
+
+        string auxiliaryPackageId = NormalizePortDockPackageId(slot.GetLoadoutPackageId("auxiliary"));
+        if (!TryResolvePortDockKorshunAuxiliaryVisualSpec(auxiliaryPackageId, out PortDockKorshunWeaponVisualSpec spec))
+        {
+            return false;
+        }
+
+        return IsPortDockKorshunPlacementSetMounted(previewRoot, spec, 2);
+    }
+
+    private static bool IsPortDockKorshunPlacementSetMounted(
+        Transform previewRoot,
+        PortDockKorshunWeaponVisualSpec spec,
+        int minimumMountedCount)
+    {
+        int mountedCount = 0;
+        bool mounted = true;
+        PortDockKorshunWeaponPlacement[] placements = spec.placements;
+        if (placements == null || placements.Length == 0)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < placements.Length; i++)
+        {
+            mounted &= IsPortDockKorshunWeaponObjectMounted(
+                previewRoot,
+                placements[i].instanceObjectName,
+                placements[i].targetMountName,
+                ref mountedCount);
+        }
+
+        return mounted && mountedCount >= minimumMountedCount;
+    }
+
+    private static bool IsPortDockKorshunLoadoutVisualsClean(Transform root, DockedDevelopmentShipState slot)
+    {
+        if (root == null || slot == null)
+        {
+            return false;
+        }
+
+        string mainPackageId = NormalizePortDockPackageId(slot.GetLoadoutPackageId("main"));
+        string auxiliaryPackageId = NormalizePortDockPackageId(slot.GetLoadoutPackageId("auxiliary"));
+        int mainPreviewCount = CountActiveDescendantsByNameContains(root, "Korshun_PortPreview_");
+        int auxiliaryPreviewCount = CountActiveDescendantsByNameContains(root, "Korshun_PortAuxPreview_");
+        int oldBlockoutCount = CountActiveDescendantsByNameContains(root, "Korshun_100mm_Single_Blockout");
+        int authoredTorpedoCount = CountActiveDescendantsByNameContains(root, "Korshun_TorpedoLauncher_3Tube");
+        int utilityPreviewBeamCount = CountActiveDescendantsByNameContains(root, "ColorBeam_");
+        bool mainMapped = TryResolvePortDockKorshunMainVisualSpec(mainPackageId, out _);
+        bool auxiliaryMapped = TryResolvePortDockKorshunAuxiliaryVisualSpec(auxiliaryPackageId, out PortDockKorshunWeaponVisualSpec auxiliarySpec);
+        bool mainPairSeparated = mainMapped
+            && TryResolvePortDockKorshunMainVisualSpec(mainPackageId, out PortDockKorshunWeaponVisualSpec mainSpec)
+            && IsPortDockKorshunPreviewPairSeparated(root, mainSpec, false);
+        bool auxiliaryPairSeparated = auxiliaryMapped
+            && IsPortDockKorshunPreviewPairSeparated(root, auxiliarySpec, true);
+        bool magnetOk = true;
+        if (auxiliaryPackageId.Contains("magnet"))
+        {
+            magnetOk = CountActiveDescendantsByNameContains(root, "Korshun_PortAuxPreview_Magnet_Left") == 1
+                && CountActiveDescendantsByNameContains(root, "Korshun_PortAuxPreview_Magnet_Right") == 1;
+        }
+
+        return mainMapped
+            && auxiliaryMapped
+            && mainPreviewCount == 2
+            && auxiliaryPreviewCount == 2
+            && mainPairSeparated
+            && auxiliaryPairSeparated
+            && oldBlockoutCount == 0
+            && authoredTorpedoCount == 0
+            && utilityPreviewBeamCount == 0
+            && magnetOk;
+    }
+
+    private static string BuildPortDockKorshunLoadoutVisualCleanDetails(Transform root, DockedDevelopmentShipState slot)
+    {
+        if (root == null || slot == null)
+        {
+            return "root or slot missing";
+        }
+
+        string mainPackageId = NormalizePortDockPackageId(slot.GetLoadoutPackageId("main"));
+        string auxiliaryPackageId = NormalizePortDockPackageId(slot.GetLoadoutPackageId("auxiliary"));
+        return "main="
+            + mainPackageId
+            + ", aux="
+            + auxiliaryPackageId
+            + ", mainPreview="
+            + CountActiveDescendantsByNameContains(root, "Korshun_PortPreview_")
+            + ", auxPreview="
+            + CountActiveDescendantsByNameContains(root, "Korshun_PortAuxPreview_")
+            + ", old100mmBlockout="
+            + CountActiveDescendantsByNameContains(root, "Korshun_100mm_Single_Blockout")
+            + ", authoredTorpedoes="
+            + CountActiveDescendantsByNameContains(root, "Korshun_TorpedoLauncher_3Tube")
+            + ", colorBeams="
+            + CountActiveDescendantsByNameContains(root, "ColorBeam_")
+            + ", magnetLeft="
+            + CountActiveDescendantsByNameContains(root, "Korshun_PortAuxPreview_Magnet_Left")
+            + ", magnetRight="
+            + CountActiveDescendantsByNameContains(root, "Korshun_PortAuxPreview_Magnet_Right")
+            + ", mainPairSeparated="
+            + (TryResolvePortDockKorshunMainVisualSpec(mainPackageId, out PortDockKorshunWeaponVisualSpec mainSpec)
+                && IsPortDockKorshunPreviewPairSeparated(root, mainSpec, false))
+            + ", auxPairSeparated="
+            + (TryResolvePortDockKorshunAuxiliaryVisualSpec(auxiliaryPackageId, out PortDockKorshunWeaponVisualSpec auxiliarySpec)
+                && IsPortDockKorshunPreviewPairSeparated(root, auxiliarySpec, true))
+            + ".";
+    }
+
+    private static bool IsPortDockKorshunPreviewPairSeparated(
+        Transform root,
+        PortDockKorshunWeaponVisualSpec spec,
+        bool sideBySide)
+    {
+        if (root == null || spec.placements == null || spec.placements.Length < 2)
+        {
+            return false;
+        }
+
+        Transform first = FindDescendantByExactName(root, spec.placements[0].instanceObjectName);
+        Transform second = FindDescendantByExactName(root, spec.placements[1].instanceObjectName);
+        if (first == null
+            || second == null
+            || !first.gameObject.activeInHierarchy
+            || !second.gameObject.activeInHierarchy
+            || !TryCalculatePortDockModuleMountBoundsInSpace(first, root, out Bounds firstBounds)
+            || !TryCalculatePortDockModuleMountBoundsInSpace(second, root, out Bounds secondBounds))
+        {
+            return false;
+        }
+
+        const float minimumSeparation = 0.08f;
+        if (sideBySide)
+        {
+            return Mathf.Abs(firstBounds.center.x - secondBounds.center.x) > minimumSeparation;
+        }
+
+        return Mathf.Abs(firstBounds.center.z - secondBounds.center.z) > minimumSeparation;
+    }
+
+    private static string BuildPortDockKorshunPlacementMountDetails(Transform root, PortDockKorshunWeaponVisualSpec spec)
+    {
+        if (root == null)
+        {
+            return "root missing";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        PortDockKorshunWeaponPlacement[] placements = spec.placements;
+        if (placements == null || placements.Length == 0)
+        {
+            return "placements empty";
+        }
+
+        for (int i = 0; i < placements.Length; i++)
+        {
+            PortDockKorshunWeaponPlacement placement = placements[i];
+            Transform weapon = FindDescendantByExactName(root, placement.instanceObjectName);
+            Transform mount = FindDescendantByExactName(root, placement.targetMountName);
+            Bounds weaponBounds = default;
+            Bounds mountBounds = default;
+            bool weaponBoundsOk = weapon != null && TryCalculatePortDockModuleMountBoundsInSpace(weapon, root, out weaponBounds);
+            bool mountBoundsOk = mount != null && TryCalculateRendererBoundsInSpace(mount, root, out mountBounds);
+            bool active = weapon != null && weapon.gameObject.activeInHierarchy;
+            if (i > 0)
+            {
+                builder.Append(" | ");
+            }
+
+            builder.Append(placement.instanceObjectName)
+                .Append(": weapon=")
+                .Append(weapon != null)
+                .Append(", active=")
+                .Append(active)
+                .Append(", mount=")
+                .Append(mount != null)
+                .Append(", wb=")
+                .Append(weaponBoundsOk)
+                .Append(", mb=")
+                .Append(mountBoundsOk);
+            if (weaponBoundsOk && mountBoundsOk)
+            {
+                builder.Append(", wc=")
+                    .Append(FormatVector3ForTests(weaponBounds.center))
+                    .Append(", ws=")
+                    .Append(FormatVector3ForTests(weaponBounds.size))
+                    .Append(", mc=")
+                    .Append(FormatVector3ForTests(mountBounds.center))
+                    .Append(", ms=")
+                    .Append(FormatVector3ForTests(mountBounds.size));
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static string FormatVector3ForTests(Vector3 value)
+    {
+        return "("
+            + value.x.ToString("0.##")
+            + ","
+            + value.y.ToString("0.##")
+            + ","
+            + value.z.ToString("0.##")
+            + ")";
+    }
+
+    private static bool IsPortDockKorshunWeaponObjectMounted(
+        Transform root,
+        string weaponObjectName,
+        string mountObjectName,
+        ref int mountedCount)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(weaponObjectName) || string.IsNullOrWhiteSpace(mountObjectName))
+        {
+            return true;
+        }
+
+        Transform weapon = FindDescendantByExactName(root, weaponObjectName);
+        if (weapon == null || !weapon.gameObject.activeInHierarchy)
+        {
+            return true;
+        }
+
+        Transform mount = FindDescendantByExactName(root, mountObjectName);
+        if (mount == null
+            || !TryCalculatePortDockModuleMountBoundsInSpace(weapon, root, out Bounds weaponBounds)
+            || !TryCalculateRendererBoundsInSpace(mount, root, out Bounds mountBounds))
+        {
+            return false;
+        }
+
+        mountedCount++;
+        float xLimit = mountBounds.extents.x + weaponBounds.extents.x + 0.55f;
+        float zLimit = mountBounds.extents.z + weaponBounds.extents.z + 0.55f;
+        bool closeHorizontally = Mathf.Abs(weaponBounds.center.x - mountBounds.center.x) <= xLimit
+            && Mathf.Abs(weaponBounds.center.z - mountBounds.center.z) <= zLimit;
+        float sinkTolerance = Mathf.Max(0.75f, mountBounds.size.y * 0.5f);
+        float floatTolerance = Mathf.Max(0.75f, weaponBounds.size.y * 0.35f);
+        bool closeVertically = weaponBounds.max.y >= mountBounds.max.y - sinkTolerance
+            && weaponBounds.min.y <= mountBounds.max.y + floatTolerance;
+        return closeHorizontally && closeVertically;
+    }
+
+    private static int CountActiveDescendantsByNameContains(Transform root, string token)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(token))
+        {
+            return 0;
+        }
+
+        int count = 0;
+        Transform[] children = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child == null || child == root || !child.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if ((child.name ?? "").IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool TryShowPortDockKorshunWeaponPlacement(Transform modelRoot, PortDockKorshunWeaponPlacement placement)
+    {
+        if (modelRoot == null || string.IsNullOrWhiteSpace(placement.instanceObjectName))
+        {
+            return false;
+        }
+
+        if (placement.kind == PortDockKorshunWeaponPlacementKind.ExistingAuthored)
+        {
+            return ShowPortDockKorshunExistingWeaponPlacement(
+                modelRoot,
+                placement.instanceObjectName,
+                placement.targetMountName);
+        }
+
+        if (placement.kind == PortDockKorshunWeaponPlacementKind.AuthoredClone)
+        {
+            return TryClonePortDockKorshunAuthoredWeapon(
+                modelRoot,
+                placement.sourceObjectName,
+                placement.sourceMountName,
+                placement.targetMountName,
+                placement.instanceObjectName,
+                placement.yawDegrees);
+        }
+
+        if (placement.kind == PortDockKorshunWeaponPlacementKind.EquipmentPrefab)
+        {
+            return TryCreatePortDockEquipmentWeaponPreview(
+                modelRoot,
+                placement.sourceObjectName,
+                placement.targetMountName,
+                placement.instanceObjectName,
+                placement.yawDegrees,
+                placement.scale);
+        }
+
+        if (placement.kind == PortDockKorshunWeaponPlacementKind.HarpoonPlaceholder)
+        {
+            return TryCreatePortDockHarpoonPlaceholderPreview(
+                modelRoot,
+                placement.targetMountName,
+                placement.instanceObjectName,
+                placement.yawDegrees,
+                placement.scale);
+        }
+
+        return false;
+    }
+
+    private static bool TryClonePortDockKorshunAuthoredWeapon(
+        Transform modelRoot,
+        string sourceObjectName,
+        string sourceMountName,
+        string targetMountName,
+        string cloneName,
+        float yawDegrees)
+    {
+        Transform source = FindDescendantByExactName(modelRoot, sourceObjectName);
+        Transform sourceMount = FindDescendantByExactName(modelRoot, sourceMountName);
+        Transform targetMount = FindDescendantByExactName(modelRoot, targetMountName);
+        if (source == null || sourceMount == null || targetMount == null)
+        {
+            return false;
+        }
+
+        if (!TryCalculateRendererBoundsInSpace(sourceMount, modelRoot, out Bounds sourceMountBounds)
+            || !TryCalculateRendererBoundsInSpace(targetMount, modelRoot, out Bounds targetMountBounds))
+        {
+            return false;
+        }
+
+        Vector3 sourceAnchor = new Vector3(sourceMountBounds.center.x, sourceMountBounds.max.y, sourceMountBounds.center.z);
+        Vector3 targetAnchor = new Vector3(targetMountBounds.center.x, targetMountBounds.max.y, targetMountBounds.center.z);
+        GameObject cloneRoot = new GameObject(string.IsNullOrWhiteSpace(cloneName) ? sourceObjectName + "_Clone" : cloneName);
+        cloneRoot.transform.SetParent(modelRoot, false);
+        cloneRoot.transform.localPosition = Vector3.zero;
+        cloneRoot.transform.localRotation = Quaternion.identity;
+        cloneRoot.transform.localScale = Vector3.one;
+
+        Quaternion yawRotation = Quaternion.Euler(0f, yawDegrees, 0f);
+        Vector3 targetOffset = targetAnchor - sourceAnchor;
+        int rendererCount = 0;
+        MeshFilter[] sourceFilters = source.GetComponentsInChildren<MeshFilter>(true);
+        for (int i = 0; i < sourceFilters.Length; i++)
+        {
+            MeshFilter sourceFilter = sourceFilters[i];
+            if (sourceFilter == null || sourceFilter.sharedMesh == null)
+            {
+                continue;
+            }
+
+            MeshRenderer sourceRenderer = sourceFilter.GetComponent<MeshRenderer>();
+            if (sourceRenderer == null)
+            {
+                continue;
+            }
+
+            GameObject child = new GameObject(sourceFilter.gameObject.name);
+            child.transform.SetParent(cloneRoot.transform, false);
+            child.transform.localPosition = Vector3.zero;
+            child.transform.localRotation = Quaternion.identity;
+            child.transform.localScale = Vector3.one;
+
+            Mesh sourceMesh = sourceFilter.sharedMesh;
+            Mesh cloneMesh = Instantiate(sourceMesh);
+            cloneMesh.name = cloneRoot.name + "_" + sourceMesh.name;
+
+            Vector3[] vertices = sourceMesh.vertices;
+            for (int vertexIndex = 0; vertexIndex < vertices.Length; vertexIndex++)
+            {
+                Vector3 rootVertex = modelRoot.InverseTransformPoint(sourceFilter.transform.TransformPoint(vertices[vertexIndex]));
+                vertices[vertexIndex] = sourceAnchor + yawRotation * (rootVertex - sourceAnchor) + targetOffset;
+            }
+
+            cloneMesh.vertices = vertices;
+
+            Vector3[] sourceNormals = sourceMesh.normals;
+            if (sourceNormals != null && sourceNormals.Length == vertices.Length)
+            {
+                Vector3[] normals = new Vector3[sourceNormals.Length];
+                for (int normalIndex = 0; normalIndex < sourceNormals.Length; normalIndex++)
+                {
+                    Vector3 rootNormal = modelRoot.InverseTransformDirection(sourceFilter.transform.TransformDirection(sourceNormals[normalIndex]));
+                    normals[normalIndex] = (yawRotation * rootNormal).normalized;
+                }
+
+                cloneMesh.normals = normals;
+            }
+
+            Vector4[] sourceTangents = sourceMesh.tangents;
+            if (sourceTangents != null && sourceTangents.Length == vertices.Length)
+            {
+                Vector4[] tangents = new Vector4[sourceTangents.Length];
+                for (int tangentIndex = 0; tangentIndex < sourceTangents.Length; tangentIndex++)
+                {
+                    Vector4 sourceTangent = sourceTangents[tangentIndex];
+                    Vector3 rootTangent = modelRoot.InverseTransformDirection(sourceFilter.transform.TransformDirection(new Vector3(sourceTangent.x, sourceTangent.y, sourceTangent.z)));
+                    Vector3 rotatedTangent = (yawRotation * rootTangent).normalized;
+                    tangents[tangentIndex] = new Vector4(rotatedTangent.x, rotatedTangent.y, rotatedTangent.z, sourceTangent.w);
+                }
+
+                cloneMesh.tangents = tangents;
+            }
+
+            cloneMesh.RecalculateBounds();
+
+            MeshFilter cloneFilter = child.AddComponent<MeshFilter>();
+            cloneFilter.sharedMesh = cloneMesh;
+            MeshRenderer cloneRenderer = child.AddComponent<MeshRenderer>();
+            cloneRenderer.sharedMaterials = sourceRenderer.sharedMaterials;
+            cloneRenderer.shadowCastingMode = sourceRenderer.shadowCastingMode;
+            cloneRenderer.receiveShadows = sourceRenderer.receiveShadows;
+            cloneRenderer.lightProbeUsage = sourceRenderer.lightProbeUsage;
+            cloneRenderer.reflectionProbeUsage = sourceRenderer.reflectionProbeUsage;
+            rendererCount++;
+        }
+
+        if (rendererCount <= 0)
+        {
+            DestroyPortPreviewObject(cloneRoot);
+            return false;
+        }
+
+        cloneRoot.SetActive(true);
+        return true;
+    }
+
+    private static bool ShowPortDockKorshunExistingWeaponPlacement(
+        Transform modelRoot,
+        string objectName,
+        string targetMountName)
+    {
+        Transform weapon = FindDescendantByExactName(modelRoot, objectName);
+        if (weapon == null)
+        {
+            return false;
+        }
+
+        SetGameObjectTreeActive(weapon, true);
+
+        Transform targetMount = FindDescendantByExactName(modelRoot, targetMountName);
+        if (targetMount == null
+            || !TryCalculateRendererBoundsInSpace(targetMount, modelRoot, out Bounds targetMountBounds)
+            || !TryCalculatePortDockModuleMountBoundsInSpace(weapon, modelRoot, out Bounds weaponBounds))
+        {
+            return true;
+        }
+
+        Vector3 targetAnchor = new Vector3(targetMountBounds.center.x, targetMountBounds.max.y, targetMountBounds.center.z);
+        Vector3 weaponAnchor = new Vector3(weaponBounds.center.x, weaponBounds.min.y, weaponBounds.center.z);
+        weapon.position += modelRoot.TransformVector(targetAnchor - weaponAnchor);
+        return true;
+    }
+
+    private static bool TryCreatePortDockEquipmentWeaponPreview(
+        Transform modelRoot,
+        string equipmentModelId,
+        string targetMountName,
+        string instanceName,
+        float yawDegrees,
+        float scale)
+    {
+        if (modelRoot == null || string.IsNullOrWhiteSpace(equipmentModelId) || string.IsNullOrWhiteSpace(targetMountName))
+        {
+            return false;
+        }
+
+        Transform targetMount = FindDescendantByExactName(modelRoot, targetMountName);
+        GameObject prefab = LoadPortDockEquipmentModelPrefab(equipmentModelId);
+        if (targetMount == null || prefab == null)
+        {
+            return false;
+        }
+
+        GameObject module = Instantiate(prefab, modelRoot);
+        module.name = string.IsNullOrWhiteSpace(instanceName) ? equipmentModelId + "_PortPreview" : instanceName;
+        module.transform.localPosition = Vector3.zero;
+        module.transform.localRotation = Quaternion.Euler(0f, yawDegrees, 0f);
+        module.transform.localScale = Vector3.one * Mathf.Max(0.001f, scale);
+        DisablePortPreviewColliders(module.transform);
+        module.SetActive(true);
+
+        if (!TryCalculateRendererBoundsInSpace(targetMount, modelRoot, out Bounds targetMountBounds)
+            || !TryCalculateRendererBoundsInSpace(module.transform, modelRoot, out Bounds moduleBounds))
+        {
+            DestroyPortPreviewObject(module);
+            return false;
+        }
+
+        Vector3 targetAnchor = new Vector3(targetMountBounds.center.x, targetMountBounds.max.y, targetMountBounds.center.z);
+        Vector3 moduleAnchor = new Vector3(moduleBounds.center.x, moduleBounds.min.y, moduleBounds.center.z);
+        module.transform.localPosition += targetAnchor - moduleAnchor;
+        return true;
+    }
+
+    private static bool TryCreatePortDockHarpoonPlaceholderPreview(
+        Transform modelRoot,
+        string targetMountName,
+        string instanceName,
+        float yawDegrees,
+        float scale)
+    {
+        if (modelRoot == null || string.IsNullOrWhiteSpace(targetMountName))
+        {
+            return false;
+        }
+
+        Transform targetMount = FindDescendantByExactName(modelRoot, targetMountName);
+        if (targetMount == null)
+        {
+            return false;
+        }
+
+        GameObject module = CreatePortDockHarpoonPlaceholderObject(instanceName, yawDegrees, scale);
+        module.transform.SetParent(modelRoot, false);
+        module.transform.localPosition = Vector3.zero;
+        if (!TryCalculateRendererBoundsInSpace(targetMount, modelRoot, out Bounds targetMountBounds)
+            || !TryCalculateRendererBoundsInSpace(module.transform, modelRoot, out Bounds moduleBounds))
+        {
+            DestroyPortPreviewObject(module);
+            return false;
+        }
+
+        Vector3 targetAnchor = new Vector3(targetMountBounds.center.x, targetMountBounds.max.y, targetMountBounds.center.z);
+        Vector3 moduleAnchor = new Vector3(moduleBounds.center.x, moduleBounds.min.y, moduleBounds.center.z);
+        module.transform.localPosition += targetAnchor - moduleAnchor;
+        return true;
+    }
+
+    private static GameObject CreatePortDockHarpoonPlaceholderObject(string instanceName, float yawDegrees, float scale)
+    {
+        GameObject module = new GameObject(string.IsNullOrWhiteSpace(instanceName) ? "Korshun_PortAuxPreview_HarpoonCannon" : instanceName);
+        module.transform.localRotation = Quaternion.Euler(0f, yawDegrees, 0f);
+        module.transform.localScale = Vector3.one * Mathf.Max(0.001f, scale);
+
+        Material darkMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(new Color(0.14f, 0.22f, 0.24f, 1f), 1.45f);
+        Material boltMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(new Color(0.54f, 0.84f, 0.94f, 1f), 1.95f);
+        CreatePortDockHarpoonPrimitive(module.transform, "Harpoon Carriage", new Vector3(0f, 0f, 0f), new Vector3(5.2f, 2.8f, 6.8f), darkMaterial);
+        CreatePortDockHarpoonPrimitive(module.transform, "Harpoon Pressure Barrel", new Vector3(0f, 1.65f, 4.4f), new Vector3(1.65f, 1.45f, 11.5f), darkMaterial);
+        CreatePortDockHarpoonPrimitive(module.transform, "Harpoon Cable Drum", new Vector3(0f, 1.25f, -2.6f), new Vector3(4.4f, 2.0f, 2.3f), darkMaterial);
+        CreatePortDockHarpoonPrimitive(module.transform, "Loaded Harpoon Bolt", new Vector3(0f, 2.05f, 10.1f), new Vector3(0.62f, 0.62f, 5.4f), boltMaterial);
+        DisablePortPreviewColliders(module.transform);
+        module.SetActive(true);
+        return module;
+    }
+
+    private static void CreatePortDockHarpoonPrimitive(
+        Transform parent,
+        string name,
+        Vector3 localPosition,
+        Vector3 localScale,
+        Material material)
+    {
+        GameObject primitive = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        primitive.name = name;
+        primitive.transform.SetParent(parent, false);
+        primitive.transform.localPosition = localPosition;
+        primitive.transform.localScale = localScale;
+        Renderer renderer = primitive.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+    }
+
+    private static void DecoratePortDockUtilityBeamPreview(Transform module, string equipmentModelId)
+    {
+        if (module == null || string.IsNullOrWhiteSpace(equipmentModelId))
+        {
+            return;
+        }
+
+        string normalizedId = equipmentModelId.Trim().ToLowerInvariant();
+        CoreTacticalUtilityBeamPalette palette;
+        if (normalizedId.Contains("magnet"))
+        {
+            palette = CoreTacticalUtilityBeamPalette.Magnet;
+        }
+        else if (normalizedId.Contains("repairbeam") || normalizedId.Contains("repair_beam"))
+        {
+            palette = CoreTacticalUtilityBeamPalette.Repair;
+        }
+        else if (normalizedId.Contains("hackingdish") || normalizedId.Contains("scanner"))
+        {
+            palette = CoreTacticalUtilityBeamPalette.Scanner;
+        }
+        else
+        {
+            return;
+        }
+
+        if (!TryCalculateRendererBoundsInSpace(module, module, out Bounds localBounds))
+        {
+            return;
+        }
+
+        CoreTacticalUtilityBeamVisual.ResolvePalette(palette, out Color startColor, out Color middleColor, out Color endColor);
+        Material beamMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(middleColor);
+        float width = Mathf.Clamp(Mathf.Max(localBounds.size.x, localBounds.size.z) * 0.035f, 0.035f, 0.16f);
+        float length = Mathf.Clamp(Mathf.Max(localBounds.size.x, localBounds.size.z) * 1.25f, 0.75f, 3.4f);
+        float spread = Mathf.Clamp(localBounds.size.x * 0.22f, 0.04f, 0.42f);
+        float lift = Mathf.Clamp(localBounds.size.y * 0.18f, 0.04f, 0.32f);
+        Vector3 basePoint = new Vector3(localBounds.center.x, localBounds.center.y + lift, localBounds.max.z);
+
+        AddPortDockUtilityBeamPreviewLine(
+            module,
+            "ColorBeam_Core",
+            beamMaterial,
+            basePoint,
+            basePoint + new Vector3(0f, lift * 0.2f, length),
+            width,
+            startColor,
+            middleColor,
+            endColor);
+        AddPortDockUtilityBeamPreviewLine(
+            module,
+            "ColorBeam_Left",
+            beamMaterial,
+            basePoint + new Vector3(-spread, 0f, 0f),
+            basePoint + new Vector3(-spread * 1.35f, lift * 0.65f, length * 0.92f),
+            width * 0.72f,
+            middleColor,
+            endColor,
+            startColor);
+        AddPortDockUtilityBeamPreviewLine(
+            module,
+            "ColorBeam_Right",
+            beamMaterial,
+            basePoint + new Vector3(spread, 0f, 0f),
+            basePoint + new Vector3(spread * 1.35f, -lift * 0.28f, length * 0.92f),
+            width * 0.72f,
+            endColor,
+            startColor,
+            middleColor);
+    }
+
+    private static void AddPortDockUtilityBeamPreviewLine(
+        Transform module,
+        string suffix,
+        Material material,
+        Vector3 start,
+        Vector3 end,
+        float width,
+        Color startColor,
+        Color middleColor,
+        Color endColor)
+    {
+        GameObject lineObject = new GameObject(module.name + "_" + suffix);
+        lineObject.transform.SetParent(module, false);
+        LineRenderer line = lineObject.AddComponent<LineRenderer>();
+        line.sharedMaterial = material;
+        line.useWorldSpace = false;
+        line.positionCount = 3;
+        line.SetPosition(0, start);
+        line.SetPosition(1, Vector3.Lerp(start, end, 0.52f) + Vector3.up * width * 1.25f);
+        line.SetPosition(2, end);
+        line.startWidth = width;
+        line.endWidth = width * 0.32f;
+        line.numCapVertices = 4;
+        line.numCornerVertices = 3;
+        line.colorGradient = BuildPortDockUtilityBeamGradient(startColor, middleColor, endColor);
+        line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        line.receiveShadows = false;
+    }
+
+    private static Gradient BuildPortDockUtilityBeamGradient(Color startColor, Color middleColor, Color endColor)
+    {
+        Gradient gradient = new Gradient();
+        gradient.SetKeys(
+            new[]
+            {
+                new GradientColorKey(startColor, 0f),
+                new GradientColorKey(middleColor, 0.52f),
+                new GradientColorKey(endColor, 1f)
+            },
+            new[]
+            {
+                new GradientAlphaKey(Mathf.Clamp01(startColor.a), 0f),
+                new GradientAlphaKey(Mathf.Clamp01(middleColor.a), 0.52f),
+                new GradientAlphaKey(Mathf.Clamp01(endColor.a), 1f)
+            });
+        return gradient;
+    }
+
+    private static void DestroyDescendantsByNameContains(Transform root, string token)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(token))
+        {
+            return;
+        }
+
+        List<GameObject> targets = new List<GameObject>();
+        Transform[] children = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child == null || child == root)
+            {
+                continue;
+            }
+
+            if ((child.name ?? "").IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                targets.Add(child.gameObject);
+            }
+        }
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            DestroyPortPreviewObject(targets[i]);
+        }
+    }
+
+    private static void SetDescendantActiveByNameContains(Transform root, string token, bool active)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(token))
+        {
+            return;
+        }
+
+        Transform[] children = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child == null || child == root)
+            {
+                continue;
+            }
+
+            if ((child.name ?? "").IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                child.gameObject.SetActive(active);
+            }
+        }
+    }
+
+    private static void SetGameObjectTreeActive(Transform root, bool active)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Transform[] children = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            if (children[i] != null)
+            {
+                children[i].gameObject.SetActive(active);
+            }
+        }
+    }
+
+    private static bool ShowDescendantByExactName(Transform root, string name)
+    {
+        Transform child = FindDescendantByExactName(root, name);
+        if (child == null)
+        {
+            return false;
+        }
+
+        child.gameObject.SetActive(true);
+        return true;
+    }
+
+    private static Transform FindDescendantByExactName(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        Transform[] children = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child == null)
+            {
+                continue;
+            }
+
+            string childName = child.name ?? "";
+            if (string.Equals(childName, name, StringComparison.OrdinalIgnoreCase)
+                || childName.StartsWith(name + ".", StringComparison.OrdinalIgnoreCase))
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsKorshunPreviewShip(ShipTreeEntryConfig ship)
+    {
+        return ship != null
+            && string.Equals(ship.shipId, "capital_patrol_frigate_r02", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizePortDockPackageId(string packageId)
+    {
+        return string.IsNullOrWhiteSpace(packageId) ? "" : packageId.Trim().ToLowerInvariant();
+    }
+
+    private static GameObject LoadPortDockShipModelPrefab(string visualModelId)
+    {
+        string normalizedModelId = string.IsNullOrWhiteSpace(visualModelId) ? "" : visualModelId.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedModelId))
+        {
+            return null;
+        }
+
+        GameObject resourcePrefab = Resources.Load<GameObject>(PortDockShipModelResourceRoot + normalizedModelId);
+        if (resourcePrefab != null)
+        {
+            return resourcePrefab;
+        }
+
+#if UNITY_EDITOR
+        string assetPath = "Assets/ShipImports/Models/BlenderShips/" + normalizedModelId + ".fbx";
+        return AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+#else
+        return null;
+#endif
+    }
+
+    private static GameObject LoadPortDockEquipmentModelPrefab(string equipmentModelId)
+    {
+        string normalizedModelId = string.IsNullOrWhiteSpace(equipmentModelId) ? "" : equipmentModelId.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedModelId))
+        {
+            return null;
+        }
+
+        GameObject resourcePrefab = Resources.Load<GameObject>(PortDockEquipmentModelResourceRoot + normalizedModelId);
+        if (resourcePrefab != null)
+        {
+            return resourcePrefab;
+        }
+
+#if UNITY_EDITOR
+        string assetPath = "Assets/ShipImports/Models/Turrets/" + normalizedModelId + ".fbx";
+        return AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+#else
+        return null;
+#endif
+    }
+
+    private static void DisablePortPreviewColliders(Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+            {
+                DestroyPortPreviewComponent(colliders[i]);
+            }
+        }
+    }
+
+    private static bool TryCalculateLocalRendererBounds(Transform root, out Bounds bounds)
+    {
+        bounds = default;
+        if (root == null)
+        {
+            return false;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool initialized = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            if (!renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Bounds worldBounds = renderer.bounds;
+            Vector3 min = worldBounds.min;
+            Vector3 max = worldBounds.max;
+            Vector3[] corners =
+            {
+                new Vector3(min.x, min.y, min.z),
+                new Vector3(min.x, min.y, max.z),
+                new Vector3(min.x, max.y, min.z),
+                new Vector3(min.x, max.y, max.z),
+                new Vector3(max.x, min.y, min.z),
+                new Vector3(max.x, min.y, max.z),
+                new Vector3(max.x, max.y, min.z),
+                new Vector3(max.x, max.y, max.z)
+            };
+            for (int cornerIndex = 0; cornerIndex < corners.Length; cornerIndex++)
+            {
+                Vector3 localCorner = root.InverseTransformPoint(corners[cornerIndex]);
+                if (!initialized)
+                {
+                    bounds = new Bounds(localCorner, Vector3.zero);
+                    initialized = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(localCorner);
+                }
+            }
+        }
+
+        return initialized;
+    }
+
+    private static bool TryCalculateRendererBoundsInSpace(Transform root, Transform reference, out Bounds bounds)
+    {
+        bounds = default;
+        if (root == null || reference == null)
+        {
+            return false;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool initialized = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Bounds worldBounds = renderer.bounds;
+            Vector3 min = worldBounds.min;
+            Vector3 max = worldBounds.max;
+            Vector3[] corners =
+            {
+                new Vector3(min.x, min.y, min.z),
+                new Vector3(min.x, min.y, max.z),
+                new Vector3(min.x, max.y, min.z),
+                new Vector3(min.x, max.y, max.z),
+                new Vector3(max.x, min.y, min.z),
+                new Vector3(max.x, min.y, max.z),
+                new Vector3(max.x, max.y, min.z),
+                new Vector3(max.x, max.y, max.z)
+            };
+            for (int cornerIndex = 0; cornerIndex < corners.Length; cornerIndex++)
+            {
+                Vector3 localCorner = reference.InverseTransformPoint(corners[cornerIndex]);
+                if (!initialized)
+                {
+                    bounds = new Bounds(localCorner, Vector3.zero);
+                    initialized = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(localCorner);
+                }
+            }
+        }
+
+        return initialized;
+    }
+
+    private static bool TryCalculatePortDockModuleMountBoundsInSpace(Transform root, Transform reference, out Bounds bounds)
+    {
+        bounds = default;
+        if (root == null || reference == null)
+        {
+            return false;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool initialized = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null
+                || !renderer.enabled
+                || !renderer.gameObject.activeInHierarchy
+                || renderer is LineRenderer
+                || (renderer.name ?? "").IndexOf("ColorBeam", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                continue;
+            }
+
+            Bounds worldBounds = renderer.bounds;
+            Vector3 min = worldBounds.min;
+            Vector3 max = worldBounds.max;
+            Vector3[] corners =
+            {
+                new Vector3(min.x, min.y, min.z),
+                new Vector3(min.x, min.y, max.z),
+                new Vector3(min.x, max.y, min.z),
+                new Vector3(min.x, max.y, max.z),
+                new Vector3(max.x, min.y, min.z),
+                new Vector3(max.x, min.y, max.z),
+                new Vector3(max.x, max.y, min.z),
+                new Vector3(max.x, max.y, max.z)
+            };
+            for (int cornerIndex = 0; cornerIndex < corners.Length; cornerIndex++)
+            {
+                Vector3 localCorner = reference.InverseTransformPoint(corners[cornerIndex]);
+                if (!initialized)
+                {
+                    bounds = new Bounds(localCorner, Vector3.zero);
+                    initialized = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(localCorner);
+                }
+            }
+        }
+
+        return initialized;
+    }
+
+    private Vector3 BuildPortDockShipPreviewGeometry(Transform root, ShipTreeEntryConfig ship, Color color, Vector3 size)
+    {
+        string classId = ship != null ? ship.shipClassId : "";
+        Material hullMaterial = CreatePortPreviewMaterial(color);
+        Material deckMaterial = CreatePortPreviewMaterial(Color.Lerp(color, Color.white, 0.18f));
+        Material darkMaterial = CreatePortPreviewMaterial(Color.Lerp(color, Color.black, 0.35f));
+
+        CreatePreviewBox(root, "Hull", new Vector3(0f, size.y * 0.34f, 0f), new Vector3(size.x, size.y * 0.55f, size.z * 0.78f), hullMaterial);
+        CreatePreviewBox(root, "Bow", new Vector3(0f, size.y * 0.36f, size.z * 0.44f), new Vector3(size.x * 0.72f, size.y * 0.46f, size.z * 0.16f), hullMaterial);
+        CreatePreviewBox(root, "Stern", new Vector3(0f, size.y * 0.34f, -size.z * 0.43f), new Vector3(size.x * 0.82f, size.y * 0.48f, size.z * 0.13f), darkMaterial);
+        CreatePreviewBox(root, "Deck House", new Vector3(0f, size.y * 0.82f, -size.z * 0.08f), new Vector3(size.x * 0.42f, size.y * 0.56f, size.z * 0.18f), deckMaterial);
+
+        int turretCount = IsBattleshipClass(classId) ? 3 : IsCruiserClass(classId) ? 2 : 1;
+        for (int i = 0; i < turretCount; i++)
+        {
+            float z = turretCount == 1
+                ? size.z * 0.16f
+                : Mathf.Lerp(size.z * 0.26f, -size.z * 0.28f, i / Mathf.Max(1f, turretCount - 1f));
+            CreatePreviewBox(root, "Turret " + (i + 1).ToString(), new Vector3(0f, size.y * 0.78f, z), new Vector3(size.x * 0.24f, size.y * 0.16f, size.x * 0.24f), darkMaterial);
+            CreatePreviewBox(root, "Barrel " + (i + 1).ToString(), new Vector3(0f, size.y * 0.80f, z + size.x * 0.25f), new Vector3(size.x * 0.055f, size.y * 0.055f, size.x * 0.58f), darkMaterial);
+        }
+
+        return size;
+    }
+
+    private GameObject CreatePreviewBox(Transform parent, string name, Vector3 localPosition, Vector3 localScale, Material material)
+    {
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        box.name = name;
+        box.transform.SetParent(parent, false);
+        box.transform.localPosition = localPosition;
+        box.transform.localRotation = Quaternion.identity;
+        box.transform.localScale = localScale;
+        Collider collider = box.GetComponent<Collider>();
+        if (collider != null)
+        {
+            DestroyPortPreviewComponent(collider);
+        }
+
+        Renderer renderer = box.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.sharedMaterial = material;
+        }
+
+        return box;
+    }
+
+    private void ClearPreviewChildren(Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        for (int i = root.childCount - 1; i >= 0; i--)
+        {
+            DestroyPortPreviewObject(root.GetChild(i).gameObject);
+        }
+    }
+
+    private static void DestroyPortPreviewObject(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        target.SetActive(false);
+        if (target.transform.parent != null)
+        {
+            target.transform.SetParent(null, false);
+        }
+
+        if (Application.isPlaying)
+        {
+            UnityEngine.Object.Destroy(target);
+        }
+        else
+        {
+            UnityEngine.Object.DestroyImmediate(target);
+        }
+    }
+
+    private static void DestroyPortPreviewComponent(Component target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            UnityEngine.Object.Destroy(target);
+        }
+        else
+        {
+            UnityEngine.Object.DestroyImmediate(target);
+        }
+    }
+
+    private bool TryGetDevelopmentDockKeyForSlot(int slotIndex, out string dockKey)
+    {
+        dockKey = "";
+        if (city == null)
+        {
+            return false;
+        }
+
+        string preferredKey = GetPveDockInstanceKey(Mathf.Max(0, slotIndex) + 1);
+        if (city.HasExternalDockKeyForTests(preferredKey))
+        {
+            dockKey = preferredKey;
+            return true;
+        }
+
+        int maxCount = TryGetDefinition(PveDockBuildingId, out BaseBuildingDefinition definition)
+            ? GetBuildingMaxCount(definition)
+            : MetaGameState.DevelopmentDockSlotCount;
+        for (int i = 1; i <= maxCount; i++)
+        {
+            string key = GetPveDockInstanceKey(i);
+            if (city.HasExternalDockKeyForTests(key))
+            {
+                dockKey = key;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetDevelopmentDockSlotIndexForDockKey(string dockKey, out int slotIndex)
+    {
+        slotIndex = 0;
+        if (string.IsNullOrWhiteSpace(dockKey))
+        {
+            return false;
+        }
+
+        string normalizedDockKey = dockKey.Trim();
+        if (!string.Equals(GetDefinitionId(normalizedDockKey), PveDockBuildingId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        int marker = normalizedDockKey.IndexOf("__", StringComparison.Ordinal);
+        if (marker < 0)
+        {
+            slotIndex = 0;
+            return true;
+        }
+
+        string suffix = normalizedDockKey.Substring(marker + 2);
+        if (int.TryParse(suffix, out int instanceIndex) && instanceIndex > 0)
+        {
+            slotIndex = Mathf.Clamp(instanceIndex - 1, 0, MetaGameState.DevelopmentDockSlotCount - 1);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string GetPveDockInstanceKey(int instanceIndex)
+    {
+        return instanceIndex <= 1
+            ? PveDockBuildingId
+            : PveDockBuildingId + "__" + instanceIndex.ToString();
+    }
+
+    private float GetPortDockCameraZoomForSlot(int slotIndex)
+    {
+        DockedDevelopmentShipState slot = null;
+        if (meta != null)
+        {
+            IReadOnlyList<DockedDevelopmentShipState> slots = meta.GetDevelopmentDockShipSlots();
+            if (slots != null && slotIndex >= 0 && slotIndex < slots.Count)
+            {
+                slot = slots[slotIndex];
+            }
+        }
+
+        ShipTreeEntryConfig ship = slot != null && slot.HasShip ? GetShipTreeEntry(slot.shipId) : null;
+        Vector3 size = GetPortPreviewShipSize(ship, slot, ResolvePortPreviewShipLengthMeters(ship, slot));
+        return Mathf.Clamp(size.z * 0.78f + 3.8f, 7.4f, 13.6f);
+    }
+
+    private bool DoesPortDockBerthFitShipClass(string shipClassId)
+    {
+        if (city == null || !TryGetDevelopmentDockKeyForSlot(0, out string dockKey))
+        {
+            return false;
+        }
+
+        if (!city.TryGetExternalDockBerthPoseForRuntime(
+                dockKey,
+                out _,
+                out _,
+                out float berthLength,
+                out float berthWidth,
+                out _))
+        {
+            return false;
+        }
+
+        Vector3 size = GetPortPreviewShipSizeForClass(shipClassId);
+        return size.z <= berthLength && size.x <= berthWidth;
+    }
+
+    private Vector3 GetPortPreviewShipSize(ShipTreeEntryConfig ship, DockedDevelopmentShipState slot, float lengthMeters)
+    {
+        string classId = ship != null ? ship.shipClassId : "";
+        Vector3 canonicalMeters = GetPortPreviewCanonicalShipSizeMeters(classId);
+        float safeLengthMeters = Mathf.Max(1f, lengthMeters);
+        float lengthRatio = safeLengthMeters / Mathf.Max(1f, canonicalMeters.z);
+        Vector3 sizeMeters = new Vector3(
+            canonicalMeters.x * lengthRatio,
+            canonicalMeters.y * lengthRatio,
+            safeLengthMeters);
+        return sizeMeters * PortDockMetersToCityUnits;
+    }
+
+    private static Vector3 GetPortPreviewShipSizeForClass(string shipClassId)
+    {
+        return GetPortPreviewCanonicalShipSizeMeters(shipClassId) * PortDockMetersToCityUnits;
+    }
+
+    private static Vector3 GetPortPreviewCanonicalShipSizeMeters(string shipClassId)
+    {
+        if (IsBattleshipClass(shipClassId))
+        {
+            return new Vector3(62f, 20f, PortDockBattleshipLengthMeters);
+        }
+
+        if (IsCruiserClass(shipClassId))
+        {
+            return new Vector3(32f, 12f, PortDockCruiserLengthMeters);
+        }
+
+        return new Vector3(15f, 7f, PortDockFrigateLengthMeters);
+    }
+
+    private float ResolvePortPreviewShipLengthMeters(ShipTreeEntryConfig ship, DockedDevelopmentShipState slot)
+    {
+        if (ship == null)
+        {
+            return PortDockFrigateLengthMeters;
+        }
+
+        SessionConfigDatabase config = meta != null ? meta.SessionConfig : null;
+        string selectedHullPackageId = slot != null ? slot.GetLoadoutPackageId("hull") : "";
+        if (config != null)
+        {
+            KorshunHullPackageConfig selectedHull = !string.IsNullOrWhiteSpace(selectedHullPackageId)
+                ? config.GetKorshunHullPackage(selectedHullPackageId)
+                : null;
+            if (selectedHull != null
+                && string.Equals(selectedHull.shipId, ship.shipId, StringComparison.OrdinalIgnoreCase)
+                && selectedHull.lengthM > 0f)
+            {
+                return selectedHull.lengthM;
+            }
+
+            if (config.korshunHullPackages != null)
+            {
+                for (int i = 0; i < config.korshunHullPackages.Count; i++)
+                {
+                    KorshunHullPackageConfig package = config.korshunHullPackages[i];
+                    if (package != null
+                        && package.IsBasePackage
+                        && string.Equals(package.shipId, ship.shipId, StringComparison.OrdinalIgnoreCase)
+                        && package.lengthM > 0f)
+                    {
+                        return package.lengthM;
+                    }
+                }
+            }
+        }
+
+        if (IsBattleshipClass(ship.shipClassId))
+        {
+            return PortDockBattleshipLengthMeters;
+        }
+
+        if (IsCruiserClass(ship.shipClassId))
+        {
+            return PortDockCruiserLengthMeters;
+        }
+
+        return PortDockFrigateLengthMeters;
+    }
+
+    private static bool IsBattleshipClass(string shipClassId)
+    {
+        return ContainsIgnoreCase(shipClassId, "battleship")
+            || ContainsIgnoreCase(shipClassId, "linear")
+            || ContainsIgnoreCase(shipClassId, "line_ship");
+    }
+
+    private static bool IsCruiserClass(string shipClassId)
+    {
+        return ContainsIgnoreCase(shipClassId, "cruiser");
+    }
+
+    private static bool ContainsIgnoreCase(string value, string pattern)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && !string.IsNullOrWhiteSpace(pattern)
+            && value.IndexOf(pattern, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static Color GetPortPreviewShipColor(ShipTreeEntryConfig ship)
+    {
+        if (ship != null && ship.visualColor.a > 0.01f)
+        {
+            return ship.visualColor;
+        }
+
+        return new Color(0.42f, 0.52f, 0.62f, 1f);
+    }
+
+    private static Material CreatePortPreviewMaterial(Color color)
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null)
+        {
+            shader = Shader.Find("Standard");
+        }
+
+        Material material = new Material(shader);
+        material.color = color;
+        return material;
     }
 
     private bool OpenRepairDockWindowFromExternalDock(string dockKey)
@@ -1789,10 +4371,10 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         processingStatusMessage = "";
         selectedProcessingInputItemId = "";
         SetText(windowTitleText, GetBuildingDisplayName(openBuildingId));
-        SetText(windowExitButtonText, "\u2039");
+        SetText(windowExitButtonText, "Выйти");
         if (windowExitButtonText != null)
         {
-            windowExitButtonText.fontSize = 38;
+            windowExitButtonText.fontSize = 18;
             windowExitButtonText.color = new Color32(58, 66, 83, 255);
         }
         SetActiveIfNotNull(windowBodyText, false);
@@ -6816,6 +9398,122 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
             && string.Equals(definition.category, "knowledge", StringComparison.OrdinalIgnoreCase);
     }
 
+    private struct PortDockKorshunWeaponVisualSpec
+    {
+        public readonly string foreObjectName;
+        public readonly string aftObjectName;
+        public readonly PortDockKorshunWeaponPlacement[] placements;
+
+        public PortDockKorshunWeaponVisualSpec(
+            PortDockKorshunWeaponPlacement forePlacement,
+            PortDockKorshunWeaponPlacement aftPlacement)
+        {
+            this.foreObjectName = forePlacement.instanceObjectName ?? "";
+            this.aftObjectName = aftPlacement.instanceObjectName ?? "";
+            this.placements = new[] { forePlacement, aftPlacement };
+        }
+    }
+
+    private enum PortDockKorshunWeaponPlacementKind
+    {
+        None = 0,
+        ExistingAuthored = 1,
+        AuthoredClone = 2,
+        EquipmentPrefab = 3,
+        HarpoonPlaceholder = 4
+    }
+
+    private struct PortDockKorshunWeaponPlacement
+    {
+        public readonly PortDockKorshunWeaponPlacementKind kind;
+        public readonly string instanceObjectName;
+        public readonly string sourceObjectName;
+        public readonly string sourceMountName;
+        public readonly string targetMountName;
+        public readonly float yawDegrees;
+        public readonly float scale;
+
+        private PortDockKorshunWeaponPlacement(
+            PortDockKorshunWeaponPlacementKind kind,
+            string instanceObjectName,
+            string sourceObjectName,
+            string sourceMountName,
+            string targetMountName,
+            float yawDegrees,
+            float scale)
+        {
+            this.kind = kind;
+            this.instanceObjectName = instanceObjectName ?? "";
+            this.sourceObjectName = sourceObjectName ?? "";
+            this.sourceMountName = sourceMountName ?? "";
+            this.targetMountName = targetMountName ?? "";
+            this.yawDegrees = yawDegrees;
+            this.scale = scale;
+        }
+
+        public static PortDockKorshunWeaponPlacement Existing(string objectName, string targetMountName)
+        {
+            return new PortDockKorshunWeaponPlacement(
+                PortDockKorshunWeaponPlacementKind.ExistingAuthored,
+                objectName,
+                objectName,
+                "",
+                targetMountName,
+                0f,
+                1f);
+        }
+
+        public static PortDockKorshunWeaponPlacement AuthoredClone(
+            string instanceObjectName,
+            string sourceObjectName,
+            string sourceMountName,
+            string targetMountName,
+            float yawDegrees)
+        {
+            return new PortDockKorshunWeaponPlacement(
+                PortDockKorshunWeaponPlacementKind.AuthoredClone,
+                instanceObjectName,
+                sourceObjectName,
+                sourceMountName,
+                targetMountName,
+                yawDegrees,
+                1f);
+        }
+
+        public static PortDockKorshunWeaponPlacement Equipment(
+            string instanceObjectName,
+            string equipmentModelId,
+            string targetMountName,
+            float yawDegrees,
+            float scale)
+        {
+            return new PortDockKorshunWeaponPlacement(
+                PortDockKorshunWeaponPlacementKind.EquipmentPrefab,
+                instanceObjectName,
+                equipmentModelId,
+                "",
+                targetMountName,
+                yawDegrees,
+                scale);
+        }
+
+        public static PortDockKorshunWeaponPlacement HarpoonPlaceholder(
+            string instanceObjectName,
+            string targetMountName,
+            float yawDegrees,
+            float scale)
+        {
+            return new PortDockKorshunWeaponPlacement(
+                PortDockKorshunWeaponPlacementKind.HarpoonPlaceholder,
+                instanceObjectName,
+                "",
+                "",
+                targetMountName,
+                yawDegrees,
+                scale);
+        }
+    }
+
     private static string GetBuildingActionLabel(string buildingId, int actionIndex)
     {
         if (actionIndex == 1 && IsKnowledgeBuilding(buildingId))
@@ -7185,6 +9883,20 @@ public sealed class WildWindBaseIslandView : MonoBehaviour
         public Vector2 anchoredPosition;
         public Vector2 sizeDelta;
     }
+}
+
+public sealed class PortDockShipPreviewHandle : MonoBehaviour
+{
+    public string shipId = "";
+    public string shipClassId = "";
+    public string visualModelId = "";
+    public string loadoutSignature = "";
+    public Color color = Color.white;
+    public bool usesAuthoredModel;
+    public int generatedWeaponVisualCount;
+    public Vector3 localBoundsSize = Vector3.zero;
+    public Vector3 targetPortSize = Vector3.zero;
+    public float targetLengthMeters;
 }
 
 public sealed class BaseIslandProcessingCollectBubbleHandle : MonoBehaviour

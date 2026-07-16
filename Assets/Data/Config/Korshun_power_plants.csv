@@ -1,0 +1,11 @@
+id_power_plant,base_package_id,upgrade_level,ship_id,local_name_ru,power_multiplier,upgrade_cost_multiplier,speed_delta_ms,acceleration_delta_ms2,turn_rate_delta_deg_per_second,battery_capacity,energy_generation_per_second,module_hp,allows_electronic_equipment,notes_ru
+korshun_power_steam_gas,,base,capital_patrol_frigate_r02,Парогазовая установка,1.00,1.00,14,4.03,5,0,0,900,false,Быстрая крепкая механическая установка без питания электрооборудования
+korshun_power_steam_gas_plus,korshun_power_steam_gas,plus,capital_patrol_frigate_r02,Парогазовая установка +,1.50,4.00,21,6.04,8,0,0,1300,false,Очень мощная механика без электроники
+korshun_power_turbogenerator,,base,capital_patrol_frigate_r02,Турбинно-генераторная установка,1.00,1.00,8,2.30,2,90,6,650,true,Быстрый ход и малое стабильное питание электронных модулей
+korshun_power_turbogenerator_plus,korshun_power_turbogenerator,plus,capital_patrol_frigate_r02,Турбинно-генераторная установка +,1.50,4.00,12,3.45,3.5,135,9,900,true,Лучше ход и заметно больше питания
+korshun_power_capacitor,,base,capital_patrol_frigate_r02,Конденсаторная установка,1.00,1.00,0,0,-1,300,2,450,true,Большой запас батареи для короткого активного окна
+korshun_power_capacitor_plus,korshun_power_capacitor,plus,capital_patrol_frigate_r02,Конденсаторная установка +,1.45,4.00,2,0.58,0,450,4,650,true,Еще больше батареи и меньше штрафов хода
+korshun_power_generator,,base,capital_patrol_frigate_r02,Генераторная установка,1.00,1.00,-7,-2.01,-2,160,14,600,true,Много генерации ценой скорости и приемистости
+korshun_power_generator_plus,korshun_power_generator,plus,capital_patrol_frigate_r02,Генераторная установка +,1.50,4.00,-4,-1.15,-1,240,21,850,true,Сильная генерация с частично снятыми штрафами
+korshun_power_armored,,base,capital_patrol_frigate_r02,Бронированная установка,1.00,1.00,-13,-3.74,-4,70,3,1100,true,Тяжелая защищенная силовая установка с малой энергетикой
+korshun_power_armored_plus,korshun_power_armored,plus,capital_patrol_frigate_r02,Бронированная установка +,1.45,4.00,-8,-2.30,-2.5,110,5,1600,true,Дорогая бронированная машина с меньшим штрафом скорости

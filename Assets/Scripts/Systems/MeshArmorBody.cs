@@ -14,6 +14,7 @@ public class MeshArmorPlate
     public string displayNameRu = "Бронелист";
     [InspectorName("Толщина брони, мм")]
     [Min(0f)] public float armorMm = 40f;
+    public CoreTacticalResistanceSet resistances = DamageResistanceUtility.DefaultShipResistances;
     [InspectorName("Треугольники mesh")]
     public List<int> triangleIndices = new List<int>();
     [InspectorName("Цвет отладки")]
@@ -25,6 +26,7 @@ public class MeshArmorPlate
         {
             zoneId = plateId,
             displayNameRu = displayNameRu,
+            resistances = resistances,
             armorMm = Mathf.Max(0f, armorMm),
             ricochetAngleDeg = ricochetAngleDeg,
             overmatchCaliberMultiplier = 0f,
@@ -72,6 +74,8 @@ public class MeshArmorBody : MonoBehaviour
     [Min(0.001f)] public float planeDistanceThreshold = 0.05f;
     [InspectorName("Броня по умолчанию, мм")]
     [Min(0f)] public float defaultArmorMm = 40f;
+    [InspectorName("Default resistances")]
+    public CoreTacticalResistanceSet defaultResistances = DamageResistanceUtility.DefaultShipResistances;
     [InspectorName("Use material armor names")]
     public bool useMaterialArmorNames = true;
 
@@ -111,6 +115,7 @@ public class MeshArmorBody : MonoBehaviour
     private void OnValidate()
     {
         defaultArmorMm = Mathf.Max(0f, defaultArmorMm);
+        defaultResistances.Normalize();
         planeDistanceThreshold = Mathf.Max(0.001f, planeDistanceThreshold);
         ricochetAngleDeg = Mathf.Clamp(ricochetAngleDeg, 0f, 89f);
         maxDrawnTriangles = Mathf.Max(1, maxDrawnTriangles);
@@ -229,6 +234,7 @@ public class MeshArmorBody : MonoBehaviour
                 plateId = $"mesh_plate_{i + 1:00}",
                 displayNameRu = plateName,
                 armorMm = defaultArmorMm,
+                resistances = defaultResistances,
                 triangleIndices = new List<int>(group.triangleIndices),
                 debugColor = new Color(color.r, color.g, color.b, 0.35f)
             });
@@ -418,6 +424,7 @@ public class MeshArmorBody : MonoBehaviour
                 plateId = zoneId,
                 displayNameRu = displayName,
                 armorMm = Mathf.Max(0f, armorMm),
+                resistances = parsed ? DamageResistanceUtility.FromLegacyArmorHint(armorMm) : defaultResistances,
                 triangleIndices = subMeshTriangleIndices,
                 debugColor = new Color(color.r, color.g, color.b, 0.35f)
             });
@@ -570,6 +577,7 @@ public class MeshArmorBody : MonoBehaviour
             MeshArmorPlate plate = plates[i];
             if (plate == null) continue;
             plate.armorMm = Mathf.Max(0f, plate.armorMm);
+            plate.resistances.Normalize();
         }
     }
 

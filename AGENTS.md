@@ -82,6 +82,8 @@ changes.
   and a guard against double reward or accidental reset.
 - If a proper big-test check is not feasible in the current turn, say that clearly
   in the final response and explain the remaining risk.
+- After running Play Mode, Big Test, or Unity automation, stop Play Mode before
+  finishing the turn so the editor is left in Edit Mode for the user.
 
 ## Before Implementing Risky Features
 

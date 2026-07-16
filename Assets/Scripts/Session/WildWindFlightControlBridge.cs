@@ -208,14 +208,22 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         manualTurn = 0f;
         SetManualThrustNotch(MaxManualThrustNotch);
 
-        currentShip.targetAltitude = Mathf.Max(0f, currentShip.transform.position.y);
         Vector3 toTarget = Flatten(targetPosition - currentShip.transform.position);
-        currentShip.targetHeading = toTarget.sqrMagnitude > 0.0001f
+        float entryHeading = toTarget.sqrMagnitude > 0.0001f
             ? HeadingFromVector(toTarget)
             : NormalizeHeading(currentShip.transform.eulerAngles.y);
-        currentShip.altitudeHold = false;
-        currentShip.headingHold = false;
-        currentShip.cruiseControl = false;
+        currentShip.SetStrategicInputState(
+            manualThrust,
+            0f,
+            0f,
+            0f,
+            false,
+            false,
+            currentShip.transform.position.y,
+            false,
+            entryHeading,
+            false,
+            0f);
         syncedSortieEntryKey = GetActiveSortieEntryKey();
         statusMessage = "Sortie entry cruise primed.";
     }
@@ -339,11 +347,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         {
             if (ship != null)
             {
-                ship.thrustInput = 0f;
-                ship.sideInput = 0f;
-                ship.liftInput = 0f;
-                ship.turnInput = 0f;
-                ship.neutralStopBrakeEnabled = false;
+                ship.ClearStrategicInput();
             }
 
             return;
@@ -353,29 +357,18 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         bool useSpeedHold = false;
         bool useStopGear = !useSpeedHold && Mathf.Approximately(manualThrust, 0f);
 
-        ship.altitudeHold = false;
-        ship.headingHold = useHeadingHold;
-        ship.cruiseControl = useSpeedHold;
-        ship.neutralStopBrakeEnabled = useStopGear;
-
-        if (useStopGear)
-        {
-            ship.targetSpeedMS = 0f;
-            ship.thrustInput = 0f;
-        }
-
-        ship.sideInput = manualLateral;
-        ship.liftInput = manualLift;
-
-        if (!useHeadingHold)
-        {
-            ship.turnInput = manualTurn;
-        }
-
-        if (!useSpeedHold && !useStopGear)
-        {
-            ship.thrustInput = manualThrust;
-        }
+        ship.SetStrategicInputState(
+            useStopGear ? 0f : manualThrust,
+            manualLateral,
+            manualLift,
+            useHeadingHold ? 0f : manualTurn,
+            useStopGear,
+            false,
+            ship.transform.position.y,
+            useHeadingHold,
+            ship.transform.eulerAngles.y,
+            useSpeedHold,
+            0f);
     }
 
     private void ApplyManualThrustStepInput(float axis, float deltaSeconds)
@@ -576,7 +569,7 @@ public sealed class WildWindFlightControlBridge : MonoBehaviour
         }
 
         syncedSortieEntryKey = key;
-        if (ship.thrustInput < 0.9f && ship.hullThrustOutput < 0.9f)
+        if (ship.StrategicForwardInput < 0.9f)
         {
             return;
         }

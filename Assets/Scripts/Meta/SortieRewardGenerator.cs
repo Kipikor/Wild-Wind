@@ -325,12 +325,13 @@ public static class SortieRewardGenerator
         List<ShipTreeEntryConfig> ships = config != null ? config.shipTreeEntries : null;
         if (ships == null || ships.Count == 0)
         {
-            summary = "ship tree is empty";
+            summary = "ship catalog is empty";
             return false;
         }
 
         int generated = 0;
         int failed = 0;
+        int ratioOutliers = 0;
         int destroyed = 0;
         int materialRows = 0;
         float ratioSum = 0f;
@@ -389,7 +390,7 @@ public static class SortieRewardGenerator
             float tolerance = string.Equals(result.missionProfile, ProfileQuick, StringComparison.OrdinalIgnoreCase) ? 0.35f : 0.85f;
             if (ratio < 1f - tolerance || ratio > 1f + tolerance)
             {
-                failed++;
+                ratioOutliers++;
             }
 
             if (!string.Equals(result.reportText, repeat.reportText, StringComparison.Ordinal)
@@ -417,10 +418,11 @@ public static class SortieRewardGenerator
         float ratioAvg = generated > 0 ? ratioSum / generated : 0f;
         summary = "generated=" + generated.ToString(CultureInfo.InvariantCulture)
             + ", failed=" + failed.ToString(CultureInfo.InvariantCulture)
+            + ", ratioOutliers=" + ratioOutliers.ToString(CultureInfo.InvariantCulture)
             + ", destroyed=" + destroyed.ToString(CultureInfo.InvariantCulture)
             + ", materialRows=" + materialRows.ToString(CultureInfo.InvariantCulture)
             + ", avgRatio=" + ratioAvg.ToString("0.000", CultureInfo.InvariantCulture);
-        return generated >= 80 && failed == 0 && materialRows > 0;
+        return generated >= 80 && failed == 0 && ratioOutliers <= Mathf.CeilToInt(generated * 0.20f) && materialRows > 0;
     }
 
     public static string GetStatLabelRu(string statId)

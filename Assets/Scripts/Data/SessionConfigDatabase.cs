@@ -29,6 +29,7 @@ public partial class SessionConfigDatabase
     public List<ModifierDefinitionConfig> modifierDefinitions = new List<ModifierDefinitionConfig>();
     public List<QuestDefinitionConfig> questDefinitions = new List<QuestDefinitionConfig>();
     public List<QuickSortieRewardSourceConfig> quickSortieRewardSources = new List<QuickSortieRewardSourceConfig>();
+    public CoreTacticalBalanceConfig coreTacticalBalance = new CoreTacticalBalanceConfig();
 
     public bool isLoaded;
     public string lastError = "";
@@ -58,7 +59,9 @@ public partial class SessionConfigDatabase
             LoadHulls(Path.Combine(folder, "Hull.csv"));
             LoadClaudiumLoops(Path.Combine(folder, "Claudium_loop.csv"));
             LoadSpecialModules(Path.Combine(folder, "Special_module.csv"));
-            LoadShipTree(Path.Combine(folder, "Ship_tree.csv"));
+            LoadShipCatalog(Path.Combine(folder, "Ship_catalog.csv"));
+            LoadCoreTacticalBalance(Path.Combine(folder, "Core_tactical_balance.csv"));
+            LoadKorshunComponentConfigs(folder);
             isLoaded = true;
             lastError = "";
         }
@@ -196,6 +199,8 @@ public partial class SessionConfigDatabase
         questDefinitions.Clear();
         ClearQuickSortieConfigs();
         ClearShipPartConfigs();
+        ClearCoreTacticalBalance();
+        ClearKorshunComponentConfigs();
         itemsById.Clear();
         portsById.Clear();
         gasCondensateTypesById.Clear();
@@ -213,6 +218,43 @@ public partial class SessionConfigDatabase
     private void ClearQuickSortieConfigs()
     {
         quickSortieRewardSources.Clear();
+    }
+
+    private void ClearCoreTacticalBalance()
+    {
+        coreTacticalBalance = new CoreTacticalBalanceConfig();
+    }
+
+    private void LoadCoreTacticalBalance(string path)
+    {
+        ClearCoreTacticalBalance();
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        foreach (Dictionary<string, string> row in ReadCsv(path))
+        {
+            string id = NormalizeBalanceKey(Get(row, "id"));
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                continue;
+            }
+
+            float value = ParseFloat(Get(row, "value"));
+            switch (id)
+            {
+                case "explosive_radius_reference_mass_kg":
+                    coreTacticalBalance.explosiveRadiusReferenceMassKg = Mathf.Max(0.001f, value);
+                    break;
+                case "explosive_radius_reference_m":
+                    coreTacticalBalance.explosiveRadiusReferenceMeters = Mathf.Max(0.001f, value);
+                    break;
+                case "explosive_radius_mass_exponent":
+                    coreTacticalBalance.explosiveRadiusMassExponent = Mathf.Clamp(value, 0.1f, 1f);
+                    break;
+            }
+        }
     }
 
     private void LoadQuickSortieRewardSources(string path)
@@ -737,6 +779,13 @@ public partial class SessionConfigDatabase
         return row != null && row.TryGetValue(key, out string value) ? value : "";
     }
 
+    private static string NormalizeBalanceKey(string value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? ""
+            : value.Trim().ToLowerInvariant();
+    }
+
     private static int ParseInt(string value, int fallback = 0)
     {
         return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int result) ? result : fallback;
@@ -775,6 +824,17 @@ public partial class SessionConfigDatabase
             normalized.Equals("y", StringComparison.OrdinalIgnoreCase);
     }
 
+}
+
+public class CoreTacticalBalanceConfig
+{
+    public const float DefaultExplosiveRadiusReferenceMassKg = 50f;
+    public const float DefaultExplosiveRadiusReferenceMeters = 20f;
+    public const float DefaultExplosiveRadiusMassExponent = 0.5f;
+
+    public float explosiveRadiusReferenceMassKg = DefaultExplosiveRadiusReferenceMassKg;
+    public float explosiveRadiusReferenceMeters = DefaultExplosiveRadiusReferenceMeters;
+    public float explosiveRadiusMassExponent = DefaultExplosiveRadiusMassExponent;
 }
 
 public class ItemConfig

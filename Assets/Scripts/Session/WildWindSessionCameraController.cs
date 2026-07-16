@@ -225,7 +225,7 @@ public sealed class WildWindSessionCameraController : MonoBehaviour
         Transform target = GetMovementTarget();
         bool shouldControl = ShouldControlGameplayCursor(target);
         ResolveGameplayCursorState(shouldControl, out lockState, out cursorVisible);
-        return shouldControl;
+        return lockState == CursorLockMode.None && cursorVisible;
     }
 
     private Vector3 ReadMovementInput()

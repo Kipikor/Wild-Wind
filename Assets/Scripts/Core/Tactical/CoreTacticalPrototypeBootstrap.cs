@@ -2,6 +2,560 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+public struct CoreTacticalVisualWeaponHandle
+{
+    public Transform pivot;
+    public Quaternion initialLocalRotation;
+    public float baselineYawDegrees;
+    public Renderer[] renderers;
+
+    public bool IsValid => pivot != null;
+}
+
+internal static class CoreTacticalWeaponVisualMaterialUtility
+{
+    private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
+    private static readonly int TintColorPropertyId = Shader.PropertyToID("_TintColor");
+    private static readonly int EmissionColorPropertyId = Shader.PropertyToID("_EmissionColor");
+
+    public static Material CreateVisibleMaterial(Color color, float emissionMultiplier)
+    {
+        Material material = new Material(FindVisibleShader());
+        ApplyVisibleColor(material, color, emissionMultiplier);
+        return material;
+    }
+
+    public static Material CreateTransparentMaterial(Color color, float emissionMultiplier)
+    {
+        Material material = new Material(FindVisibleShader());
+        ConfigureTransparentMaterial(material);
+        ApplyVisibleColor(material, color, emissionMultiplier);
+        return material;
+    }
+
+    public static Material CreateVertexColorTransparentMaterial(Color fallbackTint)
+    {
+        Material material = new Material(FindVertexColorShader());
+        ConfigureTransparentMaterial(material);
+        // Mesh and LineRenderer weapon trails carry their real color in vertex/line colors.
+        // Keep the material white so the shader does not multiply those colors into darkness.
+        ApplyVisibleColor(material, Color.white, 0f);
+        if (material.HasProperty(TintColorPropertyId)) material.SetColor(TintColorPropertyId, Color.white);
+        material.name = "Core Tactical Weapon Vertex Color Transparent " + ColorUtility.ToHtmlStringRGBA(fallbackTint);
+        return material;
+    }
+
+    public static void ApplyVisibleColor(Material material, Color color, float emissionMultiplier)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        if (material.HasProperty(BaseColorPropertyId)) material.SetColor(BaseColorPropertyId, color);
+        if (material.HasProperty(ColorPropertyId)) material.SetColor(ColorPropertyId, color);
+        if (material.HasProperty(TintColorPropertyId)) material.SetColor(TintColorPropertyId, color);
+        if (emissionMultiplier > 0f && material.HasProperty(EmissionColorPropertyId))
+        {
+            material.SetColor(EmissionColorPropertyId, color * emissionMultiplier);
+            material.EnableKeyword("_EMISSION");
+        }
+
+        material.color = color;
+    }
+
+    public static void ConfigureTransparentMaterial(Material material)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
+        if (material.HasProperty("_Blend")) material.SetFloat("_Blend", 0f);
+        if (material.HasProperty("_AlphaClip")) material.SetFloat("_AlphaClip", 0f);
+        if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
+        if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        material.EnableKeyword("_ALPHABLEND_ON");
+        material.DisableKeyword("_ALPHATEST_ON");
+        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+    }
+
+    public static Color ResolveVisibleColor(Material material, Color fallback)
+    {
+        Color color = fallback;
+        if (material != null)
+        {
+            if (material.HasProperty(BaseColorPropertyId))
+            {
+                color = material.GetColor(BaseColorPropertyId);
+            }
+            else if (material.HasProperty(ColorPropertyId))
+            {
+                color = material.GetColor(ColorPropertyId);
+            }
+            else if (material.HasProperty(TintColorPropertyId))
+            {
+                color = material.GetColor(TintColorPropertyId);
+            }
+            else
+            {
+                color = material.color;
+            }
+        }
+
+        float luminance = color.r * 0.2126f + color.g * 0.7152f + color.b * 0.0722f;
+        return luminance <= 0.04f ? fallback : color;
+    }
+
+    private static Shader FindVisibleShader()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Sprites/Default");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) shader = Shader.Find("Standard");
+        return shader;
+    }
+
+    private static Shader FindVertexColorShader()
+    {
+        Shader shader = Shader.Find("Sprites/Default");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) shader = Shader.Find("Standard");
+        return shader;
+    }
+}
+
+[DisallowMultipleComponent]
+public sealed class CoreTacticalShipVisualWeaponBinding : MonoBehaviour
+{
+    private readonly List<Transform> scratchTransforms = new List<Transform>(32);
+    private CoreTacticalShipMotor owner;
+    private Transform visualRoot;
+
+    public void Initialize(CoreTacticalShipMotor ship, Transform importedVisualRoot)
+    {
+        owner = ship;
+        visualRoot = importedVisualRoot;
+    }
+
+    public bool TryBindFrigateMainMount(string displayName, float baselineYawDegrees, out CoreTacticalVisualWeaponHandle handle)
+    {
+        handle = default;
+        if (visualRoot == null)
+        {
+            return false;
+        }
+
+        Transform pivot = null;
+        string normalizedName = Normalize(displayName);
+        if (normalizedName.Contains("fore"))
+        {
+            pivot = FindDeepChildExact("Korshun_Turret_76mm_Twin_Fore")
+                ?? FindProjectedExtreme("Turret", front: true);
+        }
+        else if (normalizedName.Contains("aft"))
+        {
+            pivot = FindDeepChildExact("Korshun_Turret_76mm_Twin_Aft")
+                ?? FindProjectedExtreme("Turret", front: false);
+        }
+
+        return TryCreateHandle(pivot, baselineYawDegrees, out handle);
+    }
+
+    public bool TryBindCapitalMainTurret(string displayName, float baselineYawDegrees, out CoreTacticalVisualWeaponHandle handle)
+    {
+        handle = default;
+        if (visualRoot == null)
+        {
+            return false;
+        }
+
+        CollectDeepChildrenContaining("Turret", scratchTransforms, excludeToken: "Base");
+        if (scratchTransforms.Count == 0)
+        {
+            return false;
+        }
+
+        SortByForwardProjection(scratchTransforms);
+        string normalizedName = Normalize(displayName);
+        int index = 0;
+        if (normalizedName.Contains("turret b")) index = Mathf.Min(1, scratchTransforms.Count - 1);
+        else if (normalizedName.Contains("turret x")) index = Mathf.Max(0, scratchTransforms.Count - 2);
+        else if (normalizedName.Contains("turret y")) index = scratchTransforms.Count - 1;
+
+        return TryCreateHandle(scratchTransforms[index], baselineYawDegrees, out handle);
+    }
+
+    public bool TryBindMissileLauncher(int sideSign, out CoreTacticalVisualWeaponHandle handle)
+    {
+        return TryBindMissileLauncher(sideSign, "torpedo", out handle);
+    }
+
+    public bool TryBindMissileLauncher(int sideSign, string visualRole, out CoreTacticalVisualWeaponHandle handle)
+    {
+        handle = default;
+        if (visualRoot == null)
+        {
+            return false;
+        }
+
+        string normalizedRole = Normalize(visualRole);
+        bool mainRocket = normalizedRole.Contains("main") && (normalizedRole.Contains("rocket") || normalizedRole.Contains("nurs") || normalizedRole.Contains("missile"));
+        bool sideRocket = normalizedRole.Contains("side") && (normalizedRole.Contains("rocket") || normalizedRole.Contains("nurs") || normalizedRole.Contains("missile"));
+        bool sideHarpoon = normalizedRole.Contains("harpoon");
+        Transform pivot = null;
+        float baselineYawDegrees = sideSign < 0 ? -90f : 90f;
+
+        if (mainRocket)
+        {
+            pivot = sideSign < 0
+                ? FindDeepChildExact("Korshun_CombatMain_RocketLauncher_Pod_Fore")
+                    ?? FindDeepChildExact("Korshun_PortPreview_RocketLauncher_Pod_Fore")
+                : FindDeepChildExact("Korshun_CombatMain_RocketLauncher_Pod_Aft")
+                    ?? FindDeepChildExact("Korshun_PortPreview_RocketLauncher_Pod_Aft");
+            baselineYawDegrees = 0f;
+        }
+        else if (sideRocket)
+        {
+            pivot = sideSign < 0
+                ? FindDeepChildExact("Korshun_CombatAux_RocketLauncher_Pod_Left")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_RocketLauncher_Pod_Left")
+                : FindDeepChildExact("Korshun_CombatAux_RocketLauncher_Pod_Right")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_RocketLauncher_Pod_Right");
+        }
+        else if (sideHarpoon)
+        {
+            pivot = sideSign < 0
+                ? FindDeepChildExact("Korshun_CombatAux_HarpoonCannon_Left")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_HarpoonCannon_Left")
+                    ?? FindDeepChildExact("Barbet_CombatSmall_HarpoonCannon_Left")
+                    ?? FindDeepChildExact("Barbet_PortSmallPreview_HarpoonCannon_Left")
+                : FindDeepChildExact("Korshun_CombatAux_HarpoonCannon_Right")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_HarpoonCannon_Right")
+                    ?? FindDeepChildExact("Barbet_CombatSmall_HarpoonCannon_Right")
+                    ?? FindDeepChildExact("Barbet_PortSmallPreview_HarpoonCannon_Right");
+        }
+
+        if (pivot == null)
+        {
+            pivot = sideSign < 0
+                ? FindDeepChildExact("Korshun_TorpedoLauncher_3Tube_Left")
+                : FindDeepChildExact("Korshun_TorpedoLauncher_3Tube_Right");
+        }
+
+        if (pivot == null)
+        {
+            pivot = sideRocket
+                ? FindProjectedSide("RocketLauncher", sideSign)
+                : sideHarpoon
+                    ? FindProjectedSide("Harpoon", sideSign)
+                    : FindProjectedSide("TorpedoLauncher", sideSign);
+        }
+
+        return TryCreateHandle(pivot, baselineYawDegrees, out handle);
+    }
+
+    public bool TryBindUtilityModule(string utilityKind, int sideSign, out CoreTacticalVisualWeaponHandle handle)
+    {
+        handle = default;
+        if (visualRoot == null)
+        {
+            return false;
+        }
+
+        string normalizedKind = Normalize(utilityKind);
+        string token = "Utility";
+        Transform pivot = null;
+        if (normalizedKind.Contains("magnet"))
+        {
+            token = "Magnet";
+            pivot = sideSign < 0
+                ? FindDeepChildExact("Korshun_CombatAux_Magnet_Left")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_Magnet_Left")
+                    ?? FindDeepChildExact("Barbet_CombatSmall_Magnet_Left")
+                    ?? FindDeepChildExact("Barbet_PortSmallPreview_Magnet_Left")
+                : FindDeepChildExact("Korshun_CombatAux_Magnet_Right")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_Magnet_Right")
+                    ?? FindDeepChildExact("Barbet_CombatSmall_Magnet_Right")
+                    ?? FindDeepChildExact("Barbet_PortSmallPreview_Magnet_Right");
+        }
+        else if (normalizedKind.Contains("siphon"))
+        {
+            token = "GasSiphon";
+            pivot = sideSign < 0
+                ? FindDeepChildExact("Korshun_CombatAux_GasSiphon_Left")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_GasSiphon_Left")
+                    ?? FindDeepChildExact("Barbet_CombatSmall_GasSiphon_Left")
+                    ?? FindDeepChildExact("Barbet_PortSmallPreview_GasSiphon_Left")
+                : FindDeepChildExact("Korshun_CombatAux_GasSiphon_Right")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_GasSiphon_Right")
+                    ?? FindDeepChildExact("Barbet_CombatSmall_GasSiphon_Right")
+                    ?? FindDeepChildExact("Barbet_PortSmallPreview_GasSiphon_Right");
+        }
+        else if (normalizedKind.Contains("repair"))
+        {
+            token = "RepairBeam";
+            pivot = sideSign < 0
+                ? FindDeepChildExact("Korshun_CombatAux_RepairBeam_Left")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_RepairBeam_Left")
+                : FindDeepChildExact("Korshun_CombatAux_RepairBeam_Right")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_RepairBeam_Right");
+        }
+        else if (normalizedKind.Contains("scanner") || normalizedKind.Contains("hacker"))
+        {
+            token = "HackingDish";
+            pivot = sideSign < 0
+                ? FindDeepChildExact("Korshun_CombatAux_HackingDish_Left")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_HackingDish_Left")
+                : FindDeepChildExact("Korshun_CombatAux_HackingDish_Right")
+                    ?? FindDeepChildExact("Korshun_PortAuxPreview_HackingDish_Right");
+        }
+
+        if (pivot == null)
+        {
+            pivot = FindProjectedSide(token, sideSign);
+        }
+
+        return TryCreateHandle(pivot, sideSign < 0 ? -90f : 90f, out handle);
+    }
+
+    public static void ApplyYaw(CoreTacticalVisualWeaponHandle handle, float currentYawDegrees)
+    {
+        if (!handle.IsValid)
+        {
+            return;
+        }
+
+        float deltaYaw = Mathf.DeltaAngle(handle.baselineYawDegrees, currentYawDegrees);
+        handle.pivot.localRotation = Quaternion.AngleAxis(deltaYaw, Vector3.up) * handle.initialLocalRotation;
+    }
+
+    public static float CalculateLocalYawDegrees(Transform ownerTransform, Vector3 worldDirection, float fallbackYawDegrees)
+    {
+        Vector3 flatDirection = worldDirection;
+        flatDirection.y = 0f;
+        if (flatDirection.sqrMagnitude <= 0.0001f)
+        {
+            return fallbackYawDegrees;
+        }
+
+        Vector3 ownerForward = ownerTransform != null ? ownerTransform.forward : Vector3.forward;
+        ownerForward.y = 0f;
+        if (ownerForward.sqrMagnitude <= 0.0001f)
+        {
+            ownerForward = Vector3.forward;
+        }
+
+        return Mathf.DeltaAngle(0f, Vector3.SignedAngle(ownerForward.normalized, flatDirection.normalized, Vector3.up));
+    }
+
+    public static void ApplyYawToward(CoreTacticalVisualWeaponHandle handle, Transform ownerTransform, Vector3 worldDirection, float fallbackYawDegrees)
+    {
+        ApplyYaw(handle, CalculateLocalYawDegrees(ownerTransform, worldDirection, fallbackYawDegrees));
+    }
+
+    public static Vector3 GetMuzzlePosition(CoreTacticalVisualWeaponHandle handle, Vector3 fallbackPosition, Vector3 fireDirection)
+    {
+        if (!handle.IsValid)
+        {
+            return fallbackPosition;
+        }
+
+        Vector3 direction = fireDirection.sqrMagnitude > 0.0001f ? fireDirection.normalized : handle.pivot.forward;
+        if (TryGetBounds(handle, out Bounds bounds))
+        {
+            return GetProjectedBoundsTip(bounds, direction);
+        }
+
+        return handle.pivot.position + direction * 4f;
+    }
+
+    private bool TryCreateHandle(Transform pivot, float baselineYawDegrees, out CoreTacticalVisualWeaponHandle handle)
+    {
+        handle = default;
+        if (pivot == null)
+        {
+            return false;
+        }
+
+        handle = new CoreTacticalVisualWeaponHandle
+        {
+            pivot = pivot,
+            initialLocalRotation = pivot.localRotation,
+            baselineYawDegrees = baselineYawDegrees,
+            renderers = pivot.GetComponentsInChildren<Renderer>(true)
+        };
+        return true;
+    }
+
+    private Transform FindDeepChildExact(string objectName)
+    {
+        if (visualRoot == null || string.IsNullOrWhiteSpace(objectName))
+        {
+            return null;
+        }
+
+        Transform[] children = visualRoot.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child != null && string.Equals(child.name, objectName, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private Transform FindProjectedExtreme(string requiredToken, bool front)
+    {
+        CollectDeepChildrenContaining(requiredToken, scratchTransforms, excludeToken: "Base");
+        if (scratchTransforms.Count == 0)
+        {
+            return null;
+        }
+
+        SortByForwardProjection(scratchTransforms);
+        return front ? scratchTransforms[scratchTransforms.Count - 1] : scratchTransforms[0];
+    }
+
+    private Transform FindProjectedSide(string requiredToken, int sideSign)
+    {
+        CollectDeepChildrenContaining(requiredToken, scratchTransforms);
+        if (scratchTransforms.Count == 0)
+        {
+            return null;
+        }
+
+        Vector3 right = owner != null ? owner.transform.right : visualRoot.right;
+        Transform best = null;
+        float bestScore = sideSign < 0 ? float.PositiveInfinity : float.NegativeInfinity;
+        for (int i = 0; i < scratchTransforms.Count; i++)
+        {
+            Transform candidate = scratchTransforms[i];
+            if (candidate == null) continue;
+            Vector3 origin = owner != null ? owner.transform.position : visualRoot.position;
+            float score = Vector3.Dot(candidate.position - origin, right);
+            if ((sideSign < 0 && score < bestScore) || (sideSign >= 0 && score > bestScore))
+            {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+
+        return best;
+    }
+
+    private void CollectDeepChildrenContaining(string requiredToken, List<Transform> results, string excludeToken = "")
+    {
+        results.Clear();
+        if (visualRoot == null || string.IsNullOrWhiteSpace(requiredToken))
+        {
+            return;
+        }
+
+        string required = Normalize(requiredToken);
+        string excluded = Normalize(excludeToken);
+        Transform[] children = visualRoot.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child == null || child == visualRoot)
+            {
+                continue;
+            }
+
+            string name = Normalize(child.name);
+            if (!name.Contains(required))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(excluded) && name.Contains(excluded))
+            {
+                continue;
+            }
+
+            results.Add(child);
+        }
+    }
+
+    private void SortByForwardProjection(List<Transform> transforms)
+    {
+        Vector3 forward = owner != null ? owner.transform.forward : visualRoot.forward;
+        transforms.Sort((a, b) => Vector3.Dot(a.position, forward).CompareTo(Vector3.Dot(b.position, forward)));
+    }
+
+    private static bool TryGetBounds(CoreTacticalVisualWeaponHandle handle, out Bounds bounds)
+    {
+        bounds = default;
+        if (handle.renderers == null)
+        {
+            return false;
+        }
+
+        bool found = false;
+        for (int i = 0; i < handle.renderers.Length; i++)
+        {
+            Renderer renderer = handle.renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            if (!found)
+            {
+                bounds = renderer.bounds;
+                found = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        return found;
+    }
+
+    private static Vector3 GetProjectedBoundsTip(Bounds bounds, Vector3 direction)
+    {
+        Vector3 center = bounds.center;
+        Vector3 extents = bounds.extents;
+        float bestProjection = float.NegativeInfinity;
+
+        for (int x = -1; x <= 1; x += 2)
+        {
+            for (int y = -1; y <= 1; y += 2)
+            {
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    Vector3 corner = center + Vector3.Scale(extents, new Vector3(x, y, z));
+                    float projection = Vector3.Dot(corner, direction);
+                    if (projection > bestProjection)
+                    {
+                        bestProjection = projection;
+                    }
+                }
+            }
+        }
+
+        float centerProjection = Vector3.Dot(center, direction);
+        return center + direction * (bestProjection - centerProjection);
+    }
+
+    private static string Normalize(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "" : value.Trim().ToLowerInvariant();
+    }
+}
+
 public static class CoreTacticalPrototypeBootstrap
 {
     public const string PrototypeSceneName = "WildWindCoreTacticalPrototype";
@@ -117,8 +671,12 @@ public static class CoreTacticalPrototypeBootstrap
         camera.fieldOfView = 42f;
         camera.nearClipPlane = 0.2f;
         camera.farClipPlane = 60000f;
-        camera.clearFlags = CameraClearFlags.SolidColor;
-        camera.backgroundColor = new Color(0.06f, 0.08f, 0.10f, 1f);
+        camera.clearFlags = CameraClearFlags.Skybox;
+        if (fleet != null)
+        {
+            fleet.SetInputCamera(camera);
+        }
+
         CoreTacticalCameraRig rig = cameraObject.AddComponent<CoreTacticalCameraRig>();
         rig.fleet = fleet;
         rig.targetCamera = camera;
@@ -247,8 +805,12 @@ public static class CoreTacticalPrototypeBootstrap
         motor.forwardAccelerationMS2 = forwardAccelerationMS2;
         motor.lateralAccelerationMS2 = Mathf.Max(0.5f, forwardAccelerationMS2 * 0.45f);
         motor.brakingAccelerationMS2 = brakingAccelerationMS2;
+        motor.arrivalRadiusMeters = Mathf.Clamp(size.z * 0.14f, 8f, 42f);
+        motor.arrivalLockSpeedMS = Mathf.Max(1.5f, maxForwardSpeedMS * 0.05f);
+        motor.slowdownDistanceMeters = Mathf.Max(motor.slowdownDistanceMeters, size.z * 0.8f);
         motor.maxYawRateDegPerSecond = maxYawRateDegPerSecond;
-        motor.noseFirstYawHardGateDeg = 110f;
+        motor.noseFirstYawReadyDeg = 95f;
+        motor.noseFirstYawHardGateDeg = 170f;
         motor.obstacleAvoidanceLookAheadMeters = Mathf.Max(size.z * 0.9f, maxForwardSpeedMS * 7f);
         motor.obstacleAvoidanceMarginMeters = Mathf.Max(8f, size.x * 0.35f);
         motor.obstacleAvoidanceStrength = 1.55f;
@@ -263,12 +825,30 @@ public static class CoreTacticalPrototypeBootstrap
         health.maxHealth = Mathf.Max(100f, massKg / 10000f);
         health.ResetHealth();
 
+        CoreTacticalDamageProfile damageProfile = shipObject.AddComponent<CoreTacticalDamageProfile>();
+        string classId = ResolveDefaultDamageClassId(shipId, size);
+        damageProfile.ConfigureDefense(
+            classId,
+            health.maxHealth,
+            CoreTacticalDamageProfile.ResolveClassBaselineResistances(classId),
+            0f,
+            0f);
+
         if (registerWithFleet && fleet != null)
         {
             fleet.RegisterShip(motor);
         }
 
         return motor;
+    }
+
+    private static string ResolveDefaultDamageClassId(string shipId, Vector3 size)
+    {
+        string id = string.IsNullOrWhiteSpace(shipId) ? "" : shipId.Trim().ToLowerInvariant();
+        if (id.Contains("battleship") || size.z >= 260f) return "battleship";
+        if (id.Contains("cruiser") || size.z >= 110f) return "cruiser";
+        if (id.Contains("frigate") || size.z >= 38f) return "frigate";
+        return "small";
     }
 
     public static CoreTacticalWeaponControl ConfigureFrigateAutocannonLoadout(
@@ -302,6 +882,11 @@ public static class CoreTacticalPrototypeBootstrap
         mainBattery.dispersionAtMaxRangeMeters = 80f;
         mainBattery.shellVisualScale = 7.2f;
         mainBattery.burstRadiusMeters = 36f;
+        mainBattery.shellResistanceIgnorePercent = 70f;
+        mainBattery.shellCaliberMm = 203f;
+        mainBattery.shellDirectImpactFuseThresholdMeters = 0f;
+        mainBattery.shellFireChancePercent = 12f;
+        mainBattery.detonationMode = CoreTacticalProjectileDetonationMode.AirBurst;
 
         CoreTacticalSecondaryMountBattery secondaryBattery = GetOrAddComponent<CoreTacticalSecondaryMountBattery>(cruiser);
         secondaryBattery.owner = cruiser;
@@ -462,6 +1047,11 @@ public static class CoreTacticalPrototypeBootstrap
         battery.owner = frigate;
         battery.target = target;
         battery.targetTeam = targetTeam;
+        battery.shellResistanceIgnorePercent = 45f;
+        battery.shellCaliberMm = 57f;
+        battery.shellDirectImpactFuseThresholdMeters = 4f;
+        battery.shellFireChancePercent = 0f;
+        battery.detonationMode = CoreTacticalProjectileDetonationMode.DirectImpact;
     }
 
     private static void ConfigureBattleshipSecondaryBattery(
@@ -497,6 +1087,11 @@ public static class CoreTacticalPrototypeBootstrap
         battery.owner = battleship;
         battery.target = target;
         battery.targetTeam = targetTeam;
+        battery.shellResistanceIgnorePercent = 406f;
+        battery.shellCaliberMm = 406f;
+        battery.shellDirectImpactFuseThresholdMeters = 28f;
+        battery.shellFireChancePercent = 0f;
+        battery.detonationMode = CoreTacticalProjectileDetonationMode.DirectImpact;
     }
 
     private static void ConfigureBattleshipMissileLauncher(
@@ -665,19 +1260,7 @@ public sealed class CoreTacticalPriorityTargetControl : MonoBehaviour
 
     public static bool IsValidPriorityTarget(CoreTacticalShipMotor candidate, CoreTacticalCombatTeam targetTeam)
     {
-        if (candidate == null)
-        {
-            return false;
-        }
-
-        CoreTacticalCombatant combatant = candidate.GetComponent<CoreTacticalCombatant>();
-        if (combatant == null || combatant.team != targetTeam || !combatant.IsAlive)
-        {
-            return false;
-        }
-
-        CoreTacticalPrototypeHealth health = candidate.GetComponent<CoreTacticalPrototypeHealth>();
-        return health == null || health.currentHealth > 0f;
+        return CoreTacticalOreTargetingRules.IsValidExplicitTarget(candidate, targetTeam);
     }
 }
 
@@ -723,7 +1306,7 @@ public sealed class CoreTacticalWeaponTargetCoordinator : MonoBehaviour
         for (int i = 0; i < combatants.Length; i++)
         {
             CoreTacticalCombatant combatant = combatants[i];
-            if (combatant == null || combatant.team != targetTeam || !combatant.IsAlive || combatant.ship == owner)
+            if (!CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(combatant, targetTeam) || combatant.ship == owner)
             {
                 continue;
             }
@@ -1262,8 +1845,10 @@ public sealed class CoreTacticalPrototypeHealth : MonoBehaviour
     public string lastDamageSource = "";
     public float lastDamageTime;
     public bool destroyOnDeath = true;
+    public bool createDeathExplosionVisual = true;
 
     private bool deathHandled;
+    private CoreTacticalDamageProfile damageProfile;
 
     public void ResetHealth()
     {
@@ -1273,9 +1858,56 @@ public sealed class CoreTacticalPrototypeHealth : MonoBehaviour
         lastDamageSource = "";
         lastDamageTime = 0f;
         deathHandled = false;
+        damageProfile = GetComponent<CoreTacticalDamageProfile>();
+        if (damageProfile != null)
+        {
+            damageProfile.ResetRuntimeState();
+        }
     }
 
     public void ApplyDamage(float amount, string source)
+    {
+        ApplyDamage(CoreTacticalDamageRequest.Kinetic(amount, source));
+    }
+
+    public void ApplyDamage(CoreTacticalDamageRequest request)
+    {
+        float amount = Mathf.Max(0f, request.damage);
+        if (amount <= 0f)
+        {
+            return;
+        }
+
+        damageProfile ??= GetComponent<CoreTacticalDamageProfile>();
+        if (damageProfile != null)
+        {
+            float before = currentHealth;
+            CoreTacticalDamageResolution resolution = damageProfile.ResolveDamage(request);
+            ApplyResolvedDamage(resolution.hullDamage, request.source);
+            NotifyOreBoulderDamage(request, before - currentHealth);
+            return;
+        }
+
+        float currentBefore = currentHealth;
+        ApplyResolvedDamage(amount, request.source);
+        NotifyOreBoulderDamage(request, currentBefore - currentHealth);
+    }
+
+    private void NotifyOreBoulderDamage(CoreTacticalDamageRequest request, float appliedHullDamage)
+    {
+        if (appliedHullDamage <= 0f)
+        {
+            return;
+        }
+
+        CoreTacticalOreBoulder boulder = GetComponent<CoreTacticalOreBoulder>();
+        if (boulder != null)
+        {
+            boulder.NotifyAppliedDamage(request, appliedHullDamage);
+        }
+    }
+
+    public void ApplyResolvedDamage(float amount, string source)
     {
         amount = Mathf.Max(0f, amount);
         if (amount <= 0f)
@@ -1301,7 +1933,17 @@ public sealed class CoreTacticalPrototypeHealth : MonoBehaviour
         }
 
         deathHandled = true;
-        CoreTacticalFlakBurstVisual.Create(transform.position, 95f);
+        CoreTacticalAutomatonWreckSpawner wreckSpawner = GetComponent<CoreTacticalAutomatonWreckSpawner>();
+        if (wreckSpawner != null)
+        {
+            wreckSpawner.SpawnWreck();
+        }
+
+        if (createDeathExplosionVisual && GetComponent<CoreTacticalOreBoulder>() == null)
+        {
+            CoreTacticalFlakBurstVisual.Create(transform.position, 95f);
+        }
+
         if (destroyOnDeath)
         {
             Destroy(gameObject);
@@ -1316,18 +1958,20 @@ public enum CoreTacticalWeaponGroup
     Secondary152mm = 2,
     Missiles = 3,
     MachineGuns = 4,
-    Autocannon30mm = 5
+    Autocannon30mm = 5,
+    Torpedoes = 6
 }
 
 [DisallowMultipleComponent]
 public sealed class CoreTacticalWeaponControl : MonoBehaviour
 {
-    public const int WeaponGroupCount = 6;
+    public const int WeaponGroupCount = 7;
 
     [SerializeField] private bool configured;
     [SerializeField] private bool[] fireEnabled = new bool[WeaponGroupCount];
-    [SerializeField] private int[] ammoRemaining = new int[WeaponGroupCount];
-    [SerializeField] private int[] ammoCapacity = new int[WeaponGroupCount];
+    [SerializeField] private bool[] weaponGroupActive = new bool[WeaponGroupCount];
+    [SerializeField] private string[] runtimeDisplayNames = new string[WeaponGroupCount];
+    [SerializeField] private string[] runtimeIcons = new string[WeaponGroupCount];
     public bool fireSuppressed;
 
     private void Awake()
@@ -1350,11 +1994,11 @@ public sealed class CoreTacticalWeaponControl : MonoBehaviour
         }
 
         EnsureArrays();
-        SetGroup(CoreTacticalWeaponGroup.MainBattery, 144);
-        SetGroup(CoreTacticalWeaponGroup.Secondary76mm, 3200);
-        SetGroup(CoreTacticalWeaponGroup.Secondary152mm, 800);
-        SetGroup(CoreTacticalWeaponGroup.Missiles, 64);
-        SetGroup(CoreTacticalWeaponGroup.MachineGuns, 50000);
+        SetGroupActive(CoreTacticalWeaponGroup.MainBattery);
+        SetGroupActive(CoreTacticalWeaponGroup.Secondary76mm);
+        SetGroupActive(CoreTacticalWeaponGroup.Secondary152mm);
+        SetGroupActive(CoreTacticalWeaponGroup.Missiles);
+        SetGroupActive(CoreTacticalWeaponGroup.MachineGuns);
         configured = true;
     }
 
@@ -1366,10 +2010,10 @@ public sealed class CoreTacticalWeaponControl : MonoBehaviour
         }
 
         EnsureArrays();
-        SetGroup(CoreTacticalWeaponGroup.MainBattery, 96);
-        SetGroup(CoreTacticalWeaponGroup.Secondary76mm, 2400);
-        SetGroup(CoreTacticalWeaponGroup.Secondary152mm, 480);
-        SetGroup(CoreTacticalWeaponGroup.MachineGuns, 28000);
+        SetGroupActive(CoreTacticalWeaponGroup.MainBattery);
+        SetGroupActive(CoreTacticalWeaponGroup.Secondary76mm);
+        SetGroupActive(CoreTacticalWeaponGroup.Secondary152mm);
+        SetGroupActive(CoreTacticalWeaponGroup.MachineGuns);
         configured = true;
     }
 
@@ -1381,8 +2025,43 @@ public sealed class CoreTacticalWeaponControl : MonoBehaviour
         }
 
         EnsureArrays();
-        SetGroup(CoreTacticalWeaponGroup.Autocannon30mm, 2400);
+        SetGroupActive(CoreTacticalWeaponGroup.Autocannon30mm);
         configured = true;
+    }
+
+    public void SetRuntimeWeaponGroupActive(CoreTacticalWeaponGroup group, bool active = true)
+    {
+        EnsureArrays();
+        int index = ToIndex(group);
+        weaponGroupActive[index] = active;
+        if (active)
+        {
+            fireEnabled[index] = true;
+        }
+
+        configured = true;
+    }
+
+    public void ClearRuntimeWeaponGroups()
+    {
+        EnsureArrays();
+        for (int i = 0; i < WeaponGroupCount; i++)
+        {
+            weaponGroupActive[i] = false;
+            fireEnabled[i] = true;
+            runtimeDisplayNames[i] = "";
+            runtimeIcons[i] = "";
+        }
+
+        configured = true;
+    }
+
+    public void SetRuntimeGroupPresentation(CoreTacticalWeaponGroup group, string displayName, string icon)
+    {
+        EnsureArrays();
+        int index = ToIndex(group);
+        runtimeDisplayNames[index] = string.IsNullOrWhiteSpace(displayName) ? "" : displayName.Trim();
+        runtimeIcons[index] = string.IsNullOrWhiteSpace(icon) ? "" : icon.Trim();
     }
 
     public bool IsFireEnabled(CoreTacticalWeaponGroup group)
@@ -1405,68 +2084,30 @@ public sealed class CoreTacticalWeaponControl : MonoBehaviour
         fireEnabled[index] = !fireEnabled[index];
     }
 
-    public bool HasAmmo(CoreTacticalWeaponGroup group)
+    public bool IsWeaponGroupActive(CoreTacticalWeaponGroup group)
     {
         EnsureArrays();
-        return ammoRemaining[ToIndex(group)] > 0;
+        return weaponGroupActive[ToIndex(group)];
     }
 
     public bool CanFire(CoreTacticalWeaponGroup group)
     {
         EnsureArrays();
         int index = ToIndex(group);
-        return !fireSuppressed && fireEnabled[index] && ammoRemaining[index] > 0;
+        return !fireSuppressed && fireEnabled[index] && weaponGroupActive[index];
     }
 
-    public bool TryConsume(CoreTacticalWeaponGroup group, int amount)
+    public string GetRuntimeDisplayName(CoreTacticalWeaponGroup group)
     {
         EnsureArrays();
-        amount = Mathf.Max(0, amount);
-        if (amount <= 0)
-        {
-            return true;
-        }
-
-        int index = ToIndex(group);
-        if (fireSuppressed || !fireEnabled[index] || ammoRemaining[index] < amount)
-        {
-            return false;
-        }
-
-        ammoRemaining[index] -= amount;
-        return true;
+        string value = runtimeDisplayNames[ToIndex(group)];
+        return string.IsNullOrWhiteSpace(value) ? GetDisplayName(group) : value;
     }
 
-    public int ConsumeUpTo(CoreTacticalWeaponGroup group, int amount)
+    public string GetRuntimeIcon(CoreTacticalWeaponGroup group)
     {
         EnsureArrays();
-        amount = Mathf.Max(0, amount);
-        if (amount <= 0)
-        {
-            return 0;
-        }
-
-        int index = ToIndex(group);
-        if (fireSuppressed || !fireEnabled[index] || ammoRemaining[index] <= 0)
-        {
-            return 0;
-        }
-
-        int consumed = Mathf.Min(ammoRemaining[index], amount);
-        ammoRemaining[index] -= consumed;
-        return consumed;
-    }
-
-    public int GetRemaining(CoreTacticalWeaponGroup group)
-    {
-        EnsureArrays();
-        return ammoRemaining[ToIndex(group)];
-    }
-
-    public int GetCapacity(CoreTacticalWeaponGroup group)
-    {
-        EnsureArrays();
-        return ammoCapacity[ToIndex(group)];
+        return runtimeIcons[ToIndex(group)];
     }
 
     public static string GetDisplayName(CoreTacticalWeaponGroup group)
@@ -1477,17 +2118,17 @@ public sealed class CoreTacticalWeaponControl : MonoBehaviour
             CoreTacticalWeaponGroup.Secondary76mm => "PMK 76 mm",
             CoreTacticalWeaponGroup.Secondary152mm => "PMK 152 mm",
             CoreTacticalWeaponGroup.Missiles => "Missiles",
+            CoreTacticalWeaponGroup.Torpedoes => "Torpedoes",
             CoreTacticalWeaponGroup.MachineGuns => "Machine guns",
             CoreTacticalWeaponGroup.Autocannon30mm => "Autocannon 33 mm",
             _ => group.ToString()
         };
     }
 
-    private void SetGroup(CoreTacticalWeaponGroup group, int capacity)
+    private void SetGroupActive(CoreTacticalWeaponGroup group)
     {
         int index = ToIndex(group);
-        ammoCapacity[index] = Mathf.Max(0, capacity);
-        ammoRemaining[index] = ammoCapacity[index];
+        weaponGroupActive[index] = true;
         fireEnabled[index] = true;
     }
 
@@ -1503,28 +2144,41 @@ public sealed class CoreTacticalWeaponControl : MonoBehaviour
             }
         }
 
-        if (ammoRemaining == null || ammoRemaining.Length != WeaponGroupCount)
+        if (weaponGroupActive == null || weaponGroupActive.Length != WeaponGroupCount)
         {
-            int[] previous = ammoRemaining;
-            ammoRemaining = new int[WeaponGroupCount];
+            bool[] previous = weaponGroupActive;
+            weaponGroupActive = new bool[WeaponGroupCount];
             if (previous != null)
             {
-                for (int i = 0; i < Mathf.Min(previous.Length, ammoRemaining.Length); i++)
+                for (int i = 0; i < Mathf.Min(previous.Length, weaponGroupActive.Length); i++)
                 {
-                    ammoRemaining[i] = Mathf.Max(0, previous[i]);
+                    weaponGroupActive[i] = previous[i];
                 }
             }
         }
 
-        if (ammoCapacity == null || ammoCapacity.Length != WeaponGroupCount)
+        if (runtimeDisplayNames == null || runtimeDisplayNames.Length != WeaponGroupCount)
         {
-            int[] previous = ammoCapacity;
-            ammoCapacity = new int[WeaponGroupCount];
+            string[] previous = runtimeDisplayNames;
+            runtimeDisplayNames = new string[WeaponGroupCount];
             if (previous != null)
             {
-                for (int i = 0; i < Mathf.Min(previous.Length, ammoCapacity.Length); i++)
+                for (int i = 0; i < Mathf.Min(previous.Length, runtimeDisplayNames.Length); i++)
                 {
-                    ammoCapacity[i] = Mathf.Max(0, previous[i]);
+                    runtimeDisplayNames[i] = previous[i] ?? "";
+                }
+            }
+        }
+
+        if (runtimeIcons == null || runtimeIcons.Length != WeaponGroupCount)
+        {
+            string[] previous = runtimeIcons;
+            runtimeIcons = new string[WeaponGroupCount];
+            if (previous != null)
+            {
+                for (int i = 0; i < Mathf.Min(previous.Length, runtimeIcons.Length); i++)
+                {
+                    runtimeIcons[i] = previous[i] ?? "";
                 }
             }
         }
@@ -1567,8 +2221,18 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
     public float tracerTrailSeconds = 0.30f;
     public float burstRadiusMeters = 4.2f;
     public float shellDamage = 2.4f;
+    public CoreTacticalDamageType shellDamageType = CoreTacticalDamageType.Kinetic;
+    public float shellResistanceIgnorePercent = 45f;
+    public float shellCaliberMm = 57f;
+    public float shellDirectImpactFuseThresholdMeters = 4f;
+    public float shellFireChancePercent = 0f;
+    public int barrelsPerMount = 1;
+    public float barrelShotSpacingSeconds = 0.08f;
+    public float barrelSpacingMeters = 1.1f;
+    public CoreTacticalProjectileDetonationMode detonationMode = CoreTacticalProjectileDetonationMode.AirBurst;
 
     private AutocannonMount[] mounts;
+    private readonly List<PendingAutocannonShot> pendingShots = new List<PendingAutocannonShot>(16);
     private Material mountMaterial;
     private Material barrelMaterial;
     private Material shellMaterial;
@@ -1586,11 +2250,21 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
         public float currentLocalYawDegrees;
         public float desiredLocalYawDegrees;
         public float nextReadyTime;
+        public bool hasFired;
         public bool targetInsideSector;
         public bool aimed;
         public CoreTacticalShipMotor target;
         public GameObject rootObject;
         public Transform barrelPivot;
+        public CoreTacticalVisualWeaponHandle visualHandle;
+    }
+
+    private struct PendingAutocannonShot
+    {
+        public AutocannonMount mount;
+        public int barrelIndex;
+        public CoreTacticalShipMotor target;
+        public float fireTime;
     }
 
     private void Awake()
@@ -1633,6 +2307,28 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
         RefreshMountTargets();
         UpdateMounts(deltaSeconds);
         TryFireReadyMounts(now);
+        ProcessPendingShots(now);
+    }
+
+    public float GetReloadCooldownRemainingSecondsForHud()
+    {
+        if (mounts == null)
+        {
+            return 0f;
+        }
+
+        float remaining = 0f;
+        float now = Time.time;
+        for (int i = 0; i < mounts.Length; i++)
+        {
+            AutocannonMount mount = mounts[i];
+            if (mount != null && mount.hasFired)
+            {
+                remaining = Mathf.Max(remaining, mount.nextReadyTime - now);
+            }
+        }
+
+        return Mathf.Max(0f, remaining);
     }
 
     private void EnsureMounts()
@@ -1673,6 +2369,17 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
             nextReadyTime = Time.time + Mathf.Max(0f, initialReadyDelaySeconds)
         };
 
+        if (owner != null && owner.hideRuntimeWeaponVisuals)
+        {
+            CoreTacticalShipVisualWeaponBinding binding = owner.GetComponent<CoreTacticalShipVisualWeaponBinding>();
+            if (binding != null && binding.TryBindFrigateMainMount(displayName, mount.baseLocalYawDegrees, out CoreTacticalVisualWeaponHandle visualHandle))
+            {
+                mount.visualHandle = visualHandle;
+            }
+
+            return mount;
+        }
+
         mount.rootObject = new GameObject("Core Tactical " + displayName);
         mount.rootObject.transform.SetPositionAndRotation(GetMountWorldPosition(mount), GetMountWorldRotation(mount.currentLocalYawDegrees));
 
@@ -1696,13 +2403,17 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
         pivotObject.transform.localPosition = new Vector3(0f, 1.15f, 1.45f);
         mount.barrelPivot = pivotObject.transform;
 
-        GameObject barrel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        barrel.name = displayName + " Barrel";
-        barrel.transform.SetParent(mount.barrelPivot, false);
-        barrel.transform.localPosition = new Vector3(0f, 0f, BarrelLengthMeters * 0.5f);
-        barrel.transform.localScale = new Vector3(BarrelWidthMeters, BarrelHeightMeters, BarrelLengthMeters);
-        AssignRendererMaterial(barrel, barrelMaterial);
-        DestroyPrimitiveCollider(barrel);
+        int barrelCount = Mathf.Max(1, barrelsPerMount);
+        for (int barrelIndex = 0; barrelIndex < barrelCount; barrelIndex++)
+        {
+            GameObject barrel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            barrel.name = displayName + " Barrel " + (barrelIndex + 1).ToString();
+            barrel.transform.SetParent(mount.barrelPivot, false);
+            barrel.transform.localPosition = new Vector3(GetBarrelOffsetMeters(barrelIndex), 0f, BarrelLengthMeters * 0.5f);
+            barrel.transform.localScale = new Vector3(BarrelWidthMeters, BarrelHeightMeters, BarrelLengthMeters);
+            AssignRendererMaterial(barrel, barrelMaterial);
+            DestroyPrimitiveCollider(barrel);
+        }
 
         return mount;
     }
@@ -1763,7 +2474,7 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
             for (int i = 0; i < targetCandidates.Length; i++)
             {
                 CoreTacticalCombatant combatant = targetCandidates[i];
-                if (combatant == null || combatant.team != targetTeam || !combatant.IsAlive)
+                if (!CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(combatant, targetTeam))
                 {
                     continue;
                 }
@@ -1901,16 +2612,60 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
                 continue;
             }
 
-            if (FireGun(mount, mountTarget))
-            {
-                mount.nextReadyTime = now + Mathf.Max(0.03f, reloadSeconds) * Random.Range(1f - ReloadRandomSpread, 1f + ReloadRandomSpread);
-            }
+            ScheduleMountSalvo(mount, mountTarget, now);
+            mount.nextReadyTime = now + Mathf.Max(0.03f, reloadSeconds) * Random.Range(1f - ReloadRandomSpread, 1f + ReloadRandomSpread);
+            mount.hasFired = true;
         }
     }
 
-    private bool FireGun(AutocannonMount mount, CoreTacticalShipMotor shotTarget)
+    private void ScheduleMountSalvo(AutocannonMount mount, CoreTacticalShipMotor shotTarget, float now)
     {
-        Vector3 muzzlePosition = GetMuzzlePosition(mount);
+        int barrelCount = Mathf.Max(1, barrelsPerMount);
+        float spacing = Mathf.Max(0.01f, barrelShotSpacingSeconds);
+        for (int barrelIndex = 0; barrelIndex < barrelCount; barrelIndex++)
+        {
+            pendingShots.Add(new PendingAutocannonShot
+            {
+                mount = mount,
+                barrelIndex = barrelIndex,
+                target = shotTarget,
+                fireTime = now + spacing * barrelIndex
+            });
+        }
+    }
+
+    private void ProcessPendingShots(float now)
+    {
+        if (pendingShots.Count == 0)
+        {
+            return;
+        }
+
+        for (int i = pendingShots.Count - 1; i >= 0; i--)
+        {
+            PendingAutocannonShot shot = pendingShots[i];
+            if (now < shot.fireTime)
+            {
+                continue;
+            }
+
+            pendingShots.RemoveAt(i);
+            if (shot.mount == null
+                || !IsValidTarget(shot.target)
+                || !shot.mount.aimed
+                || !IsTargetInFireRange(shot.mount, shot.target)
+                || !CanFireWeapon(CoreTacticalWeaponGroup.Autocannon30mm))
+            {
+                continue;
+            }
+
+            FireGun(shot.mount, shot.barrelIndex, shot.target);
+        }
+    }
+
+    private bool FireGun(AutocannonMount mount, int barrelIndex, CoreTacticalShipMotor shotTarget)
+    {
+        Vector3 muzzlePosition = GetMuzzlePosition(mount, barrelIndex);
         if (!TryGetAimingSolution(
                 mount,
                 shotTarget,
@@ -1949,7 +2704,7 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
             return false;
         }
 
-        if (!TryConsumeWeaponAmmo(CoreTacticalWeaponGroup.Autocannon30mm, 1))
+        if (!CanFireWeapon(CoreTacticalWeaponGroup.Autocannon30mm))
         {
             return false;
         }
@@ -1969,7 +2724,14 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
             tracerMaterial,
             shotTarget,
             shellDamage,
-            mount.displayName);
+            mount.displayName,
+            detonationMode,
+            shellDamageType,
+            shellResistanceIgnorePercent,
+            shellCaliberMm,
+            shellDirectImpactFuseThresholdMeters,
+            shellFireChancePercent);
+        CoreTacticalLeviathanController.NotifyArtilleryReport(muzzlePosition, maxRangeMeters, owner);
         return true;
     }
 
@@ -1981,7 +2743,7 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
 
     private bool HasClearIdealShot(AutocannonMount mount, CoreTacticalShipMotor shotTarget)
     {
-        Vector3 muzzlePosition = GetMuzzlePosition(mount);
+        Vector3 muzzlePosition = GetMuzzleCenterPosition(mount);
         if (!TryGetAimingSolution(mount, shotTarget, muzzlePosition, out _, out Vector3 initialVelocity, out float flightTime, out _))
         {
             return false;
@@ -2077,7 +2839,7 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
         }
 
         if (!IsValidTarget(mountTarget)
-            || !TryGetAimingSolution(mount, mountTarget, GetMuzzlePosition(mount), out _, out Vector3 initialVelocity, out _, out _))
+            || !TryGetAimingSolution(mount, mountTarget, GetMuzzleCenterPosition(mount), out _, out Vector3 initialVelocity, out _, out _))
         {
             mount.barrelPivot.localRotation = Quaternion.identity;
             return;
@@ -2105,6 +2867,12 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
 
     private void ApplyMountTransform(AutocannonMount mount)
     {
+        if (mount != null && mount.visualHandle.IsValid)
+        {
+            CoreTacticalShipVisualWeaponBinding.ApplyYaw(mount.visualHandle, mount.currentLocalYawDegrees);
+            return;
+        }
+
         if (mount?.rootObject == null)
         {
             return;
@@ -2113,14 +2881,46 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
         mount.rootObject.transform.SetPositionAndRotation(GetMountWorldPosition(mount), GetMountWorldRotation(mount.currentLocalYawDegrees));
     }
 
-    private Vector3 GetMuzzlePosition(AutocannonMount mount)
+    private Vector3 GetMuzzleCenterPosition(AutocannonMount mount)
     {
+        Vector3 fallbackPosition = GetMountWorldPosition(mount);
+        if (mount != null && mount.visualHandle.IsValid)
+        {
+            Vector3 fireDirection = GetMountWorldRotation(mount.currentLocalYawDegrees) * Vector3.forward;
+            return CoreTacticalShipVisualWeaponBinding.GetMuzzlePosition(mount.visualHandle, fallbackPosition, fireDirection);
+        }
+
         if (mount?.barrelPivot == null)
         {
-            return GetMountWorldPosition(mount);
+            return fallbackPosition;
         }
 
         return mount.barrelPivot.TransformPoint(new Vector3(0f, 0f, BarrelLengthMeters));
+    }
+
+    private Vector3 GetMuzzlePosition(AutocannonMount mount, int barrelIndex)
+    {
+        Vector3 center = GetMuzzleCenterPosition(mount);
+        if (mount == null || barrelsPerMount <= 1)
+        {
+            return center;
+        }
+
+        Vector3 localRight = GetMountWorldRotation(mount.currentLocalYawDegrees) * Vector3.right;
+        return center + localRight * GetBarrelOffsetMeters(barrelIndex);
+    }
+
+    private float GetBarrelOffsetMeters(int barrelIndex)
+    {
+        int barrelCount = Mathf.Max(1, barrelsPerMount);
+        if (barrelCount <= 1)
+        {
+            return 0f;
+        }
+
+        int clampedIndex = Mathf.Clamp(barrelIndex, 0, barrelCount - 1);
+        float spacing = Mathf.Max(0.05f, barrelSpacingMeters);
+        return (clampedIndex - (barrelCount - 1) * 0.5f) * spacing;
     }
 
     private float GetDesiredLocalYawDegrees(AutocannonMount mount, CoreTacticalShipMotor aimTarget)
@@ -2157,12 +2957,6 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
     {
         CoreTacticalWeaponControl control = ResolveWeaponControl();
         return control == null || control.CanFire(group);
-    }
-
-    private bool TryConsumeWeaponAmmo(CoreTacticalWeaponGroup group, int amount)
-    {
-        CoreTacticalWeaponControl control = ResolveWeaponControl();
-        return control == null || control.TryConsume(group, amount);
     }
 
     private CoreTacticalWeaponControl ResolveWeaponControl()
@@ -2347,29 +3141,12 @@ public sealed class CoreTacticalFrigateAutocannonBattery : MonoBehaviour
 
     private static Material CreateMaterial(Color color)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        Material material = new Material(shader);
-        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
-        if (material.HasProperty("_Color")) material.SetColor("_Color", color);
-        if (material.HasProperty("_EmissionColor")) material.SetColor("_EmissionColor", color * 1.8f);
-        material.color = color;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(color, 1.8f);
     }
 
     private static Material CreateTransparentMaterial(Color color)
     {
-        Material material = CreateMaterial(color);
-        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
-        if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-        if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        material.color = color;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(color);
     }
 }
 
@@ -2406,6 +3183,13 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
     public float shellVisualScale = 11f;
     public float tracerTrailSeconds = 0.78f;
     public float burstRadiusMeters = 55f;
+    public float shellDamage = 135f;
+    public CoreTacticalDamageType shellDamageType = CoreTacticalDamageType.Explosive;
+    public float shellResistanceIgnorePercent = 406f;
+    public float shellCaliberMm = 406f;
+    public float shellDirectImpactFuseThresholdMeters = 28f;
+    public float shellFireChancePercent = 0f;
+    public CoreTacticalProjectileDetonationMode detonationMode = CoreTacticalProjectileDetonationMode.AirBurst;
 
     private readonly List<PendingMainGunShot> pendingShots = new List<PendingMainGunShot>(24);
     private MainTurret[] turrets;
@@ -2433,11 +3217,13 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
         public float currentLocalYawDegrees;
         public float desiredLocalYawDegrees;
         public float nextReadyTime;
+        public bool hasFired;
         public bool targetInsideSector;
         public bool aimed;
         public CoreTacticalShipMotor target;
         public GameObject rootObject;
         public Transform barrelPivot;
+        public CoreTacticalVisualWeaponHandle visualHandle;
     }
 
     private void Awake()
@@ -2483,6 +3269,27 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
         ProcessPendingShots(now);
     }
 
+    public float GetReloadCooldownRemainingSecondsForHud()
+    {
+        if (turrets == null)
+        {
+            return 0f;
+        }
+
+        float remaining = 0f;
+        float now = Time.time;
+        for (int i = 0; i < turrets.Length; i++)
+        {
+            MainTurret turret = turrets[i];
+            if (turret != null && turret.hasFired)
+            {
+                remaining = Mathf.Max(remaining, turret.nextReadyTime - now);
+            }
+        }
+
+        return Mathf.Max(0f, remaining);
+    }
+
     private void EnsureTurrets()
     {
         if (turrets != null)
@@ -2521,6 +3328,17 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
             desiredLocalYawDegrees = initialLocalYawDegrees,
             nextReadyTime = Time.time + Mathf.Max(0f, initialReadyDelaySeconds)
         };
+
+        if (owner != null && owner.hideRuntimeWeaponVisuals)
+        {
+            CoreTacticalShipVisualWeaponBinding binding = owner.GetComponent<CoreTacticalShipVisualWeaponBinding>();
+            if (binding != null && binding.TryBindCapitalMainTurret(displayName, initialLocalYawDegrees, out CoreTacticalVisualWeaponHandle visualHandle))
+            {
+                turret.visualHandle = visualHandle;
+            }
+
+            return turret;
+        }
 
         turret.rootObject = new GameObject("Core Tactical " + displayName);
         turret.rootObject.transform.SetPositionAndRotation(
@@ -2629,7 +3447,7 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
             for (int i = 0; i < targetCandidates.Length; i++)
             {
                 CoreTacticalCombatant combatant = targetCandidates[i];
-                if (combatant == null || combatant.team != targetTeam || !combatant.IsAlive)
+                if (!CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(combatant, targetTeam))
                 {
                     continue;
                 }
@@ -2797,6 +3615,7 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
             }
 
             turret.nextReadyTime = now + Mathf.Max(0.5f, reloadSeconds) * Random.Range(0.96f, 1.06f);
+            turret.hasFired = true;
         }
     }
 
@@ -2866,7 +3685,7 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
             return;
         }
 
-        if (!TryConsumeWeaponAmmo(CoreTacticalWeaponGroup.MainBattery, 1))
+        if (!CanFireWeapon(CoreTacticalWeaponGroup.MainBattery))
         {
             return;
         }
@@ -2885,8 +3704,15 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
             shellMaterial,
             tracerMaterial,
             shotTarget,
-            135f,
-            "406 mm main battery");
+            Mathf.Max(0f, shellDamage),
+            "406 mm main battery",
+            detonationMode,
+            shellDamageType,
+            shellResistanceIgnorePercent,
+            shellCaliberMm,
+            shellDirectImpactFuseThresholdMeters,
+            shellFireChancePercent);
+        CoreTacticalLeviathanController.NotifyArtilleryReport(muzzlePosition, maxRangeMeters, owner);
     }
 
     private bool HasClearIdealShot(MainTurret turret, CoreTacticalShipMotor shotTarget)
@@ -2911,12 +3737,6 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
     {
         CoreTacticalWeaponControl control = ResolveWeaponControl();
         return control == null || control.CanFire(group);
-    }
-
-    private bool TryConsumeWeaponAmmo(CoreTacticalWeaponGroup group, int amount)
-    {
-        CoreTacticalWeaponControl control = ResolveWeaponControl();
-        return control == null || control.TryConsume(group, amount);
     }
 
     private CoreTacticalWeaponControl ResolveWeaponControl()
@@ -3013,6 +3833,12 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
 
     private void ApplyTurretTransform(MainTurret turret)
     {
+        if (turret != null && turret.visualHandle.IsValid)
+        {
+            CoreTacticalShipVisualWeaponBinding.ApplyYaw(turret.visualHandle, turret.currentLocalYawDegrees);
+            return;
+        }
+
         if (turret?.rootObject == null)
         {
             return;
@@ -3040,9 +3866,16 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
 
     private Vector3 GetMuzzlePosition(MainTurret turret, int gunIndex)
     {
+        Vector3 fallbackPosition = GetTurretWorldPosition(turret);
+        if (turret != null && turret.visualHandle.IsValid)
+        {
+            Vector3 fireDirection = GetTurretWorldRotation(turret.currentLocalYawDegrees) * Vector3.forward;
+            return CoreTacticalShipVisualWeaponBinding.GetMuzzlePosition(turret.visualHandle, fallbackPosition, fireDirection);
+        }
+
         if (turret?.barrelPivot == null)
         {
-            return GetTurretWorldPosition(turret);
+            return fallbackPosition;
         }
 
         return turret.barrelPivot.TransformPoint(new Vector3(GetGunLateralOffset(gunIndex), 0f, GetBarrelLengthMeters()));
@@ -3125,29 +3958,12 @@ public sealed class CoreTacticalMainBattery : MonoBehaviour
 
     private static Material CreateMaterial(Color color)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        Material material = new Material(shader);
-        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
-        if (material.HasProperty("_Color")) material.SetColor("_Color", color);
-        if (material.HasProperty("_EmissionColor")) material.SetColor("_EmissionColor", color * 1.7f);
-        material.color = color;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(color, 1.7f);
     }
 
     private static Material CreateTransparentMaterial(Color color)
     {
-        Material material = CreateMaterial(color);
-        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
-        if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-        if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        material.color = color;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(color);
     }
 
     private static bool TrySolveBallisticVelocity(
@@ -3305,6 +4121,27 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
     public float gravityMS2 = 9.81f;
     // Same cheap drag model as the old PMK: long shots lose horizontal speed and land steeper.
     public float projectileLinearDragK = 0.025f;
+    public bool include76mmMounts = true;
+    public bool include152mmMounts = true;
+    public float reloadSeconds76mm = 3.6f / FireRateMultiplier;
+    public float reloadSeconds152mm = 7f / FireRateMultiplier;
+    public float muzzleVelocity76mmMS = 520f;
+    public float muzzleVelocity152mmMS = 650f;
+    public float shellDamage76mm = 9f;
+    public float shellDamage152mm = 34f;
+    public CoreTacticalDamageType shellDamageType76mm = CoreTacticalDamageType.Explosive;
+    public CoreTacticalDamageType shellDamageType152mm = CoreTacticalDamageType.Explosive;
+    public float shellResistanceIgnore76mm = 40f;
+    public float shellResistanceIgnore152mm = 55f;
+    public float shellCaliber76mm = 76f;
+    public float shellCaliber152mm = 152f;
+    public float shellDirectImpactFuseThreshold76mm = 5f;
+    public float shellDirectImpactFuseThreshold152mm = 11f;
+    public float shellFireChance76mm = 8f;
+    public float shellFireChance152mm = 12f;
+    public float burstRadius76mmMeters = 10f;
+    public float burstRadius152mmMeters = 20f;
+    public CoreTacticalProjectileDetonationMode detonationMode = CoreTacticalProjectileDetonationMode.AirBurst;
 
     private readonly List<PendingShot> pendingShots = new List<PendingShot>(64);
     private SecondaryMount[] mounts;
@@ -3336,14 +4173,22 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
         public float currentLocalYawDegrees;
         public float desiredLocalYawDegrees;
         public float nextReadyTime;
+        public bool hasFired;
         public float reloadSeconds;
         public float muzzleVelocityMS;
         public float shellVisualScale;
         public float burstRadiusMeters;
+        public float shellDamage;
+        public CoreTacticalDamageType shellDamageType;
+        public float shellResistanceIgnorePercent;
+        public float shellCaliberMm;
+        public float shellDirectImpactFuseThresholdMeters;
+        public float shellFireChancePercent;
+        public CoreTacticalProjectileDetonationMode detonationMode;
         public float tracerTrailSeconds;
         public float barrelLengthMeters;
         public float gunSpacingMeters;
-        public CoreTacticalWeaponGroup ammoGroup;
+        public CoreTacticalWeaponGroup weaponGroup;
         public bool targetInsideSector;
         public bool aimed;
         public GameObject rootObject;
@@ -3398,6 +4243,27 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
         ProcessPendingShots(now);
     }
 
+    public float GetReloadCooldownRemainingSecondsForHud(CoreTacticalWeaponGroup group)
+    {
+        if (mounts == null)
+        {
+            return 0f;
+        }
+
+        float remaining = 0f;
+        float now = Time.time;
+        for (int i = 0; i < mounts.Length; i++)
+        {
+            SecondaryMount mount = mounts[i];
+            if (mount != null && mount.hasFired && mount.weaponGroup == group)
+            {
+                remaining = Mathf.Max(remaining, mount.nextReadyTime - now);
+            }
+        }
+
+        return Mathf.Max(0f, remaining);
+    }
+
     private void EnsureMounts()
     {
         if (mounts != null)
@@ -3413,8 +4279,15 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
         tracerMaterial = CreateTransparentMaterial(new Color(0.82f, 0.86f, 0.88f, 0.28f));
 
         List<SecondaryMount> createdMounts = new List<SecondaryMount>(24);
-        AddSecondaryMountSet(createdMounts, "76 mm PMK", 8, 0.64f, -0.42f, 0.42f, 3.6f / FireRateMultiplier, 520f, 2.2f, 10f, 0.48f, 5.2f, 1.35f, CoreTacticalWeaponGroup.Secondary76mm, mountMaterial76mm, shellMaterial76mm);
-        AddSecondaryMountSet(createdMounts, "152 mm PMK", 4, 0.73f, -0.30f, 0.30f, 7f / FireRateMultiplier, 650f, 4.2f, 20f, 0.48f, 9.8f, 2.45f, CoreTacticalWeaponGroup.Secondary152mm, mountMaterial152mm, shellMaterial152mm);
+        if (include76mmMounts)
+        {
+            AddSecondaryMountSet(createdMounts, "76 mm PMK", 8, 0.64f, -0.42f, 0.42f, reloadSeconds76mm, muzzleVelocity76mmMS, 2.2f, burstRadius76mmMeters, shellDamage76mm, shellDamageType76mm, shellResistanceIgnore76mm, shellCaliber76mm, shellDirectImpactFuseThreshold76mm, shellFireChance76mm, 0.48f, 5.2f, 1.35f, CoreTacticalWeaponGroup.Secondary76mm, mountMaterial76mm, shellMaterial76mm);
+        }
+
+        if (include152mmMounts)
+        {
+            AddSecondaryMountSet(createdMounts, "152 mm PMK", 4, 0.73f, -0.30f, 0.30f, reloadSeconds152mm, muzzleVelocity152mmMS, 4.2f, burstRadius152mmMeters, shellDamage152mm, shellDamageType152mm, shellResistanceIgnore152mm, shellCaliber152mm, shellDirectImpactFuseThreshold152mm, shellFireChance152mm, 0.48f, 9.8f, 2.45f, CoreTacticalWeaponGroup.Secondary152mm, mountMaterial152mm, shellMaterial152mm);
+        }
         mounts = createdMounts.ToArray();
     }
 
@@ -3429,10 +4302,16 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
         float muzzleVelocityMS,
         float shellVisualScale,
         float burstRadiusMeters,
+        float shellDamage,
+        CoreTacticalDamageType shellDamageType,
+        float shellResistanceIgnorePercent,
+        float shellCaliberMm,
+        float shellDirectImpactFuseThresholdMeters,
+        float shellFireChancePercent,
         float tracerTrailSeconds,
         float barrelLengthMeters,
         float gunSpacingMeters,
-        CoreTacticalWeaponGroup ammoGroup,
+        CoreTacticalWeaponGroup weaponGroup,
         Material mountMaterial,
         Material shellMaterial)
     {
@@ -3454,10 +4333,17 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
                     muzzleVelocityMS = Mathf.Max(1f, muzzleVelocityMS),
                     shellVisualScale = Mathf.Max(0.1f, shellVisualScale),
                     burstRadiusMeters = Mathf.Max(0.1f, burstRadiusMeters),
+                    shellDamage = Mathf.Max(0f, shellDamage),
+                    shellDamageType = shellDamageType,
+                    shellResistanceIgnorePercent = Mathf.Max(0f, shellResistanceIgnorePercent),
+                    shellCaliberMm = Mathf.Max(0f, shellCaliberMm),
+                    shellDirectImpactFuseThresholdMeters = Mathf.Max(0f, shellDirectImpactFuseThresholdMeters),
+                    shellFireChancePercent = Mathf.Max(0f, shellFireChancePercent),
+                    detonationMode = detonationMode,
                     tracerTrailSeconds = Mathf.Max(0.1f, tracerTrailSeconds),
                     barrelLengthMeters = Mathf.Max(1f, barrelLengthMeters),
                     gunSpacingMeters = Mathf.Max(0.1f, gunSpacingMeters),
-                    ammoGroup = ammoGroup,
+                    weaponGroup = weaponGroup,
                     shellMaterial = shellMaterial,
                     tracerMaterial = tracerMaterial
                 };
@@ -3473,6 +4359,11 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
 
     private void CreateMountVisual(SecondaryMount mount, Material mountMaterial)
     {
+        if (owner != null && owner.hideRuntimeWeaponVisuals)
+        {
+            return;
+        }
+
         mount.rootObject = new GameObject("Core Tactical " + mount.displayName);
         mount.rootObject.transform.SetPositionAndRotation(GetMountWorldPosition(mount), GetMountWorldRotation(mount.currentLocalYawDegrees));
 
@@ -3566,7 +4457,7 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
             for (int i = 0; i < targetCandidates.Length; i++)
             {
                 CoreTacticalCombatant combatant = targetCandidates[i];
-                if (combatant == null || combatant.team != targetTeam || !combatant.IsAlive)
+                if (!CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(combatant, targetTeam))
                 {
                     continue;
                 }
@@ -3693,7 +4584,7 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
                 || !IsValidTarget(mountTarget)
                 || now < mount.nextReadyTime
                 || !mount.aimed
-                || !CanFireWeapon(mount.ammoGroup)
+                || !CanFireWeapon(mount.weaponGroup)
                 || !IsTargetInFireRange(mount, mountTarget)
                 || !HasClearIdealShot(mount, mountTarget))
             {
@@ -3703,6 +4594,7 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
             pendingShots.Add(new PendingShot { mountIndex = i, gunIndex = 0, fireTime = now, target = mountTarget });
             pendingShots.Add(new PendingShot { mountIndex = i, gunIndex = 1, fireTime = now + 0.08f, target = mountTarget });
             mount.nextReadyTime = now + mount.reloadSeconds * Random.Range(1f - ReloadRandomSpread, 1f + ReloadRandomSpread);
+            mount.hasFired = true;
         }
     }
 
@@ -3778,7 +4670,7 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
             return;
         }
 
-        if (!TryConsumeWeaponAmmo(mount.ammoGroup, 1))
+        if (!CanFireWeapon(mount.weaponGroup))
         {
             return;
         }
@@ -3797,8 +4689,15 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
             mount.shellMaterial,
             mount.tracerMaterial,
             shotTarget,
-            mount.ammoGroup == CoreTacticalWeaponGroup.Secondary152mm ? 34f : 9f,
-            mount.displayName);
+            Mathf.Max(0f, mount.shellDamage),
+            mount.displayName,
+            mount.detonationMode,
+            mount.shellDamageType,
+            mount.shellResistanceIgnorePercent,
+            mount.shellCaliberMm,
+            mount.shellDirectImpactFuseThresholdMeters,
+            mount.shellFireChancePercent);
+        CoreTacticalLeviathanController.NotifyArtilleryReport(muzzlePosition, maxRangeMeters, owner);
     }
 
     private bool IsTargetInFireRange(SecondaryMount mount, CoreTacticalShipMotor fireTarget)
@@ -3839,12 +4738,6 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
     {
         CoreTacticalWeaponControl control = ResolveWeaponControl();
         return control == null || control.CanFire(group);
-    }
-
-    private bool TryConsumeWeaponAmmo(CoreTacticalWeaponGroup group, int amount)
-    {
-        CoreTacticalWeaponControl control = ResolveWeaponControl();
-        return control == null || control.TryConsume(group, amount);
     }
 
     private CoreTacticalWeaponControl ResolveWeaponControl()
@@ -4038,29 +4931,12 @@ public sealed class CoreTacticalSecondaryMountBattery : MonoBehaviour
 
     private static Material CreateMaterial(Color color)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        Material material = new Material(shader);
-        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
-        if (material.HasProperty("_Color")) material.SetColor("_Color", color);
-        if (material.HasProperty("_EmissionColor")) material.SetColor("_EmissionColor", color * 1.7f);
-        material.color = color;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(color, 1.7f);
     }
 
     private static Material CreateTransparentMaterial(Color color)
     {
-        Material material = CreateMaterial(color);
-        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
-        if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-        if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        material.color = color;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(color);
     }
 
     private static bool TrySolveBallisticVelocity(
@@ -4216,6 +5092,7 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
     public float targetRefreshIntervalSeconds = 0.2f;
     public float damageTickIntervalSeconds = 0.5f;
     public float damagePerMountTick = 0.56f;
+    public float machineGunResistanceIgnorePercent = 10f;
     public float tracerRatePerSecondPerMount = 22f;
     public float tracerSpeedMS = 2200f;
     public float tracerLengthMeters = 10f;
@@ -4225,7 +5102,6 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
     public float tracerTargetSpreadMeters = 260f;
     public float tracerTargetVerticalSpreadScale = 0.32f;
     public float tracerCorePassChance = 0.12f;
-    public float ammoRoundsPerSecondPerMount = 45f;
     public float mountYawRateDegPerSecond = 95f;
     public Color tracerColor = new Color(0.72f, 0.48f, 0.24f, 0.58f);
 
@@ -4266,7 +5142,6 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
         public float currentLocalYawDegrees;
         public float desiredLocalYawDegrees;
         public float spawnBudget;
-        public float ammoSpendBudget;
         public bool canFire;
         public bool firingThisFrame;
         public CoreTacticalShipMotor target;
@@ -4321,11 +5196,6 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
             {
                 MachineGunMount mount = mounts[i];
                 if (!mount.canFire || !IsTargetInRange(mount.target))
-                {
-                    continue;
-                }
-
-                if (!TrySpendMachineGunAmmo(mount, deltaSeconds))
                 {
                     continue;
                 }
@@ -4404,6 +5274,11 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
             currentLocalYawDegrees = baseLocalYawDegrees,
             desiredLocalYawDegrees = baseLocalYawDegrees
         };
+
+        if (owner != null && owner.hideRuntimeWeaponVisuals)
+        {
+            return mount;
+        }
 
         mount.rootObject = new GameObject("Core Tactical " + displayName);
         mount.rootObject.transform.SetPositionAndRotation(GetMountWorldPosition(mount), GetMountWorldRotation(mount.currentLocalYawDegrees));
@@ -4531,7 +5406,7 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
             for (int i = 0; i < targetCandidates.Length; i++)
             {
                 CoreTacticalCombatant combatant = targetCandidates[i];
-                if (combatant == null || combatant.team != targetTeam || !combatant.IsAlive)
+                if (!CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(combatant, targetTeam))
                 {
                     continue;
                 }
@@ -4688,7 +5563,10 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
         {
             if (entry.Key != null && entry.Key.currentHealth > 0f)
             {
-                entry.Key.ApplyDamage(Mathf.Max(0f, damagePerMountTick) * entry.Value, "Machine gun mounts");
+                entry.Key.ApplyDamage(CoreTacticalDamageRequest.Kinetic(
+                    Mathf.Max(0f, damagePerMountTick) * entry.Value,
+                    "Machine gun mounts",
+                    machineGunResistanceIgnorePercent));
             }
         }
 
@@ -4698,49 +5576,10 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
         }
     }
 
-    private bool TrySpendMachineGunAmmo(MachineGunMount mount, float deltaSeconds)
-    {
-        if (mount == null || !CanFireWeapon(CoreTacticalWeaponGroup.MachineGuns))
-        {
-            return false;
-        }
-
-        mount.ammoSpendBudget += Mathf.Max(0f, ammoRoundsPerSecondPerMount) * Mathf.Max(0f, deltaSeconds);
-        int roundsToSpend = Mathf.FloorToInt(mount.ammoSpendBudget);
-        if (roundsToSpend <= 0)
-        {
-            return HasWeaponAmmo(CoreTacticalWeaponGroup.MachineGuns);
-        }
-
-        int consumed = ConsumeWeaponAmmoUpTo(CoreTacticalWeaponGroup.MachineGuns, roundsToSpend);
-        if (consumed <= 0)
-        {
-            mount.ammoSpendBudget = 0f;
-            return false;
-        }
-
-        mount.ammoSpendBudget = consumed >= roundsToSpend
-            ? mount.ammoSpendBudget - roundsToSpend
-            : 0f;
-        return true;
-    }
-
     private bool CanFireWeapon(CoreTacticalWeaponGroup group)
     {
         CoreTacticalWeaponControl control = ResolveWeaponControl();
         return control == null || control.CanFire(group);
-    }
-
-    private bool HasWeaponAmmo(CoreTacticalWeaponGroup group)
-    {
-        CoreTacticalWeaponControl control = ResolveWeaponControl();
-        return control == null || control.HasAmmo(group);
-    }
-
-    private int ConsumeWeaponAmmoUpTo(CoreTacticalWeaponGroup group, int amount)
-    {
-        CoreTacticalWeaponControl control = ResolveWeaponControl();
-        return control == null ? Mathf.Max(0, amount) : control.ConsumeUpTo(group, amount);
     }
 
     private CoreTacticalWeaponControl ResolveWeaponControl()
@@ -5018,28 +5857,12 @@ public sealed class CoreTacticalMachineGunMountBattery : MonoBehaviour
 
     private static Material CreateMaterial(Color color)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        Material material = new Material(shader);
-        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
-        if (material.HasProperty("_Color")) material.SetColor("_Color", color);
-        material.color = color;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(color, 1.15f);
     }
 
     private static Material CreateTransparentMaterial(Color color)
     {
-        Material material = CreateMaterial(color);
-        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
-        if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-        if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        material.color = color;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(color);
     }
 
     private static float GetFlatDistance(Vector3 first, Vector3 second)
@@ -5060,6 +5883,7 @@ public sealed class CoreTacticalMachineGunAura : MonoBehaviour
     public float radiusMeters = 2000f;
     public float damageTickIntervalSeconds = 0.5f;
     public float damagePerTick = 2.5f;
+    public float machineGunResistanceIgnorePercent = 10f;
     public float tracerRatePerSecond = 220f;
     public float tracerSpeedMS = 2200f;
     public float tracerLengthMeters = 10f;
@@ -5163,7 +5987,10 @@ public sealed class CoreTacticalMachineGunAura : MonoBehaviour
         targetHealth ??= target != null ? target.GetComponent<CoreTacticalPrototypeHealth>() : null;
         if (targetHealth != null)
         {
-            targetHealth.ApplyDamage(damagePerTick, "Machine gun aura");
+            targetHealth.ApplyDamage(CoreTacticalDamageRequest.Kinetic(
+                damagePerTick,
+                "Machine gun aura",
+                machineGunResistanceIgnorePercent));
         }
 
         nextDamageTickTime = now + Mathf.Max(0.05f, damageTickIntervalSeconds);
@@ -5398,21 +6225,7 @@ public sealed class CoreTacticalMachineGunAura : MonoBehaviour
 
     private Material CreateTracerMaterial()
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Sprites/Default");
-        if (shader == null) shader = Shader.Find("Standard");
-        Material material = new Material(shader);
-        if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", tracerColor);
-        if (material.HasProperty("_Color")) material.SetColor("_Color", tracerColor);
-        if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
-        if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-        if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        material.color = tracerColor;
-        return material;
+        return CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(tracerColor);
     }
 
     private static float GetFlatDistance(Vector3 first, Vector3 second)
@@ -5642,6 +6455,7 @@ public sealed class CoreTacticalSecondaryBattery : MonoBehaviour
             group.shellMaterial,
             group.tracerMaterial,
             target);
+        CoreTacticalLeviathanController.NotifyArtilleryReport(muzzlePosition, maxRangeMeters, owner);
     }
 
     private bool TryPredictAimPoint(
@@ -5858,14 +6672,7 @@ public sealed class CoreTacticalSecondaryBattery : MonoBehaviour
             return cachedMaterial;
         }
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        cachedMaterial = new Material(shader);
-        if (cachedMaterial.HasProperty("_BaseColor")) cachedMaterial.SetColor("_BaseColor", color);
-        if (cachedMaterial.HasProperty("_Color")) cachedMaterial.SetColor("_Color", color);
-        if (cachedMaterial.HasProperty("_EmissionColor")) cachedMaterial.SetColor("_EmissionColor", color * 2.4f);
-        cachedMaterial.color = color;
+        cachedMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(color, 2.4f);
         return cachedMaterial;
     }
 
@@ -5877,20 +6684,7 @@ public sealed class CoreTacticalSecondaryBattery : MonoBehaviour
         }
 
         Color smokeColor = new Color(0.82f, 0.86f, 0.88f, 0.28f);
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        cachedMaterial = new Material(shader);
-        if (cachedMaterial.HasProperty("_BaseColor")) cachedMaterial.SetColor("_BaseColor", smokeColor);
-        if (cachedMaterial.HasProperty("_Color")) cachedMaterial.SetColor("_Color", smokeColor);
-        if (cachedMaterial.HasProperty("_Surface")) cachedMaterial.SetFloat("_Surface", 1f);
-        if (cachedMaterial.HasProperty("_SrcBlend")) cachedMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (cachedMaterial.HasProperty("_DstBlend")) cachedMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        if (cachedMaterial.HasProperty("_ZWrite")) cachedMaterial.SetInt("_ZWrite", 0);
-        if (cachedMaterial.HasProperty("_Cull")) cachedMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-        cachedMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        cachedMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        cachedMaterial.color = smokeColor;
+        cachedMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(smokeColor);
         return cachedMaterial;
     }
 
@@ -5972,15 +6766,24 @@ public sealed class CoreTacticalSecondaryBattery : MonoBehaviour
     }
 }
 
+public enum CoreTacticalProjectileDetonationMode
+{
+    AirBurst,
+    DirectImpact
+}
+
 public sealed class CoreTacticalProjectileVisual : MonoBehaviour
 {
     private const int TrailSampleCount = 4;
     private const float MaxStableTrailMeters = 260f;
     private const float MaxFuseTimingErrorSeconds = 0.055f;
     private const float FuseTimingErrorFlightFraction = 0.035f;
-    private const float CameraDistanceWidthScale = 0.0007f;
-    private const float HeadCameraDistanceLengthScale = 0.0013f;
-    private const float HeadCameraDistanceWidthScale = 0.00022f;
+    private const float DirectImpactMissRangeMultiplier = 1.5f;
+    private const float CameraDistanceWidthScale = 0.00105f;
+    private const float HeadCameraDistanceLengthScale = 0.0016f;
+    private const float HeadCameraDistanceWidthScale = 0.00034f;
+    private const float MinTracerCoreWidthMeters = 0.34f;
+    private const float MinTracerGlowWidthMeters = 0.72f;
     private static readonly RaycastHit[] HitBuffer = new RaycastHit[8];
 
     private readonly Vector3[] headVertices = new Vector3[4];
@@ -5999,8 +6802,14 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
     private float burstRadiusMeters;
     private float hitRadius;
     private float damageAmount;
+    private CoreTacticalDamageType damageType;
+    private float damageResistanceIgnorePercent;
+    private float damageCaliberMm;
+    private float damageDirectImpactFuseThresholdMeters;
+    private float damageFireChancePercent;
     private float visualScale;
     private string damageSource;
+    private CoreTacticalProjectileDetonationMode detonationMode;
     private bool damageApplied;
     private CoreTacticalShipMotor target;
     private Mesh headMesh;
@@ -6024,7 +6833,13 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         Material tracerMaterial,
         CoreTacticalShipMotor target,
         float damageAmount = 0f,
-        string damageSource = "")
+        string damageSource = "",
+        CoreTacticalProjectileDetonationMode detonationMode = CoreTacticalProjectileDetonationMode.AirBurst,
+        CoreTacticalDamageType damageType = CoreTacticalDamageType.Kinetic,
+        float resistanceIgnorePercent = 0f,
+        float caliberMm = 0f,
+        float directImpactFuseThresholdMeters = 0f,
+        float fireChancePercent = 0f)
     {
         GameObject projectile = new GameObject(projectileName);
         projectile.name = projectileName;
@@ -6071,7 +6886,13 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
             tracerMesh,
             target,
             damageAmount,
-            damageSource);
+            damageSource,
+            detonationMode,
+            damageType,
+            resistanceIgnorePercent,
+            caliberMm,
+            directImpactFuseThresholdMeters,
+            fireChancePercent);
     }
 
     private void Initialize(
@@ -6089,21 +6910,33 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         Mesh newTracerMesh,
         CoreTacticalShipMotor newTarget,
         float newDamageAmount,
-        string newDamageSource)
+        string newDamageSource,
+        CoreTacticalProjectileDetonationMode newDetonationMode,
+        CoreTacticalDamageType newDamageType,
+        float newResistanceIgnorePercent,
+        float newCaliberMm,
+        float newDirectImpactFuseThresholdMeters,
+        float newFireChancePercent)
     {
         startPosition = newStartPosition;
         initialVelocity = newInitialVelocity;
         gravityMS2 = newGravityMS2;
         linearDragK = Mathf.Max(0f, newLinearDragK);
         birthTime = Time.time;
-        float maxRangeFlightSeconds = GetMaxRangeFlightSeconds(maxRangeMeters, initialVelocity, linearDragK);
+        detonationMode = newDetonationMode;
+        float lifetimeRangeMeters = detonationMode == CoreTacticalProjectileDetonationMode.DirectImpact
+            ? maxRangeMeters * DirectImpactMissRangeMultiplier
+            : maxRangeMeters;
+        float maxRangeFlightSeconds = GetMaxRangeFlightSeconds(lifetimeRangeMeters, initialVelocity, linearDragK);
         // Time fuses should not be perfect range computers: air bursts get a tiny clock error
         // so repeated shots do not pop on the same invisible point. Direct hits/obstacle hits stay exact.
         float fuseTimingError = Mathf.Min(MaxFuseTimingErrorSeconds, Mathf.Max(0f, newFuseSeconds) * FuseTimingErrorFlightFraction);
-        fuseSeconds = Mathf.Clamp(
-            newFuseSeconds + Random.Range(-fuseTimingError, fuseTimingError),
-            0.05f,
-            maxRangeFlightSeconds);
+        fuseSeconds = detonationMode == CoreTacticalProjectileDetonationMode.AirBurst
+            ? Mathf.Clamp(
+                newFuseSeconds + Random.Range(-fuseTimingError, fuseTimingError),
+                0.05f,
+                maxRangeFlightSeconds)
+            : maxRangeFlightSeconds;
         deathTime = birthTime + maxRangeFlightSeconds;
         trailSeconds = Mathf.Max(0.1f, newTrailSeconds);
         burstRadiusMeters = Mathf.Max(0.1f, newBurstRadiusMeters);
@@ -6115,6 +6948,11 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         tracerCamera = Camera.main;
         target = newTarget;
         damageAmount = Mathf.Max(0f, newDamageAmount);
+        damageType = newDamageType;
+        damageResistanceIgnorePercent = Mathf.Max(0f, newResistanceIgnorePercent);
+        damageCaliberMm = Mathf.Max(0f, newCaliberMm);
+        damageDirectImpactFuseThresholdMeters = Mathf.Max(0f, newDirectImpactFuseThresholdMeters);
+        damageFireChancePercent = Mathf.Max(0f, newFireChancePercent);
         damageSource = string.IsNullOrWhiteSpace(newDamageSource) ? gameObject.name : newDamageSource;
         previousPosition = newStartPosition;
     }
@@ -6141,7 +6979,7 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
     private void Update()
     {
         float elapsed = Time.time - birthTime;
-        if (elapsed >= fuseSeconds)
+        if (detonationMode == CoreTacticalProjectileDetonationMode.AirBurst && elapsed >= fuseSeconds)
         {
             ExplodeAt(EvaluatePosition(fuseSeconds));
             Destroy(gameObject);
@@ -6150,23 +6988,55 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
 
         if (Time.time >= deathTime)
         {
-            ExplodeAt(EvaluatePosition(elapsed));
             Destroy(gameObject);
             return;
         }
 
         Vector3 position = EvaluatePosition(elapsed);
         Vector3 frameDelta = position - previousPosition;
-        if (CoreTacticalWeaponOcclusion.SegmentHitsObstacle(previousPosition, position, hitRadius, out Vector3 obstacleHitPosition))
+        if (CoreTacticalAutomatonWreck.TrySphereCastWreck(previousPosition, position, hitRadius, out CoreTacticalAutomatonWreck wreckHit, out Vector3 wreckHitPosition))
         {
-            ExplodeAt(obstacleHitPosition);
+            if (detonationMode == CoreTacticalProjectileDetonationMode.AirBurst)
+            {
+                ExplodeAt(wreckHitPosition);
+            }
+            else
+            {
+                ImpactAt(wreckHitPosition, false);
+                wreckHit.ApplyProjectileDamage(damageAmount, damageSource, wreckHitPosition);
+                damageApplied = damageAmount > 0f;
+            }
+
             Destroy(gameObject);
             return;
         }
 
-        if (HitsTarget(previousPosition, position))
+        if (CoreTacticalWeaponOcclusion.SegmentHitsObstacle(previousPosition, position, hitRadius, out Vector3 obstacleHitPosition))
         {
-            ExplodeAt(position);
+            if (detonationMode == CoreTacticalProjectileDetonationMode.AirBurst)
+            {
+                ExplodeAt(obstacleHitPosition);
+            }
+            else
+            {
+                ImpactAt(obstacleHitPosition, false);
+            }
+
+            Destroy(gameObject);
+            return;
+        }
+
+        if (HitsTarget(previousPosition, position, out Vector3 targetHitPosition))
+        {
+            if (detonationMode == CoreTacticalProjectileDetonationMode.AirBurst)
+            {
+                ExplodeAt(targetHitPosition);
+            }
+            else
+            {
+                ImpactAt(targetHitPosition, true);
+            }
+
             Destroy(gameObject);
             return;
         }
@@ -6180,10 +7050,62 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
     private void ExplodeAt(Vector3 position)
     {
         CoreTacticalFlakBurstVisual.Create(position, burstRadiusMeters);
+        CoreTacticalLeviathanController.NotifyProjectileImpact(position, burstRadiusMeters, 0.06f);
         TryApplyDamageAt(position);
     }
 
+    private void ImpactAt(Vector3 position, bool applyDirectDamage)
+    {
+        CoreTacticalFlakBurstVisual.Create(position, Mathf.Max(0.75f, visualScale * 0.75f));
+        CoreTacticalLeviathanController.NotifyProjectileImpact(position, Mathf.Max(8f, hitRadius * 3f), applyDirectDamage ? 0.105f : 0.045f);
+        if (applyDirectDamage)
+        {
+            TryApplyDirectDamageAt(position);
+        }
+    }
+
     private void TryApplyDamageAt(Vector3 position)
+    {
+        if (damageApplied || damageAmount <= 0f)
+        {
+            return;
+        }
+
+        int wreckDamageCount = CoreTacticalAutomatonWreck.ApplyExplosionDamageToWrecks(
+            position,
+            burstRadiusMeters,
+            damageAmount,
+            damageSource);
+
+        if (target == null)
+        {
+            damageApplied = wreckDamageCount > 0;
+            return;
+        }
+
+        CoreTacticalPrototypeHealth health = target.GetComponent<CoreTacticalPrototypeHealth>();
+        if (health == null || health.currentHealth <= 0f)
+        {
+            damageApplied = wreckDamageCount > 0;
+            return;
+        }
+
+        float closestDistance = GetClosestTargetDistance(position);
+        if (closestDistance > Mathf.Max(0.1f, burstRadiusMeters))
+        {
+            damageApplied = wreckDamageCount > 0;
+            return;
+        }
+
+        float damageScale = Mathf.Lerp(
+            0.35f,
+            1f,
+            1f - Mathf.Clamp01(closestDistance / Mathf.Max(0.1f, burstRadiusMeters)));
+        health.ApplyDamage(BuildDamageRequest(damageAmount * damageScale, position, burstRadiusMeters));
+        damageApplied = true;
+    }
+
+    private void TryApplyDirectDamageAt(Vector3 position)
     {
         if (damageApplied || damageAmount <= 0f || target == null)
         {
@@ -6197,17 +7119,26 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         }
 
         float closestDistance = GetClosestTargetDistance(position);
-        if (closestDistance > Mathf.Max(0.1f, burstRadiusMeters))
+        if (closestDistance > Mathf.Max(0.1f, hitRadius))
         {
             return;
         }
 
-        float damageScale = Mathf.Lerp(
-            0.35f,
-            1f,
-            1f - Mathf.Clamp01(closestDistance / Mathf.Max(0.1f, burstRadiusMeters)));
-        health.ApplyDamage(damageAmount * damageScale, damageSource);
+        health.ApplyDamage(BuildDamageRequest(damageAmount, position, 0f));
         damageApplied = true;
+    }
+
+    private CoreTacticalDamageRequest BuildDamageRequest(float damage, Vector3 position, float explosionRadiusMeters)
+    {
+        return CoreTacticalDamageRequest.Create(
+            damageType,
+            damage,
+            damageSource,
+            damageResistanceIgnorePercent,
+            damageFireChancePercent,
+            explosionRadiusMeters,
+            position,
+            initialVelocity);
     }
 
     private float GetClosestTargetDistance(Vector3 position)
@@ -6258,13 +7189,13 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         widthDirection.Normalize();
         float cameraDistance = camera != null ? Vector3.Distance(camera.transform.position, worldPosition) : 0f;
         float length = Mathf.Clamp(
-            Mathf.Max(visualScale * 3.1f, cameraDistance * HeadCameraDistanceLengthScale),
-            visualScale * 2.3f,
-            visualScale * 8.5f);
+            Mathf.Max(visualScale * 3.8f, cameraDistance * HeadCameraDistanceLengthScale),
+            visualScale * 2.8f,
+            visualScale * 10.0f);
         float width = Mathf.Clamp(
-            Mathf.Max(visualScale * 0.42f, cameraDistance * HeadCameraDistanceWidthScale),
-            visualScale * 0.26f,
-            visualScale * 1.25f);
+            Mathf.Max(MinTracerCoreWidthMeters, visualScale * 0.55f, cameraDistance * HeadCameraDistanceWidthScale),
+            Mathf.Max(MinTracerCoreWidthMeters, visualScale * 0.34f),
+            Mathf.Max(MinTracerGlowWidthMeters, visualScale * 1.55f));
 
         Vector3 tail = -tangent * (length * 0.74f);
         Vector3 head = tangent * (length * 0.26f);
@@ -6317,9 +7248,19 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         widthDirection.Normalize();
         float cameraDistance = camera != null ? Vector3.Distance(camera.transform.position, center) : 0f;
         float width = Mathf.Clamp(
-            Mathf.Max(visualScale * 0.32f, cameraDistance * CameraDistanceWidthScale),
-            visualScale * 0.18f,
-            visualScale * 1.25f);
+            Mathf.Max(MinTracerCoreWidthMeters, visualScale * 0.42f, cameraDistance * CameraDistanceWidthScale),
+            Mathf.Max(MinTracerCoreWidthMeters, visualScale * 0.24f),
+            Mathf.Max(MinTracerGlowWidthMeters, visualScale * 1.45f));
+        float glowWidth = Mathf.Max(MinTracerGlowWidthMeters, width * 2.2f);
+
+        AddTracerTaperedQuad(
+            tail,
+            head,
+            widthDirection,
+            glowWidth * 0.30f,
+            glowWidth,
+            new Color(1.00f, 0.42f, 0.08f, 0.035f),
+            new Color(1.00f, 0.78f, 0.18f, 0.18f));
 
         AddTracerTaperedQuad(
             tail,
@@ -6327,8 +7268,8 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
             widthDirection,
             width * 0.18f,
             width,
-            new Color(0.82f, 0.86f, 0.88f, 0.02f),
-            new Color(0.86f, 0.90f, 0.92f, 0.34f));
+            new Color(1.00f, 0.64f, 0.18f, 0.06f),
+            new Color(1.00f, 0.90f, 0.42f, 0.62f));
 
         tracerMesh.Clear(false);
         tracerMesh.SetVertices(tracerVertices);
@@ -6340,6 +7281,7 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
     private void AddTracerQuad(Vector3 tail, Vector3 head, Vector3 widthDirection, float widthMeters, Color color)
     {
         Vector3 halfWidth = widthDirection * (widthMeters * 0.5f);
+        int vertexIndex = tracerVertices.Count;
         tracerVertices.Add(tail - halfWidth);
         tracerVertices.Add(tail + halfWidth);
         tracerVertices.Add(head + halfWidth);
@@ -6350,12 +7292,12 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         tracerColors.Add(color);
         tracerColors.Add(color);
 
-        tracerIndices.Add(0);
-        tracerIndices.Add(1);
-        tracerIndices.Add(2);
-        tracerIndices.Add(0);
-        tracerIndices.Add(2);
-        tracerIndices.Add(3);
+        tracerIndices.Add(vertexIndex);
+        tracerIndices.Add(vertexIndex + 1);
+        tracerIndices.Add(vertexIndex + 2);
+        tracerIndices.Add(vertexIndex);
+        tracerIndices.Add(vertexIndex + 2);
+        tracerIndices.Add(vertexIndex + 3);
     }
 
     private void AddTracerTaperedQuad(
@@ -6369,6 +7311,7 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
     {
         Vector3 tailHalfWidth = widthDirection * (tailWidthMeters * 0.5f);
         Vector3 headHalfWidth = widthDirection * (headWidthMeters * 0.5f);
+        int vertexIndex = tracerVertices.Count;
         tracerVertices.Add(tail - tailHalfWidth);
         tracerVertices.Add(tail + tailHalfWidth);
         tracerVertices.Add(head + headHalfWidth);
@@ -6379,12 +7322,12 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         tracerColors.Add(headColor);
         tracerColors.Add(headColor);
 
-        tracerIndices.Add(0);
-        tracerIndices.Add(1);
-        tracerIndices.Add(2);
-        tracerIndices.Add(0);
-        tracerIndices.Add(2);
-        tracerIndices.Add(3);
+        tracerIndices.Add(vertexIndex);
+        tracerIndices.Add(vertexIndex + 1);
+        tracerIndices.Add(vertexIndex + 2);
+        tracerIndices.Add(vertexIndex);
+        tracerIndices.Add(vertexIndex + 2);
+        tracerIndices.Add(vertexIndex + 3);
     }
 
     private Camera GetTracerCamera()
@@ -6397,8 +7340,9 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
         return tracerCamera;
     }
 
-    private bool HitsTarget(Vector3 from, Vector3 to)
+    private bool HitsTarget(Vector3 from, Vector3 to, out Vector3 hitPosition)
     {
+        hitPosition = to;
         if (target == null)
         {
             return false;
@@ -6425,6 +7369,12 @@ public sealed class CoreTacticalProjectileVisual : MonoBehaviour
             Collider hitCollider = HitBuffer[i].collider;
             if (hitCollider != null && hitCollider.GetComponentInParent<CoreTacticalShipMotor>() == target)
             {
+                hitPosition = HitBuffer[i].point;
+                if (hitPosition == Vector3.zero)
+                {
+                    hitPosition = to;
+                }
+
                 return true;
             }
         }
@@ -6606,8 +7556,13 @@ public sealed class CoreTacticalMeshFadeDestroyer : MonoBehaviour
 
 public sealed class CoreTacticalFlakBurstVisual : MonoBehaviour
 {
+    private const float MinBurstVisualRadiusMeters = 7f;
+    private const float BurstVisualRadiusMultiplier = 1.35f;
+    private const float BurstVisualLifetimeSeconds = 0.48f;
     private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
+    private static readonly int TintColorPropertyId = Shader.PropertyToID("_TintColor");
+    private static readonly int EmissionColorPropertyId = Shader.PropertyToID("_EmissionColor");
     private static Mesh sharedBurstMesh;
     private static Material sharedBurstMaterial;
     private static MaterialPropertyBlock propertyBlock;
@@ -6637,9 +7592,9 @@ public sealed class CoreTacticalFlakBurstVisual : MonoBehaviour
     {
         burstRenderer = newRenderer;
         targetCamera = Camera.main;
-        radiusMeters = Mathf.Max(0.1f, newRadiusMeters);
+        radiusMeters = Mathf.Max(MinBurstVisualRadiusMeters, newRadiusMeters * BurstVisualRadiusMultiplier);
         birthTime = Time.time;
-        lifetimeSeconds = 0.22f;
+        lifetimeSeconds = BurstVisualLifetimeSeconds;
         UpdateVisual(0f);
     }
 
@@ -6667,14 +7622,16 @@ public sealed class CoreTacticalFlakBurstVisual : MonoBehaviour
             transform.rotation = targetCamera.transform.rotation;
         }
 
-        float scale = radiusMeters * 2f * Mathf.Lerp(0.35f, 1f, Mathf.Sin(normalizedAge * Mathf.PI * 0.5f));
+        float scale = radiusMeters * 2f * Mathf.Lerp(0.42f, 1f, Mathf.Sin(normalizedAge * Mathf.PI * 0.5f));
         transform.localScale = new Vector3(scale, scale, scale);
 
         propertyBlock ??= new MaterialPropertyBlock();
-        Color color = new Color(1f, 0.78f, 0.18f, Mathf.Lerp(0.75f, 0f, normalizedAge));
+        Color color = new Color(1f, 0.78f, 0.18f, Mathf.Lerp(0.88f, 0f, normalizedAge));
         burstRenderer.GetPropertyBlock(propertyBlock);
         propertyBlock.SetColor(BaseColorPropertyId, color);
         propertyBlock.SetColor(ColorPropertyId, color);
+        propertyBlock.SetColor(TintColorPropertyId, color);
+        propertyBlock.SetColor(EmissionColorPropertyId, color * 2.8f);
         burstRenderer.SetPropertyBlock(propertyBlock);
     }
 
@@ -6687,12 +7644,15 @@ public sealed class CoreTacticalFlakBurstVisual : MonoBehaviour
 
         const int SegmentCount = 28;
         Vector3[] vertices = new Vector3[SegmentCount + 1];
+        Color[] colors = new Color[SegmentCount + 1];
         int[] indices = new int[SegmentCount * 3];
         vertices[0] = Vector3.zero;
+        colors[0] = new Color(1f, 0.92f, 0.36f, 1f);
         for (int i = 0; i < SegmentCount; i++)
         {
             float angle = i / (float)SegmentCount * Mathf.PI * 2f;
             vertices[i + 1] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+            colors[i + 1] = new Color(1f, 0.48f, 0.06f, 0.74f);
         }
 
         for (int i = 0; i < SegmentCount; i++)
@@ -6708,6 +7668,7 @@ public sealed class CoreTacticalFlakBurstVisual : MonoBehaviour
             name = "Core Tactical Flak Burst Disk"
         };
         sharedBurstMesh.vertices = vertices;
+        sharedBurstMesh.colors = colors;
         sharedBurstMesh.SetIndices(indices, MeshTopology.Triangles, 0, true);
         sharedBurstMesh.RecalculateBounds();
         return sharedBurstMesh;
@@ -6720,21 +7681,13 @@ public sealed class CoreTacticalFlakBurstVisual : MonoBehaviour
             return sharedBurstMaterial;
         }
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Sprites/Default");
-        if (shader == null) shader = Shader.Find("Standard");
-        sharedBurstMaterial = new Material(shader);
-        Color color = new Color(1f, 0.78f, 0.18f, 0.75f);
-        if (sharedBurstMaterial.HasProperty("_BaseColor")) sharedBurstMaterial.SetColor("_BaseColor", color);
-        if (sharedBurstMaterial.HasProperty("_Color")) sharedBurstMaterial.SetColor("_Color", color);
-        if (sharedBurstMaterial.HasProperty("_Surface")) sharedBurstMaterial.SetFloat("_Surface", 1f);
-        if (sharedBurstMaterial.HasProperty("_SrcBlend")) sharedBurstMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (sharedBurstMaterial.HasProperty("_DstBlend")) sharedBurstMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        if (sharedBurstMaterial.HasProperty("_ZWrite")) sharedBurstMaterial.SetInt("_ZWrite", 0);
-        if (sharedBurstMaterial.HasProperty("_Cull")) sharedBurstMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-        sharedBurstMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        sharedBurstMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        sharedBurstMaterial.color = color;
+        Color color = new Color(1f, 0.78f, 0.18f, 0.88f);
+        sharedBurstMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(color);
+        if (sharedBurstMaterial.HasProperty(EmissionColorPropertyId))
+        {
+            sharedBurstMaterial.EnableKeyword("_EMISSION");
+        }
+
         return sharedBurstMaterial;
     }
 }
@@ -6753,6 +7706,7 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
     public float targetRefreshIntervalSeconds = 0.2f;
     public string missileName = "Core Tactical Missile";
     public CoreTacticalMissileGuidanceMode guidanceMode = CoreTacticalMissileGuidanceMode.PredictedIntercept;
+    public CoreTacticalWeaponGroup weaponGroup = CoreTacticalWeaponGroup.Missiles;
     public int sideSign = 1;
     public float localZScale = 0.2f;
     public Color missileColor = new Color(0.72f, 0.95f, 1f, 1f);
@@ -6766,15 +7720,66 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
     public float proximityRadiusMeters = 20f;
     public float explosionRadiusMeters = 32f;
     public float missileDamage = 95f;
+    public CoreTacticalDamageType missileDamageType = CoreTacticalDamageType.Explosive;
+    public float missileResistanceIgnorePercent = 90f;
+    public float missileCaliberMm = 200f;
+    public float missileFireChancePercent = 12f;
+    public bool fullDamageInsideExplosionRadius;
+    public bool manualLaunchOnly;
+    public int projectilesPerManualSalvo = 1;
+    public int automaticBurstProjectileCount = 1;
+    public float automaticBurstShotIntervalSeconds = 0.08f;
+    public float automaticBurstSpreadDegrees = 10f;
+    public bool automaticBurstUsesChaoticCloud;
+    public float automaticBurstCloudScatterDegrees = 7f;
+    public float automaticBurstCloudForwardJitterDegrees = 3f;
+    public float automaticBurstShotIntervalJitterSeconds = 0.04f;
+    public float automaticBurstChaosAmplitudeDegrees = 12f;
+    public float automaticBurstChaosFrequencyHz = 0.95f;
+    public float manualFanAngleDegrees = 15f;
+    public float manualAimSectorDegrees = 120f;
+    public float manualCooldownSeconds = 8f;
+    public string visualLauncherRole = "torpedo";
 
     private float nextLaunchTime;
+    private CoreTacticalShipMotor automaticBurstTarget;
+    private Vector3 automaticBurstCenterDirection = Vector3.forward;
+    private int automaticBurstRemaining;
+    private int automaticBurstLaunched;
+    private int automaticBurstTotal;
+    private float nextAutomaticBurstShotTime;
+    private float automaticBurstSeed;
     private GameObject launcherObject;
     private Material launcherMaterial;
     private Material missileMaterial;
     private Material trailMaterial;
     private CoreTacticalWeaponControl weaponControl;
     private CoreTacticalCombatant[] targetCandidates = new CoreTacticalCombatant[0];
+    private CoreTacticalVisualWeaponHandle visualLauncherHandle;
     private float nextTargetRefreshTime;
+    private bool visualLauncherHandleResolved;
+    private bool reloadCooldownStarted;
+
+    public float ManualRangeMeters => Mathf.Max(1f, missileSpeedMS) * Mathf.Max(0.1f, missileLifetimeSeconds);
+    public float ManualFanAngleDegrees => Mathf.Max(0f, manualFanAngleDegrees);
+    public float ManualAimSectorDegrees => Mathf.Clamp(manualAimSectorDegrees, 1f, 180f);
+    public int ProjectilesPerManualSalvo => Mathf.Max(1, projectilesPerManualSalvo);
+    public int AutomaticBurstProjectileCount => Mathf.Max(1, automaticBurstProjectileCount);
+    public float AutomaticBurstShotIntervalSeconds => Mathf.Max(0.01f, automaticBurstShotIntervalSeconds);
+    public float AutomaticBurstSpreadDegrees => Mathf.Max(0f, automaticBurstSpreadDegrees);
+    public bool AutomaticBurstUsesChaoticCloudForTests => automaticBurstUsesChaoticCloud;
+    public float AutomaticBurstCloudScatterDegreesForTests => Mathf.Max(0f, automaticBurstCloudScatterDegrees);
+    public float AutomaticBurstShotIntervalJitterSecondsForTests => Mathf.Max(0f, automaticBurstShotIntervalJitterSeconds);
+    public float AutomaticBurstChaosAmplitudeDegreesForTests => Mathf.Max(0f, automaticBurstChaosAmplitudeDegrees);
+    public float AutomaticBurstChaosFrequencyHzForTests => Mathf.Max(0f, automaticBurstChaosFrequencyHz);
+    public float AutomaticBurstLauncherFanOffsetDegreesForTests => GetAutomaticBurstLauncherFanOffsetDegrees();
+    public float ReloadCooldownRemainingSeconds => reloadCooldownStarted ? Mathf.Max(0f, nextLaunchTime - Time.time) : 0f;
+
+    public void SetReloadCooldownRemainingSecondsForTests(float seconds)
+    {
+        nextLaunchTime = Time.time + Mathf.Max(0f, seconds);
+        reloadCooldownStarted = seconds > 0.05f;
+    }
 
     private void Awake()
     {
@@ -6803,6 +7808,16 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
         EnsureLauncherVisual();
         ApplyLauncherTransform();
         float now = Time.time;
+        if (TryContinueAutomaticBurst(now))
+        {
+            return;
+        }
+
+        if (manualLaunchOnly)
+        {
+            return;
+        }
+
         RefreshTargetCandidates(now);
         CoreTacticalShipMotor launchTarget = FindBestReachableTarget();
         if (launchTarget == null)
@@ -6815,14 +7830,26 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
             return;
         }
 
-        if (!CanFireWeapon(CoreTacticalWeaponGroup.Missiles))
+        if (!CanFireWeapon(weaponGroup))
         {
+            return;
+        }
+
+        if (AutomaticBurstProjectileCount > 1)
+        {
+            if (StartAutomaticBurst(launchTarget, now))
+            {
+                nextLaunchTime = Time.time + Mathf.Max(0.05f, launchIntervalSeconds);
+                reloadCooldownStarted = true;
+            }
+
             return;
         }
 
         if (LaunchMissile(launchTarget))
         {
             nextLaunchTime = Time.time + Mathf.Max(0.05f, launchIntervalSeconds);
+            reloadCooldownStarted = true;
         }
     }
 
@@ -6852,7 +7879,7 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
             for (int i = 0; i < targetCandidates.Length; i++)
             {
                 CoreTacticalCombatant combatant = targetCandidates[i];
-                if (combatant == null || combatant.team != targetTeam || !combatant.IsAlive)
+                if (!CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(combatant, targetTeam))
                 {
                     continue;
                 }
@@ -6919,13 +7946,247 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
             return false;
         }
 
-        if (!TryConsumeWeaponAmmo(CoreTacticalWeaponGroup.Missiles, 1))
+        Vector3 launchPosition = GetLaunchPosition();
+        Vector3 launchDirection = GetInitialLaunchDirection(launchPosition, launchTarget);
+        return LaunchMissileInDirection(launchDirection, launchTarget, true);
+    }
+
+    private bool StartAutomaticBurst(CoreTacticalShipMotor launchTarget, float now)
+    {
+        if (!IsValidTarget(launchTarget) || !CanFireWeapon(weaponGroup))
         {
             return false;
         }
 
         Vector3 launchPosition = GetLaunchPosition();
-        Vector3 launchDirection = GetInitialLaunchDirection(launchPosition, launchTarget);
+        automaticBurstCenterDirection = FlattenDirection(GetInitialLaunchDirection(launchPosition, launchTarget), transform.forward);
+        automaticBurstTarget = launchTarget;
+        automaticBurstTotal = AutomaticBurstProjectileCount;
+        automaticBurstRemaining = automaticBurstTotal;
+        automaticBurstLaunched = 0;
+        automaticBurstSeed = UnityEngine.Random.value * 1000f + Time.time * 13.37f + sideSign * 29.11f;
+        nextAutomaticBurstShotTime = now;
+        return TryContinueAutomaticBurst(now);
+    }
+
+    private bool TryContinueAutomaticBurst(float now)
+    {
+        if (automaticBurstRemaining <= 0)
+        {
+            return false;
+        }
+
+        bool launchedAny = false;
+        float shotInterval = AutomaticBurstShotIntervalSeconds;
+        int safety = 0;
+        while (automaticBurstRemaining > 0
+            && now + 0.0001f >= nextAutomaticBurstShotTime
+            && safety < AutomaticBurstProjectileCount)
+        {
+            if (!CanFireWeapon(weaponGroup))
+            {
+                StopAutomaticBurst();
+                return launchedAny;
+            }
+
+            Vector3 launchDirection = GetAutomaticBurstShotDirection(automaticBurstLaunched, automaticBurstTotal);
+            if (!LaunchMissileInDirection(launchDirection, automaticBurstTarget, false))
+            {
+                StopAutomaticBurst();
+                return launchedAny;
+            }
+
+            launchedAny = true;
+            automaticBurstLaunched++;
+            automaticBurstRemaining--;
+            nextAutomaticBurstShotTime = now + shotInterval + GetAutomaticBurstShotIntervalJitter(automaticBurstLaunched);
+            safety++;
+            break;
+        }
+
+        if (automaticBurstRemaining <= 0)
+        {
+            StopAutomaticBurst();
+        }
+
+        return launchedAny || automaticBurstRemaining > 0;
+    }
+
+    private Vector3 GetAutomaticBurstShotDirection(int shotIndex, int shotCount)
+    {
+        Vector3 centerDirection = GetAutomaticBurstTrackedCenterDirection();
+        if (shotCount <= 1)
+        {
+            return centerDirection;
+        }
+
+        if (automaticBurstUsesChaoticCloud)
+        {
+            return GetChaoticCloudShotDirection(centerDirection, shotIndex, shotCount);
+        }
+
+        float spread = AutomaticBurstSpreadDegrees;
+        float normalized = shotIndex / Mathf.Max(1f, shotCount - 1f);
+        float angle = Mathf.Lerp(-spread * 0.5f, spread * 0.5f, normalized)
+            + GetAutomaticBurstLauncherFanOffsetDegrees();
+        return FlattenDirection(Quaternion.AngleAxis(angle, Vector3.up) * centerDirection, centerDirection);
+    }
+
+    private Vector3 GetChaoticCloudShotDirection(Vector3 centerDirection, int shotIndex, int shotCount)
+    {
+        float seed = automaticBurstSeed + shotIndex * 41.37f + sideSign * 7.91f;
+        float scatter = Mathf.Max(0f, automaticBurstCloudScatterDegrees);
+        float spread = Mathf.Max(scatter, AutomaticBurstSpreadDegrees * 0.55f);
+        float normalized = shotCount <= 1 ? 0.5f : shotIndex / Mathf.Max(1f, shotCount - 1f);
+        float wovenOffset = Mathf.Sin(seed * 1.21f) * spread * 0.42f
+            + Mathf.Sin((normalized + 0.17f) * Mathf.PI * 4.5f + automaticBurstSeed) * spread * 0.32f;
+        float randomOffset = (Hash01(seed) * 2f - 1f) * spread;
+        float forwardJitter = (Hash01(seed + 19.43f) * 2f - 1f) * Mathf.Max(0f, automaticBurstCloudForwardJitterDegrees);
+        float angle = Mathf.Clamp(randomOffset * 0.72f + wovenOffset + forwardJitter, -spread * 1.25f, spread * 1.25f);
+        return FlattenDirection(Quaternion.AngleAxis(angle, Vector3.up) * centerDirection, centerDirection);
+    }
+
+    private Vector3 GetAutomaticBurstTrackedCenterDirection()
+    {
+        Vector3 fallbackDirection = FlattenDirection(automaticBurstCenterDirection, transform.forward);
+        if (automaticBurstTarget == null)
+        {
+            return fallbackDirection;
+        }
+
+        automaticBurstCenterDirection = FlattenDirection(
+            GetInitialLaunchDirection(GetLaunchPosition(), automaticBurstTarget),
+            fallbackDirection);
+        return automaticBurstCenterDirection;
+    }
+
+    private float GetAutomaticBurstLauncherFanOffsetDegrees()
+    {
+        if (weaponGroup != CoreTacticalWeaponGroup.Missiles
+            || manualLaunchOnly
+            || AutomaticBurstProjectileCount <= 1
+            || automaticBurstUsesChaoticCloud)
+        {
+            return 0f;
+        }
+
+        float signedSide = sideSign < 0 ? -1f : 1f;
+        return signedSide * Mathf.Clamp(AutomaticBurstSpreadDegrees * 0.32f, 2.5f, 5.5f);
+    }
+
+    private float GetAutomaticBurstShotIntervalJitter(int shotIndex)
+    {
+        if (!automaticBurstUsesChaoticCloud)
+        {
+            return 0f;
+        }
+
+        float jitter = Mathf.Max(0f, automaticBurstShotIntervalJitterSeconds);
+        if (jitter <= 0.001f)
+        {
+            return 0f;
+        }
+
+        float seed = automaticBurstSeed + shotIndex * 17.73f;
+        return (Hash01(seed) * 2f - 1f) * jitter;
+    }
+
+    private void StopAutomaticBurst()
+    {
+        automaticBurstTarget = null;
+        automaticBurstRemaining = 0;
+        automaticBurstLaunched = 0;
+        automaticBurstTotal = 0;
+        nextAutomaticBurstShotTime = 0f;
+        automaticBurstSeed = 0f;
+    }
+
+    public bool TryLaunchManualFan(Vector3 worldDirection)
+    {
+        if (!manualLaunchOnly
+            || Time.time < nextLaunchTime
+            || !CanFireWeapon(weaponGroup)
+            || !IsDirectionInsideManualSector(worldDirection))
+        {
+            return false;
+        }
+
+        Vector3 centerDirection = FlattenDirection(worldDirection, GetManualAimCenterDirection());
+        int projectileCount = Mathf.Max(1, projectilesPerManualSalvo);
+        float fanAngle = Mathf.Max(0f, manualFanAngleDegrees);
+        int launched = 0;
+        for (int i = 0; i < projectileCount; i++)
+        {
+            float normalized = projectileCount <= 1 ? 0.5f : i / (float)(projectileCount - 1);
+            float localAngle = Mathf.Lerp(-fanAngle * 0.5f, fanAngle * 0.5f, normalized);
+            Vector3 launchDirection = Quaternion.AngleAxis(localAngle, Vector3.up) * centerDirection;
+            if (LaunchMissileInDirection(launchDirection, null, false))
+            {
+                launched++;
+            }
+        }
+
+        if (launched <= 0)
+        {
+            return false;
+        }
+
+        nextLaunchTime = Time.time + Mathf.Max(0.2f, manualCooldownSeconds);
+        reloadCooldownStarted = true;
+        return true;
+    }
+
+    public Vector3 GetManualLaunchPosition()
+    {
+        return GetLaunchPosition();
+    }
+
+    public Vector3 GetManualAimCenterDirection()
+    {
+        return FlattenDirection(GetLauncherWorldRotation() * Vector3.forward, owner != null ? owner.transform.forward : transform.forward);
+    }
+
+    public float GetManualAimDeltaDegrees(Vector3 worldDirection)
+    {
+        Vector3 aimDirection = FlattenDirection(worldDirection, GetManualAimCenterDirection());
+        return Mathf.Abs(Vector3.SignedAngle(GetManualAimCenterDirection(), aimDirection, Vector3.up));
+    }
+
+    public bool IsDirectionInsideManualSector(Vector3 worldDirection)
+    {
+        return GetManualAimDeltaDegrees(worldDirection) <= ManualAimSectorDegrees * 0.5f;
+    }
+
+    public Vector3 GetInitialLaunchDirectionForTests(Vector3 launchPosition, CoreTacticalShipMotor launchTarget)
+    {
+        return GetInitialLaunchDirection(launchPosition, launchTarget);
+    }
+
+    public Vector3 GetAutomaticBurstTrackedCenterDirectionForTests(CoreTacticalShipMotor launchTarget)
+    {
+        automaticBurstTarget = launchTarget;
+        if (automaticBurstCenterDirection.sqrMagnitude <= 0.0001f)
+        {
+            automaticBurstCenterDirection = FlattenDirection(transform.forward, Vector3.forward);
+        }
+
+        return GetAutomaticBurstTrackedCenterDirection();
+    }
+
+    private bool LaunchMissileInDirection(Vector3 launchDirection, CoreTacticalShipMotor launchTarget, bool allowTargetAcquisition)
+    {
+        if (!CanFireWeapon(weaponGroup))
+        {
+            return false;
+        }
+
+        Vector3 launchPosition = GetLaunchPosition();
+        bool chaoticCloudShot = automaticBurstUsesChaoticCloud && automaticBurstTotal > 1;
+        int cloudShotIndex = chaoticCloudShot ? automaticBurstLaunched : 0;
+        float cloudSeed = automaticBurstSeed + cloudShotIndex * 23.71f + sideSign * 5.37f;
+        float cloudDriftDegrees = chaoticCloudShot
+            ? (Hash01(cloudSeed + 3.19f) * 2f - 1f) * Mathf.Max(0f, automaticBurstCloudScatterDegrees)
+            : 0f;
         CoreTacticalGuidedMissile.Create(
             missileName,
             launchPosition,
@@ -6934,13 +8195,26 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
             guidanceMode,
             Mathf.Max(1f, missileSpeedMS),
             Mathf.Max(0.1f, missileLifetimeSeconds),
-            Mathf.Max(1f, missileTurnRateDegPerSecond),
+            Mathf.Max(0f, missileTurnRateDegPerSecond),
             Mathf.Max(0.02f, guidanceIntervalSeconds),
             Mathf.Max(0.5f, proximityRadiusMeters),
             Mathf.Max(1f, explosionRadiusMeters),
             Mathf.Max(0f, missileDamage),
+            missileDamageType,
+            fullDamageInsideExplosionRadius,
+            targetTeam,
             CreateMissileMaterial(ref missileMaterial, missileColor),
-            CreateMissileTrailMaterial(ref trailMaterial, trailColor));
+            CreateMissileTrailMaterial(ref trailMaterial, trailColor),
+            trailColor,
+            missileResistanceIgnorePercent,
+            missileCaliberMm,
+            0f,
+            missileFireChancePercent,
+            allowTargetAcquisition,
+            chaoticCloudShot ? automaticBurstChaosAmplitudeDegrees : 0f,
+            chaoticCloudShot ? automaticBurstChaosFrequencyHz : 0f,
+            cloudSeed,
+            cloudDriftDegrees);
         return true;
     }
 
@@ -6948,12 +8222,6 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
     {
         CoreTacticalWeaponControl control = ResolveWeaponControl();
         return control == null || control.CanFire(group);
-    }
-
-    private bool TryConsumeWeaponAmmo(CoreTacticalWeaponGroup group, int amount)
-    {
-        CoreTacticalWeaponControl control = ResolveWeaponControl();
-        return control == null || control.TryConsume(group, amount);
     }
 
     private CoreTacticalWeaponControl ResolveWeaponControl()
@@ -6978,13 +8246,31 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
 
     private Vector3 GetLaunchPosition()
     {
+        if (TryGetVisualLauncherMuzzle(out Vector3 visualMuzzle))
+        {
+            return visualMuzzle;
+        }
+
         return GetLauncherWorldPosition() + GetLauncherWorldRotation() * Vector3.forward * 18f;
     }
 
     private Vector3 GetLauncherWorldPosition()
     {
+        return GetFallbackLauncherWorldPosition();
+    }
+
+    private Vector3 GetFallbackLauncherWorldPosition()
+    {
         Vector3 hullSize = owner != null ? owner.hullSizeMeters : transform.localScale;
         Transform ownerTransform = owner != null ? owner.transform : transform;
+        if (IsMainRocketVisualRole())
+        {
+            float localZ = sideSign < 0 ? hullSize.z * 0.24f : -hullSize.z * 0.24f;
+            return ownerTransform.position
+                + ownerTransform.up * (hullSize.y * 0.58f + 3f)
+                + ownerTransform.forward * localZ;
+        }
+
         int safeSide = sideSign < 0 ? -1 : 1;
         return ownerTransform.position
             + ownerTransform.right * (safeSide * hullSize.x * 0.70f)
@@ -6995,23 +8281,138 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
     private Quaternion GetLauncherWorldRotation()
     {
         Transform ownerTransform = owner != null ? owner.transform : transform;
+        if (IsMainRocketVisualRole())
+        {
+            return ownerTransform.rotation;
+        }
+
         int safeSide = sideSign < 0 ? -1 : 1;
         return ownerTransform.rotation * Quaternion.Euler(0f, safeSide > 0 ? 90f : -90f, 0f);
     }
 
     private Vector3 GetInitialLaunchDirection(Vector3 launchPosition, CoreTacticalShipMotor launchTarget)
     {
-        Vector3 toTarget = launchTarget != null ? launchTarget.transform.position - launchPosition : transform.forward;
+        Vector3 aimPoint = GetInitialLaunchAimPoint(launchPosition, launchTarget);
+        Vector3 toTarget = launchTarget != null ? aimPoint - launchPosition : transform.forward;
         if (toTarget.sqrMagnitude <= 0.001f)
         {
             return transform.forward;
         }
 
-        return toTarget.normalized;
+        return FlattenDirection(toTarget, transform.forward);
+    }
+
+    private Vector3 GetInitialLaunchAimPoint(Vector3 launchPosition, CoreTacticalShipMotor launchTarget)
+    {
+        if (launchTarget == null)
+        {
+            return launchPosition + transform.forward;
+        }
+
+        Vector3 targetPosition = launchTarget.transform.position;
+        if (!ShouldUsePredictedLaunchAim())
+        {
+            return targetPosition;
+        }
+
+        Vector3 targetVelocity = launchTarget.Body != null ? launchTarget.Body.linearVelocity : Vector3.zero;
+        if (targetVelocity.sqrMagnitude <= 0.001f)
+        {
+            return targetPosition;
+        }
+
+        return PredictInitialInterceptPoint(launchPosition, targetPosition, targetVelocity, missileSpeedMS);
+    }
+
+    private bool ShouldUsePredictedLaunchAim()
+    {
+        return guidanceMode == CoreTacticalMissileGuidanceMode.PredictedIntercept
+            || (weaponGroup == CoreTacticalWeaponGroup.Missiles
+                && !manualLaunchOnly
+                && AutomaticBurstProjectileCount > 1
+                && missileTurnRateDegPerSecond <= 0.001f);
+    }
+
+    private static Vector3 PredictInitialInterceptPoint(
+        Vector3 missilePosition,
+        Vector3 targetPosition,
+        Vector3 targetVelocity,
+        float missileSpeed)
+    {
+        Vector3 relativePosition = targetPosition - missilePosition;
+        float safeMissileSpeed = Mathf.Max(1f, missileSpeed);
+        float a = Vector3.Dot(targetVelocity, targetVelocity) - safeMissileSpeed * safeMissileSpeed;
+        float b = 2f * Vector3.Dot(relativePosition, targetVelocity);
+        float c = Vector3.Dot(relativePosition, relativePosition);
+
+        float interceptTime = 0f;
+        if (Mathf.Abs(a) <= 0.0001f)
+        {
+            interceptTime = Mathf.Abs(b) > 0.0001f ? -c / b : 0f;
+        }
+        else
+        {
+            float discriminant = b * b - 4f * a * c;
+            if (discriminant >= 0f)
+            {
+                float sqrt = Mathf.Sqrt(discriminant);
+                float first = (-b - sqrt) / (2f * a);
+                float second = (-b + sqrt) / (2f * a);
+                interceptTime = GetSmallestPositiveLaunchTime(first, second);
+            }
+        }
+
+        if (interceptTime <= 0f)
+        {
+            interceptTime = relativePosition.magnitude / safeMissileSpeed;
+        }
+
+        return targetPosition + targetVelocity * interceptTime;
+    }
+
+    private static float GetSmallestPositiveLaunchTime(float first, float second)
+    {
+        bool firstPositive = first > 0f;
+        bool secondPositive = second > 0f;
+        if (firstPositive && secondPositive)
+        {
+            return Mathf.Min(first, second);
+        }
+
+        if (firstPositive)
+        {
+            return first;
+        }
+
+        return secondPositive ? second : 0f;
+    }
+
+    private static Vector3 FlattenDirection(Vector3 direction, Vector3 fallback)
+    {
+        direction.y = 0f;
+        fallback.y = 0f;
+        if (direction.sqrMagnitude > 0.0001f)
+        {
+            return direction.normalized;
+        }
+
+        return fallback.sqrMagnitude > 0.0001f ? fallback.normalized : Vector3.forward;
     }
 
     private void EnsureLauncherVisual()
     {
+        if (owner != null && owner.hideRuntimeWeaponVisuals)
+        {
+            TryGetVisualLauncherHandle(out _);
+            if (launcherObject != null)
+            {
+                Destroy(launcherObject);
+                launcherObject = null;
+            }
+
+            return;
+        }
+
         if (launcherObject != null || owner == null)
         {
             return;
@@ -7040,6 +8441,46 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
             AssignRendererMaterial(tube, launcherMaterial);
             DestroyPrimitiveCollider(tube);
         }
+    }
+
+    private bool TryGetVisualLauncherMuzzle(out Vector3 muzzlePosition)
+    {
+        muzzlePosition = default;
+        if (!TryGetVisualLauncherHandle(out CoreTacticalVisualWeaponHandle handle))
+        {
+            return false;
+        }
+
+        Vector3 fireDirection = GetLauncherWorldRotation() * Vector3.forward;
+        muzzlePosition = CoreTacticalShipVisualWeaponBinding.GetMuzzlePosition(handle, GetFallbackLauncherWorldPosition(), fireDirection);
+        return true;
+    }
+
+    private bool TryGetVisualLauncherHandle(out CoreTacticalVisualWeaponHandle handle)
+    {
+        if (visualLauncherHandleResolved)
+        {
+            handle = visualLauncherHandle;
+            return handle.IsValid;
+        }
+
+        visualLauncherHandleResolved = true;
+        visualLauncherHandle = default;
+        if (owner == null)
+        {
+            handle = default;
+            return false;
+        }
+
+        CoreTacticalShipVisualWeaponBinding binding = owner.GetComponent<CoreTacticalShipVisualWeaponBinding>();
+        if (binding == null || !binding.TryBindMissileLauncher(sideSign, visualLauncherRole, out visualLauncherHandle))
+        {
+            handle = default;
+            return false;
+        }
+
+        handle = visualLauncherHandle;
+        return true;
     }
 
     private void ApplyLauncherTransform()
@@ -7079,14 +8520,7 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
             return cachedMaterial;
         }
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        cachedMaterial = new Material(shader);
-        if (cachedMaterial.HasProperty("_BaseColor")) cachedMaterial.SetColor("_BaseColor", color);
-        if (cachedMaterial.HasProperty("_Color")) cachedMaterial.SetColor("_Color", color);
-        if (cachedMaterial.HasProperty("_EmissionColor")) cachedMaterial.SetColor("_EmissionColor", color * 2.2f);
-        cachedMaterial.color = color;
+        cachedMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(color, 2.2f);
         return cachedMaterial;
     }
 
@@ -7097,14 +8531,32 @@ public sealed class CoreTacticalMissileLauncher : MonoBehaviour
             return cachedMaterial;
         }
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        cachedMaterial = new Material(shader);
-        if (cachedMaterial.HasProperty("_BaseColor")) cachedMaterial.SetColor("_BaseColor", color);
-        if (cachedMaterial.HasProperty("_Color")) cachedMaterial.SetColor("_Color", color);
-        cachedMaterial.color = color;
+        cachedMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(color);
         return cachedMaterial;
+    }
+
+    private static void ApplyMissileMaterialColor(Material material, Color color, float emissionMultiplier)
+    {
+        CoreTacticalWeaponVisualMaterialUtility.ApplyVisibleColor(material, color, emissionMultiplier);
+    }
+
+    private static void ConfigureMissileTrailMaterial(Material material)
+    {
+        CoreTacticalWeaponVisualMaterialUtility.ConfigureTransparentMaterial(material);
+    }
+
+    private bool IsMainRocketVisualRole()
+    {
+        string normalizedRole = string.IsNullOrWhiteSpace(visualLauncherRole)
+            ? ""
+            : visualLauncherRole.Trim().ToLowerInvariant();
+        return normalizedRole.Contains("main")
+            && (normalizedRole.Contains("rocket") || normalizedRole.Contains("nurs") || normalizedRole.Contains("missile"));
+    }
+
+    private static float Hash01(float value)
+    {
+        return Mathf.Repeat(Mathf.Sin(value * 12.9898f + 78.233f) * 43758.5453f, 1f);
     }
 }
 
@@ -7112,6 +8564,9 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
 {
     private const int TrailPointCount = 18;
     private static readonly RaycastHit[] HitBuffer = new RaycastHit[8];
+    private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
+    private static readonly int EmissionColorPropertyId = Shader.PropertyToID("_EmissionColor");
 
     private CoreTacticalShipMotor target;
     private CoreTacticalCombatTeam targetTeam = CoreTacticalCombatTeam.Enemy;
@@ -7122,17 +8577,32 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
     private float proximityRadiusMeters;
     private float explosionRadiusMeters;
     private float damageAmount;
+    private CoreTacticalDamageType damageType;
+    private float resistanceIgnorePercent;
+    private float caliberMm;
+    private float directImpactFuseThresholdMeters;
+    private float fireChancePercent;
+    private bool fullDamageInsideExplosionRadius;
     private bool damageApplied;
     private float deathTime;
+    private float launchTime;
     private float nextGuidanceTime;
     private Vector3 currentForward;
     private Vector3 guidanceDirection;
+    private Vector3 unguidedBaseDirection;
     private Vector3 previousPosition;
+    private bool allowTargetAcquisition = true;
+    private float unguidedChaosAmplitudeRad;
+    private float unguidedChaosFrequencyHz;
+    private float unguidedChaosPhase;
+    private float unguidedChaosDriftRad;
     private LineRenderer trail;
     private readonly Vector3[] trailPoints = new Vector3[TrailPointCount];
     private Collider currentAvoidanceObstacle;
     private float currentAvoidanceSide = 1f;
     private int activeTrailPointCount;
+
+    private float DetonationSensitivityRadiusMeters => GetDetonationSensitivityRadiusMeters(proximityRadiusMeters, explosionRadiusMeters);
 
     public static void Create(
         string missileName,
@@ -7147,8 +8617,21 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         float proximityRadiusMeters,
         float explosionRadiusMeters,
         float damageAmount,
+        CoreTacticalDamageType damageType,
+        bool fullDamageInsideExplosionRadius,
+        CoreTacticalCombatTeam targetTeam,
         Material missileMaterial,
-        Material trailMaterial)
+        Material trailMaterial,
+        Color trailColor,
+        float resistanceIgnorePercent,
+        float caliberMm,
+        float directImpactFuseThresholdMeters,
+        float fireChancePercent,
+        bool allowTargetAcquisition = true,
+        float unguidedChaosAmplitudeDegrees = 0f,
+        float unguidedChaosFrequencyHz = 0f,
+        float unguidedChaosPhase = 0f,
+        float unguidedChaosDriftDegrees = 0f)
     {
         GameObject missile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         missile.name = missileName;
@@ -7164,10 +8647,18 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         if (renderer != null)
         {
             renderer.sharedMaterial = missileMaterial;
+            ApplyMissileRendererColor(renderer, ResolveMaterialVisibleColor(missileMaterial, new Color(1f, 0.35f, 0.16f, 1f)));
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
         }
 
         LineRenderer line = missile.AddComponent<LineRenderer>();
         line.sharedMaterial = trailMaterial != null ? trailMaterial : missileMaterial;
+        Color visibleTrailColor = trailColor.maxColorComponent > 0.04f
+            ? trailColor
+            : ResolveMaterialVisibleColor(trailMaterial != null ? trailMaterial : missileMaterial, new Color(0.95f, 0.42f, 0.20f, 1f));
+        line.startColor = visibleTrailColor;
+        line.endColor = new Color(visibleTrailColor.r, visibleTrailColor.g, visibleTrailColor.b, 0.16f);
         line.positionCount = 2;
         line.useWorldSpace = true;
         line.startWidth = 3.6f;
@@ -7190,7 +8681,68 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
             proximityRadiusMeters,
             explosionRadiusMeters,
             damageAmount,
-            line);
+            damageType,
+            fullDamageInsideExplosionRadius,
+            targetTeam,
+            line,
+            resistanceIgnorePercent,
+            caliberMm,
+            directImpactFuseThresholdMeters,
+            fireChancePercent,
+            allowTargetAcquisition,
+            unguidedChaosAmplitudeDegrees,
+            unguidedChaosFrequencyHz,
+            unguidedChaosPhase,
+            unguidedChaosDriftDegrees);
+    }
+
+    public static float ResolveDetonationSensitivityRadiusForTests(float proximityRadiusMeters, float explosionRadiusMeters)
+    {
+        return GetDetonationSensitivityRadiusMeters(proximityRadiusMeters, explosionRadiusMeters);
+    }
+
+    public static int ApplyExplosionDamageForTests(
+        Vector3 position,
+        CoreTacticalShipMotor preferredTarget,
+        CoreTacticalCombatTeam targetTeam,
+        float damageAmount,
+        float explosionRadiusMeters,
+        bool fullDamageInsideExplosionRadius)
+    {
+        return ApplyExplosionDamageAt(
+            position,
+            preferredTarget,
+            targetTeam,
+            Mathf.Max(0f, damageAmount),
+            CoreTacticalDamageType.Explosive,
+            0f,
+            0f,
+            0f,
+            "Guided missile test",
+            Vector3.forward,
+            0f,
+            Mathf.Max(1f, explosionRadiusMeters),
+            fullDamageInsideExplosionRadius);
+    }
+
+    private static Color ResolveMaterialVisibleColor(Material material, Color fallback)
+    {
+        return CoreTacticalWeaponVisualMaterialUtility.ResolveVisibleColor(material, fallback);
+    }
+
+    private static void ApplyMissileRendererColor(Renderer renderer, Color color)
+    {
+        if (renderer == null)
+        {
+            return;
+        }
+
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(propertyBlock);
+        propertyBlock.SetColor(BaseColorPropertyId, color);
+        propertyBlock.SetColor(ColorPropertyId, color);
+        propertyBlock.SetColor(EmissionColorPropertyId, color * 2.2f);
+        renderer.SetPropertyBlock(propertyBlock);
     }
 
     private void Initialize(
@@ -7205,10 +8757,22 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         float newProximityRadiusMeters,
         float newExplosionRadiusMeters,
         float newDamageAmount,
-        LineRenderer newTrail)
+        CoreTacticalDamageType newDamageType,
+        bool newFullDamageInsideExplosionRadius,
+        CoreTacticalCombatTeam newTargetTeam,
+        LineRenderer newTrail,
+        float newResistanceIgnorePercent,
+        float newCaliberMm,
+        float newDirectImpactFuseThresholdMeters,
+        float newFireChancePercent,
+        bool newAllowTargetAcquisition,
+        float newUnguidedChaosAmplitudeDegrees,
+        float newUnguidedChaosFrequencyHz,
+        float newUnguidedChaosPhase,
+        float newUnguidedChaosDriftDegrees)
     {
         target = newTarget;
-        targetTeam = ResolveTargetTeam(newTarget);
+        targetTeam = newTarget != null ? ResolveTargetTeam(newTarget) : newTargetTeam;
         guidanceMode = newGuidanceMode;
         speedMS = newSpeedMS;
         turnRateRadPerSecond = turnRateDegPerSecond * Mathf.Deg2Rad;
@@ -7216,10 +8780,23 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         proximityRadiusMeters = newProximityRadiusMeters;
         explosionRadiusMeters = Mathf.Max(1f, newExplosionRadiusMeters);
         damageAmount = Mathf.Max(0f, newDamageAmount);
+        damageType = newDamageType;
+        resistanceIgnorePercent = Mathf.Max(0f, newResistanceIgnorePercent);
+        caliberMm = Mathf.Max(0f, newCaliberMm);
+        directImpactFuseThresholdMeters = Mathf.Max(0f, newDirectImpactFuseThresholdMeters);
+        fireChancePercent = Mathf.Max(0f, newFireChancePercent);
+        fullDamageInsideExplosionRadius = newFullDamageInsideExplosionRadius;
+        launchTime = Time.time;
         deathTime = Time.time + lifetimeSeconds;
         nextGuidanceTime = 0f;
         currentForward = FlattenDirection(startDirection, Vector3.forward);
         guidanceDirection = currentForward;
+        unguidedBaseDirection = currentForward;
+        allowTargetAcquisition = newAllowTargetAcquisition;
+        unguidedChaosAmplitudeRad = Mathf.Max(0f, newUnguidedChaosAmplitudeDegrees) * Mathf.Deg2Rad;
+        unguidedChaosFrequencyHz = Mathf.Max(0f, newUnguidedChaosFrequencyHz);
+        unguidedChaosPhase = newUnguidedChaosPhase;
+        unguidedChaosDriftRad = newUnguidedChaosDriftDegrees * Mathf.Deg2Rad;
         previousPosition = startPosition;
         trail = newTrail;
         transform.rotation = Quaternion.LookRotation(currentForward, Vector3.up);
@@ -7235,6 +8812,7 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
     {
         if (Time.time >= deathTime)
         {
+            ExplodeAt(transform.position);
             DetachTrailForFade();
             Destroy(gameObject);
             return;
@@ -7242,28 +8820,56 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
 
         if (!IsLiveTarget(target))
         {
-            target = FindNearestLiveTarget();
+            if (allowTargetAcquisition)
+            {
+                target = FindNearestLiveTarget();
+            }
+
             if (target == null)
             {
                 guidanceDirection = currentForward;
             }
         }
 
-        if (Time.time >= nextGuidanceTime)
+        if (HasUnguidedChaos())
+        {
+            guidanceDirection = ResolveObstacleAvoidedDirection(GetUnguidedChaosDirection());
+        }
+        else if (Time.time >= nextGuidanceTime)
         {
             guidanceDirection = target != null ? CalculateGuidanceDirection() : ResolveObstacleAvoidedDirection(currentForward);
             nextGuidanceTime = Time.time + guidanceIntervalSeconds;
         }
 
         float deltaSeconds = Mathf.Max(0.001f, Time.deltaTime);
-        currentForward = Vector3.RotateTowards(
-            currentForward,
-            guidanceDirection,
-            turnRateRadPerSecond * deltaSeconds,
-            0f);
-        currentForward = FlattenDirection(currentForward, guidanceDirection);
+        if (HasUnguidedChaos())
+        {
+            currentForward = FlattenDirection(guidanceDirection, currentForward);
+        }
+        else
+        {
+            currentForward = Vector3.RotateTowards(
+                currentForward,
+                guidanceDirection,
+                turnRateRadPerSecond * deltaSeconds,
+                0f);
+            currentForward = FlattenDirection(currentForward, guidanceDirection);
+        }
 
         Vector3 nextPosition = transform.position + currentForward * (speedMS * deltaSeconds);
+        if (CoreTacticalAutomatonWreck.TrySphereCastWreck(
+                previousPosition,
+                nextPosition,
+                Mathf.Max(3f, proximityRadiusMeters * 0.35f),
+                out _,
+                out Vector3 wreckHitPosition))
+        {
+            ExplodeAt(wreckHitPosition);
+            DetachTrailForFade();
+            Destroy(gameObject);
+            return;
+        }
+
         if (CoreTacticalWeaponOcclusion.SegmentHitsObstacle(
                 previousPosition,
                 nextPosition,
@@ -7276,8 +8882,9 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
             return;
         }
 
-        if (HitsTarget(previousPosition, nextPosition))
+        if (HitsTarget(previousPosition, nextPosition, out CoreTacticalShipMotor impactTarget))
         {
+            target = impactTarget;
             ExplodeAt(nextPosition);
             DetachTrailForFade();
             Destroy(gameObject);
@@ -7292,41 +8899,164 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
     private void ExplodeAt(Vector3 position)
     {
         CoreTacticalFlakBurstVisual.Create(position, explosionRadiusMeters);
+        CoreTacticalLeviathanController.NotifyProjectileImpact(position, explosionRadiusMeters, 0.06f);
         TryApplyDamageAt(position);
     }
 
     private void TryApplyDamageAt(Vector3 position)
     {
-        if (damageApplied || damageAmount <= 0f || target == null)
+        if (damageApplied || damageAmount <= 0f)
         {
             return;
         }
 
-        CoreTacticalPrototypeHealth health = target.GetComponent<CoreTacticalPrototypeHealth>();
-        if (health == null || health.currentHealth <= 0f)
-        {
-            return;
-        }
-
-        float closestDistance = GetClosestTargetDistance(position);
-        if (closestDistance > Mathf.Max(0.1f, explosionRadiusMeters))
-        {
-            return;
-        }
-
-        float damageScale = Mathf.Lerp(
-            0.45f,
-            1f,
-            1f - Mathf.Clamp01(closestDistance / Mathf.Max(0.1f, explosionRadiusMeters)));
-        health.ApplyDamage(damageAmount * damageScale, guidanceMode == CoreTacticalMissileGuidanceMode.PredictedIntercept
+        string source = guidanceMode == CoreTacticalMissileGuidanceMode.PredictedIntercept
             ? "Smart missile"
-            : "Dumb missile");
-        damageApplied = true;
+            : "Dumb missile";
+        int appliedCount = ApplyExplosionDamageAt(
+            position,
+            target,
+            targetTeam,
+            damageAmount,
+            damageType,
+            resistanceIgnorePercent,
+            caliberMm,
+            directImpactFuseThresholdMeters,
+            source,
+            currentForward,
+            fireChancePercent,
+            explosionRadiusMeters,
+            fullDamageInsideExplosionRadius);
+        damageApplied = appliedCount > 0;
     }
 
-    private float GetClosestTargetDistance(Vector3 position)
+    private static int ApplyExplosionDamageAt(
+        Vector3 position,
+        CoreTacticalShipMotor preferredTarget,
+        CoreTacticalCombatTeam targetTeam,
+        float damageAmount,
+        CoreTacticalDamageType damageType,
+        float resistanceIgnorePercent,
+        float caliberMm,
+        float directImpactFuseThresholdMeters,
+        string source,
+        Vector3 damageDirection,
+        float fireChancePercent,
+        float explosionRadiusMeters,
+        bool fullDamageInsideExplosionRadius)
     {
-        Collider[] colliders = target != null ? target.GetComponentsInChildren<Collider>() : null;
+        if (damageAmount <= 0f)
+        {
+            return 0;
+        }
+
+        int appliedCount = 0;
+        if (TryApplyExplosionDamageToTarget(
+                position,
+                preferredTarget,
+                damageAmount,
+                damageType,
+                resistanceIgnorePercent,
+                caliberMm,
+                directImpactFuseThresholdMeters,
+                source,
+                damageDirection,
+                fireChancePercent,
+                explosionRadiusMeters,
+                fullDamageInsideExplosionRadius))
+        {
+            appliedCount++;
+        }
+
+        CoreTacticalCombatant[] combatants = FindObjectsByType<CoreTacticalCombatant>(FindObjectsSortMode.None);
+        for (int i = 0; i < combatants.Length; i++)
+        {
+            CoreTacticalCombatant combatant = combatants[i];
+            CoreTacticalShipMotor candidate = combatant != null ? combatant.ship : null;
+            if (candidate == null || candidate == preferredTarget || !IsValidExplosionTarget(candidate, preferredTarget, targetTeam))
+            {
+                continue;
+            }
+
+            if (TryApplyExplosionDamageToTarget(
+                    position,
+                    candidate,
+                    damageAmount,
+                    damageType,
+                    resistanceIgnorePercent,
+                    caliberMm,
+                    directImpactFuseThresholdMeters,
+                    source,
+                    damageDirection,
+                    fireChancePercent,
+                    explosionRadiusMeters,
+                    fullDamageInsideExplosionRadius))
+            {
+                appliedCount++;
+            }
+        }
+
+        appliedCount += CoreTacticalAutomatonWreck.ApplyExplosionDamageToWrecks(
+            position,
+            explosionRadiusMeters,
+            damageAmount,
+            source);
+
+        return appliedCount;
+    }
+
+    private static bool TryApplyExplosionDamageToTarget(
+        Vector3 position,
+        CoreTacticalShipMotor damageTarget,
+        float damageAmount,
+        CoreTacticalDamageType damageType,
+        float resistanceIgnorePercent,
+        float caliberMm,
+        float directImpactFuseThresholdMeters,
+        string source,
+        Vector3 damageDirection,
+        float fireChancePercent,
+        float explosionRadiusMeters,
+        bool fullDamageInsideExplosionRadius)
+    {
+        if (!IsLiveTarget(damageTarget))
+        {
+            return false;
+        }
+
+        CoreTacticalPrototypeHealth health = damageTarget.GetComponent<CoreTacticalPrototypeHealth>();
+        if (health == null || health.currentHealth <= 0f)
+        {
+            return false;
+        }
+
+        float closestDistance = GetClosestTargetDistance(position, damageTarget);
+        if (closestDistance > Mathf.Max(0.1f, explosionRadiusMeters))
+        {
+            return false;
+        }
+
+        float damageScale = fullDamageInsideExplosionRadius
+            ? 1f
+            : Mathf.Lerp(
+                0.45f,
+                1f,
+                1f - Mathf.Clamp01(closestDistance / Mathf.Max(0.1f, explosionRadiusMeters)));
+        health.ApplyDamage(CoreTacticalDamageRequest.Create(
+            damageType,
+            damageAmount * damageScale,
+            source,
+            resistanceIgnorePercent,
+            fireChancePercent,
+            explosionRadiusMeters,
+            position,
+            FlattenDirection(damageDirection, Vector3.forward)));
+        return true;
+    }
+
+    private static float GetClosestTargetDistance(Vector3 position, CoreTacticalShipMotor distanceTarget)
+    {
+        Collider[] colliders = distanceTarget != null ? distanceTarget.GetComponentsInChildren<Collider>() : null;
         float closestDistance = float.PositiveInfinity;
         if (colliders != null)
         {
@@ -7344,8 +9074,8 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
 
         if (float.IsPositiveInfinity(closestDistance))
         {
-            closestDistance = target != null
-                ? Vector3.Distance(position, target.transform.position)
+            closestDistance = distanceTarget != null
+                ? Vector3.Distance(position, distanceTarget.transform.position)
                 : float.PositiveInfinity;
         }
 
@@ -7380,6 +9110,23 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         Vector3 targetVelocity = target.Body != null ? target.Body.linearVelocity : Vector3.zero;
         Vector3 interceptPoint = PredictInterceptPoint(missilePosition, targetPosition, targetVelocity, speedMS);
         return ResolveObstacleAvoidedDirection(FlattenDirection(interceptPoint - missilePosition, currentForward));
+    }
+
+    private bool HasUnguidedChaos()
+    {
+        return unguidedChaosAmplitudeRad > 0.001f && unguidedChaosFrequencyHz > 0.001f;
+    }
+
+    private Vector3 GetUnguidedChaosDirection()
+    {
+        float age = Mathf.Max(0f, Time.time - launchTime);
+        float omega = unguidedChaosFrequencyHz * Mathf.PI * 2f;
+        float yawRad =
+            Mathf.Sin(age * omega + unguidedChaosPhase) * unguidedChaosAmplitudeRad +
+            Mathf.Sin(age * omega * 1.73f + unguidedChaosPhase * 0.47f + 1.37f) * unguidedChaosAmplitudeRad * 0.48f +
+            Mathf.Sin(age * omega * 0.41f + unguidedChaosPhase * 1.91f + 2.11f) * unguidedChaosAmplitudeRad * 0.31f;
+        yawRad += unguidedChaosDriftRad * Mathf.Clamp01(age * 0.42f);
+        return FlattenDirection(Quaternion.AngleAxis(yawRad * Mathf.Rad2Deg, Vector3.up) * unguidedBaseDirection, unguidedBaseDirection);
     }
 
     private Vector3 ResolveObstacleAvoidedDirection(Vector3 desiredDirection)
@@ -7491,13 +9238,9 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         return targetPosition + targetVelocity * interceptTime;
     }
 
-    private bool HitsTarget(Vector3 from, Vector3 to)
+    private bool HitsTarget(Vector3 from, Vector3 to, out CoreTacticalShipMotor hitTarget)
     {
-        if (!IsLiveTarget(target))
-        {
-            return false;
-        }
-
+        hitTarget = null;
         Vector3 segment = to - from;
         float distance = segment.magnitude;
         if (distance <= 0.001f)
@@ -7507,7 +9250,7 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
 
         int hitCount = Physics.SphereCastNonAlloc(
             from,
-            proximityRadiusMeters,
+            DetonationSensitivityRadiusMeters,
             segment / distance,
             HitBuffer,
             distance,
@@ -7517,13 +9260,39 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         for (int i = 0; i < hitCount; i++)
         {
             Collider hitCollider = HitBuffer[i].collider;
-            if (hitCollider != null && hitCollider.GetComponentInParent<CoreTacticalShipMotor>() == target)
+            CoreTacticalShipMotor hitShip = hitCollider != null ? hitCollider.GetComponentInParent<CoreTacticalShipMotor>() : null;
+            if (!IsLiveTarget(hitShip))
             {
+                continue;
+            }
+
+            if (hitShip == target || IsValidExplosionTarget(hitShip, target, targetTeam))
+            {
+                hitTarget = hitShip;
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool IsValidExplosionTarget(
+        CoreTacticalShipMotor candidate,
+        CoreTacticalShipMotor preferredTarget,
+        CoreTacticalCombatTeam targetTeam)
+    {
+        if (!IsLiveTarget(candidate))
+        {
+            return false;
+        }
+
+        if (candidate == preferredTarget)
+        {
+            return true;
+        }
+
+        CoreTacticalCombatant combatant = candidate.GetComponent<CoreTacticalCombatant>();
+        return combatant != null && combatant.team == targetTeam;
     }
 
     private void UpdateTrail(Vector3 position)
@@ -7606,10 +9375,7 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         for (int i = 0; i < combatants.Length; i++)
         {
             CoreTacticalCombatant combatant = combatants[i];
-            if (combatant == null
-                || combatant.team != targetTeam
-                || !combatant.IsAlive
-                || combatant.ship == null
+            if (!CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(combatant, targetTeam)
                 || !IsLiveTarget(combatant.ship))
             {
                 continue;
@@ -7624,6 +9390,11 @@ public sealed class CoreTacticalGuidedMissile : MonoBehaviour
         }
 
         return bestTarget;
+    }
+
+    private static float GetDetonationSensitivityRadiusMeters(float proximityRadiusMeters, float explosionRadiusMeters)
+    {
+        return Mathf.Max(0.5f, Mathf.Max(proximityRadiusMeters, explosionRadiusMeters));
     }
 }
 

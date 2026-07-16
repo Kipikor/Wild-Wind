@@ -1,0 +1,6 @@
+id_power_plant,base_package_id,upgrade_level,ship_id,local_name_ru,power_multiplier,upgrade_cost_multiplier,speed_delta_ms,acceleration_delta_ms2,turn_rate_delta_deg_per_second,battery_capacity,energy_generation_per_second,module_hp,allows_electronic_equipment,notes_ru
+barbet_power_steam_gas,,base,capital_artillery_cruiser_r02,Парогазовая установка,1.00,1.00,10,1.92,2.5,0,0,2600,false,Быстрая крепкая механика без электрооборудования
+barbet_power_turbogenerator,,base,capital_artillery_cruiser_r02,Турбинно-генераторная установка,1.00,1.00,6,1.15,1.5,220,10,1900,true,Ход плюс малое стабильное питание
+barbet_power_capacitor,,base,capital_artillery_cruiser_r02,Конденсаторная установка,1.00,1.00,0,0,-0.5,620,4,1350,true,Большой запас для короткого окна работы модулей
+barbet_power_generator,,base,capital_artillery_cruiser_r02,Генераторная установка,1.00,1.00,-8,-1.54,-1.5,340,24,1700,true,Много энергии ценой скорости
+barbet_power_armored,,base,capital_artillery_cruiser_r02,Бронированная установка,1.00,1.00,-13,-2.49,-3,180,7,3200,true,Тяжелая защищенная машина

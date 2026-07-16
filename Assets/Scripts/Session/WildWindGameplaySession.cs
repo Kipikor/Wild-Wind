@@ -8,7 +8,7 @@ public sealed class GameplaySessionAccountData
     public const int CurrentVersion = 1;
     public const string DefaultAccountId = "runtime_account";
     public const string DefaultPlayerShipId = "player_ship";
-    public const string DefaultStarterHullId = "";
+    public const string DefaultStarterHullId = "starter_airship_hull";
     public const string DefaultDockId = "capital";
 
     private static readonly Vector3 StarterDockPosition = new Vector3(-520f, 2615f, -360f);
@@ -170,6 +170,7 @@ public sealed class WildWindGameplaySession : MonoBehaviour
             return null;
         }
 
+        WildWindGameplayBootstrap.EnsureGameplayBindings(metaGameState);
         session.Configure(metaGameState, accountId);
         session.InitializeFromCurrentStateIfNeeded();
         session.RefreshFromMetaProgress();

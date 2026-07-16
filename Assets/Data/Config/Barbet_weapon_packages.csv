@@ -1,0 +1,12 @@
+id_weapon,base_package_id,upgrade_level,ship_id,local_name_ru,slot_role,power_multiplier,upgrade_cost_multiplier,range_m,damage,damage_type,resistance_ignore_percent,barrels_or_projectiles,shots_per_minute,reload_seconds,projectile_speed_ms,splash_radius_m,explosive_kg,dispersion_m_per_km,shell_type,is_machinegun_aura,machinegun_damage_per_second,notes_ru
+barbet_main_152mm_quad_he,,base,capital_artillery_cruiser_r02,152 мм счетверенная фугасная,main,1.00,1.00,4600,260,explosive,24,4,0,5.5,720,18,40.5,30,HE,false,0,Скорострельная фугасная поливалка с мягким пробиванием сопротивлений
+barbet_main_180mm_long_he,,base,capital_artillery_cruiser_r02,180 мм дальнобойная фугасная,main,1.00,1.00,7600,330,explosive,28,3,0,11,780,20,50,18,HE,false,0,Очень большая дальность небольшой урон долгий цикл
+barbet_main_203mm_he,,base,capital_artillery_cruiser_r02,203 мм фугасная,main,1.00,1.00,5900,620,explosive,34,3,0,7.5,720,28,98,24,HE,false,0,Ближе стреляет но темп и урон значительно выше
+barbet_main_234mm_ap,,base,capital_artillery_cruiser_r02,234 мм бронебойная,main,1.00,1.00,6500,1050,kinetic,42,2,0,10,820,0,0,17,AP,false,0,Точная бронебойная версия против защищенных целей
+barbet_main_254mm_he_bombard,,base,capital_artillery_cruiser_r02,254 мм фугасная бомбардная,main,1.00,1.00,4100,1400,explosive,48,3,0,13,520,42,220.5,38,HE,false,0,Тяжелые фугасы для ближнего размена
+barbet_secondary_37mm_mg,,base,capital_artillery_cruiser_r02,37 мм крупные пулеметы,secondary,1.00,1.00,1100,0,kinetic,0,0,0,0,0,0,0,0,MG,true,180,Антимелочь через пулеметную ауру
+barbet_secondary_76mm_he,,base,capital_artillery_cruiser_r02,76 мм фугасная ПМК,secondary,1.00,1.00,2600,160,explosive,18,4,0,3.4,560,10,12.5,45,HE,false,0,Стандартная ближняя ПМК с высоким темпом
+barbet_secondary_100mm_he,,base,capital_artillery_cruiser_r02,100 мм дальняя фугасная ПМК,secondary,1.00,1.00,3900,260,explosive,24,2,0,6.5,650,14,24.5,28,HE,false,0,Дальше и точнее но ниже DPS
+barbet_secondary_120mm_ap,,base,capital_artillery_cruiser_r02,120 мм бронебойная ПМК,secondary,1.00,1.00,3400,450,kinetic,32,2,0,7,700,0,0,24,AP,false,0,Медленнее но берет защищенные цели
+barbet_small_37mm_mg,,base,capital_artillery_cruiser_r02,37 мм пулеметные точки,small,1.00,1.00,1000,0,kinetic,0,0,0,0,0,0,0,0,MG,true,150,Малый слот для добивания и защиты от мелочи
+barbet_small_57mm_autocannon,,base,capital_artillery_cruiser_r02,57 мм легкая автопушка,small,1.00,1.00,2200,70,kinetic,18,2,72,0,760,0,0,52,AP,false,0,Легкая автопушка против фрегатов и малых целей

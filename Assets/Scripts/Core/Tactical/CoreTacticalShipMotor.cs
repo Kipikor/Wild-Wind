@@ -5,6 +5,11 @@ using UnityEngine;
 public sealed class CoreTacticalShipMotor : MonoBehaviour
 {
     private const int MaxAvoidanceHits = 24;
+    private const float ArrivalBrakeSafetyMultiplier = 1.18f;
+    private const float ArrivalSpeedLimitSafetyMultiplier = 0.92f;
+    private const float ArrivalHardBrakeMultiplier = 3f;
+    private const float ArrivalLateralDampingMultiplier = 1.35f;
+    private const float ArrivalLateralDampingSpeedRatio = 0.25f;
     private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
     private static readonly RaycastHit[] AvoidanceHits = new RaycastHit[MaxAvoidanceHits];
@@ -24,13 +29,16 @@ public sealed class CoreTacticalShipMotor : MonoBehaviour
     public float maxReverseSpeedMS = 6f;
     public float maxLateralSpeedMS = 3.5f;
     public float forwardSpeedMultiplier = 1f;
+    public float forwardAccelerationMultiplier = 1f;
+    public float damageMobilityMultiplier = 1f;
     public float forwardAccelerationMS2 = 5.5f;
     public float lateralAccelerationMS2 = 2.0f;
     public float brakingAccelerationMS2 = 7.5f;
     public float slowdownDistanceMeters = 46f;
     public float arrivalRadiusMeters = 7f;
-    public float noseFirstYawReadyDeg = 10f;
-    public float noseFirstYawHardGateDeg = 105f;
+    public float arrivalLockSpeedMS = 1.5f;
+    public float noseFirstYawReadyDeg = 95f;
+    public float noseFirstYawHardGateDeg = 170f;
     public float holdFacingTranslationYawGateDeg = 35f;
 
     [Header("Obstacle Avoidance")]
@@ -53,6 +61,7 @@ public sealed class CoreTacticalShipMotor : MonoBehaviour
     [Header("Visual")]
     public Color normalColor = new Color(0.16f, 0.38f, 0.86f, 1f);
     public Color selectedColor = new Color(0.98f, 0.70f, 0.16f, 1f);
+    public bool hideRuntimeWeaponVisuals;
 
     private Rigidbody body;
     private Renderer[] renderers;
@@ -97,11 +106,13 @@ public sealed class CoreTacticalShipMotor : MonoBehaviour
         maxReverseSpeedMS = Mathf.Max(0f, maxReverseSpeedMS);
         maxLateralSpeedMS = Mathf.Max(0f, maxLateralSpeedMS);
         forwardSpeedMultiplier = Mathf.Max(0.01f, forwardSpeedMultiplier);
+        forwardAccelerationMultiplier = Mathf.Max(0.01f, forwardAccelerationMultiplier);
+        damageMobilityMultiplier = Mathf.Clamp01(damageMobilityMultiplier);
         forwardAccelerationMS2 = Mathf.Max(0.01f, forwardAccelerationMS2);
         lateralAccelerationMS2 = Mathf.Max(0.01f, lateralAccelerationMS2);
         brakingAccelerationMS2 = Mathf.Max(0.01f, brakingAccelerationMS2);
-        noseFirstYawReadyDeg = Mathf.Clamp(noseFirstYawReadyDeg, 1f, 60f);
-        noseFirstYawHardGateDeg = Mathf.Clamp(noseFirstYawHardGateDeg, noseFirstYawReadyDeg + 1f, 160f);
+        noseFirstYawReadyDeg = Mathf.Clamp(noseFirstYawReadyDeg, 1f, 140f);
+        noseFirstYawHardGateDeg = Mathf.Clamp(noseFirstYawHardGateDeg, noseFirstYawReadyDeg + 1f, 179f);
         ascentSpeedMS = Mathf.Max(0.01f, ascentSpeedMS);
         descentSpeedMS = Mathf.Max(0.01f, descentSpeedMS);
         verticalAccelerationMS2 = Mathf.Max(0.01f, verticalAccelerationMS2);
@@ -109,6 +120,7 @@ public sealed class CoreTacticalShipMotor : MonoBehaviour
         yawAccelerationDegPerSecond2 = Mathf.Max(0.01f, yawAccelerationDegPerSecond2);
         slowdownDistanceMeters = Mathf.Max(1f, slowdownDistanceMeters);
         arrivalRadiusMeters = Mathf.Max(0.1f, arrivalRadiusMeters);
+        arrivalLockSpeedMS = Mathf.Max(0.05f, arrivalLockSpeedMS);
         obstacleAvoidanceLookAheadMeters = Mathf.Max(1f, obstacleAvoidanceLookAheadMeters);
         obstacleAvoidanceMarginMeters = Mathf.Max(0f, obstacleAvoidanceMarginMeters);
         obstacleAvoidanceStrength = Mathf.Clamp(obstacleAvoidanceStrength, 0.1f, 4f);
@@ -171,6 +183,16 @@ public sealed class CoreTacticalShipMotor : MonoBehaviour
         targetForward = FlattenDirection(forward, transform.forward);
         holdFacingDuringMove = holdFacing;
         hasMoveTarget = true;
+    }
+
+    public void StopCommandAtCurrentPosition()
+    {
+        Vector3 position = body != null ? body.position : transform.position;
+        targetPosition = position;
+        targetForward = FlattenDirection(transform.forward, Vector3.forward);
+        holdFacingDuringMove = false;
+        hasMoveTarget = true;
+        currentAvoidanceObstacle = null;
     }
 
     public void SetCommandPlaneAltitude(float altitudeMeters)
@@ -258,7 +280,7 @@ public sealed class CoreTacticalShipMotor : MonoBehaviour
 
         body.mass = Mathf.Max(1f, massKg);
         body.useGravity = false;
-        body.linearDamping = 0.22f;
+        body.linearDamping = 0f;
         body.angularDamping = 0.9f;
         body.maxAngularVelocity = Mathf.Max(body.maxAngularVelocity, maxYawRateDegPerSecond * Mathf.Deg2Rad * 1.5f);
         body.interpolation = RigidbodyInterpolation.Interpolate;
@@ -287,7 +309,11 @@ public sealed class CoreTacticalShipMotor : MonoBehaviour
             desiredForward,
             maxYawRateDegPerSecond * Mathf.Deg2Rad * deltaSeconds,
             0f);
-        body.angularVelocity = new Vector3(0f, 0f, 0f);
+        if (!body.isKinematic)
+        {
+            body.angularVelocity = Vector3.zero;
+        }
+
         body.MoveRotation(Quaternion.LookRotation(nextForward, Vector3.up));
     }
 
@@ -309,52 +335,251 @@ public sealed class CoreTacticalShipMotor : MonoBehaviour
 
     private void ApplyLinearControl(float deltaSeconds)
     {
+        float accelerationMultiplier = Mathf.Max(0.01f, forwardAccelerationMultiplier);
+        float effectiveForwardAcceleration = forwardAccelerationMS2 * accelerationMultiplier;
+        float effectiveBrakingAcceleration = brakingAccelerationMS2 * accelerationMultiplier;
+        float effectiveArrivalBrakingAcceleration = effectiveBrakingAcceleration * ArrivalHardBrakeMultiplier;
         Vector3 flatDelta = targetPosition - body.position;
         flatDelta.y = 0f;
         float flatDistance = flatDelta.magnitude;
+        Vector3 currentFlatVelocity = body.linearVelocity;
+        currentFlatVelocity.y = 0f;
         if (flatDistance <= arrivalRadiusMeters)
         {
-            ApplyFlatAcceleration(Vector3.zero, brakingAccelerationMS2, deltaSeconds);
+            if (TryCompleteFlatArrival())
+            {
+                return;
+            }
+
+            ApplyFlatAcceleration(
+                Vector3.zero,
+                effectiveArrivalBrakingAcceleration,
+                effectiveArrivalBrakingAcceleration,
+                deltaSeconds);
             return;
         }
 
+        Vector3 targetDirection = flatDelta / Mathf.Max(0.001f, flatDistance);
+        float lateralBrakeAcceleration = Mathf.Max(0.01f, lateralAccelerationMS2 * accelerationMultiplier);
         if (!holdFacingDuringMove)
         {
             Vector3 travelDirection = FlattenDirection(currentTravelForward, flatDelta);
             float yawReadiness = GetNoseFirstTranslationReadiness(travelDirection);
-            float speedRatio = Mathf.Clamp01(flatDistance / Mathf.Max(1f, slowdownDistanceMeters));
-            float forwardSpeedLimit = maxForwardSpeedMS * Mathf.Max(0.01f, forwardSpeedMultiplier);
-            Vector3 desiredVelocity = transform.forward * (forwardSpeedLimit * speedRatio * yawReadiness);
-            float noseFirstAccelerationLimit = yawReadiness <= 0.01f ? brakingAccelerationMS2 : forwardAccelerationMS2;
-            ApplyFlatAcceleration(desiredVelocity, noseFirstAccelerationLimit, deltaSeconds);
+            float forwardSpeedLimit = maxForwardSpeedMS * GetEffectiveForwardSpeedMultiplier();
+            float dynamicSlowdownDistance = CalculateDynamicSlowdownDistance(
+                forwardSpeedLimit,
+                currentFlatVelocity,
+                targetDirection,
+                effectiveBrakingAcceleration,
+                lateralBrakeAcceleration);
+            float speedRatio = Mathf.Clamp01(flatDistance / Mathf.Max(1f, dynamicSlowdownDistance));
+            float arrivalSpeedLimit = CalculateArrivalSpeedLimit(
+                flatDistance,
+                currentFlatVelocity,
+                targetDirection,
+                effectiveBrakingAcceleration,
+                out bool hardArrivalBrake);
+            float desiredNoseSpeed = Mathf.Min(forwardSpeedLimit * speedRatio, arrivalSpeedLimit) * yawReadiness;
+            Vector3 desiredVelocity = transform.forward * desiredNoseSpeed;
+            desiredVelocity += CalculateLateralDriftDampingVelocity(
+                currentFlatVelocity,
+                targetDirection,
+                flatDistance,
+                dynamicSlowdownDistance);
+            float noseFirstAccelerationLimit = yawReadiness <= 0.01f
+                ? effectiveBrakingAcceleration
+                : Mathf.Max(effectiveForwardAcceleration, lateralBrakeAcceleration);
+            float brakingLimit = hardArrivalBrake
+                ? effectiveArrivalBrakingAcceleration
+                : effectiveBrakingAcceleration;
+            ApplyFlatAcceleration(desiredVelocity, noseFirstAccelerationLimit, brakingLimit, deltaSeconds);
             return;
         }
 
         Vector3 localDelta = transform.InverseTransformDirection(flatDelta);
-        float forwardRatio = Mathf.Clamp(localDelta.z / slowdownDistanceMeters, -1f, 1f);
-        float lateralRatio = Mathf.Clamp(localDelta.x / slowdownDistanceMeters, -1f, 1f);
-        float holdFacingForwardSpeedLimit = maxForwardSpeedMS * Mathf.Max(0.01f, forwardSpeedMultiplier);
+        float holdFacingForwardSpeedLimit = maxForwardSpeedMS * GetEffectiveForwardSpeedMultiplier();
+        float dynamicHoldSlowdownDistance = CalculateDynamicSlowdownDistance(
+            holdFacingForwardSpeedLimit,
+            currentFlatVelocity,
+            targetDirection,
+            effectiveBrakingAcceleration,
+            lateralBrakeAcceleration);
+        float forwardRatio = Mathf.Clamp(localDelta.z / dynamicHoldSlowdownDistance, -1f, 1f);
+        float lateralRatio = Mathf.Clamp(localDelta.x / dynamicHoldSlowdownDistance, -1f, 1f);
         float desiredForwardSpeed = forwardRatio >= 0f
             ? forwardRatio * holdFacingForwardSpeedLimit
-            : forwardRatio * maxReverseSpeedMS;
-        float desiredLateralSpeed = lateralRatio * maxLateralSpeedMS;
+            : forwardRatio * maxReverseSpeedMS * GetEffectiveMobilityMultiplier();
+        float desiredLateralSpeed = lateralRatio * maxLateralSpeedMS * GetEffectiveMobilityMultiplier();
         Vector3 desiredFlatVelocity = transform.forward * desiredForwardSpeed + transform.right * desiredLateralSpeed;
         desiredFlatVelocity *= GetHoldFacingTranslationReadiness();
+        float holdArrivalSpeedLimit = CalculateArrivalSpeedLimit(
+            flatDistance,
+            currentFlatVelocity,
+            targetDirection,
+            effectiveBrakingAcceleration,
+            out bool hardHoldArrivalBrake);
+        if (desiredFlatVelocity.magnitude > holdArrivalSpeedLimit)
+        {
+            desiredFlatVelocity = desiredFlatVelocity.normalized * holdArrivalSpeedLimit;
+        }
+
+        desiredFlatVelocity += CalculateLateralDriftDampingVelocity(
+            currentFlatVelocity,
+            targetDirection,
+            flatDistance,
+            dynamicHoldSlowdownDistance);
 
         float accelerationLimit = Mathf.Abs(desiredForwardSpeed) < 0.1f && Mathf.Abs(desiredLateralSpeed) < 0.1f
-            ? brakingAccelerationMS2
-            : Mathf.Max(forwardAccelerationMS2, lateralAccelerationMS2);
-        ApplyFlatAcceleration(desiredFlatVelocity, accelerationLimit, deltaSeconds);
+            ? effectiveBrakingAcceleration
+            : Mathf.Max(effectiveForwardAcceleration, lateralBrakeAcceleration);
+        float holdBrakingLimit = hardHoldArrivalBrake
+            ? effectiveArrivalBrakingAcceleration
+            : effectiveBrakingAcceleration;
+        ApplyFlatAcceleration(desiredFlatVelocity, accelerationLimit, holdBrakingLimit, deltaSeconds);
     }
 
-    private void ApplyFlatAcceleration(Vector3 desiredFlatVelocity, float accelerationLimit, float deltaSeconds)
+    private void ApplyFlatAcceleration(Vector3 desiredFlatVelocity, float accelerationLimit, float brakingLimit, float deltaSeconds)
     {
         Vector3 currentFlatVelocity = body.linearVelocity;
         currentFlatVelocity.y = 0f;
         desiredFlatVelocity.y = 0f;
-        Vector3 requiredAcceleration = (desiredFlatVelocity - currentFlatVelocity) / deltaSeconds;
-        requiredAcceleration = Vector3.ClampMagnitude(requiredAcceleration, Mathf.Max(0.01f, accelerationLimit));
+        float currentSpeed = currentFlatVelocity.magnitude;
+        float desiredSpeed = desiredFlatVelocity.magnitude;
+        bool braking = desiredSpeed < currentSpeed - 0.05f;
+        if (!braking && currentSpeed > 0.05f)
+        {
+            Vector3 currentDirection = currentFlatVelocity / currentSpeed;
+            braking = Vector3.Dot(desiredFlatVelocity - currentFlatVelocity, currentDirection) < -0.01f;
+        }
+
+        float responseAcceleration = Mathf.Max(0.01f, braking ? brakingLimit : accelerationLimit);
+        float referenceSpeed = Mathf.Max(
+            0.1f,
+            maxForwardSpeedMS * GetEffectiveForwardSpeedMultiplier(),
+            currentSpeed,
+            desiredSpeed);
+        float responseTime = referenceSpeed / responseAcceleration;
+        float response01 = 1f - Mathf.Exp(-deltaSeconds / Mathf.Max(0.001f, responseTime));
+        Vector3 nextFlatVelocity = Vector3.Lerp(currentFlatVelocity, desiredFlatVelocity, response01);
+        if (desiredSpeed <= 0.05f && nextFlatVelocity.magnitude <= arrivalLockSpeedMS)
+        {
+            nextFlatVelocity = Vector3.zero;
+        }
+
+        Vector3 requiredAcceleration = (nextFlatVelocity - currentFlatVelocity) / deltaSeconds;
+        requiredAcceleration = Vector3.ClampMagnitude(requiredAcceleration, responseAcceleration);
+        if (!body.isKinematic)
+        {
+            Vector3 nextVelocity = body.linearVelocity;
+            nextVelocity.x = currentFlatVelocity.x + requiredAcceleration.x * deltaSeconds;
+            nextVelocity.z = currentFlatVelocity.z + requiredAcceleration.z * deltaSeconds;
+            body.linearVelocity = nextVelocity;
+            return;
+        }
+
         body.AddForce(requiredAcceleration * body.mass, ForceMode.Force);
+    }
+
+    private float CalculateDynamicSlowdownDistance(
+        float forwardSpeedLimit,
+        Vector3 currentFlatVelocity,
+        Vector3 targetDirection,
+        float effectiveBrakingAcceleration,
+        float lateralBrakeAcceleration)
+    {
+        targetDirection = FlattenDirection(targetDirection, transform.forward);
+        float currentClosingSpeed = Mathf.Max(0f, Vector3.Dot(currentFlatVelocity, targetDirection));
+        Vector3 lateralVelocity = currentFlatVelocity - targetDirection * Vector3.Dot(currentFlatVelocity, targetDirection);
+        lateralVelocity.y = 0f;
+        float speed = Mathf.Max(0.1f, forwardSpeedLimit, currentClosingSpeed);
+        float braking = Mathf.Max(0.01f, effectiveBrakingAcceleration);
+        float forwardStopDistance = speed * speed / (2f * braking) * ArrivalBrakeSafetyMultiplier;
+        float lateralStopDistance = lateralVelocity.sqrMagnitude
+            / (2f * Mathf.Max(0.01f, lateralBrakeAcceleration))
+            * ArrivalBrakeSafetyMultiplier;
+        return Mathf.Max(
+            slowdownDistanceMeters,
+            arrivalRadiusMeters + forwardStopDistance + lateralStopDistance);
+    }
+
+    private float CalculateArrivalSpeedLimit(
+        float flatDistance,
+        Vector3 currentFlatVelocity,
+        Vector3 targetDirection,
+        float effectiveBrakingAcceleration,
+        out bool hardArrivalBrake)
+    {
+        hardArrivalBrake = false;
+        targetDirection = FlattenDirection(targetDirection, transform.forward);
+        float braking = Mathf.Max(0.01f, effectiveBrakingAcceleration);
+        float brakeDistance = Mathf.Max(0f, flatDistance - arrivalRadiusMeters);
+        float currentClosingSpeed = Mathf.Max(0f, Vector3.Dot(currentFlatVelocity, targetDirection));
+        float requiredStopDistance = currentClosingSpeed * currentClosingSpeed / (2f * braking) * ArrivalBrakeSafetyMultiplier;
+        if (currentClosingSpeed > arrivalLockSpeedMS && requiredStopDistance >= brakeDistance)
+        {
+            hardArrivalBrake = true;
+            return 0f;
+        }
+
+        return Mathf.Sqrt(2f * braking * brakeDistance) * ArrivalSpeedLimitSafetyMultiplier;
+    }
+
+    private Vector3 CalculateLateralDriftDampingVelocity(
+        Vector3 currentFlatVelocity,
+        Vector3 targetDirection,
+        float flatDistance,
+        float dynamicSlowdownDistance)
+    {
+        targetDirection = FlattenDirection(targetDirection, transform.forward);
+        float speedAlongTarget = Vector3.Dot(currentFlatVelocity, targetDirection);
+        Vector3 lateralVelocity = currentFlatVelocity - targetDirection * speedAlongTarget;
+        lateralVelocity.y = 0f;
+        if (lateralVelocity.sqrMagnitude <= 0.0001f)
+        {
+            return Vector3.zero;
+        }
+
+        float brakingBand = Mathf.Max(arrivalRadiusMeters, dynamicSlowdownDistance);
+        float arrivalBlend = 1f - Mathf.Clamp01((flatDistance - arrivalRadiusMeters) / brakingBand);
+        float lateralSpeedReference = Mathf.Max(
+            1f,
+            maxForwardSpeedMS * GetEffectiveForwardSpeedMultiplier() * ArrivalLateralDampingSpeedRatio);
+        float slipBlend = Mathf.Clamp01(lateralVelocity.magnitude / lateralSpeedReference);
+        float dampingBlend = Mathf.Clamp01(Mathf.Max(arrivalBlend, slipBlend * 0.5f));
+        return -lateralVelocity * (ArrivalLateralDampingMultiplier * dampingBlend);
+    }
+
+    private float GetEffectiveForwardSpeedMultiplier()
+    {
+        return Mathf.Max(0f, forwardSpeedMultiplier) * GetEffectiveMobilityMultiplier();
+    }
+
+    private float GetEffectiveMobilityMultiplier()
+    {
+        return Mathf.Clamp01(damageMobilityMultiplier);
+    }
+
+    private bool TryCompleteFlatArrival()
+    {
+        Vector3 flatVelocity = body.linearVelocity;
+        flatVelocity.y = 0f;
+        if (flatVelocity.magnitude > arrivalLockSpeedMS)
+        {
+            return false;
+        }
+
+        Vector3 velocity = body.linearVelocity;
+        velocity.x = 0f;
+        velocity.z = 0f;
+        if (!body.isKinematic)
+        {
+            body.linearVelocity = velocity;
+        }
+
+        targetPosition.x = body.position.x;
+        targetPosition.z = body.position.z;
+        currentAvoidanceObstacle = null;
+        return true;
     }
 
     private void ApplyAltitudeControl(float deltaSeconds)

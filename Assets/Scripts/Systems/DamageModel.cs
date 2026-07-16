@@ -11,6 +11,19 @@ public enum DamageShellType
     Impact
 }
 
+public static class DamageResistanceUtility
+{
+    public static CoreTacticalResistanceSet DefaultShipResistances => new CoreTacticalResistanceSet(48f, 18f, 18f, 28f);
+    public static CoreTacticalResistanceSet DefaultOreResistances => new CoreTacticalResistanceSet(95f, 35f, 15f, 65f);
+    public static CoreTacticalResistanceSet DefaultAutomatonResistances => new CoreTacticalResistanceSet(34f, 22f, 16f, 24f);
+
+    public static CoreTacticalResistanceSet FromLegacyArmorHint(float armorMm)
+    {
+        float kinetic = Mathf.Clamp(Mathf.Max(0f, armorMm) * 1.65f, 0f, 95f);
+        return new CoreTacticalResistanceSet(kinetic, 18f, 18f, 28f);
+    }
+}
+
 public enum DamageHitOutcome
 {
     [InspectorName("Пробитие")]
@@ -47,11 +60,19 @@ public class DamageShellPreset
     [InspectorName("Старый общий урон")]
     [Tooltip("Оставлено для совместимости. Новая модель использует три отдельных урона ниже.")]
     public float damagePoints = 100f;
+    [InspectorName("Damage type")]
+    public CoreTacticalDamageType damageType = CoreTacticalDamageType.Kinetic;
+    [InspectorName("Resistance ignore, %")]
+    [Range(0f, 100f)] public float resistanceIgnorePercent = 0f;
     [InspectorName("Урон корпусу при пробитии")]
     [Tooltip("Сколько прочности корпуса снимает снаряд, если бронелист пробит.")]
     public float hullDamageOnPenetration = 100f;
+    [InspectorName("Damage roll spread")]
+    [Range(0f, 0.5f)] public float damageRollSpread = 0.25f;
     [InspectorName("Пробитие, мм")]
     public float penetrationMm = 70f;
+    [InspectorName("AP arming armor, mm")]
+    public float armingArmorMm = 0f;
     [InspectorName("Множитель пробития на максимальной дальности")]
     [Tooltip("Бронепробитие бронебойного снаряда на пределе дальности. Между стволом и пределом интерполируется по дистанции/скорости.")]
     [Range(0.05f, 1f)] public float penetrationAtMaxRangeMultiplier = 0.55f;
@@ -63,7 +84,7 @@ public class DamageShellPreset
     [InspectorName("Нормализация, град")]
     public float normalizationDegrees = 4f;
     [InspectorName("Разброс пробития")]
-    [Range(0f, 0.5f)] public float penetrationRollSpread = 0.1f;
+    [Range(0f, 0.5f)] public float penetrationRollSpread = 0.25f;
     [InspectorName("Цвет снаряда")]
     public Color projectileColor = Color.red;
 }
@@ -740,11 +761,14 @@ public static class BallisticFireControl
 public struct DamageHitContext
 {
     public DamageShellType shellType;
+    public CoreTacticalDamageType damageType;
     public string shellName;
     public string sourceName;
     public float caliberMm;
     public float damagePoints;
     public float hullDamageOnPenetration;
+    public float resistanceIgnorePercent;
+    public float armingArmorMm;
     public float penetrationMm;
     public float explosiveRadiusMeters;
     public float normalizationDegrees;
@@ -754,6 +778,7 @@ public struct DamageHitContext
     public float impactSourceMassKg;
     public float impactTargetMassKg;
     public float impactSourceDamageMultiplier;
+    public float damageRollSpread;
     public float internalTravelDistance;
     public bool deferResultLogging;
     public Vector3 hitPoint;
@@ -767,6 +792,10 @@ public struct DamageHitResult
     public DamageHitOutcome outcome;
     public string message;
     public string zoneId;
+    public CoreTacticalDamageType damageType;
+    public float resistancePercent;
+    public float resistanceIgnorePercent;
+    public float effectiveResistancePercent;
     public float armorMm;
     public float effectiveArmorMm;
     public float impactAngleDeg;
@@ -779,6 +808,7 @@ public struct ArmorSurface
 {
     public string zoneId;
     public string displayNameRu;
+    public CoreTacticalResistanceSet resistances;
     public float armorMm;
     public float ricochetAngleDeg;
     public float overmatchCaliberMultiplier;
@@ -786,12 +816,18 @@ public struct ArmorSurface
     public float highExplosiveSurfaceDamageMultiplier;
     public float ramDamageMultiplier;
 
+    public float GetResistancePercent(CoreTacticalDamageType damageType)
+    {
+        return resistances.Get(damageType);
+    }
+
     public static ArmorSurface FromZone(ArmorZone zone)
     {
         return new ArmorSurface
         {
             zoneId = zone != null ? zone.zoneId : "",
             displayNameRu = zone != null ? zone.displayNameRu : "",
+            resistances = zone != null ? zone.Resistances : DamageResistanceUtility.DefaultShipResistances,
             armorMm = zone != null ? zone.armorMm : 0f,
             ricochetAngleDeg = zone != null ? zone.ricochetAngleDeg : 70f,
             overmatchCaliberMultiplier = zone != null ? zone.overmatchCaliberMultiplier : 3f,

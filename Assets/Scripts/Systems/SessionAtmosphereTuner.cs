@@ -249,6 +249,11 @@ public sealed class SessionAtmosphereTuner : MonoBehaviour
         if (moonLight == null)
         {
             GameObject moon = GameObject.Find("Moon Directional Light");
+            if (moon == null)
+            {
+                moon = GameObject.Find("Moon Light");
+            }
+
             moonLight = moon != null ? moon.GetComponent<Light>() : null;
         }
 

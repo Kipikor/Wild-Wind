@@ -183,36 +183,44 @@ public class DamageableShip : MonoBehaviour
             normal = -normal;
         }
 
+        CoreTacticalDamageType damageType = ResolveLegacyDamageType(context);
         float rawAngle = Vector3.Angle(-incoming, normal);
-        float normalizedAngle = Mathf.Max(0f, rawAngle - Mathf.Max(0f, context.normalizationDegrees));
-        float cos = Mathf.Max(0.05f, Mathf.Cos(normalizedAngle * Mathf.Deg2Rad));
-        float effectiveArmor = Mathf.Max(0f, surface.armorMm) / cos;
+        float resistance = surface.GetResistancePercent(damageType);
+        float ignore = Mathf.Clamp(context.resistanceIgnorePercent, 0f, 100f);
+        float effectiveResistance = Mathf.Max(0f, resistance - ignore);
+        float rawDamage = ResolveRawDamageForTypedHit(surface, context);
+        if (context.shellType == DamageShellType.Impact)
+        {
+            rawDamage *= Mathf.Max(0f, ramDamageTakenMultiplier);
+        }
+        float appliedDamage = ApplyHullDamage(rawDamage
+            * Mathf.Clamp01(1f - effectiveResistance / 100f)
+            * Mathf.Max(0f, surface.structureDamageMultiplier));
+
+        DamageHitOutcome outcome = context.shellType == DamageShellType.Impact
+            ? DamageHitOutcome.ImpactDamage
+            : damageType == CoreTacticalDamageType.Explosive
+                ? DamageHitOutcome.ExplosiveSplash
+                : DamageHitOutcome.Penetration;
+        IncrementOutcomeCounter(outcome);
 
         DamageHitResult result = new DamageHitResult
         {
+            outcome = outcome,
             zoneId = surface.zoneId,
+            damageType = damageType,
+            resistancePercent = resistance,
+            resistanceIgnorePercent = ignore,
+            effectiveResistancePercent = effectiveResistance,
             armorMm = surface.armorMm,
-            effectiveArmorMm = effectiveArmor,
+            effectiveArmorMm = effectiveResistance,
             impactAngleDeg = rawAngle,
-            penetrationMm = context.penetrationMm,
-            remainingStructureHp = structureHp
+            penetrationMm = ignore,
+            structureDamage = appliedDamage,
+            remainingStructureHp = structureHp,
+            message = BuildTypedDamageMessage(surface, context, damageType, rawDamage, appliedDamage, effectiveResistance)
         };
 
-        if (context.shellType == DamageShellType.ArmorPiercing)
-        {
-            ResolveArmorPiercingHit(surface, context, effectiveArmor, rawAngle, ref result);
-        }
-        else if (context.shellType == DamageShellType.HighExplosive)
-        {
-            ResolveHighExplosiveHit(surface, context, effectiveArmor, ref result);
-        }
-        else
-        {
-            ResolveImpactHit(surface, context, ref result);
-        }
-
-        result.remainingStructureHp = structureHp;
-        result.message = AppendArmorTelemetry(result.message, context, result);
         if (!context.deferResultLogging)
         {
             FinalizeHitResult(result);
@@ -276,6 +284,83 @@ public class DamageableShip : MonoBehaviour
         return bounds.center;
     }
 
+    private static CoreTacticalDamageType ResolveLegacyDamageType(DamageHitContext context)
+    {
+        if (context.shellType == DamageShellType.Impact)
+        {
+            return CoreTacticalDamageType.Kinetic;
+        }
+
+        if (context.damageType != default)
+        {
+            return context.damageType;
+        }
+
+        return context.shellType == DamageShellType.HighExplosive
+            ? CoreTacticalDamageType.Explosive
+            : CoreTacticalDamageType.Kinetic;
+    }
+
+    private static float ResolveRawDamageForTypedHit(ArmorSurface surface, DamageHitContext context)
+    {
+        if (context.shellType == DamageShellType.Impact)
+        {
+            float sourceMultiplier = context.impactSourceDamageMultiplier > 0.001f
+                ? context.impactSourceDamageMultiplier
+                : 1f;
+            float damageScale = context.impactDamagePerKJ > 0.001f ? context.impactDamagePerKJ : 10f;
+            return Mathf.Sqrt(Mathf.Max(0f, context.impactEnergyKJ))
+                * damageScale
+                * sourceMultiplier
+                * Mathf.Max(0f, surface.ramDamageMultiplier);
+        }
+
+        return context.hullDamageOnPenetration > 0.001f
+            ? context.hullDamageOnPenetration
+            : context.damagePoints;
+    }
+
+    private void IncrementOutcomeCounter(DamageHitOutcome outcome)
+    {
+        switch (outcome)
+        {
+            case DamageHitOutcome.ExplosiveSplash:
+                explosiveSplashCount++;
+                break;
+            case DamageHitOutcome.ImpactDamage:
+                impactCount++;
+                break;
+            default:
+                penetrationCount++;
+                break;
+        }
+    }
+
+    private static string BuildTypedDamageMessage(
+        ArmorSurface surface,
+        DamageHitContext context,
+        CoreTacticalDamageType damageType,
+        float rawDamage,
+        float appliedDamage,
+        float effectiveResistance)
+    {
+        string shellName = string.IsNullOrWhiteSpace(context.shellName) ? damageType.ToString() : context.shellName;
+        string zoneName = string.IsNullOrWhiteSpace(surface.displayNameRu) ? surface.zoneId : surface.displayNameRu;
+        return "[Damage] "
+            + shellName
+            + " hit "
+            + zoneName
+            + " as "
+            + damageType
+            + ": raw "
+            + rawDamage.ToString("0.0")
+            + ", resistance "
+            + effectiveResistance.ToString("0.#")
+            + "%, hull -"
+            + appliedDamage.ToString("0.0")
+            + ".";
+    }
+
     private void ResolveArmorPiercingHit(
         ArmorSurface surface,
         DamageHitContext context,
@@ -300,7 +385,9 @@ public class DamageableShip : MonoBehaviour
         }
 
         penetrationCount++;
-        float hullDamage = ApplyHullDamage(context.hullDamageOnPenetration * Mathf.Max(0f, surface.structureDamageMultiplier));
+        bool armed = context.armingArmorMm <= 0.001f || surface.armorMm + 0.001f >= context.armingArmorMm;
+        float damageMultiplier = armed ? 1f : 0.10f;
+        float hullDamage = ApplyHullDamage(context.hullDamageOnPenetration * damageMultiplier * Mathf.Max(0f, surface.structureDamageMultiplier));
         result.structureDamage = hullDamage;
         result.outcome = DamageHitOutcome.Penetration;
         result.message = $"[Урон] Пробитие: {context.shellName} пробил {surface.displayNameRu}, корпус -{hullDamage:0.0}.";

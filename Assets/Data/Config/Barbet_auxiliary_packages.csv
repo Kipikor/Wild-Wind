@@ -1,0 +1,5 @@
+id_auxiliary,base_package_id,upgrade_level,ship_id,local_name_ru,slot_role,kind,power_multiplier,upgrade_cost_multiplier,range_m,damage,projectile_speed_ms,projectile_hp,projectiles_per_salvo,reload_seconds,energy_cost,cycle_seconds,cooldown_seconds,repair_hp_per_cycle,requires_energy,notes_ru
+barbet_small_siphon,,base,capital_artillery_cruiser_r02,Сифон облачного конденсата,small,siphon,1.00,1.00,0,32,0,0,2,0,12,0,0,0,true,Две бортовые сифонные установки для сбора сырого облачного конденсата
+barbet_small_magnet,,base,capital_artillery_cruiser_r02,Магнитный сборочный луч,small,magnet,1.00,1.00,8000,0,0,0,0,0,90,0,0,0,true,Дальний сбор груза после боя
+barbet_small_salvage_magnet,,base,capital_artillery_cruiser_r02,Сальважный магнитный луч,small,salvage_magnet,1.00,1.00,5200,0,0,0,0,0,150,0,0,0,true,Медленнее и дороже но забирает ценную начинку
+barbet_small_harpoon,,base,capital_artillery_cruiser_r02,Гарпунная пушка,small,harpoon,1.00,1.00,400,85,220,180,1,5,420,360,0,3,false,Тяжелая гарпунная пушка малого слота для охоты и буксировки

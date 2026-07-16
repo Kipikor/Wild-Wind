@@ -939,7 +939,7 @@ public class SortieZoneDefinition
     public float distanceToBaseKm = SessionExtractionConstants.DefaultSafeSortieDistanceToBaseKm;
     public float returnCruiseSpeedMS = 35f;
     public float returnPowerLever = 0.7f;
-    public float extractionRunupRequiredSeconds = 12f;
+    public float extractionRunupRequiredSeconds = 5f;
     public float extractionRunupSpeedRatio = 0.9f;
 
     public void Normalize()
@@ -1138,8 +1138,7 @@ public class SortieSessionState
         float distance = Vector2.Distance(center, point);
         float distanceToBoundary = zone.radiusMeters - distance;
         bool outsideCylinder = distance >= zone.radiusMeters;
-        bool aboveStorm = position.y > zone.stormFloorY;
-        return outsideCylinder && aboveStorm;
+        return outsideCylinder;
     }
 }
 
@@ -1232,20 +1231,15 @@ public static class SortieExtractionCalculator
         estimate.hasEnoughCoal = true;
         estimate.hasEnoughClaudium = true;
         estimate.canExtract = !estimate.isInsideCylinder
-            && estimate.isAboveStorm
             && estimate.hasExtractionRunup;
 
-        if (!estimate.isAboveStorm)
+        if (estimate.isInsideCylinder)
         {
-            estimate.status = "Extraction blocked: ship is in the storm layer.";
-        }
-        else if (estimate.isInsideCylinder)
-        {
-            estimate.status = "Extraction blocked: leave the sortie cylinder.";
+            estimate.status = "Extraction blocked: leave the mission circle.";
         }
         else if (!estimate.hasExtractionRunup)
         {
-            estimate.status = $"Extraction blocked: hold claudium slipstream toward base for {estimate.missingExtractionRunupSeconds:F1} s.";
+            estimate.status = $"Extraction blocked: stay outside the mission circle for {estimate.missingExtractionRunupSeconds:F1} s.";
         }
         else
         {

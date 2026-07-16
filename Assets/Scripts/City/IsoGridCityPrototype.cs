@@ -20,6 +20,9 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     private const float HighlightTileVisualY = 0.018f;
     private const int CityRaycastLayer = 30;
     private const int CityRaycastLayerMask = 1 << CityRaycastLayer;
+    private const float OccupiedExternalDockVisualWidthMultiplier = 1.36f;
+    private const float OccupiedExternalDockVisualLengthMultiplier = 1.68f;
+    private const float ExternalDockShipBerthHeight = 0.58f;
 
     [Header("Grid")]
     public int gridWidth = 40;
@@ -141,6 +144,47 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     private float cameraHomeBlendTargetPitchDegrees;
     private float cameraHomeBlendStartOrthographicSize;
     private float cameraHomeBlendTargetOrthographicSize;
+    private bool cameraTransformBlendActive;
+    private bool cameraTransformBlendActivatesPendingPortDockOrbit;
+    private Vector3 cameraTransformBlendStartPosition;
+    private Vector3 cameraTransformBlendTargetPosition;
+    private Quaternion cameraTransformBlendStartRotation = Quaternion.identity;
+    private Quaternion cameraTransformBlendTargetRotation = Quaternion.identity;
+    private float cameraTransformBlendStartOrthographicSize;
+    private float cameraTransformBlendTargetOrthographicSize;
+    private Vector3 cameraTransformBlendTargetPivot;
+    private float cameraTransformBlendTargetYawDegrees;
+    private float cameraTransformBlendTargetPitchDegrees;
+    private bool portDockOrbitActive;
+    private bool pendingPortDockOrbitActive;
+    private bool portDockWorldInteractionSuppressed;
+    private Vector3 portDockOrbitFocus;
+    private Vector3 portDockOrbitForward = Vector3.forward;
+    private Vector3 portDockOrbitRight = Vector3.right;
+    private float portDockOrbitBaseMajorRadius;
+    private float portDockOrbitBaseMinorRadius;
+    private float portDockOrbitBaseZoomSize;
+    private float portDockOrbitBaseCameraDistance;
+    private float portDockOrbitAngleDegrees;
+    private float portDockOrbitPitchDegrees;
+    private Vector3 pendingPortDockOrbitFocus;
+    private Vector3 pendingPortDockOrbitForward = Vector3.forward;
+    private Vector3 pendingPortDockOrbitRight = Vector3.right;
+    private float pendingPortDockOrbitBaseMajorRadius;
+    private float pendingPortDockOrbitBaseMinorRadius;
+    private float pendingPortDockOrbitBaseZoomSize;
+    private float pendingPortDockOrbitBaseCameraDistance;
+    private float pendingPortDockOrbitAngleDegrees;
+    private float pendingPortDockOrbitPitchDegrees;
+    private Vector3 portDockOrbitBlendStartFocus;
+    private Vector3 portDockOrbitBlendStartForward = Vector3.forward;
+    private Vector3 portDockOrbitBlendStartRight = Vector3.right;
+    private float portDockOrbitBlendStartBaseMajorRadius;
+    private float portDockOrbitBlendStartBaseMinorRadius;
+    private float portDockOrbitBlendStartBaseZoomSize;
+    private float portDockOrbitBlendStartBaseCameraDistance;
+    private float portDockOrbitBlendStartAngleDegrees;
+    private float portDockOrbitBlendStartPitchDegrees;
 
     private Material tileMaterial;
     private Material occupiedMaterial;
@@ -172,6 +216,12 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     private const float OutlineSimplifyTolerancePixels = 2.25f;
     private const float OutlineOverlayPlaneDistance = 2f;
     private const float CameraHomeBlendSeconds = 0.55f;
+    private const float PortDockOrbitAngleSensitivity = 0.16f;
+    private const float PortDockOrbitKeyboardDegreesPerSecond = 48f;
+    private const float PortDockOrbitMinPitchDegrees = 18f;
+    private const float PortDockOrbitMaxPitchDegrees = 66f;
+    private const float PortDockOrbitMinZoomScale = 0.55f;
+    private const float PortDockOrbitMaxZoomScale = 1.85f;
 
     public event Action<string> BuildingClicked;
     public event Action<string> ExpansionRegionClicked;
@@ -194,6 +244,7 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     public int ExpansionMarkerCountForTests => expansionMarkers.Count;
     public int ExternalDockSlotCountForTests => externalDockSlots.Count;
     public int ExternalDockPlacedCountForTests => externalDockPlacements.Count;
+    public bool IsPortDockWorldInteractionSuppressedForTests => portDockWorldInteractionSuppressed;
     public int TileColliderCountForTests => tileRoot != null
         ? tileRoot.GetComponentsInChildren<Collider>(true).Length
         : 0;
@@ -293,6 +344,32 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         && cameraPitchDegrees >= cameraMinPitchDegrees
         && cameraPitchDegrees <= cameraMaxPitchDegrees;
     public bool IsCameraHomeBlendActiveForTests => cameraHomeBlendActive;
+    public bool IsCameraTransformBlendActiveForTests => cameraTransformBlendActive;
+    public bool IsCameraTransformBlendTargetingPortDockForTests => cameraTransformBlendActive
+        && cameraTransformBlendActivatesPendingPortDockOrbit
+        && pendingPortDockOrbitActive;
+    public bool IsCameraTransformBlendTargetingPreservedStateForTests => cameraTransformBlendActive
+        && !cameraTransformBlendActivatesPendingPortDockOrbit
+        && hasPreservedCameraState
+        && Vector3.Distance(cameraTransformBlendTargetPivot, preservedCameraPivot) <= 0.01f
+        && Mathf.Abs(Mathf.DeltaAngle(cameraTransformBlendTargetYawDegrees, preservedCameraYawDegrees)) <= 0.01f
+        && Mathf.Abs(cameraTransformBlendTargetPitchDegrees - Mathf.Clamp(preservedCameraPitchDegrees, cameraMinPitchDegrees, cameraMaxPitchDegrees)) <= 0.01f
+        && Mathf.Abs(cameraTransformBlendTargetOrthographicSize - Mathf.Clamp(preservedCameraOrthographicSize, cameraMinOrthographicSize, cameraMaxOrthographicSize)) <= 0.01f;
+    public bool IsPortDockCameraOrbitActiveForTests => portDockOrbitActive;
+    public bool IsPortDockCameraOrbitLookingAtFocusForTests
+    {
+        get
+        {
+            if (!portDockOrbitActive || sceneCamera == null)
+            {
+                return false;
+            }
+
+            Vector3 toFocus = portDockOrbitFocus - sceneCamera.transform.position;
+            return toFocus.sqrMagnitude > 0.0001f
+                && Vector3.Angle(sceneCamera.transform.forward, toFocus.normalized) <= 0.5f;
+        }
+    }
     public bool IsCameraAtDefaultViewForTests => sceneCamera != null
         && Vector3.Distance(cameraPivot, IslandOrbitCenterWorld()) <= 0.01f
         && Mathf.Abs(Mathf.DeltaAngle(cameraYawDegrees, 45f)) <= 0.01f
@@ -344,7 +421,20 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         }
 
         cameraHomeBlendActive = false;
+        cameraTransformBlendActive = false;
+        ClearPortDockCameraOrbit();
         ApplyDefaultCameraPose();
+    }
+
+    public void PreserveCameraStateBeforePortDockForRuntime()
+    {
+        EnsureSceneCamera();
+        if (sceneCamera == null || portDockOrbitActive || pendingPortDockOrbitActive || cameraTransformBlendActive)
+        {
+            return;
+        }
+
+        PreserveCameraStateForRuntime();
     }
 
     public void PreserveCameraStateForRuntime()
@@ -376,12 +466,50 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         }
 
         cameraHomeBlendActive = false;
+        cameraTransformBlendActive = false;
+        ClearPortDockCameraOrbit();
         cameraPivot = preservedCameraPivot;
         cameraYawDegrees = preservedCameraYawDegrees;
         cameraPitchDegrees = Mathf.Clamp(preservedCameraPitchDegrees, cameraMinPitchDegrees, cameraMaxPitchDegrees);
         ConfigureSceneCameraForCity();
         SetCameraZoomSize(preservedCameraOrthographicSize);
         ApplyCameraTransform();
+        InvalidateHoverOutlineCache();
+        return true;
+    }
+
+    public bool FlyCameraToPreservedCameraStateForRuntime()
+    {
+        if (!hasPreservedCameraState)
+        {
+            return false;
+        }
+
+        EnsureSceneCamera();
+        if (sceneCamera == null)
+        {
+            return false;
+        }
+
+        ConfigureSceneCameraForCity();
+        float targetPitch = Mathf.Clamp(preservedCameraPitchDegrees, cameraMinPitchDegrees, cameraMaxPitchDegrees);
+        float targetZoom = Mathf.Clamp(preservedCameraOrthographicSize, cameraMinOrthographicSize, cameraMaxOrthographicSize);
+        CalculateCityCameraPose(
+            preservedCameraPivot,
+            preservedCameraYawDegrees,
+            targetPitch,
+            targetZoom,
+            out Vector3 targetPosition,
+            out Quaternion targetRotation);
+        StartCameraTransformBlend(
+            targetPosition,
+            targetRotation,
+            targetZoom,
+            preservedCameraPivot,
+            preservedCameraYawDegrees,
+            targetPitch,
+            false);
+        ClearPortDockCameraOrbit();
         InvalidateHoverOutlineCache();
         return true;
     }
@@ -395,6 +523,8 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         }
 
         ConfigureSceneCameraForCity();
+        cameraTransformBlendActive = false;
+        ClearPortDockCameraOrbit();
         cameraHomeBlendStartPivot = cameraPivot;
         cameraHomeBlendTargetPivot = IslandOrbitCenterWorld();
         cameraHomeBlendStartYawDegrees = cameraYawDegrees;
@@ -409,6 +539,170 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         InvalidateHoverOutlineCache();
     }
 
+    public bool FlyCameraToWorldFocusForRuntime(Vector3 targetPivot, float yawDegrees, float pitchDegrees, float zoomSize, bool snap)
+    {
+        EnsureSceneCamera();
+        if (sceneCamera == null)
+        {
+            return false;
+        }
+
+        ConfigureSceneCameraForCity();
+        cameraTransformBlendActive = false;
+        ClearPortDockCameraOrbit();
+        float clampedPitch = Mathf.Clamp(pitchDegrees, cameraMinPitchDegrees, cameraMaxPitchDegrees);
+        float clampedZoom = Mathf.Clamp(zoomSize, cameraMinOrthographicSize, cameraMaxOrthographicSize);
+        if (snap)
+        {
+            cameraHomeBlendActive = false;
+            cameraPivot = targetPivot;
+            cameraYawDegrees = yawDegrees;
+            cameraPitchDegrees = clampedPitch;
+            SetCameraZoomSize(clampedZoom);
+            ApplyCameraTransform();
+            InvalidateHoverOutlineCache();
+            return true;
+        }
+
+        cameraHomeBlendStartPivot = cameraPivot;
+        cameraHomeBlendTargetPivot = targetPivot;
+        cameraHomeBlendStartYawDegrees = cameraYawDegrees;
+        cameraHomeBlendTargetYawDegrees = yawDegrees;
+        cameraHomeBlendStartPitchDegrees = cameraPitchDegrees;
+        cameraHomeBlendTargetPitchDegrees = clampedPitch;
+        cameraHomeBlendStartOrthographicSize = GetCameraZoomSize();
+        cameraHomeBlendTargetOrthographicSize = clampedZoom;
+        cameraHomeBlendStartedAt = Time.unscaledTime;
+        cameraHomeBlendDuration = CameraHomeBlendSeconds;
+        cameraHomeBlendActive = true;
+        InvalidateHoverOutlineCache();
+        return true;
+    }
+
+    public bool FlyCameraToExternalDockForRuntime(string dockKey, float zoomSize, bool snap)
+    {
+        return FlyCameraToExternalDockForRuntime(dockKey, zoomSize, Vector3.zero, snap);
+    }
+
+    public bool FlyCameraToExternalDockForRuntime(string dockKey, float zoomSize, Vector3 shipSize, bool snap)
+    {
+        if (!TryGetExternalDockBerthPoseForRuntime(
+                dockKey,
+                out Vector3 berthPosition,
+                out Quaternion berthRotation,
+                out float berthLength,
+                out float berthWidth,
+                out BaseIslandExternalDockOrientation orientation))
+        {
+            return false;
+        }
+
+        Vector3 pivot = berthPosition;
+        pivot.y = Mathf.Max(pivot.y + 0.35f, 0.9f);
+        Vector3 safeShipSize = shipSize.sqrMagnitude > 0.0001f
+            ? new Vector3(
+                Mathf.Max(0.01f, shipSize.x),
+                Mathf.Max(0.01f, shipSize.y),
+                Mathf.Max(0.01f, shipSize.z))
+            : new Vector3(Mathf.Max(1f, berthWidth), 1f, Mathf.Max(1f, berthLength));
+
+        Vector3 forward = Vector3.ProjectOnPlane(berthRotation * Vector3.forward, Vector3.up).normalized;
+        if (forward.sqrMagnitude < 0.0001f)
+        {
+            forward = GetExternalDockOutwardDirection(orientation);
+        }
+
+        Vector3 right = Vector3.ProjectOnPlane(berthRotation * Vector3.right, Vector3.up).normalized;
+        if (right.sqrMagnitude < 0.0001f)
+        {
+            right = Vector3.Cross(Vector3.up, forward).normalized;
+        }
+
+        ConfigureSceneCameraForCity();
+        float clampedZoom = Mathf.Clamp(zoomSize, cameraMinOrthographicSize, cameraMaxOrthographicSize);
+        float majorRadius = Mathf.Max(safeShipSize.z * 0.72f, clampedZoom * 0.72f, berthLength * 0.55f);
+        float minorRadius = Mathf.Max(safeShipSize.x * 2.15f, clampedZoom * 0.56f, berthWidth * 0.85f);
+        float initialYaw = GetExternalDockCameraYawDegrees(orientation);
+        float targetYaw = portDockOrbitActive && sceneCamera != null
+            ? sceneCamera.transform.eulerAngles.y
+            : initialYaw;
+        float angleDegrees = CalculatePortDockOrbitAngleForCameraYaw(targetYaw, forward, right, majorRadius, minorRadius);
+        float pitchDegrees = Mathf.Clamp(42f, PortDockOrbitMinPitchDegrees, PortDockOrbitMaxPitchDegrees);
+
+        if (snap)
+        {
+            cameraHomeBlendActive = false;
+            cameraTransformBlendActive = false;
+            SetCameraZoomSize(clampedZoom);
+            ActivatePortDockCameraOrbit(
+                pivot,
+                forward,
+                right,
+                majorRadius,
+                minorRadius,
+                clampedZoom,
+                Mathf.Max(0.001f, cameraDistance),
+                angleDegrees,
+                pitchDegrees);
+            return true;
+        }
+
+        if (portDockOrbitActive)
+        {
+            CapturePortDockOrbitBlendStart();
+            SetPendingPortDockCameraOrbit(
+                pivot,
+                forward,
+                right,
+                majorRadius,
+                minorRadius,
+                clampedZoom,
+                EquivalentOrthographicSizeToCameraDistance(clampedZoom),
+                angleDegrees,
+                pitchDegrees);
+            cameraHomeBlendStartedAt = Time.unscaledTime;
+            cameraHomeBlendDuration = CameraHomeBlendSeconds;
+            cameraHomeBlendActive = true;
+            InvalidateHoverOutlineCache();
+            return true;
+        }
+
+        ClearPortDockCameraOrbit();
+        float targetCameraDistance = EquivalentOrthographicSizeToCameraDistance(clampedZoom);
+        SetPendingPortDockCameraOrbit(
+            pivot,
+            forward,
+            right,
+            majorRadius,
+            minorRadius,
+            clampedZoom,
+            targetCameraDistance,
+            angleDegrees,
+            pitchDegrees);
+        CalculatePortDockOrbitCameraPose(
+            pivot,
+            forward,
+            right,
+            majorRadius,
+            minorRadius,
+            targetCameraDistance,
+            targetCameraDistance,
+            angleDegrees,
+            pitchDegrees,
+            out Vector3 targetPosition,
+            out Quaternion targetRotation);
+        StartCameraTransformBlend(
+            targetPosition,
+            targetRotation,
+            clampedZoom,
+            pivot,
+            initialYaw,
+            pitchDegrees,
+            true);
+        InvalidateHoverOutlineCache();
+        return true;
+    }
+
     public bool OffsetCameraForTests(float pivotX, float pivotZ, float yawDelta, float pitchDelta, float orthographicSizeDelta)
     {
         EnsureSceneCamera();
@@ -418,6 +712,8 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         }
 
         cameraHomeBlendActive = false;
+        cameraTransformBlendActive = false;
+        ClearPortDockCameraOrbit();
         cameraPivot += new Vector3(pivotX, 0f, pivotZ);
         cameraYawDegrees += yawDelta;
         cameraPitchDegrees = Mathf.Clamp(cameraPitchDegrees + pitchDelta, cameraMinPitchDegrees, cameraMaxPitchDegrees);
@@ -426,6 +722,20 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         ApplyCameraTransform();
         InvalidateHoverOutlineCache();
         return true;
+    }
+
+    public bool OffsetPortDockCameraOrbitForTests(float angleDeltaDegrees)
+    {
+        if (!portDockOrbitActive || sceneCamera == null)
+        {
+            return false;
+        }
+
+        Vector3 before = sceneCamera.transform.position;
+        portDockOrbitAngleDegrees += angleDeltaDegrees;
+        ApplyCameraTransform();
+        return Vector3.Distance(before, sceneCamera.transform.position) > 0.01f
+            && IsPortDockCameraOrbitLookingAtFocusForTests;
     }
 
     public void SelectFreeMouseModeForRuntime()
@@ -451,6 +761,35 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         {
             HidePrototypeToolbar();
         }
+    }
+
+    public void SetPortDockWorldInteractionSuppressedForRuntime(bool suppressed)
+    {
+        if (portDockWorldInteractionSuppressed == suppressed)
+        {
+            return;
+        }
+
+        portDockWorldInteractionSuppressed = suppressed;
+        if (!suppressed)
+        {
+            return;
+        }
+
+        ClearPressedBuilding();
+        ClearPressedExternalDock();
+        CancelMove();
+        externalDockDragActive = false;
+        movingExternalDockKey = "";
+        showExternalDockTargets = false;
+        hoverX = -1;
+        hoverY = -1;
+        hoverBuildingId = EmptyCell;
+        hoverExternalDockSlotId = "";
+        hoverExpansionRegionId = "";
+        hoverValid = false;
+        HoveredBuildingKeyForRuntime = "";
+        DestroyHoverOutline();
     }
 
     public void ApplyExpansionRegions(IReadOnlyList<BaseIslandExpansionRegionView> regions)
@@ -900,6 +1239,46 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         return count;
     }
 
+    public int PruneInvalidBuildingsForRuntime()
+    {
+        List<int> invalidIds = null;
+        foreach (KeyValuePair<int, PlacedBuilding> pair in buildings)
+        {
+            PlacedBuilding building = pair.Value;
+            if (building == null
+                || building.gameObject == null
+                || CountEnabledRenderers(building.gameObject.transform) <= 0)
+            {
+                if (invalidIds == null)
+                {
+                    invalidIds = new List<int>();
+                }
+
+                invalidIds.Add(pair.Key);
+            }
+        }
+
+        if (invalidIds == null)
+        {
+            return 0;
+        }
+
+        int removed = 0;
+        for (int i = 0; i < invalidIds.Count; i++)
+        {
+            int id = invalidIds[i];
+            if (id == EmptyCell)
+            {
+                continue;
+            }
+
+            RemoveBuilding(id);
+            removed++;
+        }
+
+        return removed;
+    }
+
     public int CountExactBuildingKeyForTests(string buildingKey)
     {
         if (string.IsNullOrWhiteSpace(buildingKey))
@@ -917,6 +1296,17 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         }
 
         return count;
+    }
+
+    public bool DeactivateBuildingVisualForTests(string buildingKey)
+    {
+        if (!TryGetBuildingByKey(buildingKey, out PlacedBuilding building) || building.gameObject == null)
+        {
+            return false;
+        }
+
+        building.gameObject.SetActive(false);
+        return CountEnabledRenderers(building.gameObject.transform) <= 0;
     }
 
     private bool MoveExternalDockToSlot(string dockKey, string targetSlotId, bool allowSwap)
@@ -1016,6 +1406,69 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
             if (handle != null && handle.slotId == normalizedSlotId)
             {
                 dockObject = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool TryGetExternalDockBerthPoseForRuntime(
+        string dockKey,
+        out Vector3 berthPosition,
+        out Quaternion berthRotation,
+        out float berthLength,
+        out float berthWidth,
+        out BaseIslandExternalDockOrientation orientation)
+    {
+        berthPosition = Vector3.zero;
+        berthRotation = Quaternion.identity;
+        berthLength = 0f;
+        berthWidth = 0f;
+        orientation = BaseIslandExternalDockOrientation.South;
+        if (string.IsNullOrWhiteSpace(dockKey))
+        {
+            return false;
+        }
+
+        string normalizedDockKey = dockKey.Trim();
+        if (!externalDockPlacements.TryGetValue(normalizedDockKey, out ExternalDockPlacement placement)
+            || placement == null
+            || !TryGetExternalDockSlot(placement.slotId, out BaseIslandExternalDockSlotView slot))
+        {
+            return false;
+        }
+
+        bool northSouth = slot.orientation == BaseIslandExternalDockOrientation.North
+            || slot.orientation == BaseIslandExternalDockOrientation.South;
+        float contactWidth = Mathf.Max(1, slot.contactWidth) * cellSize * 0.92f;
+        float protrusionLength = Mathf.Max(1, slot.protrusionLength) * cellSize * 0.92f;
+        float visualWidth = GetExternalDockVisualContactWidth(contactWidth, true);
+        float visualLength = GetExternalDockVisualProtrusionLength(protrusionLength, true);
+        Vector3 outward = GetExternalDockOutwardDirection(slot.orientation);
+        berthPosition = new Vector3(slot.centerX * cellSize, ExternalDockShipBerthHeight, slot.centerY * cellSize)
+            + outward * (visualLength * 0.08f);
+        berthRotation = Quaternion.Euler(0f, GetExternalDockShipYawDegrees(slot.orientation), 0f);
+        berthLength = visualLength * 0.90f;
+        berthWidth = visualWidth * (northSouth ? 0.78f : 0.78f);
+        orientation = slot.orientation;
+        return true;
+    }
+
+    private bool TryGetExternalDockSlot(string slotId, out BaseIslandExternalDockSlotView slot)
+    {
+        slot = default;
+        if (string.IsNullOrWhiteSpace(slotId))
+        {
+            return false;
+        }
+
+        string normalizedSlotId = slotId.Trim();
+        for (int i = 0; i < externalDockSlots.Count; i++)
+        {
+            if (externalDockSlots[i].dockId == normalizedSlotId)
+            {
+                slot = externalDockSlots[i];
                 return true;
             }
         }
@@ -1745,6 +2198,13 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         float scrollY;
         ReadCameraPointerInput(out rightHeld, out middleHeld, out pointerDelta, out scrollY);
 
+        if (portDockOrbitActive)
+        {
+            pointerCameraControlActive = HandlePortDockCameraInput(rightHeld, middleHeld, pointerDelta, scrollY);
+            ApplyCameraTransform();
+            return;
+        }
+
         if ((rightHeld || middleHeld || Mathf.Abs(scrollY) > 0.001f) &&
             (WildWindGameplayHud.IsHudPointerCaptureActiveForCamera || IsPointerOverUi()))
         {
@@ -1787,6 +2247,43 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         ApplyCameraTransform();
     }
 
+    private bool HandlePortDockCameraInput(bool rightHeld, bool middleHeld, Vector2 pointerDelta, float scrollY)
+    {
+        bool handled = false;
+        if (rightHeld || middleHeld)
+        {
+            handled = true;
+            portDockOrbitAngleDegrees -= pointerDelta.x * PortDockOrbitAngleSensitivity;
+            portDockOrbitPitchDegrees = Mathf.Clamp(
+                portDockOrbitPitchDegrees - pointerDelta.y * PortDockOrbitAngleSensitivity,
+                PortDockOrbitMinPitchDegrees,
+                PortDockOrbitMaxPitchDegrees);
+        }
+
+        Vector2 moveInput = ReadCameraMoveInput();
+        if (Mathf.Abs(moveInput.x) > 0.001f)
+        {
+            handled = true;
+            portDockOrbitAngleDegrees += moveInput.x * PortDockOrbitKeyboardDegreesPerSecond * Time.deltaTime;
+        }
+
+        float scrollSteps = NormalizeScrollSteps(scrollY);
+        if (Mathf.Abs(scrollSteps) > 0.001f)
+        {
+            handled = true;
+            RefreshCameraZoomLimits();
+            float zoomFactor = Mathf.Exp(-scrollSteps * CameraZoomStepLogScale());
+            float baseZoom = Mathf.Max(0.01f, portDockOrbitBaseZoomSize);
+            float targetZoom = Mathf.Clamp(
+                GetCameraZoomSize() * zoomFactor,
+                baseZoom * PortDockOrbitMinZoomScale,
+                baseZoom * PortDockOrbitMaxZoomScale);
+            SetCameraZoomSize(targetZoom);
+        }
+
+        return handled;
+    }
+
     private bool ApplyCameraHomeBlend()
     {
         if (!cameraHomeBlendActive)
@@ -1798,7 +2295,18 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         if (sceneCamera == null)
         {
             cameraHomeBlendActive = false;
+            cameraTransformBlendActive = false;
             return false;
+        }
+
+        if (cameraTransformBlendActive)
+        {
+            return ApplyCameraTransformBlend();
+        }
+
+        if (portDockOrbitActive && pendingPortDockOrbitActive)
+        {
+            return ApplyPortDockOrbitBlend();
         }
 
         float duration = Mathf.Max(0.01f, cameraHomeBlendDuration);
@@ -1823,10 +2331,147 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
             SetCameraZoomSize(cameraHomeBlendTargetOrthographicSize);
             ApplyCameraTransform();
             cameraHomeBlendActive = false;
+            if (pendingPortDockOrbitActive)
+            {
+                ActivatePendingPortDockCameraOrbit();
+            }
         }
 
         InvalidateHoverOutlineCache();
         return true;
+    }
+
+    private bool ApplyCameraTransformBlend()
+    {
+        if (sceneCamera == null)
+        {
+            cameraHomeBlendActive = false;
+            cameraTransformBlendActive = false;
+            return false;
+        }
+
+        float duration = Mathf.Max(0.01f, cameraHomeBlendDuration);
+        float ratio = Mathf.Clamp01((Time.unscaledTime - cameraHomeBlendStartedAt) / duration);
+        float easedRatio = ratio * ratio * (3f - 2f * ratio);
+
+        Vector3 position = Vector3.Lerp(cameraTransformBlendStartPosition, cameraTransformBlendTargetPosition, easedRatio);
+        Quaternion rotation = Quaternion.Slerp(cameraTransformBlendStartRotation, cameraTransformBlendTargetRotation, easedRatio);
+        SetCameraZoomSize(Mathf.Lerp(
+            cameraTransformBlendStartOrthographicSize,
+            cameraTransformBlendTargetOrthographicSize,
+            easedRatio));
+        sceneCamera.transform.SetPositionAndRotation(position, rotation);
+
+        if (ratio >= 1f)
+        {
+            SetCameraZoomSize(cameraTransformBlendTargetOrthographicSize);
+            cameraHomeBlendActive = false;
+            cameraTransformBlendActive = false;
+            if (cameraTransformBlendActivatesPendingPortDockOrbit)
+            {
+                ActivatePendingPortDockCameraOrbit();
+            }
+            else
+            {
+                cameraPivot = cameraTransformBlendTargetPivot;
+                cameraYawDegrees = cameraTransformBlendTargetYawDegrees;
+                cameraPitchDegrees = Mathf.Clamp(
+                    cameraTransformBlendTargetPitchDegrees,
+                    cameraMinPitchDegrees,
+                    cameraMaxPitchDegrees);
+                ApplyCameraTransform();
+            }
+        }
+
+        InvalidateHoverOutlineCache();
+        return true;
+    }
+
+    private bool ApplyPortDockOrbitBlend()
+    {
+        float duration = Mathf.Max(0.01f, cameraHomeBlendDuration);
+        float ratio = Mathf.Clamp01((Time.unscaledTime - cameraHomeBlendStartedAt) / duration);
+        float easedRatio = ratio * ratio * (3f - 2f * ratio);
+
+        portDockOrbitFocus = Vector3.Lerp(portDockOrbitBlendStartFocus, pendingPortDockOrbitFocus, easedRatio);
+        portDockOrbitForward = SanitizeHorizontalAxis(
+            Vector3.Slerp(portDockOrbitBlendStartForward, pendingPortDockOrbitForward, easedRatio),
+            pendingPortDockOrbitForward);
+        portDockOrbitRight = SanitizeHorizontalAxis(
+            Vector3.Slerp(portDockOrbitBlendStartRight, pendingPortDockOrbitRight, easedRatio),
+            pendingPortDockOrbitRight);
+        portDockOrbitBaseMajorRadius = Mathf.Lerp(
+            portDockOrbitBlendStartBaseMajorRadius,
+            pendingPortDockOrbitBaseMajorRadius,
+            easedRatio);
+        portDockOrbitBaseMinorRadius = Mathf.Lerp(
+            portDockOrbitBlendStartBaseMinorRadius,
+            pendingPortDockOrbitBaseMinorRadius,
+            easedRatio);
+        portDockOrbitBaseZoomSize = Mathf.Lerp(
+            portDockOrbitBlendStartBaseZoomSize,
+            pendingPortDockOrbitBaseZoomSize,
+            easedRatio);
+        portDockOrbitBaseCameraDistance = Mathf.Lerp(
+            portDockOrbitBlendStartBaseCameraDistance,
+            pendingPortDockOrbitBaseCameraDistance,
+            easedRatio);
+        portDockOrbitAngleDegrees = Mathf.LerpAngle(
+            portDockOrbitBlendStartAngleDegrees,
+            pendingPortDockOrbitAngleDegrees,
+            easedRatio);
+        portDockOrbitPitchDegrees = Mathf.Lerp(
+            portDockOrbitBlendStartPitchDegrees,
+            pendingPortDockOrbitPitchDegrees,
+            easedRatio);
+        SetCameraZoomSize(Mathf.Lerp(
+            portDockOrbitBlendStartBaseZoomSize,
+            pendingPortDockOrbitBaseZoomSize,
+            easedRatio));
+        ApplyCameraTransform();
+
+        if (ratio >= 1f)
+        {
+            cameraHomeBlendActive = false;
+            ActivatePendingPortDockCameraOrbit();
+        }
+
+        InvalidateHoverOutlineCache();
+        return true;
+    }
+
+    private void StartCameraTransformBlend(
+        Vector3 targetPosition,
+        Quaternion targetRotation,
+        float targetOrthographicSize,
+        Vector3 targetPivot,
+        float targetYawDegrees,
+        float targetPitchDegrees,
+        bool activatesPendingPortDockOrbit)
+    {
+        EnsureSceneCamera();
+        if (sceneCamera == null)
+        {
+            return;
+        }
+
+        cameraTransformBlendStartPosition = sceneCamera.transform.position;
+        cameraTransformBlendTargetPosition = targetPosition;
+        cameraTransformBlendStartRotation = sceneCamera.transform.rotation;
+        cameraTransformBlendTargetRotation = targetRotation;
+        cameraTransformBlendStartOrthographicSize = GetCameraZoomSize();
+        cameraTransformBlendTargetOrthographicSize = Mathf.Clamp(
+            targetOrthographicSize,
+            cameraMinOrthographicSize,
+            cameraMaxOrthographicSize);
+        cameraTransformBlendTargetPivot = targetPivot;
+        cameraTransformBlendTargetYawDegrees = targetYawDegrees;
+        cameraTransformBlendTargetPitchDegrees = targetPitchDegrees;
+        cameraTransformBlendActivatesPendingPortDockOrbit = activatesPendingPortDockOrbit;
+        cameraHomeBlendStartedAt = Time.unscaledTime;
+        cameraHomeBlendDuration = CameraHomeBlendSeconds;
+        cameraTransformBlendActive = true;
+        cameraHomeBlendActive = true;
     }
 
     private void ReadCameraPointerInput(out bool rightHeld, out bool middleHeld, out Vector2 pointerDelta, out float scrollY)
@@ -1922,10 +2567,211 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     private void ApplyCameraTransform()
     {
         if (sceneCamera == null) return;
+        if (portDockOrbitActive)
+        {
+            ApplyPortDockOrbitCameraTransform();
+            return;
+        }
 
         Quaternion rotation = Quaternion.Euler(cameraPitchDegrees, cameraYawDegrees, 0f);
         sceneCamera.transform.rotation = rotation;
         sceneCamera.transform.position = cameraPivot - rotation * Vector3.forward * cameraDistance;
+    }
+
+    private void ApplyPortDockOrbitCameraTransform()
+    {
+        CalculatePortDockOrbitCameraPose(
+            portDockOrbitFocus,
+            portDockOrbitForward,
+            portDockOrbitRight,
+            portDockOrbitBaseMajorRadius,
+            portDockOrbitBaseMinorRadius,
+            portDockOrbitBaseCameraDistance,
+            cameraDistance,
+            portDockOrbitAngleDegrees,
+            portDockOrbitPitchDegrees,
+            out Vector3 cameraPosition,
+            out Quaternion rotation);
+        sceneCamera.transform.SetPositionAndRotation(cameraPosition, rotation);
+        cameraPivot = portDockOrbitFocus;
+        cameraYawDegrees = rotation.eulerAngles.y;
+        cameraPitchDegrees = Mathf.Clamp(portDockOrbitPitchDegrees, cameraMinPitchDegrees, cameraMaxPitchDegrees);
+    }
+
+    private void CalculateCityCameraPose(
+        Vector3 pivot,
+        float yawDegrees,
+        float pitchDegrees,
+        float zoomSize,
+        out Vector3 cameraPosition,
+        out Quaternion rotation)
+    {
+        float clampedPitch = Mathf.Clamp(pitchDegrees, cameraMinPitchDegrees, cameraMaxPitchDegrees);
+        rotation = Quaternion.Euler(clampedPitch, yawDegrees, 0f);
+        cameraPosition = pivot - rotation * Vector3.forward * EquivalentOrthographicSizeToCameraDistance(zoomSize);
+    }
+
+    private void CalculatePortDockOrbitCameraPose(
+        Vector3 focus,
+        Vector3 forward,
+        Vector3 right,
+        float baseMajorRadius,
+        float baseMinorRadius,
+        float baseCameraDistance,
+        float poseCameraDistance,
+        float angleDegrees,
+        float pitchDegrees,
+        out Vector3 cameraPosition,
+        out Quaternion rotation)
+    {
+        float zoomScale = Mathf.Clamp(
+            poseCameraDistance / Mathf.Max(0.001f, baseCameraDistance),
+            PortDockOrbitMinZoomScale,
+            PortDockOrbitMaxZoomScale);
+        float angleRadians = angleDegrees * Mathf.Deg2Rad;
+        Vector3 flatOffset =
+            SanitizeHorizontalAxis(right, Vector3.right) * (Mathf.Cos(angleRadians) * Mathf.Max(0.1f, baseMinorRadius) * zoomScale)
+            + SanitizeHorizontalAxis(forward, Vector3.forward) * (Mathf.Sin(angleRadians) * Mathf.Max(0.1f, baseMajorRadius) * zoomScale);
+        if (flatOffset.sqrMagnitude < 0.0001f)
+        {
+            flatOffset = -Vector3.forward;
+        }
+
+        float horizontalDistance = Mathf.Max(0.01f, flatOffset.magnitude);
+        float height = Mathf.Tan(Mathf.Clamp(
+            pitchDegrees,
+            PortDockOrbitMinPitchDegrees,
+            PortDockOrbitMaxPitchDegrees) * Mathf.Deg2Rad) * horizontalDistance;
+        cameraPosition = focus + flatOffset + Vector3.up * height;
+        Vector3 lookDirection = focus - cameraPosition;
+        if (lookDirection.sqrMagnitude < 0.0001f)
+        {
+            lookDirection = Vector3.forward;
+        }
+
+        rotation = Quaternion.LookRotation(lookDirection.normalized, Vector3.up);
+    }
+
+    private void ActivatePortDockCameraOrbit(
+        Vector3 focus,
+        Vector3 forward,
+        Vector3 right,
+        float majorRadius,
+        float minorRadius,
+        float baseZoomSize,
+        float baseCameraDistance,
+        float angleDegrees,
+        float pitchDegrees)
+    {
+        portDockOrbitFocus = focus;
+        portDockOrbitForward = SanitizeHorizontalAxis(forward, Vector3.forward);
+        portDockOrbitRight = SanitizeHorizontalAxis(right, Vector3.right);
+        portDockOrbitBaseMajorRadius = Mathf.Max(0.1f, majorRadius);
+        portDockOrbitBaseMinorRadius = Mathf.Max(0.1f, minorRadius);
+        portDockOrbitBaseZoomSize = Mathf.Max(0.01f, baseZoomSize);
+        portDockOrbitBaseCameraDistance = Mathf.Max(0.001f, baseCameraDistance);
+        portDockOrbitAngleDegrees = angleDegrees;
+        portDockOrbitPitchDegrees = Mathf.Clamp(pitchDegrees, PortDockOrbitMinPitchDegrees, PortDockOrbitMaxPitchDegrees);
+        pendingPortDockOrbitActive = false;
+        portDockOrbitActive = true;
+        ApplyCameraTransform();
+        InvalidateHoverOutlineCache();
+    }
+
+    private void CapturePortDockOrbitBlendStart()
+    {
+        portDockOrbitBlendStartFocus = portDockOrbitFocus;
+        portDockOrbitBlendStartForward = SanitizeHorizontalAxis(portDockOrbitForward, Vector3.forward);
+        portDockOrbitBlendStartRight = SanitizeHorizontalAxis(portDockOrbitRight, Vector3.right);
+        portDockOrbitBlendStartBaseMajorRadius = Mathf.Max(0.1f, portDockOrbitBaseMajorRadius);
+        portDockOrbitBlendStartBaseMinorRadius = Mathf.Max(0.1f, portDockOrbitBaseMinorRadius);
+        portDockOrbitBlendStartBaseZoomSize = Mathf.Max(0.01f, GetCameraZoomSize());
+        portDockOrbitBlendStartBaseCameraDistance = Mathf.Max(0.001f, portDockOrbitBaseCameraDistance);
+        portDockOrbitBlendStartAngleDegrees = portDockOrbitAngleDegrees;
+        portDockOrbitBlendStartPitchDegrees = Mathf.Clamp(
+            portDockOrbitPitchDegrees,
+            PortDockOrbitMinPitchDegrees,
+            PortDockOrbitMaxPitchDegrees);
+    }
+
+    private void SetPendingPortDockCameraOrbit(
+        Vector3 focus,
+        Vector3 forward,
+        Vector3 right,
+        float majorRadius,
+        float minorRadius,
+        float baseZoomSize,
+        float baseCameraDistance,
+        float angleDegrees,
+        float pitchDegrees)
+    {
+        pendingPortDockOrbitFocus = focus;
+        pendingPortDockOrbitForward = SanitizeHorizontalAxis(forward, Vector3.forward);
+        pendingPortDockOrbitRight = SanitizeHorizontalAxis(right, Vector3.right);
+        pendingPortDockOrbitBaseMajorRadius = Mathf.Max(0.1f, majorRadius);
+        pendingPortDockOrbitBaseMinorRadius = Mathf.Max(0.1f, minorRadius);
+        pendingPortDockOrbitBaseZoomSize = Mathf.Max(0.01f, baseZoomSize);
+        pendingPortDockOrbitBaseCameraDistance = Mathf.Max(0.001f, baseCameraDistance);
+        pendingPortDockOrbitAngleDegrees = angleDegrees;
+        pendingPortDockOrbitPitchDegrees = Mathf.Clamp(pitchDegrees, PortDockOrbitMinPitchDegrees, PortDockOrbitMaxPitchDegrees);
+        pendingPortDockOrbitActive = true;
+    }
+
+    private void ActivatePendingPortDockCameraOrbit()
+    {
+        if (!pendingPortDockOrbitActive)
+        {
+            return;
+        }
+
+        ActivatePortDockCameraOrbit(
+            pendingPortDockOrbitFocus,
+            pendingPortDockOrbitForward,
+            pendingPortDockOrbitRight,
+            pendingPortDockOrbitBaseMajorRadius,
+            pendingPortDockOrbitBaseMinorRadius,
+            pendingPortDockOrbitBaseZoomSize,
+            pendingPortDockOrbitBaseCameraDistance,
+            pendingPortDockOrbitAngleDegrees,
+            pendingPortDockOrbitPitchDegrees);
+    }
+
+    private void ClearPortDockCameraOrbit()
+    {
+        portDockOrbitActive = false;
+        pendingPortDockOrbitActive = false;
+    }
+
+    private static float CalculatePortDockOrbitAngleForCameraYaw(
+        float cameraYawDegrees,
+        Vector3 forward,
+        Vector3 right,
+        float majorRadius,
+        float minorRadius)
+    {
+        Vector3 desiredCameraOffset = -(Quaternion.Euler(0f, cameraYawDegrees, 0f) * Vector3.forward);
+        desiredCameraOffset = Vector3.ProjectOnPlane(desiredCameraOffset, Vector3.up).normalized;
+        if (desiredCameraOffset.sqrMagnitude < 0.0001f)
+        {
+            desiredCameraOffset = -Vector3.forward;
+        }
+
+        float localX = Vector3.Dot(desiredCameraOffset, SanitizeHorizontalAxis(right, Vector3.right));
+        float localZ = Vector3.Dot(desiredCameraOffset, SanitizeHorizontalAxis(forward, Vector3.forward));
+        return Mathf.Atan2(
+            localZ / Mathf.Max(0.001f, majorRadius),
+            localX / Mathf.Max(0.001f, minorRadius)) * Mathf.Rad2Deg;
+    }
+
+    private static Vector3 SanitizeHorizontalAxis(Vector3 axis, Vector3 fallback)
+    {
+        Vector3 horizontal = Vector3.ProjectOnPlane(axis, Vector3.up);
+        if (horizontal.sqrMagnitude < 0.0001f)
+        {
+            horizontal = Vector3.ProjectOnPlane(fallback, Vector3.up);
+        }
+
+        return horizontal.sqrMagnitude < 0.0001f ? Vector3.forward : horizontal.normalized;
     }
 
     private void SelectSize(int size)
@@ -1969,6 +2815,12 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         hoverExternalDockSlotId = "";
         hoverExpansionRegionId = "";
         hoverValid = false;
+
+        if (portDockWorldInteractionSuppressed)
+        {
+            RefreshHoveredBuildingKey();
+            return;
+        }
 
         RaycastHit hit;
         if (!TryRaycastPointer(out hit))
@@ -2149,6 +3001,13 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         bool leftHeld;
         bool leftReleased;
         ReadPlacementPointerInput(out leftPressed, out leftHeld, out leftReleased);
+
+        if (portDockWorldInteractionSuppressed)
+        {
+            ClearPressedBuilding();
+            ClearPressedExternalDock();
+            return;
+        }
 
         if (pointerCameraControlActive)
         {
@@ -3265,6 +4124,7 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
     {
         if (pointerCameraControlActive
             || cameraHomeBlendActive
+            || portDockWorldInteractionSuppressed
             || !freeMouseMode
             || removeMode
             || IsMoving
@@ -4439,9 +5299,11 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
             || slot.orientation == BaseIslandExternalDockOrientation.South;
         float contactWidth = Mathf.Max(1, slot.contactWidth) * cellSize * 0.92f;
         float protrusionLength = Mathf.Max(1, slot.protrusionLength) * cellSize * 0.92f;
+        float visualContactWidth = GetExternalDockVisualContactWidth(contactWidth, occupied);
+        float visualProtrusionLength = GetExternalDockVisualProtrusionLength(protrusionLength, occupied);
         Vector3 deckScale = northSouth
-            ? new Vector3(contactWidth, 0.14f, protrusionLength)
-            : new Vector3(protrusionLength, 0.14f, contactWidth);
+            ? new Vector3(visualContactWidth, 0.14f, visualProtrusionLength)
+            : new Vector3(visualProtrusionLength, 0.14f, visualContactWidth);
 
         if (!occupied && !showExternalDockTargets)
         {
@@ -4456,12 +5318,12 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
         handle.dockKey = occupied && placement != null ? placement.dockKey : "";
         handle.occupied = occupied;
 
-        float edgeOffset = contactWidth * 0.30f;
+        float edgeOffset = visualContactWidth * 0.30f;
         float railThickness = Mathf.Max(0.08f, cellSize * (occupied ? 0.12f : 0.075f));
         float railHeight = occupied ? 0.22f : 0.09f;
-        float railLength = protrusionLength * 0.88f;
+        float railLength = visualProtrusionLength * 0.88f;
         float tieThickness = Mathf.Max(0.07f, cellSize * 0.10f);
-        float innerOffset = GetExternalDockInnerOffset(slot.orientation, protrusionLength);
+        float innerOffset = GetExternalDockInnerOffset(slot.orientation, visualProtrusionLength);
         float outerOffset = -innerOffset;
         Color dockColor = occupied && placement != null
             ? placement.color
@@ -4490,31 +5352,22 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
                 dock.transform,
                 "Inner Tie",
                 new Vector3(0f, railHeight * 0.55f, innerOffset),
-                new Vector3(contactWidth * 0.72f, tieThickness, tieThickness),
+                new Vector3(visualContactWidth * 0.72f, tieThickness, tieThickness),
                 railMaterial);
             CreateExternalDockBox(
                 dock.transform,
                 "Outer Tie",
                 new Vector3(0f, railHeight * 0.55f, outerOffset),
-                new Vector3(contactWidth * 0.72f, tieThickness, tieThickness),
+                new Vector3(visualContactWidth * 0.72f, tieThickness, tieThickness),
                 railMaterial);
 
             CreateExternalDockBox(
                 dock.transform,
                 occupied ? "Dock Anchorage" : "Dock Slot Brace",
                 new Vector3(0f, railHeight * 0.8f, innerOffset * 0.82f),
-                new Vector3(contactWidth * 0.34f, railHeight * 1.35f, protrusionLength * 0.08f),
+                new Vector3(visualContactWidth * 0.34f, railHeight * 1.35f, visualProtrusionLength * 0.08f),
                 accentMaterial);
 
-            if (occupied)
-            {
-                CreateExternalDockBox(
-                    dock.transform,
-                    "Suspension Marker",
-                    new Vector3(0f, railHeight * 1.65f, 0f),
-                    new Vector3(contactWidth * 0.18f, railHeight * 0.65f, protrusionLength * 0.16f),
-                    accentMaterial);
-            }
         }
         else
         {
@@ -4534,31 +5387,22 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
                 dock.transform,
                 "Inner Tie",
                 new Vector3(innerOffset, railHeight * 0.55f, 0f),
-                new Vector3(tieThickness, tieThickness, contactWidth * 0.72f),
+                new Vector3(tieThickness, tieThickness, visualContactWidth * 0.72f),
                 railMaterial);
             CreateExternalDockBox(
                 dock.transform,
                 "Outer Tie",
                 new Vector3(outerOffset, railHeight * 0.55f, 0f),
-                new Vector3(tieThickness, tieThickness, contactWidth * 0.72f),
+                new Vector3(tieThickness, tieThickness, visualContactWidth * 0.72f),
                 railMaterial);
 
             CreateExternalDockBox(
                 dock.transform,
                 occupied ? "Dock Anchorage" : "Dock Slot Brace",
                 new Vector3(innerOffset * 0.82f, railHeight * 0.8f, 0f),
-                new Vector3(protrusionLength * 0.08f, railHeight * 1.35f, contactWidth * 0.34f),
+                new Vector3(visualProtrusionLength * 0.08f, railHeight * 1.35f, visualContactWidth * 0.34f),
                 accentMaterial);
 
-            if (occupied)
-            {
-                CreateExternalDockBox(
-                    dock.transform,
-                    "Suspension Marker",
-                    new Vector3(0f, railHeight * 1.65f, 0f),
-                    new Vector3(protrusionLength * 0.16f, railHeight * 0.65f, contactWidth * 0.18f),
-                    accentMaterial);
-            }
         }
 
         return dock;
@@ -4574,6 +5418,61 @@ public sealed class IsoGridCityPrototype : MonoBehaviour
                 return -offset;
             default:
                 return offset;
+        }
+    }
+
+    private static float GetExternalDockVisualContactWidth(float contactWidth, bool occupied)
+    {
+        return occupied ? contactWidth * OccupiedExternalDockVisualWidthMultiplier : contactWidth;
+    }
+
+    private static float GetExternalDockVisualProtrusionLength(float protrusionLength, bool occupied)
+    {
+        return occupied ? protrusionLength * OccupiedExternalDockVisualLengthMultiplier : protrusionLength;
+    }
+
+    private static Vector3 GetExternalDockOutwardDirection(BaseIslandExternalDockOrientation orientation)
+    {
+        switch (orientation)
+        {
+            case BaseIslandExternalDockOrientation.North:
+                return Vector3.forward;
+            case BaseIslandExternalDockOrientation.West:
+                return Vector3.left;
+            case BaseIslandExternalDockOrientation.East:
+                return Vector3.right;
+            default:
+                return Vector3.back;
+        }
+    }
+
+    private static float GetExternalDockShipYawDegrees(BaseIslandExternalDockOrientation orientation)
+    {
+        switch (orientation)
+        {
+            case BaseIslandExternalDockOrientation.North:
+                return 0f;
+            case BaseIslandExternalDockOrientation.West:
+                return -90f;
+            case BaseIslandExternalDockOrientation.East:
+                return 90f;
+            default:
+                return 180f;
+        }
+    }
+
+    private static float GetExternalDockCameraYawDegrees(BaseIslandExternalDockOrientation orientation)
+    {
+        switch (orientation)
+        {
+            case BaseIslandExternalDockOrientation.North:
+                return 180f;
+            case BaseIslandExternalDockOrientation.West:
+                return 90f;
+            case BaseIslandExternalDockOrientation.East:
+                return -90f;
+            default:
+                return 0f;
         }
     }
 

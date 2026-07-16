@@ -54,6 +54,8 @@ public class PlayerProgress
 
     public List<ResourceStack> inventory = new List<ResourceStack>();
     public List<ResourceStack> shipCargo = new List<ResourceStack>();
+    public List<LowGradeOreStackState> shipLowGradeOreCargo = new List<LowGradeOreStackState>();
+    public List<RawCloudCondensateStackState> shipRawCloudCondensateCargo = new List<RawCloudCondensateStackState>();
     public List<PortStorageState> portStorages = new List<PortStorageState>();
 
     public void Normalize()
@@ -92,6 +94,8 @@ public class PlayerProgress
         shipClaudiumTank ??= new ShipConsumableTankState { resourceId = "claudium" };
         inventory ??= new List<ResourceStack>();
         shipCargo ??= new List<ResourceStack>();
+        shipLowGradeOreCargo ??= new List<LowGradeOreStackState>();
+        shipRawCloudCondensateCargo ??= new List<RawCloudCondensateStackState>();
         portStorages ??= new List<PortStorageState>();
         NormalizeActiveResearchSlots();
         activeSortie.Normalize();
@@ -162,6 +166,38 @@ public class PlayerProgress
             }
 
             stack.amount = Mathf.Max(0, stack.amount);
+        }
+
+        for (int i = shipLowGradeOreCargo.Count - 1; i >= 0; i--)
+        {
+            LowGradeOreStackState stack = shipLowGradeOreCargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.oreItemId))
+            {
+                shipLowGradeOreCargo.RemoveAt(i);
+                continue;
+            }
+
+            stack.Normalize();
+            if (stack.rawMassKg <= 0.001f)
+            {
+                shipLowGradeOreCargo.RemoveAt(i);
+            }
+        }
+
+        for (int i = shipRawCloudCondensateCargo.Count - 1; i >= 0; i--)
+        {
+            RawCloudCondensateStackState stack = shipRawCloudCondensateCargo[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.condensateItemId))
+            {
+                shipRawCloudCondensateCargo.RemoveAt(i);
+                continue;
+            }
+
+            stack.Normalize();
+            if (stack.rawLiters <= 0.001f)
+            {
+                shipRawCloudCondensateCargo.RemoveAt(i);
+            }
         }
 
         shipWeaponSpendBufferKg = Mathf.Clamp(shipWeaponSpendBufferKg, 0f, 0.999f);
@@ -447,7 +483,11 @@ public class PlayerProgress
     public void ClearShipCargo()
     {
         shipCargo ??= new List<ResourceStack>();
+        shipLowGradeOreCargo ??= new List<LowGradeOreStackState>();
+        shipRawCloudCondensateCargo ??= new List<RawCloudCondensateStackState>();
         shipCargo.Clear();
+        shipLowGradeOreCargo.Clear();
+        shipRawCloudCondensateCargo.Clear();
     }
 
     public void ClearShipConsumableTanks()
@@ -596,6 +636,66 @@ public class PlayerProgress
         stack.amount += amount;
     }
 
+    public float AddShipLowGradeOreCargo(string oreItemId, float rawMassKg, float usefulOreKg, string displayName = "")
+    {
+        if (string.IsNullOrWhiteSpace(oreItemId) || rawMassKg <= 0f) return 0f;
+
+        LowGradeOreStackState stack = GetShipLowGradeOreStack(oreItemId, true);
+        stack.Add(oreItemId, rawMassKg, usefulOreKg, displayName);
+        return rawMassKg;
+    }
+
+    public LowGradeOreStackState GetShipLowGradeOreStack(string oreItemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(oreItemId)) return null;
+        shipLowGradeOreCargo ??= new List<LowGradeOreStackState>();
+
+        for (int i = 0; i < shipLowGradeOreCargo.Count; i++)
+        {
+            LowGradeOreStackState stack = shipLowGradeOreCargo[i];
+            if (stack != null && string.Equals(stack.oreItemId, oreItemId, StringComparison.OrdinalIgnoreCase))
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        LowGradeOreStackState newStack = new LowGradeOreStackState { oreItemId = oreItemId };
+        shipLowGradeOreCargo.Add(newStack);
+        return newStack;
+    }
+
+    public float AddShipRawCloudCondensateCargo(string condensateItemId, float rawLiters, float usefulLiters, string displayName = "")
+    {
+        if (string.IsNullOrWhiteSpace(condensateItemId) || rawLiters <= 0f) return 0f;
+
+        RawCloudCondensateStackState stack = GetShipRawCloudCondensateStack(condensateItemId, true);
+        stack.Add(condensateItemId, rawLiters, usefulLiters, displayName);
+        return rawLiters;
+    }
+
+    public RawCloudCondensateStackState GetShipRawCloudCondensateStack(string condensateItemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(condensateItemId)) return null;
+        shipRawCloudCondensateCargo ??= new List<RawCloudCondensateStackState>();
+
+        for (int i = 0; i < shipRawCloudCondensateCargo.Count; i++)
+        {
+            RawCloudCondensateStackState stack = shipRawCloudCondensateCargo[i];
+            if (stack != null && string.Equals(stack.condensateItemId, condensateItemId, StringComparison.OrdinalIgnoreCase))
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        RawCloudCondensateStackState newStack = new RawCloudCondensateStackState { condensateItemId = condensateItemId };
+        shipRawCloudCondensateCargo.Add(newStack);
+        return newStack;
+    }
+
     public void SetShipCargoAmount(string resourceId, int amount)
     {
         shipCargo ??= new List<ResourceStack>();
@@ -634,6 +734,22 @@ public class PlayerProgress
             total += Mathf.Max(0, stack.amount);
         }
 
+        shipLowGradeOreCargo ??= new List<LowGradeOreStackState>();
+        for (int i = 0; i < shipLowGradeOreCargo.Count; i++)
+        {
+            LowGradeOreStackState stack = shipLowGradeOreCargo[i];
+            if (stack == null) continue;
+            total += Mathf.CeilToInt(Mathf.Max(0f, stack.rawMassKg));
+        }
+
+        shipRawCloudCondensateCargo ??= new List<RawCloudCondensateStackState>();
+        for (int i = 0; i < shipRawCloudCondensateCargo.Count; i++)
+        {
+            RawCloudCondensateStackState stack = shipRawCloudCondensateCargo[i];
+            if (stack == null) continue;
+            total += Mathf.CeilToInt(Mathf.Max(0f, stack.rawLiters));
+        }
+
         return total;
     }
 
@@ -648,6 +764,22 @@ public class PlayerProgress
             ResourceStack stack = shipCargo[i];
             if (stack == null) continue;
             total += config.GetItemTransportMassKg(stack.resourceId, stack.amount);
+        }
+
+        shipLowGradeOreCargo ??= new List<LowGradeOreStackState>();
+        for (int i = 0; i < shipLowGradeOreCargo.Count; i++)
+        {
+            LowGradeOreStackState stack = shipLowGradeOreCargo[i];
+            if (stack == null) continue;
+            total += Mathf.Max(0f, stack.rawMassKg);
+        }
+
+        shipRawCloudCondensateCargo ??= new List<RawCloudCondensateStackState>();
+        for (int i = 0; i < shipRawCloudCondensateCargo.Count; i++)
+        {
+            RawCloudCondensateStackState stack = shipRawCloudCondensateCargo[i];
+            if (stack == null) continue;
+            total += Mathf.Max(0f, stack.rawLiters);
         }
 
         return total;
@@ -983,11 +1115,15 @@ public class PortStorageState
 {
     public string portId = "";
     public List<ResourceStack> storage = new List<ResourceStack>();
+    public List<LowGradeOreStackState> lowGradeOre = new List<LowGradeOreStackState>();
+    public List<RawCloudCondensateStackState> rawCloudCondensate = new List<RawCloudCondensateStackState>();
 
     public void Normalize()
     {
         portId ??= "";
         storage ??= new List<ResourceStack>();
+        lowGradeOre ??= new List<LowGradeOreStackState>();
+        rawCloudCondensate ??= new List<RawCloudCondensateStackState>();
 
         for (int i = storage.Count - 1; i >= 0; i--)
         {
@@ -999,6 +1135,38 @@ public class PortStorageState
             }
 
             stack.amount = Mathf.Max(0, stack.amount);
+        }
+
+        for (int i = lowGradeOre.Count - 1; i >= 0; i--)
+        {
+            LowGradeOreStackState stack = lowGradeOre[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.oreItemId))
+            {
+                lowGradeOre.RemoveAt(i);
+                continue;
+            }
+
+            stack.Normalize();
+            if (stack.rawMassKg <= 0.001f)
+            {
+                lowGradeOre.RemoveAt(i);
+            }
+        }
+
+        for (int i = rawCloudCondensate.Count - 1; i >= 0; i--)
+        {
+            RawCloudCondensateStackState stack = rawCloudCondensate[i];
+            if (stack == null || string.IsNullOrWhiteSpace(stack.condensateItemId))
+            {
+                rawCloudCondensate.RemoveAt(i);
+                continue;
+            }
+
+            stack.Normalize();
+            if (stack.rawLiters <= 0.001f)
+            {
+                rawCloudCondensate.RemoveAt(i);
+            }
         }
     }
 
@@ -1015,6 +1183,66 @@ public class PortStorageState
         ResourceStack stack = GetResourceStack(resourceId, true);
         stack.amount += amount;
         return amount;
+    }
+
+    public float AddLowGradeOre(string oreItemId, float rawMassKg, float usefulOreKg, string displayName = "")
+    {
+        if (string.IsNullOrWhiteSpace(oreItemId) || rawMassKg <= 0f) return 0f;
+
+        LowGradeOreStackState stack = GetLowGradeOreStack(oreItemId, true);
+        stack.Add(oreItemId, rawMassKg, usefulOreKg, displayName);
+        return rawMassKg;
+    }
+
+    public LowGradeOreStackState GetLowGradeOreStack(string oreItemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(oreItemId)) return null;
+        lowGradeOre ??= new List<LowGradeOreStackState>();
+
+        for (int i = 0; i < lowGradeOre.Count; i++)
+        {
+            LowGradeOreStackState stack = lowGradeOre[i];
+            if (stack != null && string.Equals(stack.oreItemId, oreItemId, StringComparison.OrdinalIgnoreCase))
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        LowGradeOreStackState newStack = new LowGradeOreStackState { oreItemId = oreItemId };
+        lowGradeOre.Add(newStack);
+        return newStack;
+    }
+
+    public float AddRawCloudCondensate(string condensateItemId, float rawLiters, float usefulLiters, string displayName = "")
+    {
+        if (string.IsNullOrWhiteSpace(condensateItemId) || rawLiters <= 0f) return 0f;
+
+        RawCloudCondensateStackState stack = GetRawCloudCondensateStack(condensateItemId, true);
+        stack.Add(condensateItemId, rawLiters, usefulLiters, displayName);
+        return rawLiters;
+    }
+
+    public RawCloudCondensateStackState GetRawCloudCondensateStack(string condensateItemId, bool createIfMissing)
+    {
+        if (string.IsNullOrWhiteSpace(condensateItemId)) return null;
+        rawCloudCondensate ??= new List<RawCloudCondensateStackState>();
+
+        for (int i = 0; i < rawCloudCondensate.Count; i++)
+        {
+            RawCloudCondensateStackState stack = rawCloudCondensate[i];
+            if (stack != null && string.Equals(stack.condensateItemId, condensateItemId, StringComparison.OrdinalIgnoreCase))
+            {
+                return stack;
+            }
+        }
+
+        if (!createIfMissing) return null;
+
+        RawCloudCondensateStackState newStack = new RawCloudCondensateStackState { condensateItemId = condensateItemId };
+        rawCloudCondensate.Add(newStack);
+        return newStack;
     }
 
     public void SetResourceAmount(string resourceId, int amount)
@@ -1070,6 +1298,56 @@ public class PortStorageState
         if (stack == null || stack.amount < amount) return false;
 
         stack.amount -= amount;
+        return true;
+    }
+
+    public bool TrySpendLowGradeOre(string oreItemId, float rawMassKg, out float usefulOreKg)
+    {
+        usefulOreKg = 0f;
+        if (rawMassKg <= 0f) return true;
+
+        LowGradeOreStackState stack = GetLowGradeOreStack(oreItemId, false);
+        if (stack == null || stack.rawMassKg + 0.001f < rawMassKg)
+        {
+            return false;
+        }
+
+        float concentration = stack.UsefulConcentration01;
+        float spentRawKg = Mathf.Min(stack.rawMassKg, rawMassKg);
+        usefulOreKg = spentRawKg * concentration;
+        stack.rawMassKg = Mathf.Max(0f, stack.rawMassKg - spentRawKg);
+        stack.usefulOreKg = Mathf.Max(0f, stack.usefulOreKg - usefulOreKg);
+        stack.Normalize();
+        if (stack.rawMassKg <= 0.001f && lowGradeOre != null)
+        {
+            lowGradeOre.Remove(stack);
+        }
+
+        return true;
+    }
+
+    public bool TrySpendRawCloudCondensate(string condensateItemId, float rawLiters, out float usefulLiters)
+    {
+        usefulLiters = 0f;
+        if (rawLiters <= 0f) return true;
+
+        RawCloudCondensateStackState stack = GetRawCloudCondensateStack(condensateItemId, false);
+        if (stack == null || stack.rawLiters + 0.001f < rawLiters)
+        {
+            return false;
+        }
+
+        float concentration = stack.UsefulConcentration01;
+        float spentRawLiters = Mathf.Min(stack.rawLiters, rawLiters);
+        usefulLiters = spentRawLiters * concentration;
+        stack.rawLiters = Mathf.Max(0f, stack.rawLiters - spentRawLiters);
+        stack.usefulLiters = Mathf.Max(0f, stack.usefulLiters - usefulLiters);
+        stack.Normalize();
+        if (stack.rawLiters <= 0.001f && rawCloudCondensate != null)
+        {
+            rawCloudCondensate.Remove(stack);
+        }
+
         return true;
     }
 
@@ -1350,7 +1628,9 @@ public class DockedDevelopmentShipState
     public string shipId = "";
     public int sortiesRemaining;
     public int generation;
+    public int loadoutDefaultsVersion;
     public string lastRewardSummary = "";
+    public List<DockedShipLoadoutSelection> loadoutSelections = new List<DockedShipLoadoutSelection>();
 
     public bool HasShip => !string.IsNullOrWhiteSpace(shipId);
 
@@ -1360,14 +1640,93 @@ public class DockedDevelopmentShipState
         shipId = string.IsNullOrWhiteSpace(shipId) ? "" : shipId.Trim();
         sortiesRemaining = Mathf.Clamp(sortiesRemaining, 0, MetaGameState.DevelopmentDockShipMaxSorties);
         generation = Mathf.Max(0, generation);
+        loadoutDefaultsVersion = Mathf.Max(0, loadoutDefaultsVersion);
         lastRewardSummary ??= "";
+        loadoutSelections ??= new List<DockedShipLoadoutSelection>();
+        for (int i = loadoutSelections.Count - 1; i >= 0; i--)
+        {
+            DockedShipLoadoutSelection selection = loadoutSelections[i];
+            if (selection == null)
+            {
+                loadoutSelections.RemoveAt(i);
+                continue;
+            }
+
+            selection.Normalize();
+            if (string.IsNullOrWhiteSpace(selection.slotId))
+            {
+                loadoutSelections.RemoveAt(i);
+            }
+        }
     }
 
     public void ClearShip()
     {
         shipId = "";
         sortiesRemaining = 0;
+        loadoutDefaultsVersion = 0;
         lastRewardSummary = "";
+        loadoutSelections ??= new List<DockedShipLoadoutSelection>();
+        loadoutSelections.Clear();
+    }
+
+    public string GetLoadoutPackageId(string slotId)
+    {
+        if (string.IsNullOrWhiteSpace(slotId) || loadoutSelections == null)
+        {
+            return "";
+        }
+
+        for (int i = 0; i < loadoutSelections.Count; i++)
+        {
+            DockedShipLoadoutSelection selection = loadoutSelections[i];
+            if (selection != null && string.Equals(selection.slotId, slotId, StringComparison.OrdinalIgnoreCase))
+            {
+                return selection.packageId ?? "";
+            }
+        }
+
+        return "";
+    }
+
+    public void SetLoadoutPackageId(string slotId, string packageId)
+    {
+        if (string.IsNullOrWhiteSpace(slotId))
+        {
+            return;
+        }
+
+        loadoutSelections ??= new List<DockedShipLoadoutSelection>();
+        string normalizedSlotId = slotId.Trim();
+        string normalizedPackageId = string.IsNullOrWhiteSpace(packageId) ? "" : packageId.Trim();
+        for (int i = 0; i < loadoutSelections.Count; i++)
+        {
+            DockedShipLoadoutSelection selection = loadoutSelections[i];
+            if (selection != null && string.Equals(selection.slotId, normalizedSlotId, StringComparison.OrdinalIgnoreCase))
+            {
+                selection.packageId = normalizedPackageId;
+                return;
+            }
+        }
+
+        loadoutSelections.Add(new DockedShipLoadoutSelection
+        {
+            slotId = normalizedSlotId,
+            packageId = normalizedPackageId
+        });
+    }
+}
+
+[Serializable]
+public class DockedShipLoadoutSelection
+{
+    public string slotId = "";
+    public string packageId = "";
+
+    public void Normalize()
+    {
+        slotId = string.IsNullOrWhiteSpace(slotId) ? "" : slotId.Trim();
+        packageId = string.IsNullOrWhiteSpace(packageId) ? "" : packageId.Trim();
     }
 }
 
@@ -1614,6 +1973,92 @@ public class ResourceStack
 {
     public string resourceId = "";
     public int amount;
+}
+
+[Serializable]
+public class LowGradeOreStackState
+{
+    public string oreItemId = "";
+    public string displayName = "";
+    public float rawMassKg;
+    public float usefulOreKg;
+
+    public float UsefulConcentration01 => rawMassKg > 0.001f
+        ? Mathf.Clamp01(usefulOreKg / rawMassKg)
+        : 0f;
+
+    public void Normalize()
+    {
+        oreItemId = string.IsNullOrWhiteSpace(oreItemId) ? "" : oreItemId.Trim();
+        displayName ??= "";
+        rawMassKg = Mathf.Max(0f, rawMassKg);
+        usefulOreKg = Mathf.Clamp(usefulOreKg, 0f, rawMassKg);
+    }
+
+    public void Add(string itemId, float rawKg, float usefulKg, string name = "")
+    {
+        if (!string.IsNullOrWhiteSpace(itemId))
+        {
+            oreItemId = itemId.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            displayName = name.Trim();
+        }
+
+        rawMassKg += Mathf.Max(0f, rawKg);
+        usefulOreKg += Mathf.Max(0f, usefulKg);
+        Normalize();
+    }
+}
+
+[Serializable]
+public class RawCloudCondensateStackState
+{
+    public string condensateItemId = "";
+    public string displayName = "";
+    public float rawLiters;
+    public float usefulLiters;
+
+    public float UsefulConcentration01 => rawLiters > 0.001f
+        ? Mathf.Clamp01(usefulLiters / rawLiters)
+        : 0f;
+
+    public void Normalize()
+    {
+        condensateItemId = string.IsNullOrWhiteSpace(condensateItemId) ? "" : condensateItemId.Trim();
+        displayName ??= "";
+        rawLiters = Mathf.Max(0f, rawLiters);
+        usefulLiters = Mathf.Clamp(usefulLiters, 0f, rawLiters);
+    }
+
+    public void Add(string itemId, float rawAmountLiters, float usefulAmountLiters, string name = "")
+    {
+        if (!string.IsNullOrWhiteSpace(itemId))
+        {
+            condensateItemId = itemId.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            displayName = name.Trim();
+        }
+
+        rawLiters += Mathf.Max(0f, rawAmountLiters);
+        usefulLiters += Mathf.Max(0f, usefulAmountLiters);
+        Normalize();
+    }
+
+    public float RemoveWater(float requestedWaterLiters)
+    {
+        Normalize();
+        float waterLiters = Mathf.Max(0f, rawLiters - usefulLiters);
+        float removed = Mathf.Min(waterLiters, Mathf.Max(0f, requestedWaterLiters));
+        rawLiters = Mathf.Max(usefulLiters, rawLiters - removed);
+        Normalize();
+        return removed;
+    }
 }
 
 [Serializable]

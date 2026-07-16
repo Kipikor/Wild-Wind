@@ -16,6 +16,7 @@ quest_airframe_order,Набор корпуса,Airframe Kit,,,production,Зав�
 quest_module_order,Набор модуля,Module Kit,,,production,Завершите заказ набора модуля,cascade_order_completed,module_kit,1,retroactive,auto,quest_airframe_order,freight,160,,,,,,,150
 quest_safe_ore_sortie,Возвращение с руды,Ore Sortie,,,sortie,Вернитесь из рудного вылета,sortie_completed,safe_ore_boulders,1,retroactive,manual,,freight,220,,,,,,,160
 quest_install_gas_extractor,Газовый экстрактор,Gas Extractor,,,fitting,Установите газовый экстрактор,ship_module_installed,starter_gas_extractor,1,retroactive,manual,,freight,180,,,,,,,170
+quest_select_starter_hull,Стартовый корпус,Starter Hull,,,fitting,Выберите базовый корпус корабля,ship_hull_selected,any,1,retroactive,manual,quest_install_gas_extractor,freight,180,,,,,,,175
 quest_install_mining_hold,Рудный трюм,Mining Hold,,,fitting,Установите рудный трюм,ship_module_installed,starter_mining_hold,1,retroactive,manual,quest_install_gas_extractor,freight,180,,,,,,,180
 quest_claim_manual_reward,Ручная награда,Manual Reward,,,main,Получите награду вручную после прогресса,resource_acquired,design_experience,10,retroactive,manual,,freight,100,,,,,,,200
 fquest_capital_01,Империя: поручение 01,Capital Contract 01,capital,campaign,faction_campaign,"Шаг 1 большой цепочки столичной службы: закрепите доверие, выполните профильные работы и откройте следующую поставку фракции.",faction_reputation,capital,20,retroactive,manual,,solid,2,,,250,30,capital,20,10001

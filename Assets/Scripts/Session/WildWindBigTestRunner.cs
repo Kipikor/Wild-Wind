@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 #if UNITY_EDITOR
@@ -51,14 +52,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         "CSV-РєРѕРЅС„РёРіРё",
         "Localization",
         "Р“СЂСѓР·РѕРІС‹Рµ РµРґРёРЅРёС†С‹ Рё РѕС‚СЃРµРєРё РєРѕСЂР°Р±Р»РµР№",
-        "Pioneer ship catalog",
-        "Starter hull visual asset contract",
+        "Legacy ship asset cleanup",
         "Session legacy cleanup",
         "Session-only runtime",
         "Runtime account",
         "Р’РёР·СѓР°Р», РІС‹СЃРѕС‚РЅС‹Рµ СЃР»РѕРё Рё С‚СѓРјР°РЅ",
         "РќР°СЃС‚СЂРѕР№РєРё РїСЂРѕРµРєС‚Р° Рё СѓРїСЂР°РІР»РµРЅРёРµ",
-        "РљРѕСЂР°Р±Р»СЊ, РІРµС‚РµСЂ Рё Р»С‘С‚РЅР°СЏ С„РёР·РёРєР°",
+        "Strategic ship runtime",
         "Knowledge screen runtime",
         "Base island runtime",
         "Direct port entry and persistent progress reset",
@@ -284,7 +284,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             ValidateRuntimeAccount(report);
             ValidateVisualAtmosphere(report);
             ValidateSettings(report);
-            ValidateShipWindAerodynamics(report);
+            ValidateStrategicShipRuntime(report);
             ValidateKnowledgeScreenRuntime(report);
             ValidateBaseIslandRuntime(report);
         });
@@ -903,7 +903,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Info("ID Р·Р°РїСѓСЃРєР°: " + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".");
         report.Info("РљРЅРѕРїРєР°: Wild Wind/РџСЂРѕРІРµСЃС‚Рё Р±РѕР»СЊС€РѕР№ С‚РµСЃС‚.");
         report.Info("РќР°Р·РЅР°С‡РµРЅРёРµ: РѕРґРёРЅ РѕР±С‰РёР№ РґРѕС‚РѕС€РЅС‹Р№ РїСЂРѕС‚РѕРєРѕР» РїРѕ С‚РµРєСѓС‰РµР№ СЃР±РѕСЂРєРµ РёРіСЂС‹.");
-        report.Info("Currently covered: CSV config, tech tree, ship tree, production, session-only runtime, runtime account, persistent progress, visual dependencies, settings, wind/aerodynamics, flight physics, direct port entry and progress reset.");
+        report.Info("Currently covered: CSV config, tech tree, flat ship catalog, production, session-only runtime, runtime account, persistent progress, visual dependencies, settings, strategic ship runtime, direct port entry and progress reset.");
         report.Info("Р”РѕРїСѓСЃРєРё: СЃРёРјСѓР»СЏС†РёСЏ РїСЂРѕРёР·РІРѕРґСЃС‚РІ " + productionSimulationMinutes.ToString("0.#") + " РјРёРЅ, session-only СЃС†РµРЅР° Р±РµР· open-world runtime objects Рё Р±РµР· world manifest РІ account data.");
         report.Info("РџСЂРёРЅС†РёРї: FAIL = СЃР»РѕРјР°РЅРѕ РёР»Рё РїСЂРѕС‚РёРІРѕСЂРµС‡РёС‚ С‚РµРєСѓС‰РµРјСѓ РўР—; WARN = РїРѕРґРѕР·СЂРёС‚РµР»СЊРЅРѕ, РЅРѕ РјРѕР¶РЅРѕ РїСЂРѕРґРѕР»Р¶Р°С‚СЊ; OK = РїСЂРѕРІРµСЂРµРЅРѕ СЏРІРЅРѕ.");
         report.Pass("РџР°СЃРїРѕСЂС‚ Р±РѕР»СЊС€РѕРіРѕ С‚РµСЃС‚Р° СЃС„РѕСЂРјРёСЂРѕРІР°РЅ Рё РїРѕРїР°РґС‘С‚ РІ РјР°С€РёРЅРЅРѕ-С‡РёС‚Р°РµРјС‹Р№ СЂРµР·СѓР»СЊС‚Р°С‚.");
@@ -1084,10 +1084,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(config.specialModules.Count == 5, "Special_module.csv contains only the five temporary starter fitting modules: " + config.specialModules.Count + ".");
         report.Check(config.hulls.Count == 0
             && config.GetHull(GameplaySessionAccountData.DefaultStarterHullId) == null
-            && config.GetHull("cruiser203_hull") == null
-            && config.claudiumLoops.Count == 0
-            && config.GetClaudiumLoop("starter_claudium_loop") == null,
-            "Old runtime hull and claudium-loop CSV rows are removed until the new Blender ships are imported.");
+            && config.claudiumLoops.Count == 0,
+            "Runtime hull and claudium-loop CSV rows are disabled while the current Blender ship catalog owns playable ship selection.");
         report.Check(!File.Exists(ProjectPath("Assets/Data/Config/Engine.csv")) &&
             !File.Exists(ProjectPath("Assets/Data/Config/Propeller.csv")),
             "Engine and propeller CSVs are removed; hull physics owns thrust and fuel.");
@@ -1105,10 +1103,25 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && !specialModuleCsvText.Contains("leviathan_alarm_generation_multiplier")
             && !specialModuleCsvText.Contains("harpoon_"),
             "Special_module.csv keeps only session fitting gates and no active cloud-harvester, survey-radius or harpoon columns.");
-        report.Check(config.shipTreeEntries.Count == 465
-            && config.GetShipTreeEntry("pioneer") == null
-            && config.GetShipTreeEntry("cruiser203") == null,
-            "Ship_tree.csv contains only the 465-ship faction development roster; old runtime Pioneer/Cruiser 203 rows are removed.");
+        string coreTacticalBalanceCsvText = ReadProjectText("Assets/Data/Config/Core_tactical_balance.csv");
+        CoreTacticalBalanceConfig tacticalBalance = config.coreTacticalBalance;
+        bool coreTacticalBalanceReady = tacticalBalance != null
+            && coreTacticalBalanceCsvText.Contains("explosive_radius_reference_mass_kg")
+            && coreTacticalBalanceCsvText.Contains("explosive_radius_reference_m")
+            && coreTacticalBalanceCsvText.Contains("explosive_radius_mass_exponent")
+            && Approximately(tacticalBalance.explosiveRadiusReferenceMassKg, 50f, 0.001f)
+            && Approximately(tacticalBalance.explosiveRadiusReferenceMeters, 20f, 0.001f)
+            && Approximately(tacticalBalance.explosiveRadiusMassExponent, 0.5f, 0.001f);
+        report.Check(coreTacticalBalanceReady,
+            coreTacticalBalanceReady
+                ? "Core_tactical_balance.csv exposes the configurable explosive radius anchor: 50 kg -> 20 m, exponent 0.5."
+                : "Core_tactical_balance.csv must expose the configurable explosive radius anchor used by Core Tactical blast-radius math.");
+        ValidateKorshunComponentConfig(config, report);
+        report.Check(config.shipTreeEntries.Count == 3
+            && config.GetShipTreeEntry("capital_patrol_frigate_r02") != null
+            && config.GetShipTreeEntry("capital_artillery_cruiser_r02") != null
+            && config.GetShipTreeEntry("capital_heavy_battleship_r02") != null,
+            "Ship_catalog.csv contains only the current flat playable ship catalog: Korshun, Barbet and Val.");
         report.Check(!File.Exists(ProjectPath("Assets/Data/Config/Island_production.csv")) &&
             !File.Exists(ProjectPath("Assets/Data/Config/Production_industry.csv")) &&
             !File.Exists(ProjectPath("Assets/Data/Config/Production_recipe.csv")) &&
@@ -1126,13 +1139,1141 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         CheckUniqueIds(config.leviathanTypes, type => type.id, "С‚РёРїРѕРІ Р»РµРІРёР°С„Р°РЅРѕРІ", report);
         CheckUniqueIds(config.technologies, tech => tech.id, "С‚РµС…РЅРѕР»РѕРіРёР№", report);
         CheckUniqueIds(config.modifierDefinitions, modifier => modifier.id, "technology modifiers", report);
+        CheckUniqueIds(config.korshunHullPackages, package => package.id, "Korshun hull packages", report);
+        CheckUniqueIds(config.korshunPowerPlants, powerPlant => powerPlant.id, "Korshun power plants", report);
+        CheckUniqueIds(config.korshunWeaponPackages, weapon => weapon.id, "Korshun main weapon packages", report);
+        CheckUniqueIds(config.korshunAuxiliaryPackages, auxiliary => auxiliary.id, "Korshun auxiliary packages", report);
+        CheckUniqueIds(config.shipCitadelPackages, citadel => citadel.id, "ship citadel packages", report);
+        report.Check(
+            ComponentPackageTextIsEncodingClean(config),
+            "Ship component package UI text contains no mojibake markers.");
         CheckUniqueIds(config.specialModules, module => module.id, "СЃРїРµС†РјРѕРґСѓР»РµР№", report);
-        CheckUniqueIds(config.shipTreeEntries, ship => ship.shipId, "РєРѕСЂР°Р±Р»РµР№ РІ Ship_tree.csv", report);
+        CheckUniqueIds(config.shipTreeEntries, ship => ship.shipId, "ships in Ship_catalog.csv", report);
         CheckUniqueIds(config.questDefinitions, quest => quest.id, "Quest.csv tasks", report);
         ValidateShipTreeConfig(config, report);
         ValidateQuestConfig(config, report);
         ValidateConfigReferences(config, report);
         ValidateSessionPortConfig(config, report);
+    }
+
+    private static void ValidateKorshunComponentConfig(SessionConfigDatabase config, BigTestReport report)
+    {
+        if (config == null)
+        {
+            report.Fail("Korshun component config is missing because SessionConfigDatabase is null.");
+            return;
+        }
+
+        KorshunHullPackageConfig patrol = config.GetKorshunHullPackage("korshun_hull_patrol");
+        KorshunHullPackageConfig assault = config.GetKorshunHullPackage("korshun_hull_assault");
+        KorshunHullPackageConfig fast = config.GetKorshunHullPackage("korshun_hull_fast");
+        KorshunHullPackageConfig cargo = config.GetKorshunHullPackage("korshun_hull_cargo");
+        KorshunHullPackageConfig stealth = config.GetKorshunHullPackage("korshun_hull_stealth");
+        KorshunHullPackageConfig patrolPlus = config.GetKorshunHullPackage("korshun_hull_patrol_plus");
+        KorshunHullPackageConfig assaultPlus = config.GetKorshunHullPackage("korshun_hull_assault_plus");
+        KorshunHullPackageConfig fastPlus = config.GetKorshunHullPackage("korshun_hull_fast_plus");
+        KorshunHullPackageConfig cargoPlus = config.GetKorshunHullPackage("korshun_hull_cargo_plus");
+        KorshunHullPackageConfig stealthPlus = config.GetKorshunHullPackage("korshun_hull_stealth_plus");
+        KorshunPowerPlantConfig steamGas = config.GetKorshunPowerPlant("korshun_power_steam_gas");
+        bool hullPackagesReady = config.korshunHullPackages.Count >= 10
+            && patrol != null
+            && assault != null
+            && fast != null
+            && cargo != null
+            && stealth != null
+            && patrolPlus != null
+            && assaultPlus != null
+            && fastPlus != null
+            && cargoPlus != null
+            && stealthPlus != null
+            && Approximately(patrol.lengthM, 60f, 0.01f)
+            && Approximately(patrol.structureHp, 16000f, 0.01f)
+            && Approximately(patrol.kineticResistancePercent, 48f, 0.01f)
+            && Approximately(patrol.thermalResistancePercent, 18f, 0.01f)
+            && Approximately(patrol.chemicalResistancePercent, 18f, 0.01f)
+            && Approximately(patrol.explosiveResistancePercent, 28f, 0.01f)
+            && Approximately(patrol.cargoCapacityTons, 40f, 0.01f)
+            && Approximately(patrol.cruiseSpeedMS, 46f, 0.01f)
+            && Approximately(patrol.accelerationMS2, 13.24f, 0.01f)
+            && Approximately(patrol.turnRateDegPerSecond, 25f, 0.01f)
+            && Approximately(patrol.detectionRangeM, 4800f, 0.01f)
+            && assault.structureHp > patrol.structureHp
+            && assault.kineticResistancePercent > patrol.kineticResistancePercent
+            && assault.cruiseSpeedMS < patrol.cruiseSpeedMS
+            && fast.cruiseSpeedMS > patrol.cruiseSpeedMS
+            && fast.kineticResistancePercent < patrol.kineticResistancePercent
+            && cargo.cargoCapacityTons > patrol.cargoCapacityTons
+            && stealth.detectionRangeM < patrol.detectionRangeM
+            && steamGas != null
+            && Approximately(patrol.cruiseSpeedMS + steamGas.speedDeltaMS, 60f, 0.01f)
+            && Approximately(patrol.accelerationMS2 + steamGas.accelerationDeltaMS2, 17.27f, 0.02f)
+            && Approximately(patrol.turnRateDegPerSecond + steamGas.turnRateDeltaDegPerSecond, 30f, 0.01f)
+            && PlusUpgradeLinks(patrolPlus, patrol.id)
+            && PlusUpgradeLinks(assaultPlus, assault.id)
+            && PlusUpgradeLinks(fastPlus, fast.id)
+            && PlusUpgradeLinks(cargoPlus, cargo.id)
+            && PlusUpgradeLinks(stealthPlus, stealth.id)
+            && patrolPlus.structureHp >= patrol.structureHp * 1.45f
+            && patrolPlus.kineticResistancePercent > patrol.kineticResistancePercent
+            && assaultPlus.structureHp >= assault.structureHp * 1.45f
+            && fastPlus.cruiseSpeedMS >= fast.cruiseSpeedMS * 1.25f
+            && cargoPlus.cargoCapacityTons >= cargo.cargoCapacityTons * 1.45f
+            && stealthPlus.detectionRangeM <= stealth.detectionRangeM * 0.7f;
+        report.Check(hullPackagesReady,
+            "Korshun hull packages encode five base variants and five expensive plus variants around the raw 60 m/s, 8-second frigate package baseline before the x2.25 class speed multiplier.");
+
+        KorshunPowerPlantConfig turbogenerator = config.GetKorshunPowerPlant("korshun_power_turbogenerator");
+        KorshunPowerPlantConfig capacitor = config.GetKorshunPowerPlant("korshun_power_capacitor");
+        KorshunPowerPlantConfig generator = config.GetKorshunPowerPlant("korshun_power_generator");
+        KorshunPowerPlantConfig armored = config.GetKorshunPowerPlant("korshun_power_armored");
+        KorshunPowerPlantConfig steamGasPlus = config.GetKorshunPowerPlant("korshun_power_steam_gas_plus");
+        KorshunPowerPlantConfig turbogeneratorPlus = config.GetKorshunPowerPlant("korshun_power_turbogenerator_plus");
+        KorshunPowerPlantConfig capacitorPlus = config.GetKorshunPowerPlant("korshun_power_capacitor_plus");
+        KorshunPowerPlantConfig generatorPlus = config.GetKorshunPowerPlant("korshun_power_generator_plus");
+        KorshunPowerPlantConfig armoredPlus = config.GetKorshunPowerPlant("korshun_power_armored_plus");
+        bool powerPlantsReady = config.korshunPowerPlants.Count >= 10
+            && steamGas != null
+            && turbogenerator != null
+            && capacitor != null
+            && generator != null
+            && armored != null
+            && steamGasPlus != null
+            && turbogeneratorPlus != null
+            && capacitorPlus != null
+            && generatorPlus != null
+            && armoredPlus != null
+            && Approximately(steamGas.speedDeltaMS, 14f, 0.01f)
+            && Approximately(steamGas.accelerationDeltaMS2, 4.03f, 0.01f)
+            && Approximately(steamGas.batteryCapacity, 0f, 0.01f)
+            && Approximately(steamGas.energyGenerationPerSecond, 0f, 0.01f)
+            && !steamGas.allowsElectronicEquipment
+            && turbogenerator.allowsElectronicEquipment
+            && capacitor.batteryCapacity > turbogenerator.batteryCapacity
+            && generator.energyGenerationPerSecond > turbogenerator.energyGenerationPerSecond
+            && armored.moduleHp > steamGas.moduleHp
+            && armored.speedDeltaMS < 0f
+            && PlusUpgradeLinks(steamGasPlus, steamGas.id)
+            && PlusUpgradeLinks(turbogeneratorPlus, turbogenerator.id)
+            && PlusUpgradeLinks(capacitorPlus, capacitor.id)
+            && PlusUpgradeLinks(generatorPlus, generator.id)
+            && PlusUpgradeLinks(armoredPlus, armored.id)
+            && steamGasPlus.speedDeltaMS >= steamGas.speedDeltaMS * 1.45f
+            && turbogeneratorPlus.energyGenerationPerSecond >= turbogenerator.energyGenerationPerSecond * 1.45f
+            && capacitorPlus.batteryCapacity >= capacitor.batteryCapacity * 1.45f
+            && generatorPlus.energyGenerationPerSecond >= generator.energyGenerationPerSecond * 1.45f
+            && armoredPlus.moduleHp >= armored.moduleHp * 1.4f;
+        report.Check(powerPlantsReady,
+            "Korshun power plants encode five base variants and five expensive plus variants.");
+
+        KorshunWeaponPackageConfig machinegun = config.GetKorshunWeaponPackage("korshun_main_37mm_mg_aura");
+        KorshunWeaponPackageConfig autocannon = config.GetKorshunWeaponPackage("korshun_main_57mm_triple_autocannon");
+        KorshunWeaponPackageConfig twin76 = config.GetKorshunWeaponPackage("korshun_main_76mm_twin");
+        KorshunWeaponPackageConfig single100 = config.GetKorshunWeaponPackage("korshun_main_100mm_single");
+        KorshunWeaponPackageConfig nurs = config.GetKorshunWeaponPackage("korshun_main_nurs_turret");
+        KorshunWeaponPackageConfig mortar = config.GetKorshunWeaponPackage("korshun_main_200mm_mortar");
+        KorshunWeaponPackageConfig machinegunPlus = config.GetKorshunWeaponPackage("korshun_main_37mm_mg_aura_plus");
+        KorshunWeaponPackageConfig autocannonPlus = config.GetKorshunWeaponPackage("korshun_main_57mm_triple_autocannon_plus");
+        KorshunWeaponPackageConfig twin76Plus = config.GetKorshunWeaponPackage("korshun_main_76mm_twin_plus");
+        KorshunWeaponPackageConfig single100Plus = config.GetKorshunWeaponPackage("korshun_main_100mm_single_plus");
+        KorshunWeaponPackageConfig nursPlus = config.GetKorshunWeaponPackage("korshun_main_nurs_turret_plus");
+        KorshunWeaponPackageConfig mortarPlus = config.GetKorshunWeaponPackage("korshun_main_200mm_mortar_plus");
+        bool weaponsReady = config.korshunWeaponPackages.Count >= 12
+            && machinegun != null
+            && autocannon != null
+            && twin76 != null
+            && single100 != null
+            && nurs != null
+            && mortar != null
+            && machinegunPlus != null
+            && autocannonPlus != null
+            && twin76Plus != null
+            && single100Plus != null
+            && nursPlus != null
+            && mortarPlus != null
+            && machinegun.isMachinegunAura
+            && machinegun.damageType == CoreTacticalDamageType.Kinetic
+            && Approximately(machinegun.rangeM, 1000f, 0.01f)
+            && Approximately(machinegun.machinegunDamagePerSecond, 120f, 0.01f)
+            && autocannon.barrelsOrProjectiles == 3
+            && Approximately(autocannon.rangeM, 2400f, 0.01f)
+            && autocannon.damageType == CoreTacticalDamageType.Kinetic
+            && twin76.barrelsOrProjectiles == 2
+            && twin76.damageType == CoreTacticalDamageType.Kinetic
+            && Approximately(twin76.resistanceIgnorePercent, 24f, 0.01f)
+            && single100.barrelsOrProjectiles == 1
+            && single100.rangeM > twin76.rangeM
+            && single100.resistanceIgnorePercent > twin76.resistanceIgnorePercent
+            && single100.shotsPerMinute < twin76.shotsPerMinute
+            && nurs.barrelsOrProjectiles == 16
+            && nurs.damageType == CoreTacticalDamageType.Explosive
+            && Approximately(nurs.reloadSeconds, 12f, 0.01f)
+            && Approximately(nurs.damage, 220f, 0.01f)
+            && Approximately(nurs.projectileSpeedMS, 420f, 0.01f)
+            && Approximately(nurs.splashRadiusM, 6.3f, 0.01f)
+            && Approximately(nurs.explosiveKg, 5f, 0.01f)
+            && mortar.rangeM < twin76.rangeM
+            && Approximately(mortar.rangeM, 600f, 0.01f)
+            && mortar.damage > single100.damage
+            && Approximately(mortar.explosiveKg, 12.5f, 0.01f)
+            && PlusUpgradeLinks(machinegunPlus, machinegun.id)
+            && PlusUpgradeLinks(autocannonPlus, autocannon.id)
+            && PlusUpgradeLinks(twin76Plus, twin76.id)
+            && PlusUpgradeLinks(single100Plus, single100.id)
+            && PlusUpgradeLinks(nursPlus, nurs.id)
+            && PlusUpgradeLinks(mortarPlus, mortar.id)
+            && machinegunPlus.machinegunDamagePerSecond >= machinegun.machinegunDamagePerSecond * 1.45f
+            && autocannonPlus.damage >= autocannon.damage * 1.4f
+            && twin76Plus.damage >= twin76.damage * 1.45f
+            && single100Plus.resistanceIgnorePercent > single100.resistanceIgnorePercent
+            && nursPlus.barrelsOrProjectiles > nurs.barrelsOrProjectiles
+            && Approximately(nursPlus.reloadSeconds, 10f, 0.01f)
+            && Approximately(nursPlus.damage, 330f, 0.01f)
+            && Approximately(nursPlus.projectileSpeedMS, 480f, 0.01f)
+            && Approximately(nursPlus.splashRadiusM, 7.1f, 0.01f)
+            && Approximately(nursPlus.explosiveKg, 6.25f, 0.01f)
+            && Approximately(mortarPlus.rangeM, 700f, 0.01f)
+            && mortarPlus.damage >= mortar.damage * 1.45f;
+        report.Check(weaponsReady,
+            "Korshun main weapon packages cover six base weapons and six expensive plus upgrades.");
+
+        KorshunAuxiliaryPackageConfig torpedoes = config.GetKorshunAuxiliaryPackage("korshun_aux_torpedo_triple_side");
+        KorshunAuxiliaryPackageConfig sideNurs = config.GetKorshunAuxiliaryPackage("korshun_aux_side_nurs");
+        KorshunAuxiliaryPackageConfig harpoon = config.GetKorshunAuxiliaryPackage("korshun_aux_harpoon");
+        KorshunAuxiliaryPackageConfig magnet = config.GetKorshunAuxiliaryPackage("korshun_aux_magnet");
+        KorshunAuxiliaryPackageConfig salvageMagnet = config.GetKorshunAuxiliaryPackage("korshun_aux_salvage_magnet");
+        KorshunAuxiliaryPackageConfig siphon = config.GetKorshunAuxiliaryPackage("korshun_aux_siphon");
+        KorshunAuxiliaryPackageConfig cloudConcentrator = config.GetKorshunAuxiliaryPackage("korshun_aux_cloud_concentrator");
+        KorshunAuxiliaryPackageConfig repairBeam = config.GetKorshunAuxiliaryPackage("korshun_aux_repair_beam");
+        KorshunAuxiliaryPackageConfig scannerHacker = config.GetKorshunAuxiliaryPackage("korshun_aux_scanner_hacker");
+        KorshunAuxiliaryPackageConfig torpedoesPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_torpedo_triple_side_plus");
+        KorshunAuxiliaryPackageConfig sideNursPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_side_nurs_plus");
+        KorshunAuxiliaryPackageConfig harpoonPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_harpoon_plus");
+        KorshunAuxiliaryPackageConfig magnetPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_magnet_plus");
+        KorshunAuxiliaryPackageConfig salvageMagnetPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_salvage_magnet_plus");
+        KorshunAuxiliaryPackageConfig siphonPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_siphon_plus");
+        KorshunAuxiliaryPackageConfig cloudConcentratorPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_cloud_concentrator_plus");
+        KorshunAuxiliaryPackageConfig repairBeamPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_repair_beam_plus");
+        KorshunAuxiliaryPackageConfig scannerHackerPlus = config.GetKorshunAuxiliaryPackage("korshun_aux_scanner_hacker_plus");
+        bool auxiliaryReady = config.korshunAuxiliaryPackages.Count >= 19
+            && torpedoes != null
+            && sideNurs != null
+            && harpoon != null
+            && magnet != null
+            && salvageMagnet != null
+            && siphon != null
+            && cloudConcentrator != null
+            && repairBeam != null
+            && scannerHacker != null
+            && torpedoesPlus != null
+            && sideNursPlus != null
+            && harpoonPlus != null
+            && magnetPlus != null
+            && salvageMagnetPlus != null
+            && siphonPlus != null
+            && cloudConcentratorPlus != null
+            && repairBeamPlus != null
+            && scannerHackerPlus != null
+            && Approximately(torpedoes.rangeM, 10000f, 0.01f)
+            && Approximately(torpedoes.damage, 5000f, 0.01f)
+            && Approximately(torpedoes.projectileSpeedMS, 120f, 0.01f)
+            && Approximately(torpedoes.projectileHp, 450f, 0.01f)
+            && Approximately(torpedoes.explosiveKg, 120f, 0.01f)
+            && torpedoes.projectilesPerSalvo == 6
+            && !torpedoes.requiresEnergy
+            && Approximately(sideNurs.reloadSeconds, 12f, 0.01f)
+            && Approximately(sideNurs.damage, 220f, 0.01f)
+            && Approximately(sideNurs.projectileSpeedMS, 420f, 0.01f)
+            && Approximately(sideNurs.explosiveKg, 5f, 0.01f)
+            && string.Equals(harpoon.kind, "harpoon", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(harpoon.slotRole, "auxiliary", StringComparison.OrdinalIgnoreCase)
+            && Approximately(harpoon.rangeM, 1800f, 0.01f)
+            && Approximately(harpoon.damage, 55f, 0.01f)
+            && Approximately(harpoon.projectileSpeedMS, 360f, 0.01f)
+            && Approximately(harpoon.projectileHp, 100f, 0.01f)
+            && Approximately(harpoon.explosiveKg, 1000f, 0.01f)
+            && Approximately(harpoon.reloadSeconds, 5f, 0.01f)
+            && Approximately(harpoon.energyCost, 280f, 0.01f)
+            && Approximately(harpoon.cycleSeconds, 300f, 0.01f)
+            && Approximately(harpoon.repairHpPerCycle, 2f, 0.01f)
+            && !harpoon.requiresEnergy
+            && magnet.requiresEnergy
+            && Approximately(magnet.energyCost, 35f, 0.01f)
+            && Approximately(magnet.cycleSeconds, 8f, 0.01f)
+            && string.Equals(salvageMagnet.kind, "salvage_magnet", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(salvageMagnet.slotRole, "auxiliary", StringComparison.OrdinalIgnoreCase)
+            && Approximately(salvageMagnet.rangeM, 1000f, 0.01f)
+            && Approximately(salvageMagnet.damage, 22f, 0.01f)
+            && Approximately(salvageMagnet.energyCost, 20f, 0.01f)
+            && Approximately(salvageMagnet.cycleSeconds, 5f, 0.01f)
+            && salvageMagnet.requiresEnergy
+            && string.Equals(siphon.kind, "siphon", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(siphon.slotRole, "auxiliary", StringComparison.OrdinalIgnoreCase)
+            && Approximately(siphon.damage, 24f, 0.01f)
+            && siphon.projectilesPerSalvo == 1
+            && siphon.requiresEnergy
+            && string.Equals(cloudConcentrator.kind, "cloud_concentrator", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(cloudConcentrator.slotRole, "small", StringComparison.OrdinalIgnoreCase)
+            && Approximately(cloudConcentrator.damage, 20f, 0.01f)
+            && Approximately(cloudConcentrator.cycleSeconds, 5f, 0.01f)
+            && cloudConcentrator.requiresEnergy
+            && Approximately(repairBeam.energyCost, 50f, 0.01f)
+            && Approximately(repairBeam.cycleSeconds, 10f, 0.01f)
+            && Approximately(repairBeam.cooldownSeconds, 5f, 0.01f)
+            && Approximately(repairBeam.repairHpPerCycle, 700f, 0.01f)
+            && Approximately(scannerHacker.energyCost, 45f, 0.01f)
+            && Approximately(scannerHacker.cycleSeconds, 8f, 0.01f)
+            && PlusUpgradeLinks(torpedoesPlus, torpedoes.id)
+            && PlusUpgradeLinks(sideNursPlus, sideNurs.id)
+            && PlusUpgradeLinks(harpoonPlus, harpoon.id)
+            && Approximately(harpoonPlus.rangeM, 2200f, 0.01f)
+            && Approximately(harpoonPlus.projectileSpeedMS, 440f, 0.01f)
+            && PlusUpgradeLinks(magnetPlus, magnet.id)
+            && PlusUpgradeLinks(salvageMagnetPlus, salvageMagnet.id)
+            && PlusUpgradeLinks(siphonPlus, siphon.id)
+            && PlusUpgradeLinks(cloudConcentratorPlus, cloudConcentrator.id)
+            && PlusUpgradeLinks(repairBeamPlus, repairBeam.id)
+            && PlusUpgradeLinks(scannerHackerPlus, scannerHacker.id)
+            && torpedoesPlus.damage >= torpedoes.damage * 1.45f
+            && Approximately(torpedoesPlus.explosiveKg, 180f, 0.01f)
+            && sideNursPlus.projectilesPerSalvo > sideNurs.projectilesPerSalvo
+            && Approximately(sideNursPlus.reloadSeconds, 10f, 0.01f)
+            && Approximately(sideNursPlus.damage, 330f, 0.01f)
+            && Approximately(sideNursPlus.projectileSpeedMS, 480f, 0.01f)
+            && Approximately(sideNursPlus.explosiveKg, 6.25f, 0.01f)
+            && harpoonPlus.damage > harpoon.damage
+            && harpoonPlus.projectileHp > harpoon.projectileHp
+            && Approximately(harpoonPlus.explosiveKg, 1500f, 0.01f)
+            && harpoonPlus.reloadSeconds < harpoon.reloadSeconds
+            && magnetPlus.rangeM > magnet.rangeM
+            && salvageMagnetPlus.damage > salvageMagnet.damage
+            && Approximately(salvageMagnetPlus.energyCost, 24f, 0.01f)
+            && salvageMagnetPlus.cycleSeconds < salvageMagnet.cycleSeconds
+            && siphonPlus.projectilesPerSalvo > siphon.projectilesPerSalvo
+            && cloudConcentratorPlus.damage > cloudConcentrator.damage
+            && repairBeamPlus.repairHpPerCycle >= repairBeam.repairHpPerCycle * 1.45f
+            && scannerHackerPlus.rangeM > scannerHacker.rangeM;
+        report.Check(auxiliaryReady,
+            "Korshun auxiliary packages cover combat utilities, harpoons, salvage magnet, siphon, cloud concentrator and expensive plus upgrades.");
+
+        string korshunWeaponCsvText = ReadProjectText("Assets/Data/Config/Korshun_weapon_packages.csv");
+        string korshunAuxiliaryCsvText = ReadProjectText("Assets/Data/Config/Korshun_auxiliary_packages.csv");
+        string barbetWeaponCsvText = ReadProjectText("Assets/Data/Config/Barbet_weapon_packages.csv");
+        bool explosiveMassConfigReady =
+            korshunWeaponCsvText.Contains("explosive_kg") &&
+            korshunAuxiliaryCsvText.Contains("explosive_kg") &&
+            barbetWeaponCsvText.Contains("explosive_kg") &&
+            nurs != null &&
+            nursPlus != null &&
+            mortar != null &&
+            torpedoes != null &&
+            torpedoesPlus != null &&
+            Approximately(nurs.explosiveKg, 5f, 0.01f) &&
+            Approximately(nursPlus.explosiveKg, 6.25f, 0.01f) &&
+            Approximately(mortar.explosiveKg, 12.5f, 0.01f) &&
+            Approximately(torpedoes.explosiveKg, 120f, 0.01f) &&
+            Approximately(torpedoesPlus.explosiveKg, 180f, 0.01f);
+        report.Check(explosiveMassConfigReady,
+            explosiveMassConfigReady
+                ? "Explosive weapons encode explosive_kg so blast radius can be derived from the shared 50 kg -> 20 m balance anchor."
+                : "Explosive weapon configs must expose explosive_kg for rockets, torpedoes and HE shells instead of hiding blast radius as one-off numbers.");
+
+        ShipTreeEntryConfig korshunShip = config.GetShipTreeEntry("capital_patrol_frigate_r02");
+        DockedDevelopmentShipState defaultRuntimeSlot = CreateKorshunRuntimeProbeSlot(
+            machinegun != null ? machinegun.id : "korshun_main_37mm_mg_aura",
+            torpedoes != null ? torpedoes.id : "korshun_aux_torpedo_triple_side");
+        bool defaultRuntimeReady = ValidateKorshunRuntimeProbe(
+            config,
+            korshunShip,
+            defaultRuntimeSlot,
+            expectMachineGun: true,
+            expectAutocannon: false,
+            expectApAutocannon: false,
+            out string defaultRuntimeDetails);
+        report.Check(defaultRuntimeReady,
+            defaultRuntimeReady
+                ? "Default Korshun runtime profile enters Core Tactical from the fast hull at 162 m/s after the whole 72 m/s package speed is multiplied by the frigate x2.25 class speed rule, with infinite package weapons, machine-gun main weapon and manual TRP torpedoes."
+                : "Default Korshun runtime profile is broken: " + defaultRuntimeDetails);
+
+        DockedDevelopmentShipState single100RuntimeSlot = CreateKorshunRuntimeProbeSlot(
+            single100 != null ? single100.id : "korshun_main_100mm_single",
+            torpedoes != null ? torpedoes.id : "korshun_aux_torpedo_triple_side");
+        bool single100RuntimeReady = ValidateKorshunRuntimeProbe(
+            config,
+            korshunShip,
+            single100RuntimeSlot,
+            expectMachineGun: false,
+            expectAutocannon: true,
+            expectApAutocannon: true,
+            out string single100RuntimeDetails);
+        report.Check(single100RuntimeReady,
+            single100RuntimeReady
+                ? "Korshun 100 mm loadout builds a live AP gun package with no phantom MSL weapon group and keeps the 162 m/s fast-hull combat speed."
+                : "Korshun 100 mm runtime loadout is broken: " + single100RuntimeDetails);
+
+        DockedDevelopmentShipState nursRuntimeSlot = CreateKorshunRuntimeProbeSlot(
+            nurs != null ? nurs.id : "korshun_main_nurs_turret",
+            "");
+        bool nursRuntimeReady = ValidateKorshunNursRuntimeProbe(
+            config,
+            korshunShip,
+            nursRuntimeSlot,
+            out string nursRuntimeDetails);
+        report.Check(nursRuntimeReady,
+            nursRuntimeReady
+                ? "Korshun NURS loadout builds two unguided chaotic Core Tactical rocket clouds with target-tracked burst aim, 12-second reload, explosion-radius proximity, range-end detonation, HUD cooldown countdown, compact damage radius and an active MSL weapon group."
+                : "Korshun NURS runtime loadout is broken: " + nursRuntimeDetails);
+
+        DockedDevelopmentShipState fastRuntimeSlot = CreateKorshunRuntimeProbeSlot(
+            machinegun != null ? machinegun.id : "korshun_main_37mm_mg_aura",
+            torpedoes != null ? torpedoes.id : "korshun_aux_torpedo_triple_side",
+            "korshun_hull_fast",
+            "korshun_power_steam_gas");
+        bool fastRuntimeReady = ValidateKorshunRuntimeProbe(
+            config,
+            korshunShip,
+            fastRuntimeSlot,
+            expectMachineGun: true,
+            expectAutocannon: false,
+            expectApAutocannon: false,
+            out string fastRuntimeDetails,
+            expectedSpeedMS: 162f,
+            expectedAccelerationMS2: 46.63f,
+            expectedYawDegPerSecond: 36f,
+            expectedHullPackageId: "korshun_hull_fast",
+            expectedPowerPackageId: "korshun_power_steam_gas");
+        report.Check(fastRuntimeReady,
+            fastRuntimeReady
+                ? "Korshun fast hull runtime profile enters Core Tactical at 162 m/s: (58 m/s hull + 14 m/s steam-gas power) x2.25."
+                : "Korshun fast hull runtime profile is broken: " + fastRuntimeDetails);
+
+        KorshunHullPackageConfig barbetAssault = config.GetKorshunHullPackage("barbet_hull_assault");
+        KorshunHullPackageConfig barbetArtillery = config.GetKorshunHullPackage("barbet_hull_artillery");
+        KorshunHullPackageConfig barbetRangefinder = config.GetKorshunHullPackage("barbet_hull_rangefinder");
+        KorshunPowerPlantConfig barbetSteamGas = config.GetKorshunPowerPlant("barbet_power_steam_gas");
+        ShipCitadelPackageConfig barbetCitadel = config.GetShipCitadelPackage("barbet_citadel_standard");
+        ShipCitadelPackageConfig barbetArmoredCitadel = config.GetShipCitadelPackage("barbet_citadel_armored");
+        KorshunWeaponPackageConfig barbet152 = config.GetKorshunWeaponPackage("barbet_main_152mm_quad_he");
+        KorshunWeaponPackageConfig barbet234 = config.GetKorshunWeaponPackage("barbet_main_234mm_ap");
+        KorshunWeaponPackageConfig barbetSmall57 = config.GetKorshunWeaponPackage("barbet_small_57mm_autocannon");
+        KorshunAuxiliaryPackageConfig barbetMagnet = config.GetKorshunAuxiliaryPackage("barbet_small_magnet");
+        KorshunAuxiliaryPackageConfig barbetSmallSiphon = config.GetKorshunAuxiliaryPackage("barbet_small_siphon");
+        KorshunAuxiliaryPackageConfig barbetHarpoon = config.GetKorshunAuxiliaryPackage("barbet_small_harpoon");
+        bool barbetSmallSiphonReady = barbetSmallSiphon != null
+            && string.Equals(barbetSmallSiphon.shipId, "capital_artillery_cruiser_r02", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbetSmallSiphon.SlotRoleOrDefault, "small", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbetSmallSiphon.kind, "siphon", StringComparison.OrdinalIgnoreCase)
+            && barbetSmallSiphon.projectilesPerSalvo == 2
+            && Approximately(barbetSmallSiphon.damage, 32f, 0.01f)
+            && Approximately(barbetSmallSiphon.energyCost, 12f, 0.01f);
+        report.Check(barbetSmallSiphonReady,
+            barbetSmallSiphonReady
+                ? "Barbet small slot exposes a selectable two-channel cloud siphon package instead of a fixed hull visual."
+                : "Barbet small slot must expose barbet_small_siphon as a selectable siphon equipment package.");
+        bool barbetHarpoonReady = barbetHarpoon != null
+            && string.Equals(barbetHarpoon.shipId, "capital_artillery_cruiser_r02", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbetHarpoon.SlotRoleOrDefault, "small", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbetHarpoon.kind, "harpoon", StringComparison.OrdinalIgnoreCase)
+            && Approximately(barbetHarpoon.rangeM, 400f, 0.01f)
+            && Approximately(barbetHarpoon.damage, 85f, 0.01f)
+            && Approximately(barbetHarpoon.projectileSpeedMS, 220f, 0.01f)
+            && Approximately(barbetHarpoon.projectileHp, 180f, 0.01f)
+            && Approximately(barbetHarpoon.reloadSeconds, 5f, 0.01f)
+            && Approximately(barbetHarpoon.cycleSeconds, 360f, 0.01f)
+            && !barbetHarpoon.requiresEnergy;
+        report.Check(barbetHarpoonReady,
+            barbetHarpoonReady
+                ? "Barbet small slot also exposes a selectable heavy harpoon cannon package."
+                : "Barbet small slot must expose barbet_small_harpoon as selectable harpoon equipment.");
+        bool barbetReady = barbetAssault != null
+            && barbetArtillery != null
+            && barbetRangefinder != null
+            && barbetSteamGas != null
+            && barbetCitadel != null
+            && barbetArmoredCitadel != null
+            && barbet152 != null
+            && barbet234 != null
+            && barbetSmall57 != null
+            && barbetMagnet != null
+            && barbetSmallSiphonReady
+            && barbetHarpoonReady
+            && string.Equals(barbet152.slotRole, "main", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbet234.shellType, "AP", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbetSmall57.slotRole, "small", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbetMagnet.SlotRoleOrDefault, "small", StringComparison.OrdinalIgnoreCase)
+            && Approximately(barbetArtillery.cruiseSpeedMS + barbetSteamGas.speedDeltaMS, 45f, 0.01f)
+            && Approximately(barbetArtillery.accelerationMS2 + barbetSteamGas.accelerationDeltaMS2, 8.64f, 0.03f)
+            && Approximately(barbetArtillery.turnRateDegPerSecond + barbetSteamGas.turnRateDeltaDegPerSecond, 18f, 0.01f)
+            && barbetAssault.structureHp > barbetArtillery.structureHp
+            && barbetRangefinder.weaponRangeMultiplier > 1f
+            && barbetArtillery.reloadMultiplier < 1f
+            && barbetArmoredCitadel.kineticResistanceBonusPercent > barbetCitadel.kineticResistanceBonusPercent;
+        report.Check(barbetReady,
+            "Barbet component packages load from runtime CSVs around the 45 m/s, 12-second cruiser combat baseline: hulls, power plants, citadel, main guns, PMK/S weapons and interchangeable small-slot magnetic/siphon equipment.");
+
+        DockedDevelopmentShipState barbetRuntimeSlot = new DockedDevelopmentShipState
+        {
+            slotIndex = 1,
+            shipId = "capital_artillery_cruiser_r02",
+            sortiesRemaining = MetaGameState.DevelopmentDockShipMaxSorties
+        };
+        barbetRuntimeSlot.SetLoadoutPackageId("hull", "barbet_hull_artillery");
+        barbetRuntimeSlot.SetLoadoutPackageId("power", "barbet_power_steam_gas");
+        barbetRuntimeSlot.SetLoadoutPackageId("citadel", "barbet_citadel_standard");
+        barbetRuntimeSlot.SetLoadoutPackageId("small", "barbet_small_siphon");
+        ShipTreeEntryConfig barbetShip = config.GetShipTreeEntry("capital_artillery_cruiser_r02");
+        CoreTacticalCombatSortieController.CoreTacticalRuntimeProfileSnapshot barbetRuntimeProfile;
+        bool barbetRuntimeReady = barbetReady
+            && barbetShip != null
+            && CoreTacticalCombatSortieController.TryBuildRuntimeProfileSnapshotForTests(barbetShip, barbetRuntimeSlot, config, out barbetRuntimeProfile)
+            && string.Equals(barbetRuntimeProfile.classId, "cruiser", StringComparison.OrdinalIgnoreCase)
+            && Approximately(barbetRuntimeProfile.maxForwardSpeedMS, 67.5f, 0.01f)
+            && Approximately(barbetRuntimeProfile.forwardAccelerationMS2, 12.95f, 0.03f)
+            && Approximately(barbetRuntimeProfile.maxForwardSpeedMS * 2.3025851f / Mathf.Max(0.01f, barbetRuntimeProfile.forwardAccelerationMS2), 12f, 0.03f)
+            && string.Equals(barbetRuntimeProfile.hullPackageId, "barbet_hull_artillery", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbetRuntimeProfile.powerPackageId, "barbet_power_steam_gas", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(barbetRuntimeProfile.smallPackageId, "barbet_small_siphon", StringComparison.OrdinalIgnoreCase);
+        report.Check(barbetRuntimeReady,
+            barbetRuntimeReady
+                ? "Barbet cruiser runtime profile enters Core Tactical at 67.5 m/s from the whole 45 m/s package speed after the cruiser x1.5 class speed multiplier and preserves the selected small siphon package."
+                : "Barbet cruiser runtime profile must apply the cruiser x1.5 class speed multiplier and preserve the selected small siphon package.");
+    }
+
+    private static DockedDevelopmentShipState CreateKorshunRuntimeProbeSlot(
+        string mainPackageId,
+        string auxiliaryPackageId,
+        string hullPackageId = "korshun_hull_fast",
+        string powerPackageId = "korshun_power_steam_gas")
+    {
+        DockedDevelopmentShipState slot = new DockedDevelopmentShipState
+        {
+            slotIndex = 0,
+            shipId = "capital_patrol_frigate_r02",
+            sortiesRemaining = MetaGameState.DevelopmentDockShipMaxSorties
+        };
+        slot.SetLoadoutPackageId("hull", hullPackageId);
+        slot.SetLoadoutPackageId("power", powerPackageId);
+        slot.SetLoadoutPackageId("main", mainPackageId);
+        slot.SetLoadoutPackageId("auxiliary", auxiliaryPackageId);
+        return slot;
+    }
+
+    private static bool ValidateKorshunRuntimeProbe(
+        SessionConfigDatabase config,
+        ShipTreeEntryConfig ship,
+        DockedDevelopmentShipState slot,
+        bool expectMachineGun,
+        bool expectAutocannon,
+        bool expectApAutocannon,
+        out string details,
+        float expectedSpeedMS = 162f,
+        float expectedAccelerationMS2 = 46.63f,
+        float expectedYawDegPerSecond = 36f,
+        string expectedHullPackageId = "korshun_hull_fast",
+        string expectedPowerPackageId = "korshun_power_steam_gas")
+    {
+        details = "";
+        if (config == null)
+        {
+            details = "SessionConfigDatabase is null.";
+            return false;
+        }
+
+        if (ship == null)
+        {
+            details = "capital_patrol_frigate_r02 is missing from Ship_catalog.csv.";
+            return false;
+        }
+
+        if (!CoreTacticalCombatSortieController.TryBuildRuntimeProfileSnapshotForTests(ship, slot, config, out CoreTacticalCombatSortieController.CoreTacticalRuntimeProfileSnapshot profile))
+        {
+            details = "runtime profile snapshot could not be built.";
+            return false;
+        }
+
+        CoreTacticalShipMotor probe = null;
+        try
+        {
+            probe = CoreTacticalPrototypeBootstrap.CreatePrototypeShip(
+                null,
+                profile.shipId,
+                "Big Test Korshun Runtime Probe",
+                Vector3.zero,
+                Quaternion.identity,
+                profile.hullSizeMeters,
+                profile.maxForwardSpeedMS,
+                profile.forwardAccelerationMS2,
+                profile.brakingAccelerationMS2,
+                profile.maxYawRateDegPerSecond,
+                profile.maxReverseSpeedMS,
+                profile.maxLateralSpeedMS,
+                profile.massKg,
+                false,
+                new Color(0.42f, 0.48f, 0.45f, 1f));
+
+            bool configured = CoreTacticalCombatSortieController.TryConfigureRuntimeLoadoutForTests(
+                probe,
+                ship,
+                slot,
+                config,
+                out CoreTacticalCombatSortieController.CoreTacticalRuntimeProfileSnapshot runtime);
+            CoreTacticalWeaponControl weaponControl = probe != null ? probe.GetComponent<CoreTacticalWeaponControl>() : null;
+            CoreTacticalFrigateAutocannonBattery autocannon = probe != null ? probe.GetComponent<CoreTacticalFrigateAutocannonBattery>() : null;
+            CoreTacticalMachineGunMountBattery machineGun = probe != null ? probe.GetComponent<CoreTacticalMachineGunMountBattery>() : null;
+            CoreTacticalMissileLauncher[] launchers = probe != null ? probe.GetComponents<CoreTacticalMissileLauncher>() : Array.Empty<CoreTacticalMissileLauncher>();
+
+            float acceleration90PercentSeconds = expectedSpeedMS * 2.3025851f / Mathf.Max(0.01f, expectedAccelerationMS2);
+            bool movementProfileOk = configured
+                && probe != null
+                && Approximately(runtime.maxForwardSpeedMS, expectedSpeedMS, 0.01f)
+                && Approximately(probe.maxForwardSpeedMS, expectedSpeedMS, 0.01f)
+                && !Approximately(probe.maxForwardSpeedMS, 34f, 0.01f)
+                && Approximately(runtime.forwardAccelerationMS2, expectedAccelerationMS2, 0.03f)
+                && Approximately(runtime.brakingAccelerationMS2, expectedAccelerationMS2, 0.03f)
+                && Approximately(acceleration90PercentSeconds, 8f, 0.03f)
+                && Approximately(runtime.maxYawRateDegPerSecond, expectedYawDegPerSecond, 0.01f)
+                && Approximately(profile.hullSizeMeters.z, 60f, 0.01f)
+                && string.Equals(runtime.hullPackageId, expectedHullPackageId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(runtime.powerPackageId, expectedPowerPackageId, StringComparison.OrdinalIgnoreCase);
+            bool weaponControlOk = weaponControl != null
+                && !weaponControl.fireSuppressed
+                && runtime.activeWeaponGroupCount > 0
+                && runtime.hasAnyFireableWeapon
+                && runtime.hasAnyNonMissileWeapon
+                && !runtime.missileActive
+                && runtime.torpedoActive;
+            bool machineGunOk = expectMachineGun
+                ? machineGun != null && runtime.machineGunActive && !runtime.autocannonActive
+                : machineGun == null && !runtime.machineGunActive;
+            bool autocannonOk = expectAutocannon
+                ? autocannon != null
+                    && runtime.autocannonActive
+                    && autocannon.maxRangeMeters >= 4000f
+                    && autocannon.reloadSeconds > 2.5f
+                    && autocannon.reloadSeconds < 4.5f
+                    && (!expectApAutocannon || autocannon.detonationMode == CoreTacticalProjectileDetonationMode.DirectImpact)
+                : autocannon == null && !runtime.autocannonActive;
+            bool torpedoOk = ValidateTorpedoRuntimeLaunchers(launchers, out int torpedoLauncherCount)
+                && torpedoLauncherCount == 2;
+
+            details = "speed="
+                + (probe != null ? probe.maxForwardSpeedMS.ToString("0.##") : "null")
+                + ", accel="
+                + runtime.forwardAccelerationMS2.ToString("0.##")
+                + ", t90="
+                + acceleration90PercentSeconds.ToString("0.##")
+                + ", yaw="
+                + runtime.maxYawRateDegPerSecond.ToString("0.##")
+                + ", main="
+                + runtime.mainPackageId
+                + ", weaponGroups="
+                + runtime.activeWeaponGroupCount
+                + ", MG="
+                + runtime.machineGunActive
+                + ", AC="
+                + runtime.autocannonActive
+                + ", MSL="
+                + runtime.missileActive
+                + ", TRP="
+                + runtime.torpedoActive
+                + ", torpedoLaunchers="
+                + torpedoLauncherCount
+                + ".";
+            return movementProfileOk && weaponControlOk && machineGunOk && autocannonOk && torpedoOk;
+        }
+        finally
+        {
+            if (probe != null)
+            {
+                DestroyBigTestObject(probe.gameObject);
+            }
+        }
+    }
+
+    private static bool ValidateKorshunNursRuntimeProbe(
+        SessionConfigDatabase config,
+        ShipTreeEntryConfig ship,
+        DockedDevelopmentShipState slot,
+        out string details)
+    {
+        details = "";
+        if (config == null || ship == null || slot == null)
+        {
+            details = "config, ship or slot is missing.";
+            return false;
+        }
+
+        if (!CoreTacticalCombatSortieController.TryBuildRuntimeProfileSnapshotForTests(ship, slot, config, out CoreTacticalCombatSortieController.CoreTacticalRuntimeProfileSnapshot profile))
+        {
+            details = "runtime profile snapshot could not be built.";
+            return false;
+        }
+
+        CoreTacticalShipMotor probe = null;
+        CoreTacticalShipMotor movingTarget = null;
+        try
+        {
+            probe = CoreTacticalPrototypeBootstrap.CreatePrototypeShip(
+                null,
+                profile.shipId,
+                "Big Test Korshun NURS Runtime Probe",
+                Vector3.zero,
+                Quaternion.identity,
+                profile.hullSizeMeters,
+                profile.maxForwardSpeedMS,
+                profile.forwardAccelerationMS2,
+                profile.brakingAccelerationMS2,
+                profile.maxYawRateDegPerSecond,
+                profile.maxReverseSpeedMS,
+                profile.maxLateralSpeedMS,
+                profile.massKg,
+                false,
+                new Color(0.42f, 0.48f, 0.45f, 1f));
+
+            bool configured = CoreTacticalCombatSortieController.TryConfigureRuntimeLoadoutForTests(
+                probe,
+                ship,
+                slot,
+                config,
+                out CoreTacticalCombatSortieController.CoreTacticalRuntimeProfileSnapshot runtime);
+            CoreTacticalMissileLauncher[] launchers = probe != null ? probe.GetComponents<CoreTacticalMissileLauncher>() : Array.Empty<CoreTacticalMissileLauncher>();
+            CoreTacticalMissileLauncher missileLauncher = null;
+            int missileLauncherCount = 0;
+            int totalAutomaticBurstProjectiles = 0;
+            float minimumMissileColorLuminance = float.PositiveInfinity;
+            float minimumTrailColorLuminance = float.PositiveInfinity;
+            float maximumFanOffsetDegrees = 0f;
+            float minimumCloudScatterDegrees = float.PositiveInfinity;
+            float minimumChaosAmplitudeDegrees = float.PositiveInfinity;
+            float minimumChaosFrequencyHz = float.PositiveInfinity;
+            bool missileLaunchersOk = true;
+            for (int i = 0; i < launchers.Length; i++)
+            {
+                CoreTacticalMissileLauncher launcher = launchers[i];
+                if (launcher == null || launcher.weaponGroup != CoreTacticalWeaponGroup.Missiles)
+                {
+                    continue;
+                }
+
+                missileLauncher ??= launcher;
+                missileLauncherCount++;
+                totalAutomaticBurstProjectiles += launcher.AutomaticBurstProjectileCount;
+                float missileColorLuminance = launcher.missileColor.r * 0.2126f + launcher.missileColor.g * 0.7152f + launcher.missileColor.b * 0.0722f;
+                float trailColorLuminance = launcher.trailColor.r * 0.2126f + launcher.trailColor.g * 0.7152f + launcher.trailColor.b * 0.0722f;
+                minimumMissileColorLuminance = Mathf.Min(minimumMissileColorLuminance, missileColorLuminance);
+                minimumTrailColorLuminance = Mathf.Min(minimumTrailColorLuminance, trailColorLuminance);
+                float launcherFanOffsetDegrees = launcher.AutomaticBurstLauncherFanOffsetDegreesForTests;
+                maximumFanOffsetDegrees = Mathf.Max(maximumFanOffsetDegrees, Mathf.Abs(launcherFanOffsetDegrees));
+                minimumCloudScatterDegrees = Mathf.Min(minimumCloudScatterDegrees, launcher.AutomaticBurstCloudScatterDegreesForTests);
+                minimumChaosAmplitudeDegrees = Mathf.Min(minimumChaosAmplitudeDegrees, launcher.AutomaticBurstChaosAmplitudeDegreesForTests);
+                minimumChaosFrequencyHz = Mathf.Min(minimumChaosFrequencyHz, launcher.AutomaticBurstChaosFrequencyHzForTests);
+
+                missileLaunchersOk &= !launcher.manualLaunchOnly
+                    && launcher.ProjectilesPerManualSalvo == 8
+                    && launcher.AutomaticBurstProjectileCount == 8
+                    && Approximately(launcher.launchIntervalSeconds, 12f, 0.01f)
+                    && Approximately(launcher.AutomaticBurstShotIntervalSeconds, 0.12f, 0.001f)
+                    && launcher.AutomaticBurstSpreadDegrees >= 5f
+                    && launcher.AutomaticBurstUsesChaoticCloudForTests
+                    && launcher.AutomaticBurstCloudScatterDegreesForTests >= 6f
+                    && launcher.AutomaticBurstShotIntervalJitterSecondsForTests >= 0.04f
+                    && launcher.AutomaticBurstChaosAmplitudeDegreesForTests >= 12f
+                    && launcher.AutomaticBurstChaosFrequencyHzForTests >= 2.2f
+                    && Mathf.Abs(launcherFanOffsetDegrees) <= 0.1f
+                    && launcher.guidanceMode == CoreTacticalMissileGuidanceMode.DirectChase
+                    && Approximately(launcher.missileTurnRateDegPerSecond, 0f, 0.001f)
+                    && Approximately(launcher.missileSpeedMS, 420f, 0.01f)
+                    && Approximately(launcher.missileDamage, 220f, 0.01f)
+                    && Approximately(launcher.explosionRadiusMeters, 6.324f, 0.02f)
+                    && Approximately(launcher.proximityRadiusMeters, 6.324f, 0.02f)
+                    && Approximately(
+                        CoreTacticalGuidedMissile.ResolveDetonationSensitivityRadiusForTests(1f, launcher.explosionRadiusMeters),
+                        launcher.explosionRadiusMeters,
+                        0.02f)
+                    && !launcher.fullDamageInsideExplosionRadius
+                    && string.Equals(launcher.visualLauncherRole, "main_rocket", StringComparison.OrdinalIgnoreCase)
+                    && missileColorLuminance > 0.20f
+                    && trailColorLuminance > 0.20f
+                    && launcher.trailColor.a > 0.50f;
+            }
+
+            bool predictedUnguidedLaunchAim = false;
+            bool missileHudCooldownCountdown = false;
+            bool automaticBurstTargetTracking = false;
+            if (missileLauncher != null)
+            {
+                missileLauncher.SetReloadCooldownRemainingSecondsForTests(7.6f);
+                string cooldownEight = CoreTacticalCombatSortieController.GetWeaponCooldownTextForTests(probe, CoreTacticalWeaponGroup.Missiles);
+                missileLauncher.SetReloadCooldownRemainingSecondsForTests(1.6f);
+                string cooldownTwo = CoreTacticalCombatSortieController.GetWeaponCooldownTextForTests(probe, CoreTacticalWeaponGroup.Missiles);
+                missileLauncher.SetReloadCooldownRemainingSecondsForTests(0f);
+                string cooldownReady = CoreTacticalCombatSortieController.GetWeaponCooldownTextForTests(probe, CoreTacticalWeaponGroup.Missiles);
+                string noReloadText = CoreTacticalCombatSortieController.GetWeaponCooldownTextForTests(probe, CoreTacticalWeaponGroup.MachineGuns);
+                missileHudCooldownCountdown = cooldownEight == "8"
+                    && cooldownTwo == "2"
+                    && string.IsNullOrWhiteSpace(cooldownReady)
+                    && string.IsNullOrWhiteSpace(noReloadText);
+
+                movingTarget = CoreTacticalPrototypeBootstrap.CreatePrototypeShip(
+                    null,
+                    "big_test_nurs_moving_target",
+                    "Big Test NURS Moving Target",
+                    new Vector3(1000f, 0f, 0f),
+                    Quaternion.identity,
+                    new Vector3(20f, 8f, 60f),
+                    80f,
+                    20f,
+                    20f,
+                    30f,
+                    8f,
+                    4f,
+                    900000f,
+                    false,
+                    new Color(0.7f, 0.2f, 0.2f, 1f));
+                if (movingTarget.Body != null)
+                {
+                    movingTarget.Body.linearVelocity = new Vector3(0f, 0f, 100f);
+                }
+
+                Vector3 launchDirection = missileLauncher.GetInitialLaunchDirectionForTests(Vector3.zero, movingTarget);
+                predictedUnguidedLaunchAim = launchDirection.x > 0.80f && launchDirection.z > 0.15f;
+
+                Vector3 trackedBefore = missileLauncher.GetAutomaticBurstTrackedCenterDirectionForTests(movingTarget);
+                Vector3 movedTargetPosition = new Vector3(1000f, 0f, 520f);
+                movingTarget.transform.position = movedTargetPosition;
+                if (movingTarget.Body != null)
+                {
+                    movingTarget.Body.position = movedTargetPosition;
+                    movingTarget.Body.linearVelocity = new Vector3(0f, 0f, 100f);
+                }
+
+                Vector3 trackedAfter = missileLauncher.GetAutomaticBurstTrackedCenterDirectionForTests(movingTarget);
+                automaticBurstTargetTracking = Vector3.Angle(trackedBefore, trackedAfter) > 10f
+                    && trackedAfter.z > trackedBefore.z + 0.15f;
+            }
+
+            if (float.IsPositiveInfinity(minimumMissileColorLuminance))
+            {
+                minimumMissileColorLuminance = 0f;
+            }
+
+            if (float.IsPositiveInfinity(minimumTrailColorLuminance))
+            {
+                minimumTrailColorLuminance = 0f;
+            }
+
+            if (float.IsPositiveInfinity(minimumCloudScatterDegrees))
+            {
+                minimumCloudScatterDegrees = 0f;
+            }
+
+            if (float.IsPositiveInfinity(minimumChaosAmplitudeDegrees))
+            {
+                minimumChaosAmplitudeDegrees = 0f;
+            }
+
+            if (float.IsPositiveInfinity(minimumChaosFrequencyHz))
+            {
+                minimumChaosFrequencyHz = 0f;
+            }
+
+            bool guidedExplosionContractOk = ValidateGuidedMissileExplosionContract(out string guidedExplosionDetails);
+            bool runtimeOk = configured
+                && runtime.missileActive
+                && !runtime.torpedoActive
+                && missileLauncherCount == 2
+                && totalAutomaticBurstProjectiles == 16
+                && missileLaunchersOk
+                && maximumFanOffsetDegrees <= 0.1f
+                && minimumCloudScatterDegrees >= 6f
+                && minimumChaosAmplitudeDegrees >= 12f
+                && minimumChaosFrequencyHz >= 2.2f
+                && guidedExplosionContractOk
+                && predictedUnguidedLaunchAim
+                && automaticBurstTargetTracking
+                && missileHudCooldownCountdown;
+
+            details = "configured="
+                + configured
+                + ", MSL="
+                + runtime.missileActive
+                + ", TRP="
+                + runtime.torpedoActive
+                + ", missileLaunchers="
+                + missileLauncherCount
+                + ", damage="
+                + (missileLauncher != null ? missileLauncher.missileDamage.ToString("0.###") : "null")
+                + ", radius="
+                + (missileLauncher != null ? missileLauncher.explosionRadiusMeters.ToString("0.###") : "null")
+                + ", burstEach="
+                + (missileLauncher != null ? missileLauncher.AutomaticBurstProjectileCount.ToString() : "null")
+                + ", burstTotal="
+                + totalAutomaticBurstProjectiles
+                + ", reload="
+                + (missileLauncher != null ? missileLauncher.launchIntervalSeconds.ToString("0.###") : "null")
+                + ", turn="
+                + (missileLauncher != null ? missileLauncher.missileTurnRateDegPerSecond.ToString("0.###") : "null")
+                + ", predictedLaunchAim="
+                + predictedUnguidedLaunchAim
+                + ", burstTargetTracking="
+                + automaticBurstTargetTracking
+                + ", hudCooldown="
+                + missileHudCooldownCountdown
+                + ", maxFanOffset="
+                + maximumFanOffsetDegrees.ToString("0.###")
+                + ", minCloudScatter="
+                + minimumCloudScatterDegrees.ToString("0.###")
+                + ", minChaosAmplitude="
+                + minimumChaosAmplitudeDegrees.ToString("0.###")
+                + ", minChaosFrequency="
+                + minimumChaosFrequencyHz.ToString("0.###")
+                + ", guidedExplosion="
+                + guidedExplosionDetails
+                + ", minColorLum="
+                + minimumMissileColorLuminance.ToString("0.###")
+                + ", minTrailLum="
+                + minimumTrailColorLuminance.ToString("0.###")
+                + ".";
+            return runtimeOk;
+        }
+        finally
+        {
+            if (movingTarget != null)
+            {
+                UnityEngine.Object.DestroyImmediate(movingTarget.gameObject);
+            }
+
+            if (probe != null)
+            {
+                DestroyBigTestObject(probe.gameObject);
+            }
+        }
+    }
+
+    private static bool ValidateTorpedoRuntimeLaunchers(CoreTacticalMissileLauncher[] launchers, out int torpedoLauncherCount)
+    {
+        torpedoLauncherCount = 0;
+        if (launchers == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < launchers.Length; i++)
+        {
+            CoreTacticalMissileLauncher launcher = launchers[i];
+            if (launcher == null)
+            {
+                continue;
+            }
+
+            if (launcher.weaponGroup == CoreTacticalWeaponGroup.Missiles)
+            {
+                return false;
+            }
+
+            if (launcher.weaponGroup != CoreTacticalWeaponGroup.Torpedoes)
+            {
+                continue;
+            }
+
+            torpedoLauncherCount++;
+            float missileColorLuminance = launcher.missileColor.r * 0.2126f + launcher.missileColor.g * 0.7152f + launcher.missileColor.b * 0.0722f;
+            float trailColorLuminance = launcher.trailColor.r * 0.2126f + launcher.trailColor.g * 0.7152f + launcher.trailColor.b * 0.0722f;
+            if (!launcher.manualLaunchOnly
+                || launcher.ProjectilesPerManualSalvo != 3
+                || !Approximately(launcher.ManualAimSectorDegrees, 120f, 0.01f)
+                || !Approximately(launcher.manualFanAngleDegrees, 15f, 0.01f)
+                || !Approximately(launcher.missileSpeedMS, 120f, 0.01f)
+                || !Approximately(launcher.explosionRadiusMeters, 30.984f, 0.02f)
+                || !Approximately(launcher.proximityRadiusMeters, 30.984f, 0.02f)
+                || !launcher.fullDamageInsideExplosionRadius
+                || missileColorLuminance <= 0.25f
+                || trailColorLuminance <= 0.20f
+                || launcher.trailColor.a <= 0.50f)
+            {
+                return false;
+            }
+        }
+
+        return torpedoLauncherCount > 0;
+    }
+
+    private static bool ValidateGuidedMissileExplosionContract(out string details)
+    {
+        details = "";
+        GameObject root = null;
+        try
+        {
+            root = new GameObject("Big Test Guided Missile Explosion Contract");
+            Vector3 origin = new Vector3(940000f, 940000f, 940000f);
+            CoreTacticalPrototypeHealth enemyHealth = CreateGuidedMissileExplosionTarget(
+                root.transform,
+                "Big Test Missile Splash Enemy",
+                CoreTacticalCombatTeam.Enemy,
+                origin + Vector3.right * 5f,
+                Color.red);
+            CoreTacticalPrototypeHealth friendlyHealth = CreateGuidedMissileExplosionTarget(
+                root.transform,
+                "Big Test Missile Splash Friendly",
+                CoreTacticalCombatTeam.Friendly,
+                origin + Vector3.forward * 5f,
+                Color.green);
+
+            float sensitivityRadius = CoreTacticalGuidedMissile.ResolveDetonationSensitivityRadiusForTests(1f, 6f);
+            int damagedCount = CoreTacticalGuidedMissile.ApplyExplosionDamageForTests(
+                origin,
+                null,
+                CoreTacticalCombatTeam.Enemy,
+                100f,
+                6f,
+                false);
+            bool ok = Approximately(sensitivityRadius, 6f, 0.001f)
+                && damagedCount == 1
+                && enemyHealth != null
+                && friendlyHealth != null
+                && enemyHealth.currentHealth < 1000f
+                && Approximately(friendlyHealth.currentHealth, 1000f, 0.001f);
+            details = "sensitivity="
+                + sensitivityRadius.ToString("0.###")
+                + ", damaged="
+                + damagedCount
+                + ", enemyHp="
+                + (enemyHealth != null ? enemyHealth.currentHealth.ToString("0.###") : "null")
+                + ", friendlyHp="
+                + (friendlyHealth != null ? friendlyHealth.currentHealth.ToString("0.###") : "null");
+            return ok;
+        }
+        finally
+        {
+            DestroyBigTestObject(root);
+        }
+    }
+
+    private static CoreTacticalPrototypeHealth CreateGuidedMissileExplosionTarget(
+        Transform parent,
+        string name,
+        CoreTacticalCombatTeam team,
+        Vector3 position,
+        Color color)
+    {
+        GameObject targetObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        targetObject.name = name;
+        targetObject.transform.SetParent(parent, false);
+        targetObject.transform.position = position;
+        CoreTacticalShipMotor ship = targetObject.AddComponent<CoreTacticalShipMotor>();
+        ship.InitializePrototypeShip(name.ToLowerInvariant().Replace(" ", "_"), name, new Vector3(4f, 4f, 4f), color);
+        CoreTacticalCombatant combatant = targetObject.AddComponent<CoreTacticalCombatant>();
+        combatant.team = team;
+        combatant.ship = ship;
+        CoreTacticalPrototypeHealth health = targetObject.AddComponent<CoreTacticalPrototypeHealth>();
+        health.maxHealth = 1000f;
+        health.destroyOnDeath = false;
+        health.ResetHealth();
+        return health;
+    }
+
+    private static bool ValidateKorshunActiveRuntimeSnapshot(
+        CoreTacticalCombatSortieController.CoreTacticalRuntimeProfileSnapshot runtime,
+        out string details,
+        float expectedSpeedMS = 135f,
+        float expectedAccelerationMS2 = 38.86f,
+        float expectedYawDegPerSecond = 30f,
+        float expectedEntrySpeedMS = -1f,
+        float expectedTargetDistanceMeters = 0f,
+        string expectedHullPackageId = "korshun_hull_patrol",
+        string expectedPowerPackageId = "korshun_power_steam_gas",
+        bool expectedMissileActive = false,
+        bool expectedTorpedoActive = true)
+    {
+        float acceleration90PercentSeconds = expectedSpeedMS * 2.3025851f / Mathf.Max(0.01f, expectedAccelerationMS2);
+        float expectedInitialSpeedMS = expectedEntrySpeedMS > 0f ? expectedEntrySpeedMS : expectedSpeedMS;
+        bool movementOk = string.Equals(runtime.shipId, "capital_patrol_frigate_r02", StringComparison.OrdinalIgnoreCase)
+            && Approximately(runtime.maxForwardSpeedMS, expectedSpeedMS, 0.01f)
+            && Approximately(runtime.actualMaxForwardSpeedMS, expectedSpeedMS, 0.01f)
+            && !Approximately(runtime.actualMaxForwardSpeedMS, 34f, 0.01f)
+            && Approximately(runtime.actualForwardAccelerationMS2, expectedAccelerationMS2, 0.03f)
+            && Approximately(runtime.actualBrakingAccelerationMS2, expectedAccelerationMS2, 0.03f)
+            && Approximately(acceleration90PercentSeconds, 8f, 0.03f)
+            && Approximately(runtime.actualMaxYawRateDegPerSecond, expectedYawDegPerSecond, 0.01f)
+            && Approximately(runtime.actualFlatSpeedMS, expectedInitialSpeedMS, 0.5f)
+            && Approximately(
+                runtime.actualTargetDistanceMeters,
+                expectedTargetDistanceMeters,
+                Mathf.Max(1f, expectedTargetDistanceMeters * 0.01f))
+            && Approximately(runtime.hullSizeMeters.z, 60f, 0.01f)
+            && string.Equals(runtime.hullPackageId, expectedHullPackageId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(runtime.powerPackageId, expectedPowerPackageId, StringComparison.OrdinalIgnoreCase);
+        bool weaponsOk = runtime.activeWeaponGroupCount > 0
+            && runtime.hasAnyFireableWeapon
+            && runtime.hasAnyNonMissileWeapon
+            && runtime.missileActive == expectedMissileActive
+            && runtime.torpedoActive == expectedTorpedoActive
+            && !string.IsNullOrWhiteSpace(runtime.mainPackageId);
+        details = "ship="
+            + runtime.shipId
+            + ", profileSpeed="
+            + runtime.maxForwardSpeedMS.ToString("0.##")
+            + ", actualSpeed="
+            + runtime.actualMaxForwardSpeedMS.ToString("0.##")
+            + ", actualAccel="
+            + runtime.actualForwardAccelerationMS2.ToString("0.##")
+            + ", t90="
+            + acceleration90PercentSeconds.ToString("0.##")
+            + ", actualYaw="
+            + runtime.actualMaxYawRateDegPerSecond.ToString("0.##")
+            + ", flatSpeed="
+            + runtime.actualFlatSpeedMS.ToString("0.##")
+            + "/"
+            + expectedInitialSpeedMS.ToString("0.##")
+            + ", targetDistance="
+            + runtime.actualTargetDistanceMeters.ToString("0.##")
+            + ", main="
+            + runtime.mainPackageId
+            + ", weaponGroups="
+            + runtime.activeWeaponGroupCount
+            + ", nonMissile="
+            + runtime.hasAnyNonMissileWeapon
+            + ", MSL="
+            + runtime.missileActive
+            + ", TRP="
+            + runtime.torpedoActive
+            + ".";
+        return movementOk && weaponsOk;
+    }
+
+    private static bool PlusUpgradeLinks(KorshunHullPackageConfig upgrade, string baseId)
+    {
+        return upgrade != null &&
+            string.Equals(upgrade.basePackageId, baseId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(upgrade.upgradeLevel, "plus", StringComparison.OrdinalIgnoreCase) &&
+            upgrade.powerMultiplier >= 1.4f &&
+            upgrade.upgradeCostMultiplier >= 4f;
+    }
+
+    private static bool PlusUpgradeLinks(KorshunPowerPlantConfig upgrade, string baseId)
+    {
+        return upgrade != null &&
+            string.Equals(upgrade.basePackageId, baseId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(upgrade.upgradeLevel, "plus", StringComparison.OrdinalIgnoreCase) &&
+            upgrade.powerMultiplier >= 1.4f &&
+            upgrade.upgradeCostMultiplier >= 4f;
+    }
+
+    private static bool PlusUpgradeLinks(KorshunWeaponPackageConfig upgrade, string baseId)
+    {
+        return upgrade != null &&
+            string.Equals(upgrade.basePackageId, baseId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(upgrade.upgradeLevel, "plus", StringComparison.OrdinalIgnoreCase) &&
+            upgrade.powerMultiplier >= 1.4f &&
+            upgrade.upgradeCostMultiplier >= 4f;
+    }
+
+    private static bool PlusUpgradeLinks(KorshunAuxiliaryPackageConfig upgrade, string baseId)
+    {
+        return upgrade != null &&
+            string.Equals(upgrade.basePackageId, baseId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(upgrade.upgradeLevel, "plus", StringComparison.OrdinalIgnoreCase) &&
+            upgrade.powerMultiplier >= 1.4f &&
+            upgrade.upgradeCostMultiplier >= 4f;
     }
 
     private static void ValidateResourceCatalogConfig(SessionConfigDatabase config, BigTestReport report)
@@ -1426,7 +2567,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         string dailyTasks = ReadProjectText("Docs/Balance/PortConfigs/faction_daily_tasks.csv");
         string market = ReadProjectText("Docs/Balance/PortConfigs/faction_market_items.csv");
         string gates = ReadProjectText("Docs/Balance/PortConfigs/faction_gate_policy.csv");
-        string licenses = ReadProjectText("Docs/Balance/PortConfigs/faction_r10_licenses.csv");
         string design = ReadProjectText("Docs/Balance/FactionQuestAndMarketDesign.md");
         string meta = ReadProjectText("Assets/Scripts/Meta/MetaGameState.cs");
         string progress = ReadProjectText("Assets/Scripts/Meta/PlayerProgress.cs");
@@ -1456,19 +2596,17 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(dailyTasksReady,
             "Faction daily tasks are documented and wired as five deterministic daily jobs per faction with currency, mastery and reputation rewards.");
 
-        bool marketReady = market.Contains("stone_crushing_crown")
-            && market.Contains("mist_gas_membrane")
-            && market.Contains("ark_precision_drive")
-            && market.Contains("dev_harpoon_winch")
+        bool marketReady = market.Contains("stone_throat_grate")
+            && market.Contains("mist_separator_cassette")
+            && market.Contains("ark_servo_ring")
+            && market.Contains("dev_tension_drum")
             && market.Contains("fquest_stone_vault_10")
-            && market.Contains("fquest_factory_ark_20")
+            && market.Contains("fquest_factory_ark_10")
             && meta.Contains("FactionMarketItems")
             && meta.Contains("TryBuyFactionMarketItem")
-            && meta.Contains("currencyItemId = string.IsNullOrWhiteSpace(spec.currencyItemId)")
-            && licenses.Contains("price_currency,price_amount")
-            && licenses.Contains("solid,700");
+            && meta.Contains("currencyItemId = string.IsNullOrWhiteSpace(spec.currencyItemId)");
         report.Check(marketReady,
-            "Faction shops expose normal goods, non-craftable component locks and Solid-priced one-use R10 licenses.");
+            "Faction shops expose normal goods and non-craftable component locks without ship-license offers.");
 
         bool gatesReady = gates.Contains("processing:ore")
             && gates.Contains("processing:gas")
@@ -1642,17 +2780,21 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     {
         if (config == null || config.shipTreeEntries == null)
         {
-            report.Fail("Ship_tree.csv РЅРµ Р·Р°РіСЂСѓР¶РµРЅ.");
+            report.Fail("Ship_catalog.csv is not loaded.");
             return;
         }
 
-        bool entriesValid = config.shipTreeEntries.Count == 465;
-        List<string> invalidShipTreeEntryIds = new List<string>();
-        int developmentShipCount = 0;
-        int developmentStarterCount = 0;
-        int developmentBranchShipCount = 0;
-        int placeholderDevelopmentModels = 0;
-        int runtimeReadyDevelopmentHulls = 0;
+        string[] expectedShipIds =
+        {
+            "capital_patrol_frigate_r02",
+            "capital_artillery_cruiser_r02",
+            "capital_heavy_battleship_r02"
+        };
+        HashSet<string> expectedIds = new HashSet<string>(expectedShipIds, StringComparer.OrdinalIgnoreCase);
+        bool entriesValid = config.shipTreeEntries.Count == expectedShipIds.Length;
+        List<string> invalidShipCatalogEntryIds = new List<string>();
+        int catalogShipCount = 0;
+        int runtimeReadyHulls = 0;
 
         for (int i = 0; i < config.shipTreeEntries.Count; i++)
         {
@@ -1663,42 +2805,26 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 continue;
             }
 
-            bool isRoot = entry.rank == 0;
-            bool isDevelopment = entry.IsDevelopmentRosterShip;
-            bool isDevelopmentStarter = isDevelopment &&
-                entry.treeTier == 1 &&
-                string.Equals(entry.branchId, "starter", StringComparison.OrdinalIgnoreCase);
-            if (isDevelopment)
+            if (entry.IsDevelopmentRosterShip)
             {
-                developmentShipCount++;
-                if (entry.treeTier == 1 && entry.branchId == "starter")
-                {
-                    developmentStarterCount++;
-                }
-                else
-                {
-                    developmentBranchShipCount++;
-                }
-
-                if (entry.visualModelId == "placeholder_square" && entry.visualShapeId == "square")
-                {
-                    placeholderDevelopmentModels++;
-                }
-
+                catalogShipCount++;
                 if (entry.HasRuntimeHull)
                 {
-                    runtimeReadyDevelopmentHulls++;
+                    runtimeReadyHulls++;
                 }
             }
 
             bool entryValid = !string.IsNullOrWhiteSpace(entry.shipId) &&
+                expectedIds.Contains(entry.shipId) &&
                 !string.IsNullOrWhiteSpace(entry.localNameRu) &&
                 !string.IsNullOrWhiteSpace(entry.localNameEn) &&
                 !string.IsNullOrWhiteSpace(entry.classNameRu) &&
                 !string.IsNullOrWhiteSpace(entry.roleId) &&
                 !string.IsNullOrWhiteSpace(entry.roleNameRu) &&
                 !string.IsNullOrWhiteSpace(entry.summaryRu) &&
-                (isRoot || isDevelopmentStarter || (entry.parentShipIds != null && entry.parentShipIds.Count > 0)) &&
+                string.Equals(entry.catalogScope, "catalog", StringComparison.OrdinalIgnoreCase) &&
+                string.IsNullOrWhiteSpace(entry.branchId) &&
+                (entry.parentShipIds == null || entry.parentShipIds.Count == 0) &&
                 (string.IsNullOrWhiteSpace(entry.requiredTechnologyId) || config.GetTechnology(entry.requiredTechnologyId) != null) &&
                 (string.IsNullOrWhiteSpace(entry.hullId) || config.GetHull(entry.hullId) != null) &&
                 (string.IsNullOrWhiteSpace(entry.claudiumLoopId) || config.GetClaudiumLoop(entry.claudiumLoopId) != null) &&
@@ -1707,73 +2833,72 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 AllIdsExistAllowEmpty(entry.upgradeClaudiumLoopIds, config.GetClaudiumLoop) &&
                 AllIdsExistAllowEmpty(entry.upgradeSpecialModuleIds, config.GetSpecialModule);
 
-            if (isDevelopment)
-            {
-                bool placeholderOrRuntimeModel = entry.HasRuntimeHull ||
-                    (entry.visualModelId == "placeholder_square" && entry.visualShapeId == "square");
-                entryValid &= !string.IsNullOrWhiteSpace(entry.factionId) &&
-                    !string.IsNullOrWhiteSpace(entry.factionNameRu) &&
-                    IsKnownDevelopmentShipClass(entry.shipClassId) &&
-                    !string.IsNullOrWhiteSpace(entry.shipClassNameRu) &&
-                    !string.IsNullOrWhiteSpace(entry.branchId) &&
-                    !string.IsNullOrWhiteSpace(entry.BranchDisplayNameRu) &&
-                    entry.treeTier >= 1 &&
-                    entry.treeTier <= 10 &&
-                    entry.treeRow >= 0 &&
-                    entry.rank == entry.treeTier &&
-                    entry.catalogScope == "development" &&
-                    placeholderOrRuntimeModel &&
-                    !string.IsNullOrWhiteSpace(entry.costCurrencyItemId) &&
-                    config.GetItem(entry.costCurrencyItemId) != null &&
-                    (entry.treeTier == 1 ? entry.costAmount == 0 : entry.costAmount > 0) &&
-                    entry.TotalStatScore > 0 &&
-                    HasDevelopmentRatingScore(entry);
-            }
-
-            if (entry.parentShipIds != null)
-            {
-                for (int j = 0; j < entry.parentShipIds.Count; j++)
-                {
-                    string parentId = entry.parentShipIds[j];
-                    ShipTreeEntryConfig parent = config.GetShipTreeEntry(parentId);
-                    entryValid &= parent != null &&
-                        parent.shipId != entry.shipId &&
-                        parent.rank <= entry.rank;
-                }
-            }
+            entryValid &= !string.IsNullOrWhiteSpace(entry.factionId) &&
+                !string.IsNullOrWhiteSpace(entry.factionNameRu) &&
+                IsKnownDevelopmentShipClass(entry.shipClassId) &&
+                !string.IsNullOrWhiteSpace(entry.shipClassNameRu) &&
+                entry.rank > 0 &&
+                entry.treeTier >= 1 &&
+                entry.treeRow >= 0 &&
+                entry.HasRuntimeHull &&
+                !string.IsNullOrWhiteSpace(entry.visualModelId) &&
+                !string.IsNullOrWhiteSpace(entry.costCurrencyItemId) &&
+                config.GetItem(entry.costCurrencyItemId) != null &&
+                entry.costAmount > 0 &&
+                entry.TotalStatScore > 0 &&
+                HasDevelopmentRatingScore(entry);
 
             entriesValid &= entryValid;
-            if (!entryValid && invalidShipTreeEntryIds.Count < 8)
+            if (!entryValid && invalidShipCatalogEntryIds.Count < 8)
             {
-                invalidShipTreeEntryIds.Add(string.IsNullOrWhiteSpace(entry.shipId) ? "<empty>" : entry.shipId);
+                invalidShipCatalogEntryIds.Add(string.IsNullOrWhiteSpace(entry.shipId) ? "<empty>" : entry.shipId);
             }
         }
 
         report.Check(entriesValid
-                && config.GetShipTreeEntry("pioneer") == null
-                && config.GetShipTreeEntry("cruiser203") == null,
-            "Ship_tree.csv gives every development ship faction/class/cost/model/stat fields and contains no old runtime Pioneer/Cruiser 203 rows. Actual: count="
+                && catalogShipCount == expectedShipIds.Length
+                && runtimeReadyHulls == expectedShipIds.Length
+                && config.GetShipTreeEntry("capital_patrol_frigate_r02") != null
+                && config.GetShipTreeEntry("capital_artillery_cruiser_r02") != null
+                && config.GetShipTreeEntry("capital_heavy_battleship_r02") != null,
+            "Ship_catalog.csv gives every current ship faction/class/cost/model/stat field and no extra playable ship rows. Actual: count="
             + config.shipTreeEntries.Count
-            + "/465"
+            + "/3"
             + ", invalidExamples="
-            + (invalidShipTreeEntryIds.Count == 0 ? "none" : string.Join(",", invalidShipTreeEntryIds)));
+            + (invalidShipCatalogEntryIds.Count == 0 ? "none" : string.Join(",", invalidShipCatalogEntryIds)));
 
-        report.Check(developmentShipCount == 465
-                && developmentStarterCount == 6
-                && developmentBranchShipCount == 459
-                && placeholderDevelopmentModels == 465
-                && runtimeReadyDevelopmentHulls == 0
-                && ShipDevelopmentRosterCountsValid(config),
-            "Development ship roster contains 6 faction starters plus 51 full R2-R10 branches.");
-
-        report.Check(ShipDevelopmentTechTreeLayoutValid(config),
-            "Development ship tree has supplier branches laid out across tiers I-X from faction starter ships.");
+        report.Check(ShipCatalogIsFlat(config),
+            "Ship catalog is flat: no branch ids, no parent links and no tech-tree rows.");
 
         report.Check(!ShipTreeHasCycles(config),
-            "Р”РµСЂРµРІРѕ РєРѕСЂР°Р±Р»РµР№ РЅРµ СЃРѕРґРµСЂР¶РёС‚ С†РёРєР»РѕРІ РїРѕ parent_ship_id.");
+            "Ship catalog has no parent_ship_id cycles.");
 
     }
 
+    private static bool ShipCatalogIsFlat(SessionConfigDatabase config)
+    {
+        if (config == null || config.shipTreeEntries == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < config.shipTreeEntries.Count; i++)
+        {
+            ShipTreeEntryConfig entry = config.shipTreeEntries[i];
+            if (entry == null)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.branchId)
+                || (entry.parentShipIds != null && entry.parentShipIds.Count > 0))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
     private static bool ShipDevelopmentRosterCountsValid(SessionConfigDatabase config)
     {
         if (config == null || config.shipTreeEntries == null)
@@ -2691,13 +3816,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         bool configClean = config != null &&
             config.isLoaded &&
-            config.GetShipTreeEntry("pioneer") == null &&
-            config.GetShipTreeEntry("cruiser203") == null &&
-            config.GetHull(GameplaySessionAccountData.DefaultStarterHullId) == null &&
-            config.GetHull("cruiser203_hull") == null &&
-            config.GetClaudiumLoop("starter_claudium_loop") == null;
+            config.shipTreeEntries.Count == 3 &&
+            config.hulls.Count == 0 &&
+            config.claudiumLoops.Count == 0;
         report.Check(configClean,
-            "Old runtime Pioneer/Cruiser203 ship records and starter claudium loop are removed from loaded config.");
+            "Runtime ship config keeps only the three current playable catalog rows and no legacy hull or claudium-loop rows.");
 
         string[] removedPaths =
         {
@@ -2719,18 +3842,13 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             }
         }
 
-        string shipTreeText = ReadProjectText("Assets/Data/Config/Ship_tree.csv");
-        string hullText = ReadProjectText("Assets/Data/Config/Hull.csv");
-        string claudiumLoopText = ReadProjectText("Assets/Data/Config/Claudium_loop.csv");
-        string questText = ReadProjectText("Assets/Data/Config/Quest.csv");
+        string shipCatalogText = ReadProjectText("Assets/Data/Config/Ship_catalog.csv");
         bool csvTextClean =
-            !shipTreeText.Contains("cruiser203") &&
-            !shipTreeText.Contains("starter_hull") &&
-            !shipTreeText.Contains("starter_claudium_loop") &&
-            !hullText.Contains("starter_hull") &&
-            !hullText.Contains("cruiser203_hull") &&
-            !claudiumLoopText.Contains("starter_claudium_loop") &&
-            !questText.Contains("quest_select_cruiser203");
+            !File.Exists(ProjectPath("Assets/Data/Config/" + "Ship_" + "tree.csv")) &&
+            CountCsvDataRows(shipCatalogText) == 3 &&
+            shipCatalogText.Contains("capital_patrol_frigate_r02") &&
+            shipCatalogText.Contains("capital_artillery_cruiser_r02") &&
+            shipCatalogText.Contains("capital_heavy_battleship_r02");
 
         report.Check(leftovers.Count == 0 && csvTextClean,
             leftovers.Count == 0 && csvTextClean
@@ -2739,6 +3857,26 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     + (leftovers.Count == 0 ? "no asset paths" : string.Join(", ", leftovers))
                     + ", csvClean="
                     + csvTextClean);
+    }
+
+    private static int CountCsvDataRows(string csvText)
+    {
+        if (string.IsNullOrWhiteSpace(csvText))
+        {
+            return 0;
+        }
+
+        string[] lines = csvText.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        int rows = 0;
+        for (int i = 1; i < lines.Length; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(lines[i]))
+            {
+                rows++;
+            }
+        }
+
+        return rows;
     }
 
             #if UNITY_EDITOR
@@ -3476,182 +4614,48 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 #endif
     }
 
-    private void ValidateShipWindAerodynamics(BigTestReport report)
+    private void ValidateStrategicShipRuntime(BigTestReport report)
     {
-        report.Section("РљРѕСЂР°Р±Р»СЊ, РІРµС‚РµСЂ Рё Р»С‘С‚РЅР°СЏ С„РёР·РёРєР°");
+        report.Section("Strategic ship runtime");
         ValidateActivePlayerShipVisual(report);
         ValidateBallisticFireControl(report);
-        ValidateArmorDamageModel(report);
+        ValidateCoreTacticalDamageResistanceModel(report);
+
         GameObject testShip = null;
-        Scene probeScene = default;
         try
         {
-            testShip = new GameObject("Big Test Temporary ShipPhysics");
+            testShip = new GameObject("Big Test Strategic Ship Runtime");
             Rigidbody body = testShip.AddComponent<Rigidbody>();
             ShipPhysics ship = testShip.AddComponent<ShipPhysics>();
-            ship.enabled = false;
-            body.useGravity = false;
+            ship.baseMass = 1200f;
+            ship.cargoMassKg = 300f;
+            ship.hullForwardThrustKgf = 900f;
+            ship.hullCruiseReferenceSpeedMS = 42f;
+            ship.baseMaxSpeedMS = 42f;
+            ship.strategicVerticalSpeedMS = 8f;
+            ship.strategicYawRateDegPerSecond = 24f;
+            ship.RefreshRuntimeShipSettings();
 
-            ship.dragCoefficient = 0.5f;
-            ship.windVelocity = new Vector3(10f, 0f, 0f);
-            report.Check(Approximately(ship.CurrentWindAerodynamicFactor, 0.5f, 0.001f), "РђСЌСЂРѕРґРёРЅР°РјРёРєР° 0.5 РґР°С‘С‚ РєРѕСЌС„С„РёС†РёРµРЅС‚ РІРµС‚СЂР° 0.5.");
-            report.Check(Approximately(ship.EffectiveWindVelocity.magnitude, 5f, 0.001f), "Р’РµС‚РµСЂ 10 Рј/СЃ РїСЂРё Р°СЌСЂРѕРґРёРЅР°РјРёРєРµ 0.5 РѕС‰СѓС‰Р°РµС‚СЃСЏ РєР°Рє 5 Рј/СЃ.");
+            CoreTacticalShipMotor motor = testShip.GetComponent<CoreTacticalShipMotor>();
+            report.Check(motor != null,
+                "ShipPhysics installs CoreTacticalShipMotor as the live movement motor.");
+            report.Check(body != null
+                && !body.useGravity
+                && Approximately(body.mass, ship.GetTotalMassKg(), 0.001f),
+                "Strategic ships use a non-gravity Rigidbody with mass synchronized from cargo.");
 
-            ship.dragCoefficient = 1.2f;
-            ship.windVelocity = new Vector3(0f, 0f, 10f);
-            report.Check(Approximately(ship.EffectiveWindVelocity.magnitude, 12f, 0.001f), "РџР»РѕС…Р°СЏ Р°СЌСЂРѕРґРёРЅР°РјРёРєР° 1.2 СѓСЃРёР»РёРІР°РµС‚ РІРѕР·РґРµР№СЃС‚РІРёРµ РІРµС‚СЂР° РґРѕ 12 Рј/СЃ.");
+            ship.SetStrategicInputState(1f, 0.35f, 0.25f, 0.5f, false, false, 0f, false, 0f, false, 0f);
+            bool ticked = TryInvokePrivateMethod(ship, "FixedUpdate", report);
+            Vector3 commandDelta = motor != null ? motor.TargetPosition - ship.transform.position : Vector3.zero;
+            report.Check(ticked
+                && motor != null
+                && commandDelta.sqrMagnitude > 1f,
+                "Strategic thrust/lateral/lift/turn input is converted to CoreTacticalShipMotor commands.");
 
-            ship.baseMaxSpeedMS = 50f;
-            ship.hullCruiseReferenceSpeedMS = 50f;
-            ship.slipstreamActivationSpeedRatio = 0.8f;
-            ship.slipstreamMaxSpeedMultiplier = 5f;
-            ship.slipstreamFuelConsumptionMultiplier = 2f;
-            body.linearVelocity = new Vector3(39f, 0f, 0f);
-            bool slipstreamBlockedBelowSpeed = !ship.TrySetClaudiumSlipstreamEnabled(true, out _);
-            body.linearVelocity = new Vector3(41f, 0f, 0f);
-            bool slipstreamEnabledAboveSpeed = ship.TrySetClaudiumSlipstreamEnabled(true, out _);
-            ship.claudiumSlipstreamCharge01 = 1f;
-            bool slipstreamFullEffect = Approximately(ship.CurrentMaxSpeedMS, 250f, 0.001f)
-                && Approximately(ship.ClaudiumSlipstreamDragMultiplier, 1f, 0.001f)
-                && Approximately(ship.CurrentFuelConsumptionMultiplier, 2f, 0.001f);
-            body.linearVelocity = new Vector3(39f, 0f, 0f);
-            bool slipstreamDisabledAfterSlowdown = TryInvokePrivateMethod(ship, "FixedUpdate", report)
-                && !ship.claudiumSlipstreamEnabled;
-            report.Check(slipstreamBlockedBelowSpeed
-                && slipstreamEnabledAboveSpeed
-                && slipstreamDisabledAfterSlowdown
-                && slipstreamFullEffect,
-                "Claudium slipstream uses a relative 80% clean-speed threshold, ramps max ход x5, and doubles fixed fuel burn.");
-            ship.TrySetClaudiumSlipstreamEnabled(false, out _);
-            ship.claudiumSlipstreamCharge01 = 0f;
-
-            probeScene = SceneManager.CreateScene("Wild Wind Big Test Flight Probe", new CreateSceneParameters(LocalPhysicsMode.Physics3D));
-            report.Check(probeScene.IsValid(), "РР·РѕР»РёСЂРѕРІР°РЅРЅР°СЏ СЃС†РµРЅР° РґР»СЏ РїСЂРѕРІРµСЂРєРё Р»С‘С‚РЅРѕР№ С„РёР·РёРєРё СЃРѕР·РґР°РЅР°.");
-            if (!probeScene.IsValid())
-            {
-                return;
-            }
-
-            SceneManager.MoveGameObjectToScene(testShip, probeScene);
-            PhysicsScene physicsScene = probeScene.GetPhysicsScene();
-            report.Check(physicsScene.IsValid(), "РР·РѕР»РёСЂРѕРІР°РЅРЅР°СЏ 3D physics-СЃС†РµРЅР° РІР°Р»РёРґРЅР°.");
-            if (!physicsScene.IsValid())
-            {
-                return;
-            }
-
-            ConfigureFlightProbeShip(ship, body);
-            float expectedMass = ship.baseMass + ship.cargoMassKg;
-            report.Check(Approximately(body.mass, expectedMass, 0.001f), "Rigidbody РїРѕР»СѓС‡Р°РµС‚ СЃСѓС…СѓСЋ РјР°СЃСЃСѓ Рё РіСЂСѓР·: " + body.mass.ToString("0.#") + " РєРі.");
-
-            float fixedDeltaTime = Mathf.Max(Time.fixedDeltaTime, 0.0001f);
-            float fuelBeforeLift = ship.fuelStockKg;
-            float claudiumBeforeLift = ship.claudiumStock;
-            if (TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
-            {
-                float expectedLiftN = body.mass * 9.81f;
-                report.Check(Approximately(ship.claudiumRequestedLiftKg, body.mass, 0.5f), "РљР»Р°РІРґРёРµРІС‹Р№ РєРѕРЅС‚СѓСЂ Р·Р°РїСЂР°С€РёРІР°РµС‚ С‚СЂРёРјРјРёСЂСѓРµРјСѓСЋ РјР°СЃСЃСѓ РєРѕСЂР°Р±Р»СЏ: " + ship.claudiumRequestedLiftKg.ToString("0.#") + " РєРі.");
-                report.Check(Approximately(ship.claudiumCurrentLiftN, expectedLiftN, expectedLiftN * 0.02f), "РљР»Р°РІРґРёРµРІС‹Р№ РєРѕРЅС‚СѓСЂ РІС‹РґР°С‘С‚ РїРѕРґСЉС‘РјРЅСѓСЋ СЃРёР»Сѓ РїСЂРёРјРµСЂРЅРѕ РІРµСЃР° РєРѕСЂР°Р±Р»СЏ: " + ship.claudiumCurrentLiftN.ToString("0.#") + " Рќ.");
-                report.Check(Approximately(fuelBeforeLift, ship.fuelStockKg, 0.0001f)
-                    && Approximately(claudiumBeforeLift, ship.claudiumStock, 0.0001f),
-                    "Lift is free: it does not consume coal or claudium.");
-            }
-
-            float fuelBeforeTick = ship.fuelStockKg;
-            if (TryInvokePrivateMethod(ship, "FixedUpdate", report))
-            {
-                float expectedFuelBurn = Mathf.Max(0f, ship.fuelConsumptionKgPerMinute)
-                    * ship.CurrentFuelConsumptionMultiplier
-                    / 60f
-                    * fixedDeltaTime;
-                report.Check(Approximately(fuelBeforeTick - ship.fuelStockKg, expectedFuelBurn, Mathf.Max(0.0001f, expectedFuelBurn * 0.05f)),
-                    "Hull fuel burn uses the fixed kg-per-minute rate.");
-            }
-
-            ship.thrustInput = 1f;
-            ship.hullThrustOutput = 0f;
-            ship.hullThrustResponseRate01PerSecond = 0.10f;
-            if (TryInvokePrivateMethod(ship, "UpdateHullThrustOutput", report)
-                && TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
-            {
-                float expectedHullThrustStep = 0.10f * fixedDeltaTime;
-                report.Check(Approximately(ship.hullThrustOutput, expectedHullThrustStep, 0.0002f),
-                    "Hull thrust output follows the requested thrust with a 10% per second response: "
-                    + ship.hullThrustOutput.ToString("0.0000") + ".");
-            }
-
-            ship.claudiumStock = 20f;
-            ship.claudiumCurrentLiftN = 0f;
-            ship.claudiumLoopResponseRate01PerSecond = 0.10f;
-            if (TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
-            {
-                float expectedLoopStepN = ship.claudiumMaxLiftKg * 9.81f * 0.10f * fixedDeltaTime;
-                report.Check(Approximately(ship.claudiumCurrentLiftN, expectedLoopStepN, 0.05f),
-                    "РљР»Р°РІРґРёРµРІС‹Р№ РєРѕРЅС‚СѓСЂ РјРµРЅСЏРµС‚ С„Р°РєС‚РёС‡РµСЃРєРёР№ РїРѕРґСЉС‘Рј СЃ РїСЂРёС‘РјРёСЃС‚РѕСЃС‚СЊСЋ 10% РјР°РєСЃРёРјСѓРјР° РІ СЃРµРєСѓРЅРґСѓ: "
-                    + ship.claudiumCurrentLiftN.ToString("0.###") + " Рќ.");
-            }
-
-            ship.claudiumStock = 0f;
-            ship.claudiumCurrentLiftN = 0f;
-            if (TryInvokePrivateMethod(ship, "UpdateSimplifiedClaudium", report))
-            {
-                float expectedLoopStepWithoutClaudiumN = ship.claudiumMaxLiftKg * 9.81f * 0.10f * fixedDeltaTime;
-                report.Check(Approximately(ship.claudiumCurrentLiftN, expectedLoopStepWithoutClaudiumN, 0.05f)
-                    && ship.claudiumStock <= 0.0001f,
-                    "Lift loop works without claudium stock and does not consume claudium.");
-            }
-
-            ConfigureFlightProbeShip(ship, body);
-            ResetFlightProbeBody(body, new Vector3(0f, 1000f, 0f), Quaternion.identity, true);
-            float hoverStartY = body.position.y;
-            if (StepShipPhysicsProbe(ship, physicsScene, 20, report))
-            {
-                float hoverDrift = Mathf.Abs(body.position.y - hoverStartY);
-                report.Check(IsFinite(body.position) && IsFinite(body.linearVelocity), "РЎР±Р°Р»Р°РЅСЃРёСЂРѕРІР°РЅРЅС‹Р№ РїРѕР»С‘С‚ РЅРµ СЃРѕР·РґР°С‘С‚ NaN/Infinity РІ РїРѕР·РёС†РёРё Рё СЃРєРѕСЂРѕСЃС‚Рё.");
-                report.Check(hoverDrift <= 0.25f && Mathf.Abs(body.linearVelocity.y) <= 0.5f, "РџСЂРё СЂР°Р±РѕС‡РµРј РєР»Р°РІРґРёРµРІРѕРј РєРѕРЅС‚СѓСЂРµ РєРѕСЂР°Р±Р»СЊ РґРµСЂР¶РёС‚ РІС‹СЃРѕС‚Сѓ: РґСЂРµР№С„ " + hoverDrift.ToString("0.###") + " Рј, vy " + body.linearVelocity.y.ToString("0.###") + " Рј/СЃ.");
-            }
-
-            ConfigureFlightProbeShip(ship, body);
-            ship.claudiumStock = 0f;
-            ResetFlightProbeBody(body, new Vector3(0f, 1000f, 0f), Quaternion.identity, true);
-            float noClaudiumHoverStartY = body.position.y;
-            if (StepShipPhysicsProbe(ship, physicsScene, 10, report))
-            {
-                float noClaudiumHoverDrift = Mathf.Abs(body.position.y - noClaudiumHoverStartY);
-                report.Check(noClaudiumHoverDrift <= 0.25f && Mathf.Abs(body.linearVelocity.y) <= 0.5f,
-                    "Ship lift does not require claudium stock: drift "
-                    + noClaudiumHoverDrift.ToString("0.###")
-                    + " m, vy "
-                    + body.linearVelocity.y.ToString("0.###")
-                    + " m/s.");
-            }
-
-            ConfigureFlightProbeShip(ship, body);
-            ship.claudiumStock = 0f;
-            ship.thrustInput = 1f;
-            ship.hullThrustOutput = 1f;
-            ResetFlightProbeBody(body, Vector3.zero, Quaternion.identity, false);
-            if (StepShipPhysicsProbe(ship, physicsScene, 15, report))
-            {
-                Vector3 horizontalVelocity = body.linearVelocity;
-                horizontalVelocity.y = 0f;
-                report.Check(horizontalVelocity.z > 0.75f && ship.hullForwardThrustKgfCurrent > 0f, "Hull thrust accelerates the ship forward: v " + horizontalVelocity.magnitude.ToString("0.###") + " m/s, thrust " + ship.hullForwardThrustKgfCurrent.ToString("0.#") + " kgf.");
-            }
-
-            ConfigureForwardSpeedProbeShip(ship, body);
-            float expectedMaxSpeed = CalculateExpectedForwardMaxSpeed(ship);
-            ResetFlightProbeBody(body, Vector3.zero, Quaternion.identity, false);
-            if (StepShipPhysicsProbe(ship, physicsScene, 2000, report))
-            {
-                Vector3 terminalVelocity = body.linearVelocity;
-                terminalVelocity.y = 0f;
-                float actualSpeed = terminalVelocity.magnitude;
-                float tolerance = Mathf.Max(1f, expectedMaxSpeed * 0.08f);
-                report.Check(expectedMaxSpeed > 0f && IsFinite(expectedMaxSpeed), "Р Р°СЃС‡С‘С‚РЅР°СЏ РјР°РєСЃРёРјР°Р»СЊРЅР°СЏ СЃРєРѕСЂРѕСЃС‚СЊ РґР»СЏ С‚РµСЃС‚РѕРІРѕРіРѕ РєРѕСЂР°Р±Р»СЏ РєРѕРЅРµС‡РЅР°: " + expectedMaxSpeed.ToString("0.###") + " Рј/СЃ.");
-                report.Check(Mathf.Abs(actualSpeed - expectedMaxSpeed) <= tolerance, "РЎРёРјСѓР»СЏС†РёСЏ РїРѕР»РЅРѕРіРѕ РіР°Р·Р° СЃС…РѕРґРёС‚СЃСЏ Рє СЂР°СЃС‡С‘С‚РЅРѕР№ СЃРєРѕСЂРѕСЃС‚Рё: СЂР°СЃС‡С‘С‚ " + expectedMaxSpeed.ToString("0.###") + " Рј/СЃ, С„Р°РєС‚ " + actualSpeed.ToString("0.###") + " Рј/СЃ, РґРѕРїСѓСЃРє " + tolerance.ToString("0.###") + " Рј/СЃ.");
-            }
-
-            ValidateShipPhysicsPushPreservesExternalImpulse(probeScene, physicsScene, report);
+            report.Check(motor != null
+                && Approximately(motor.massKg, ship.GetTotalMassKg(), 0.001f)
+                && motor.maxForwardSpeedMS >= ship.CleanBaseMaxSpeedMS - 0.001f,
+                "Strategic motor receives runtime mass and speed from the ship assembly stats.");
         }
         finally
         {
@@ -3665,11 +4669,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 {
                     DestroyImmediate(testShip);
                 }
-            }
-
-            if (probeScene.IsValid())
-            {
-                SceneManager.UnloadSceneAsync(probeScene);
             }
         }
     }
@@ -3808,7 +4807,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(nearPenetration > farPenetration
             && Approximately(nearPenetration, 1f, 0.001f)
             && farPenetration < 0.5f,
-            "Armor-piercing penetration falls with range and retained velocity: near "
+            "Range-scaled resistance ignore falls with range and retained velocity: near "
             + nearPenetration.ToString("0.###")
             + ", far "
             + farPenetration.ToString("0.###")
@@ -4458,12 +5457,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         WildWindBaseIslandView islandBeforeDockScreen = WildWindBaseIslandView.EnsureForCurrentSessionScene();
         bool cameraMovedBeforeDockScreen = islandBeforeDockScreen != null
             && islandBeforeDockScreen.OffsetCityCameraForTests(2.5f, -1.75f, 13f, -4f, -1.25f);
-        string cameraSignatureBeforeDockScreen = cameraMovedBeforeDockScreen
-            ? islandBeforeDockScreen.CityCameraSignatureForTests
-            : "";
         bool dockScreenOpened = hud != null
             && hud.IsMetaDockScreenReadyForTests
-            && hud.OpenMetaDockScreenForTests()
+            && hud.PressMetaDockButtonForTests()
             && hud.IsMetaDockScreenVisibleForTests
             && hud.IsPortHudHiddenForDockScreenForTests
             && hud.MetaDockScreenPortButtonLabelForTests == "ПОРТ"
@@ -4471,10 +5467,27 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         WildWindBaseIslandView islandAfterDockScreenOpen = dockScreenOpened
             ? WildWindBaseIslandView.EnsureForCurrentSessionScene()
             : null;
+        bool dockScreenStartsSmoothEllipseBlend = islandAfterDockScreenOpen != null
+            && islandAfterDockScreenOpen.IsCityCameraHomeBlendActiveForTests
+            && islandAfterDockScreenOpen.IsCityCameraTransformBlendActiveForTests
+            && islandAfterDockScreenOpen.IsCityCameraTransformBlendTargetingPortDockForTests
+            && !islandAfterDockScreenOpen.IsPortDockCameraOrbitActiveForTests;
+        bool dockScreenFocusedPhysicalPort = islandAfterDockScreenOpen != null
+            && islandAfterDockScreenOpen.FocusSelectedDevelopmentDockShipForTests()
+            && islandAfterDockScreenOpen.IsCityVisibleForTests
+            && !string.IsNullOrWhiteSpace(islandAfterDockScreenOpen.FocusedPortDockKeyForTests)
+            && islandAfterDockScreenOpen.PortDockBattleshipBerthFitsForTests;
+        bool dockScreenUsesEllipticPortCamera = dockScreenFocusedPhysicalPort
+            && islandAfterDockScreenOpen.IsPortDockCameraOrbitActiveForTests
+            && islandAfterDockScreenOpen.IsPortDockCameraOrbitLookingAtShipForTests
+            && islandAfterDockScreenOpen.OffsetPortDockCameraOrbitForTests(32f)
+            && islandAfterDockScreenOpen.IsPortDockCameraOrbitLookingAtShipForTests;
         report.Check(dockScreenOpened
                 && islandAfterDockScreenOpen != null
-                && !islandAfterDockScreenOpen.IsCityVisibleForTests,
-            "Dock button switches to a separate Dock screen, hides the Port HUD, and shows a Port screen-exit button in the same control slot.");
+                && dockScreenStartsSmoothEllipseBlend
+                && dockScreenFocusedPhysicalPort
+                && dockScreenUsesEllipticPortCamera,
+            "Main HUD Dock button opens the Dock screen through its real Button.onClick binding as a UI layer over the live city, hides the Port HUD, starts a smooth transform blend to the physical berth ellipse, keeps a battleship-class berth available, and puts the camera on an elliptic orbit around the docked ship.");
         bool returnedFromDockScreen = hud != null
             && hud.ReturnFromMetaDockScreenToPortForTests()
             && !hud.IsMetaDockScreenVisibleForTests
@@ -4490,8 +5503,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(cameraMovedBeforeDockScreen
                 && returnedFromDockScreen
                 && islandAfterDockScreenReturn != null
-                && islandAfterDockScreenReturn.CityCameraSignatureForTests == cameraSignatureBeforeDockScreen,
-            "Returning from the Dock screen preserves the current city camera pivot, zoom and orbit instead of snapping away.");
+                && islandAfterDockScreenReturn.IsCityCameraHomeBlendActiveForTests
+                && islandAfterDockScreenReturn.IsCityCameraTransformBlendActiveForTests
+                && islandAfterDockScreenReturn.IsCityCameraTransformBlendTargetingPreservedStateForTests
+                && !islandAfterDockScreenReturn.IsPortDockCameraOrbitActiveForTests
+                && !islandAfterDockScreenReturn.IsPortDockWorldInteractionSuppressedForTests,
+            "Returning from the Dock screen leaves the port orbit and starts a smooth return to the exact city camera pose saved before Dock opened.");
         if (islandAfterDockScreenReturn != null)
         {
             islandAfterDockScreenReturn.SnapCityCameraHomeForTests();
@@ -4506,15 +5523,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(allMetaLeftSideWindowsOpenAfterDockReturn,
             "Each right-side meta window can still open after returning from the Dock screen without mutating gameplay state.");
         string developmentWindowText = hud != null ? hud.DevelopmentWindowTextForTests : "";
-        bool developmentWindowRendersFullTree = hud != null
+        bool developmentWindowRendersFlatCatalog = hud != null
             && hud.IsDevelopmentWindowCatalogReadyForTests
-            && hud.DevelopmentWindowSupplierCountForTests == 6
-            && hud.DevelopmentWindowTierColumnCountForTests == 10
-            && hud.DevelopmentWindowTileCountForTests == 100
-            && hud.DevelopmentWindowConnectionCountForTests == 99
-            && developmentWindowText.Contains("465");
-        report.Check(developmentWindowRendersFullTree,
-            "Development window renders the full selected supplier ship tech tree with 10 tiers and 100 visible Capital tiles. Actual: suppliers="
+            && hud.DevelopmentWindowSupplierCountForTests == 1
+            && hud.DevelopmentWindowTierColumnCountForTests == 0
+            && hud.DevelopmentWindowTileCountForTests == 3
+            && hud.DevelopmentWindowConnectionCountForTests == 0
+            && developmentWindowText.Contains("3");
+        report.Check(developmentWindowRendersFlatCatalog,
+            "Development window renders the flat ship catalog with three current ship cards and no tree links. Actual: suppliers="
             + (hud != null ? hud.DevelopmentWindowSupplierCountForTests : -1)
             + ", tiers="
             + (hud != null ? hud.DevelopmentWindowTierColumnCountForTests : -1)
@@ -4522,11 +5539,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             + (hud != null ? hud.DevelopmentWindowTileCountForTests : -1)
             + ", connections="
             + (hud != null ? hud.DevelopmentWindowConnectionCountForTests : -1)
-            + ", textHas465="
-            + (!string.IsNullOrWhiteSpace(developmentWindowText) && developmentWindowText.Contains("465")));
+            + ", textHas3="
+            + (!string.IsNullOrWhiteSpace(developmentWindowText) && developmentWindowText.Contains("3")));
         report.Check(hud != null
-                && developmentWindowText.IndexOf("первый столичный", StringComparison.OrdinalIgnoreCase) >= 0,
-            "Development window renders the selected ship lore below research and purchase costs.");
+                && developmentWindowText.IndexOf("Коршун", StringComparison.OrdinalIgnoreCase) >= 0,
+            "Development window renders the selected flat-catalog ship details below research and purchase costs.");
         report.Check(hud != null && hud.AreOpenHudWindowsModalForTests,
             "Open HUD windows are centered modal overlays with a fade backdrop, no minimize button and close-only chrome.");
         report.Check(hud != null
@@ -4724,6 +5741,10 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         report.Check(island.CityRaycastLayerForTests == 30
             && island.CityInteractiveColliderLayerMismatchCountForTests == 0,
             "Base island hover raycasts are isolated to the city interaction layer instead of scanning every physics collider in the session scene.");
+        report.Check(island.PortDockBattleshipBerthFitsForTests,
+            "External PVE dock berths are large enough for a battleship-class port preview instead of only fitting a small square dock tile.");
+        report.Check(island.PortDockPreviewUsesRealShipLengthScaleForTests,
+            "External dock ship previews preserve real ship-length ratios: Korshun 60 m, Barbet 150 m, Val 330 m.");
         report.Check(island.SuppressedSessionRendererCountForTests > 0,
             "Docked city view suppresses old session-world renderers while the isometric city is visible: "
             + island.SuppressedSessionRendererCountForTests + ".");
@@ -4736,8 +5757,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             "Docked city camera uses a mesh-compatible Universal renderer so the 3D city grid and buildings are visible: "
             + island.CityCameraRendererNameForTests + ".");
         GameObject sessionSceneObjects = GameObject.Find(SortieLocationIsolationController.SessionSceneObjectsRootName);
-        report.Check(sessionSceneObjects != null && sessionSceneObjects.transform.childCount == 0,
-            "Session Scene Objects remains only as an empty isolation anchor; old static port/resource visuals are not in the hierarchy.");
+        report.Check(sessionSceneObjects == null || sessionSceneObjects.transform.childCount == 0,
+            "Session Scene Objects is absent or empty; old static port/resource visuals are not in the hierarchy.");
         report.Check(GameObject.Find("Capital Port Proxy - Greenhaven") == null
             && GameObject.Find("Data Resource Field ore_field_tutorial_00") == null,
             "Docked session scene no longer contains the old capital proxy or tutorial resource field visuals.");
@@ -4787,8 +5808,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && island.GetBuildingDefinitionMaxCountForTests("laboratory") == 2
             && island.GetBuildingDefinitionMaxCountForTests("archive") == 2
             && island.GetBuildingDefinitionMaxCountForTests("workshop") == 5
-            && island.GetBuildingDefinitionMaxCountForTests("pve_dock") == 2,
-            "City building catalog stores current placement limits: processing x2, archive x2, workshop x5, PVE docks x2.");
+            && island.GetBuildingDefinitionMaxCountForTests("pve_dock") == 3,
+            "City building catalog stores current placement limits: processing x2, archive x2, workshop x5, PVE docks x3.");
         report.Check(island.BuildingCountForTests >= 9,
             "Base island exposes the initial clickable city buildings from the catalog: " + island.BuildingCountForTests + ".");
 
@@ -4831,6 +5852,18 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             report.Check(island.BuildingHasColliderForTests(buildingId),
                 "Base island building " + buildingId + " has a runtime click collider.");
         }
+
+        bool cityBuildingVisualRecovery =
+            island.DeactivateBuildingVisualForTests("anchor_house")
+            && !island.BuildingHasEnabledVisualForTests("anchor_house")
+            && island.RecoverDefaultBuildingsForTests()
+            && island.HasBuildingForTests("anchor_house")
+            && island.BuildingHasEnabledVisualForTests("anchor_house")
+            && island.BuildingHasColliderForTests("anchor_house");
+        report.Check(cityBuildingVisualRecovery,
+            cityBuildingVisualRecovery
+                ? "Base island restores missing runtime building visuals instead of leaving the city without buildings."
+                : "Base island must prune stale building records and recreate default building visuals if the runtime city loses them.");
 
         WildWindGameplayHud archiveHud = FindFirstObjectByType<WildWindGameplayHud>();
         bool archiveOwnsKnowledgeWindow = archiveHud != null
@@ -4885,23 +5918,18 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         int cityBuildingsBeforeDock = island.BuildingCountForTests;
         int dockCountBefore = island.GetPlacedBuildingCountForTests("pve_dock");
-        int externalDockCountBefore = island.ExternalDockPlacedCountForTests;
-        report.Check(dockCountBefore == 1,
-            "Base island starts with exactly one built external PVE dock.");
-        bool dockPlaced = island.PlaceCatalogBuildingForTests("pve_dock")
-            && island.GetPlacedBuildingCountForTests("pve_dock") == dockCountBefore + 1
-            && island.ExternalDockPlacedCountForTests == externalDockCountBefore + 1
-            && island.BuildingCountForTests == cityBuildingsBeforeDock
-            && island.GetBuildingDefinitionMaxCountForTests("pve_dock") == 2;
-        report.Check(dockPlaced,
-            "Dock catalog entry builds the second current PVE dock into the external dock-slot grid instead of occupying an inner city footprint.");
+        report.Check(dockCountBefore == 3
+                && island.ExternalDockPlacedCountForTests >= dockCountBefore
+                && island.BuildingCountForTests == cityBuildingsBeforeDock
+                && island.GetBuildingDefinitionMaxCountForTests("pve_dock") == 3,
+            "Base island starts with three built external PVE docks so docked ships can be previewed in separate physical berths.");
         bool dockLimitBlocked = !island.PlaceCatalogBuildingForTests("pve_dock")
             && island.GetPlacedBuildingCountForTests("pve_dock") == island.GetBuildingDefinitionMaxCountForTests("pve_dock")
             && island.BuildingCatalogStatusForTests.Contains("лимит");
         report.Check(dockLimitBlocked,
-            "Dock catalog entry blocks a third PVE dock while only two docks are currently allowed.");
+            "Dock catalog entry blocks a fourth PVE dock while three physical PVE berths are currently allowed.");
         bool dockMoved = island.MoveExternalDockToFirstFreeSlotForTests("pve_dock")
-            && island.GetPlacedBuildingCountForTests("pve_dock") == dockCountBefore + 1;
+            && island.GetPlacedBuildingCountForTests("pve_dock") == dockCountBefore;
         report.Check(dockMoved,
             "Built docks can move between their own external slots without duplicating or using the city grid.");
         report.Check(island.ShowExternalDockHoverForTests("pve_dock"),
@@ -4912,9 +5940,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && island.OpenExternalDockForTests("pve_dock")
             && baseHud.IsMetaDockScreenVisibleForTests
             && (islandAfterDockClick = WildWindBaseIslandView.EnsureForCurrentSessionScene()) != null
-            && !islandAfterDockClick.IsCityVisibleForTests;
+            && islandAfterDockClick.IsCityVisibleForTests
+            && islandAfterDockClick.FocusSelectedDevelopmentDockShipForTests()
+            && !string.IsNullOrWhiteSpace(islandAfterDockClick.FocusedPortDockKeyForTests);
         report.Check(dockScreenFromDock,
-            "Clicking a built external dock opens the Dock screen directly instead of the building radial menu.");
+            "Clicking a built external dock opens the Dock screen directly over the live city and focuses that physical berth instead of the building radial menu.");
         report.Check(dockScreenFromDock && baseHud.IsMetaDockGameplayReadyForTests,
             "Dock screen contains the concrete quick-mission ship slot, selected-ship panel, reward panel and battle/sell buttons.");
         if (baseHud != null && baseHud.IsMetaDockScreenVisibleForTests)
@@ -4925,23 +5955,31 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         MetaGameState quickDockMeta = metaGameState != null ? metaGameState : FindFirstObjectByType<MetaGameState>();
         bool quickDockLoopWorks = false;
-        bool quickDockRewardsVary = false;
         bool quickRawRewardsVary = false;
-        bool dockResultWindowWorks = false;
-        bool ordinaryDockMissionWorks = false;
         bool starterPortLoopWorks = false;
         bool emptyDockSlotOpensDevelopment = false;
         bool developmentPurchaseReturnsToDock = false;
+        bool developmentDockFreePurchaseWorks = false;
         bool developmentTreeAllMouseButtonsPan = false;
         bool coreCombatDockLaunchWorks = false;
-        int storageTotalBeforeQuickSortie = 0;
-        int storageTotalAfterQuickSortie = 0;
-        string quickDockRewardText = "";
-        string quickDockResultWindowText = "";
-        string secondQuickDockRewardText = "";
-        string secondQuickDockResultWindowText = "";
-        string ordinaryDockRewardText = "";
-        string ordinaryDockResultWindowText = "";
+        bool coreCombatRuntimeShipWorks = false;
+        bool dockLoadoutDefaultsWork = false;
+        bool portDockPreviewWorks = false;
+        bool portDockSlotSwitchKeepsOrbit = false;
+        bool portDockLoadoutPreviewUpdates = false;
+        bool portDockKorshunMainLoadoutVisualMapCoversConfig = false;
+        bool portDockKorshunMainLoadoutVisualsMounted = false;
+        bool portDockKorshunAuxiliaryLoadoutVisualMapCoversConfig = false;
+        bool portDockKorshunAuxiliaryLoadoutVisualsMounted = false;
+        bool portDockKorshunLoadoutVisualsClean = false;
+        string portDockLoadoutPreviewDetails = "";
+        string coreCombatRuntimeShipDetails = "";
+        bool coreCombatCommandProjectionWorks = false;
+        string coreCombatCommandProjectionDetails = "";
+        bool coreCombatMagnetIdleBeamSuppressed = false;
+        string coreCombatMagnetIdleBeamDetails = "";
+        bool coreCombatMagnetLoadoutVisualsWork = false;
+        string coreCombatMagnetLoadoutVisualDetails = "";
         if (quickDockMeta != null && baseHud != null)
         {
             quickDockMeta.EnsureProgressInitialized();
@@ -4951,7 +5989,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 quickDockMeta.TrySellDevelopmentDockShip(existingDockShip.slotIndex, out _);
             }
 
-            quickDockMeta.GetCapitalStorageState()?.AddResource("freight", 120000);
             bool dockOpenedForEmptySlot = baseHud.OpenMetaDockScreenForTests()
                 && baseHud.IsMetaDockGameplayReadyForTests;
             emptyDockSlotOpensDevelopment = dockOpenedForEmptySlot
@@ -4963,14 +6000,20 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 && baseHud.DragDevelopmentTreeForTests(PointerEventData.InputButton.Left, new Vector2(-160f, 160f))
                 && baseHud.DragDevelopmentTreeForTests(PointerEventData.InputButton.Middle, new Vector2(80f, -80f))
                 && baseHud.DragDevelopmentTreeForTests(PointerEventData.InputButton.Right, new Vector2(-90f, 90f));
+            PortStorageState routeBuyStorage = quickDockMeta.GetCapitalStorageState();
+            int freightBeforeRouteBuy = routeBuyStorage != null ? routeBuyStorage.GetResourceAmount("freight") : 0;
             bool boughtFromDevelopmentRoute = emptyDockSlotOpensDevelopment
                 && baseHud.BuySelectedDevelopmentShipForTests();
+            int freightAfterRouteBuy = routeBuyStorage != null ? routeBuyStorage.GetResourceAmount("freight") : 0;
             DockedDevelopmentShipState routeSlot = quickDockMeta.GetSelectedDevelopmentDockShipSlot();
             developmentPurchaseReturnsToDock = boughtFromDevelopmentRoute
                 && baseHud.IsMetaDockScreenVisibleForTests
                 && !baseHud.IsDevelopmentWindowOpenForTests
                 && routeSlot != null
                 && routeSlot.HasShip;
+            developmentDockFreePurchaseWorks = developmentPurchaseReturnsToDock
+                && MetaGameState.GetDevelopmentDockShipPurchaseCost(null) == 0
+                && freightAfterRouteBuy == freightBeforeRouteBuy;
             if (routeSlot != null && routeSlot.HasShip)
             {
                 quickDockMeta.TrySellDevelopmentDockShip(routeSlot.slotIndex, out _);
@@ -4985,65 +6028,215 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             bool developmentOpened = baseHud.OpenDevelopmentWindowForTests()
                 && baseHud.IsDevelopmentWindowVisibleForTests
                 && baseHud.IsDevelopmentWindowCatalogReadyForTests;
-            quickDockMeta.GetCapitalStorageState()?.AddResource("freight", 20000);
             bool boughtShip = developmentOpened && baseHud.BuySelectedDevelopmentShipForTests();
-            PortStorageState quickStorage = quickDockMeta.GetCapitalStorageState();
-            storageTotalBeforeQuickSortie = CountStorageResourceTotal(quickStorage);
+            bool boughtSecondPreviewShip = false;
+            if (boughtShip)
+            {
+                quickDockMeta.SelectDevelopmentDockSlot(1);
+                boughtSecondPreviewShip = quickDockMeta.TryBuyDevelopmentShipToDock("capital_artillery_cruiser_r02", out _);
+                quickDockMeta.SelectDevelopmentDockSlot(0);
+            }
+
             bool dockOpened = boughtShip
                 && baseHud.OpenMetaDockScreenForTests()
                 && baseHud.IsMetaDockGameplayReadyForTests;
-            bool sortieRan = dockOpened && baseHud.RunQuickDockSortieForTests();
-            quickDockRewardText = baseHud.MetaDockRewardTextForTests;
-            quickDockResultWindowText = baseHud.MetaDockResultWindowTextForTests;
-            bool firstResultWindowOpened = sortieRan
-                && baseHud.IsMetaDockResultWindowVisibleForTests
-                && !string.IsNullOrWhiteSpace(quickDockResultWindowText)
-                && quickDockResultWindowText.Contains("FE:");
-            int storageAfterFirstQuickSortie = CountStorageResourceTotal(quickStorage);
-            bool secondSortieRan = sortieRan && baseHud.RunQuickDockSortieForTests();
-            secondQuickDockRewardText = baseHud.MetaDockRewardTextForTests;
-            secondQuickDockResultWindowText = baseHud.MetaDockResultWindowTextForTests;
-            bool secondResultWindowOpened = secondSortieRan
-                && baseHud.IsMetaDockResultWindowVisibleForTests
-                && !string.IsNullOrWhiteSpace(secondQuickDockResultWindowText)
-                && secondQuickDockResultWindowText.Contains("FE:")
-                && !string.Equals(quickDockResultWindowText, secondQuickDockResultWindowText, StringComparison.Ordinal);
-            storageTotalAfterQuickSortie = CountStorageResourceTotal(quickStorage);
-            bool ordinaryMissionRan = secondSortieRan && baseHud.RunFirstOrdinaryDockMissionForTests();
-            ordinaryDockRewardText = baseHud.MetaDockRewardTextForTests;
-            ordinaryDockResultWindowText = baseHud.MetaDockResultWindowTextForTests;
-            bool ordinaryResultWindowOpened = ordinaryMissionRan
-                && baseHud.IsMetaDockResultWindowVisibleForTests
-                && !string.IsNullOrWhiteSpace(ordinaryDockResultWindowText)
-                && ordinaryDockResultWindowText.Contains("FE:");
-            int storageTotalAfterOrdinaryMission = CountStorageResourceTotal(quickStorage);
-            ordinaryDockMissionWorks = ordinaryMissionRan
-                && storageTotalAfterOrdinaryMission > storageTotalAfterQuickSortie
-                && !string.IsNullOrWhiteSpace(ordinaryDockRewardText)
-                && ordinaryDockRewardText.Contains("FE:")
-                && ordinaryDockRewardText.Contains("Нематериальное");
-            bool concreteRewardText = !string.IsNullOrWhiteSpace(quickDockRewardText)
-                && quickDockRewardText.Contains(" x")
-                && !string.IsNullOrWhiteSpace(secondQuickDockRewardText)
-                && secondQuickDockRewardText.Contains(" x");
-            quickDockRewardsVary = secondSortieRan
-                && storageAfterFirstQuickSortie > storageTotalBeforeQuickSortie
-                && storageTotalAfterQuickSortie > storageAfterFirstQuickSortie
-                && !string.Equals(quickDockRewardText, secondQuickDockRewardText, StringComparison.Ordinal);
-            dockResultWindowWorks = firstResultWindowOpened
-                && secondResultWindowOpened
-                && ordinaryResultWindowOpened;
-            bool soldShip = ordinaryMissionRan && baseHud.SellSelectedDockShipForTests();
+            bool coreOnlyDockUi = dockOpened
+                && baseHud.MetaDockMissionOfferCountForTests == 0
+                && !baseHud.IsMetaDockResultWindowVisibleForTests;
+            WildWindBaseIslandView dockPreviewIsland = dockOpened
+                ? WildWindBaseIslandView.EnsureForCurrentSessionScene()
+                : null;
+            portDockPreviewWorks = dockPreviewIsland != null
+                && dockPreviewIsland.FocusSelectedDevelopmentDockShipForTests()
+                && dockPreviewIsland.IsPortDockBackdropReadyForTests
+                && dockPreviewIsland.IsPortDockWorldInteractionSuppressedForTests;
+            portDockSlotSwitchKeepsOrbit = portDockPreviewWorks
+                && boughtSecondPreviewShip
+                && baseHud.PressMetaDockShipSlotForTests(1)
+                && dockPreviewIsland.FocusedPortDockSlotIndexForTests == 1
+                && dockPreviewIsland.IsPortDockCameraOrbitActiveForTests
+                && dockPreviewIsland.IsCityCameraHomeBlendActiveForTests
+                && dockPreviewIsland.IsPortDockCameraOrbitLookingAtShipForTests
+                && dockPreviewIsland.IsPortDockWorldInteractionSuppressedForTests;
+            if (dockOpened)
+            {
+                baseHud.PressMetaDockShipSlotForTests(0);
+            }
+
+            if (portDockPreviewWorks)
+            {
+                List<DockedShipLoadoutSlotView> previewLoadoutSlots = quickDockMeta.GetDevelopmentDockLoadoutSlotsForUi(0);
+                int mainLoadoutIndex = -1;
+                int auxiliaryLoadoutIndex = -1;
+                if (previewLoadoutSlots != null)
+                {
+                    for (int i = 0; i < previewLoadoutSlots.Count; i++)
+                    {
+                        DockedShipLoadoutSlotView view = previewLoadoutSlots[i];
+                        if (view != null && string.Equals(view.slotId, "main", StringComparison.OrdinalIgnoreCase))
+                        {
+                            mainLoadoutIndex = i;
+                        }
+
+                        if (view != null && string.Equals(view.slotId, "auxiliary", StringComparison.OrdinalIgnoreCase))
+                        {
+                            auxiliaryLoadoutIndex = i;
+                        }
+                    }
+                }
+
+                string previewSignatureBefore = dockPreviewIsland.SelectedPortDockPreviewLoadoutSignatureForTests;
+                bool uiCycledMainLoadout = mainLoadoutIndex >= 0 && baseHud.PressMetaDockLoadoutSlotForTests(mainLoadoutIndex);
+                string previewSignatureAfter = dockPreviewIsland.SelectedPortDockPreviewLoadoutSignatureForTests;
+                int generatedWeaponVisuals = dockPreviewIsland.SelectedPortDockPreviewGeneratedWeaponVisualCountForTests;
+                string mainLoadoutMountFailureSignature = "";
+                string mainLoadoutMountFailureDetails = "";
+                portDockKorshunMainLoadoutVisualMapCoversConfig = dockPreviewIsland.KorshunMainLoadoutPreviewVisualMapCoversConfigForTests;
+                portDockKorshunMainLoadoutVisualsMounted = dockPreviewIsland.SelectedPortDockPreviewMainWeaponMountedForTests;
+                portDockKorshunLoadoutVisualsClean = dockPreviewIsland.SelectedPortDockPreviewKorshunLoadoutVisualsCleanForTests;
+                string portDockKorshunLoadoutVisualCleanFailureDetails = portDockKorshunLoadoutVisualsClean
+                    ? ""
+                    : dockPreviewIsland.SelectedPortDockPreviewKorshunLoadoutVisualCleanDetailsForTests;
+                if (!portDockKorshunMainLoadoutVisualsMounted)
+                {
+                    mainLoadoutMountFailureSignature = dockPreviewIsland.SelectedPortDockPreviewLoadoutSignatureForTests;
+                    mainLoadoutMountFailureDetails = dockPreviewIsland.SelectedPortDockPreviewMainWeaponMountDetailsForTests;
+                }
+
+                portDockKorshunAuxiliaryLoadoutVisualMapCoversConfig = dockPreviewIsland.KorshunAuxiliaryLoadoutPreviewVisualMapCoversConfigForTests;
+                portDockKorshunAuxiliaryLoadoutVisualsMounted = dockPreviewIsland.SelectedPortDockPreviewAuxiliaryWeaponMountedForTests;
+                int mainLoadoutOptionCount = mainLoadoutIndex >= 0 && mainLoadoutIndex < previewLoadoutSlots.Count && previewLoadoutSlots[mainLoadoutIndex] != null
+                    ? previewLoadoutSlots[mainLoadoutIndex].optionCount
+                    : 0;
+                if (mainLoadoutOptionCount > 1)
+                {
+                    for (int cycle = 1; cycle < mainLoadoutOptionCount; cycle++)
+                    {
+                        bool cycleMounted = baseHud.PressMetaDockLoadoutSlotForTests(mainLoadoutIndex)
+                            && dockPreviewIsland.SelectedPortDockPreviewGeneratedWeaponVisualCountForTests >= 2
+                            && dockPreviewIsland.SelectedPortDockPreviewMainWeaponMountedForTests;
+                        bool cycleClean = dockPreviewIsland.SelectedPortDockPreviewKorshunLoadoutVisualsCleanForTests;
+                        if (!cycleClean && string.IsNullOrWhiteSpace(portDockKorshunLoadoutVisualCleanFailureDetails))
+                        {
+                            portDockKorshunLoadoutVisualCleanFailureDetails = dockPreviewIsland.SelectedPortDockPreviewKorshunLoadoutVisualCleanDetailsForTests;
+                        }
+
+                        if (!cycleMounted && string.IsNullOrWhiteSpace(mainLoadoutMountFailureSignature))
+                        {
+                            mainLoadoutMountFailureSignature = dockPreviewIsland.SelectedPortDockPreviewLoadoutSignatureForTests;
+                            mainLoadoutMountFailureDetails = dockPreviewIsland.SelectedPortDockPreviewMainWeaponMountDetailsForTests;
+                        }
+
+                        portDockKorshunMainLoadoutVisualsMounted &= cycleMounted;
+                        portDockKorshunLoadoutVisualsClean &= cycleClean;
+                    }
+                }
+
+                string auxiliarySignatureBefore = dockPreviewIsland.SelectedPortDockPreviewLoadoutSignatureForTests;
+                bool uiCycledAuxiliaryLoadout = auxiliaryLoadoutIndex >= 0 && baseHud.PressMetaDockLoadoutSlotForTests(auxiliaryLoadoutIndex);
+                string auxiliarySignatureAfter = dockPreviewIsland.SelectedPortDockPreviewLoadoutSignatureForTests;
+                int auxiliaryLoadoutOptionCount = auxiliaryLoadoutIndex >= 0 && auxiliaryLoadoutIndex < previewLoadoutSlots.Count && previewLoadoutSlots[auxiliaryLoadoutIndex] != null
+                    ? previewLoadoutSlots[auxiliaryLoadoutIndex].optionCount
+                    : 0;
+                string auxiliaryLoadoutMountFailureSignature = "";
+                string auxiliaryLoadoutMountFailureDetails = "";
+                portDockKorshunAuxiliaryLoadoutVisualsMounted &= uiCycledAuxiliaryLoadout
+                    && !string.Equals(auxiliarySignatureBefore, auxiliarySignatureAfter, StringComparison.Ordinal)
+                    && dockPreviewIsland.SelectedPortDockPreviewGeneratedWeaponVisualCountForTests >= 4
+                    && dockPreviewIsland.SelectedPortDockPreviewAuxiliaryWeaponMountedForTests;
+                bool auxiliaryClean = dockPreviewIsland.SelectedPortDockPreviewKorshunLoadoutVisualsCleanForTests;
+                if (!auxiliaryClean && string.IsNullOrWhiteSpace(portDockKorshunLoadoutVisualCleanFailureDetails))
+                {
+                    portDockKorshunLoadoutVisualCleanFailureDetails = dockPreviewIsland.SelectedPortDockPreviewKorshunLoadoutVisualCleanDetailsForTests;
+                }
+
+                portDockKorshunLoadoutVisualsClean &= auxiliaryClean;
+                if (!portDockKorshunAuxiliaryLoadoutVisualsMounted && string.IsNullOrWhiteSpace(auxiliaryLoadoutMountFailureDetails))
+                {
+                    auxiliaryLoadoutMountFailureDetails = dockPreviewIsland.SelectedPortDockPreviewAuxiliaryWeaponMountDetailsForTests;
+                }
+
+                if (auxiliaryLoadoutOptionCount > 1)
+                {
+                    for (int cycle = 1; cycle < auxiliaryLoadoutOptionCount; cycle++)
+                    {
+                        bool cycleMounted = baseHud.PressMetaDockLoadoutSlotForTests(auxiliaryLoadoutIndex)
+                            && dockPreviewIsland.SelectedPortDockPreviewGeneratedWeaponVisualCountForTests >= 4
+                            && dockPreviewIsland.SelectedPortDockPreviewAuxiliaryWeaponMountedForTests;
+                        bool cycleClean = dockPreviewIsland.SelectedPortDockPreviewKorshunLoadoutVisualsCleanForTests;
+                        if (!cycleClean && string.IsNullOrWhiteSpace(portDockKorshunLoadoutVisualCleanFailureDetails))
+                        {
+                            portDockKorshunLoadoutVisualCleanFailureDetails = dockPreviewIsland.SelectedPortDockPreviewKorshunLoadoutVisualCleanDetailsForTests;
+                        }
+
+                        if (!cycleMounted && string.IsNullOrWhiteSpace(auxiliaryLoadoutMountFailureSignature))
+                        {
+                            auxiliaryLoadoutMountFailureSignature = dockPreviewIsland.SelectedPortDockPreviewLoadoutSignatureForTests;
+                            auxiliaryLoadoutMountFailureDetails = dockPreviewIsland.SelectedPortDockPreviewAuxiliaryWeaponMountDetailsForTests;
+                        }
+
+                        portDockKorshunAuxiliaryLoadoutVisualsMounted &= cycleMounted;
+                        portDockKorshunLoadoutVisualsClean &= cycleClean;
+                    }
+                }
+
+                portDockLoadoutPreviewUpdates = uiCycledMainLoadout
+                    && !string.Equals(previewSignatureBefore, previewSignatureAfter, StringComparison.Ordinal)
+                    && previewSignatureAfter.Contains("|main=")
+                    && generatedWeaponVisuals >= 2
+                    && portDockKorshunMainLoadoutVisualMapCoversConfig
+                    && portDockKorshunMainLoadoutVisualsMounted
+                    && portDockKorshunAuxiliaryLoadoutVisualMapCoversConfig
+                    && portDockKorshunAuxiliaryLoadoutVisualsMounted
+                    && portDockKorshunLoadoutVisualsClean;
+                portDockLoadoutPreviewDetails = "index="
+                    + mainLoadoutIndex
+                    + "/"
+                    + auxiliaryLoadoutIndex
+                    + ", before="
+                    + previewSignatureBefore
+                    + ", after="
+                    + previewSignatureAfter
+                    + ", generated="
+                    + generatedWeaponVisuals
+                    + ", map="
+                    + portDockKorshunMainLoadoutVisualMapCoversConfig
+                    + ", mounted="
+                    + portDockKorshunMainLoadoutVisualsMounted
+                    + ", mainMountFail="
+                    + mainLoadoutMountFailureSignature
+                    + ", mainMountDetails="
+                    + mainLoadoutMountFailureDetails
+                    + ", auxBefore="
+                    + auxiliarySignatureBefore
+                    + ", auxAfter="
+                    + auxiliarySignatureAfter
+                    + ", auxMap="
+                    + portDockKorshunAuxiliaryLoadoutVisualMapCoversConfig
+                    + ", auxMounted="
+                    + portDockKorshunAuxiliaryLoadoutVisualsMounted
+                    + ", clean="
+                    + portDockKorshunLoadoutVisualsClean
+                    + ", cleanDetails="
+                    + portDockKorshunLoadoutVisualCleanFailureDetails
+                    + ", auxMountFail="
+                    + auxiliaryLoadoutMountFailureSignature
+                    + ", auxMountDetails="
+                    + auxiliaryLoadoutMountFailureDetails
+                    + ".";
+            }
+
+            bool soldShip = dockOpened && baseHud.SellSelectedDockShipForTests();
+            if (boughtSecondPreviewShip)
+            {
+                quickDockMeta.TrySellDevelopmentDockShip(1, out _);
+            }
+
             quickDockLoopWorks = developmentOpened
                 && boughtShip
                 && dockOpened
-                && sortieRan
-                && secondSortieRan
-                && ordinaryDockMissionWorks
-                && storageTotalAfterQuickSortie > storageTotalBeforeQuickSortie
-                && concreteRewardText
-                && quickDockRewardsVary
-                && dockResultWindowWorks
+                && coreOnlyDockUi
+                && portDockPreviewWorks
                 && soldShip;
 
             if (baseHud.IsMetaDockScreenVisibleForTests)
@@ -5052,24 +6245,24 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 WildWindBaseIslandView.EnsureForCurrentSessionScene();
             }
 
+            PortStorageState quickStorage = quickDockMeta.GetCapitalStorageState();
             DockedDevelopmentShipState dockSlot = quickDockMeta.GetSelectedDevelopmentDockShipSlot();
             if (dockSlot != null && dockSlot.HasShip)
             {
                 quickDockMeta.TrySellDevelopmentDockShip(dockSlot.slotIndex, out _);
             }
 
-            List<string> oreItemIds = GetOreItemIdsForBigTest(quickDockMeta.SessionConfig);
-            int rawOreBefore = CountStorageItems(quickStorage, oreItemIds);
-            bool boughtMiner = quickDockMeta.TryBuyDevelopmentShipToDock("stone_vault_starter", out _);
+            bool boughtMiner = quickDockMeta.TryBuyDevelopmentShipToDock("capital_patrol_frigate_r02", out _);
+            int rawRewardStacksBefore = CountStorageResourceTotal(quickStorage);
             string rawMessageA = "";
             string rawMessageB = "";
             string rawMessageC = "";
             bool rawSortieA = boughtMiner && quickDockMeta.TryRunQuickDevelopmentSortie(0, out rawMessageA);
             bool rawSortieB = rawSortieA && quickDockMeta.TryRunQuickDevelopmentSortie(0, out rawMessageB);
             bool rawSortieC = rawSortieB && quickDockMeta.TryRunQuickDevelopmentSortie(0, out rawMessageC);
-            int rawOreAfter = CountStorageItems(quickStorage, oreItemIds);
+            int rawRewardStacksAfter = CountStorageResourceTotal(quickStorage);
             quickRawRewardsVary = rawSortieC
-                && rawOreAfter > rawOreBefore
+                && rawRewardStacksAfter > rawRewardStacksBefore
                 && !string.Equals(rawMessageA, rawMessageB, StringComparison.Ordinal)
                 && !string.Equals(rawMessageB, rawMessageC, StringComparison.Ordinal);
             quickDockMeta.TrySellDevelopmentDockShip(0, out _);
@@ -5082,7 +6275,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 PortStorageState starterStorage = quickDockMeta.GetCapitalStorageState();
                 int starterFreightBefore = starterStorage != null ? starterStorage.GetResourceAmount("freight") : 0;
                 int starterExperienceBefore = starterStorage != null ? starterStorage.GetResourceAmount(SessionExtractionConstants.DesignExperienceItemId) : 0;
-                bool starterShipBought = quickDockMeta.TryBuyDevelopmentShipToDock("stone_vault_starter", out _);
+                bool starterShipBought = quickDockMeta.TryBuyDevelopmentShipToDock("capital_patrol_frigate_r02", out _);
                 bool starterSortieA = starterShipBought && quickDockMeta.TryRunQuickDevelopmentSortie(0, out _);
                 bool starterSortieB = starterSortieA && quickDockMeta.TryRunQuickDevelopmentSortie(0, out _);
                 bool starterSortieC = starterSortieB && quickDockMeta.TryRunQuickDevelopmentSortie(0, out _);
@@ -5116,7 +6309,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
                 int starterFreightAfter = starterStorage != null ? starterStorage.GetResourceAmount("freight") : 0;
                 int starterExperienceAfter = starterStorage != null ? starterStorage.GetResourceAmount(SessionExtractionConstants.DesignExperienceItemId) : 0;
-                bool paidShipAffordable = starterFreightAfter >= 9000;
+                bool paidShipAffordable = MetaGameState.GetDevelopmentDockShipPurchaseCost(null) == 0 || starterFreightAfter >= 9000;
 
                 DockedDevelopmentShipState starterDockShip = quickDockMeta.GetSelectedDevelopmentDockShipSlot();
                 if (starterDockShip != null && starterDockShip.HasShip)
@@ -5150,11 +6343,56 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             {
                 quickDockMeta.ReplaceProgress(new PlayerProgress());
                 quickDockMeta.EnsureProgressInitialized();
-                quickDockMeta.GetCapitalStorageState()?.AddResource("freight", 120000);
                 bool coreShipBought = quickDockMeta.TryBuyDevelopmentShipToDock("capital_patrol_frigate_r02", out _);
+                List<DockedShipLoadoutSlotView> coreLoadoutSlots = coreShipBought
+                    ? quickDockMeta.GetDevelopmentDockLoadoutSlotsForUi(0)
+                    : null;
+                bool hasHullLoadout = false;
+                bool hasMainLoadout = false;
+                bool hasAuxiliaryLoadout = false;
+                if (coreLoadoutSlots != null)
+                {
+                    for (int i = 0; i < coreLoadoutSlots.Count; i++)
+                    {
+                        DockedShipLoadoutSlotView loadout = coreLoadoutSlots[i];
+                        if (loadout == null || string.IsNullOrWhiteSpace(loadout.selectedPackageId))
+                        {
+                            continue;
+                        }
+
+                        hasHullLoadout |= string.Equals(loadout.slotId, "hull", StringComparison.OrdinalIgnoreCase);
+                        hasMainLoadout |= string.Equals(loadout.slotId, "main", StringComparison.OrdinalIgnoreCase);
+                        hasAuxiliaryLoadout |= string.Equals(loadout.slotId, "auxiliary", StringComparison.OrdinalIgnoreCase);
+                    }
+                }
+
+                DockedDevelopmentShipState selectedAfterDefaults = quickDockMeta.GetSelectedDevelopmentDockShipSlot();
+                bool fastHullDefaulted = selectedAfterDefaults != null
+                    && selectedAfterDefaults.loadoutDefaultsVersion >= 1
+                    && string.Equals(selectedAfterDefaults.GetLoadoutPackageId("hull"), "korshun_hull_fast", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(selectedAfterDefaults.GetLoadoutPackageId("power"), "korshun_power_steam_gas", StringComparison.OrdinalIgnoreCase);
+                bool cycledMainLoadout = coreShipBought && quickDockMeta.TryCycleDevelopmentDockLoadoutPackage(0, "main", out _);
+                DockedDevelopmentShipState selectedAfterCycle = quickDockMeta.GetSelectedDevelopmentDockShipSlot();
+                DockedDevelopmentShipState selectedForCoreCombat = selectedAfterCycle ?? selectedAfterDefaults;
+                if (selectedForCoreCombat != null)
+                {
+                    selectedForCoreCombat.SetLoadoutPackageId("auxiliary", "korshun_aux_magnet");
+                }
+
+                dockLoadoutDefaultsWork = coreLoadoutSlots != null
+                    && coreLoadoutSlots.Count >= 4
+                    && hasHullLoadout
+                    && hasMainLoadout
+                    && hasAuxiliaryLoadout
+                    && fastHullDefaulted
+                    && cycledMainLoadout
+                    && selectedAfterCycle != null
+                    && string.Equals(selectedAfterCycle.GetLoadoutPackageId("hull"), "korshun_hull_fast", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(selectedAfterCycle.GetLoadoutPackageId("main"));
                 DockedDevelopmentShipState coreSlotBefore = quickDockMeta.GetSelectedDevelopmentDockShipSlot();
                 int sortiesBeforeCoreCombat = coreSlotBefore != null ? coreSlotBefore.sortiesRemaining : -1;
                 bool coreCombatStarted = coreShipBought && quickDockMeta.BeginCoreTacticalIntroCombatSortie();
+                CoreTacticalCombatSortieController coreCombatController = null;
                 DockedDevelopmentShipState coreSlotAfter = quickDockMeta.GetSelectedDevelopmentDockShipSlot();
                 SortieSessionState coreSortie = quickDockMeta.ActiveSortie;
                 coreCombatDockLaunchWorks = coreCombatStarted
@@ -5166,6 +6404,48 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     && coreSortie.zone.sortieId == SessionExtractionConstants.CoreTacticalIntroCombatSortieId
                     && coreSlotAfter != null
                     && coreSlotAfter.sortiesRemaining == Mathf.Max(0, sortiesBeforeCoreCombat - 1);
+                if (coreCombatDockLaunchWorks)
+                {
+                    coreCombatController = CoreTacticalCombatSortieController.EnsureForActiveSortie(quickDockMeta);
+                    if (coreCombatController == null)
+                    {
+                        coreCombatRuntimeShipDetails = "Core Tactical controller was not created.";
+                    }
+                    else if (!coreCombatController.TryBuildForTests())
+                    {
+                        coreCombatRuntimeShipDetails = "Core Tactical controller refused to build for the active sortie.";
+                    }
+                    else if (!CoreTacticalCombatSortieController.TryGetActivePlayerRuntimeSnapshotForTests(out CoreTacticalCombatSortieController.CoreTacticalRuntimeProfileSnapshot activeRuntime))
+                    {
+                        coreCombatRuntimeShipDetails = "Core Tactical player runtime snapshot is unavailable after build.";
+                    }
+                    else
+                    {
+                        coreCombatRuntimeShipWorks = ValidateKorshunActiveRuntimeSnapshot(
+                            activeRuntime,
+                            out coreCombatRuntimeShipDetails,
+                            expectedSpeedMS: 162f,
+                            expectedAccelerationMS2: 46.63f,
+                            expectedYawDegPerSecond: 36f,
+                            expectedEntrySpeedMS: 365f,
+                            expectedTargetDistanceMeters: 20000f,
+                            expectedHullPackageId: "korshun_hull_fast",
+                            expectedPowerPackageId: "korshun_power_steam_gas",
+                            expectedTorpedoActive: false);
+                        coreCombatCommandProjectionWorks = ValidateCoreTacticalLiveCommandProjection(
+                            coreCombatController.GetComponent<CoreTacticalFleetController>(),
+                            out coreCombatCommandProjectionDetails);
+                        coreCombatMagnetIdleBeamSuppressed = ValidateNoIdleMagnetAuxiliaryBeamEmitters(
+                            out coreCombatMagnetIdleBeamDetails);
+                        coreCombatMagnetLoadoutVisualsWork = ValidateKorshunCombatMagnetLoadoutVisuals(
+                            out coreCombatMagnetLoadoutVisualDetails);
+                    }
+
+                    if (coreCombatController != null)
+                    {
+                        DestroyBigTestObject(coreCombatController.gameObject);
+                    }
+                }
             }
             finally
             {
@@ -5174,29 +6454,47 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         report.Check(quickDockLoopWorks,
-            "Development tree can buy a ship into the dock, run two adaptive quick missions, run one ordinary generated mission, add concrete rewards to storage and sell the ship. Storage "
-            + storageTotalBeforeQuickSortie
-            + " -> "
-            + storageTotalAfterQuickSortie
-            + ", rewards="
-            + quickDockRewardText + " / " + secondQuickDockRewardText + " / " + ordinaryDockRewardText + ".");
+            "Development tree can buy a ship into the dock, the dock exposes no quick/ordinary mission launch UI, and the ship can still be sold.");
+        report.Check(portDockPreviewWorks,
+            "A bought dock ship appears as its authored imported ship model at the physical external berth while the Dock screen stays over the live city.");
+        report.Check(portDockSlotSwitchKeepsOrbit,
+            "Switching between bought dock ships blends directly from one port ellipse to the next, keeps the port orbit active, and suppresses city/dock picking under the Dock screen.");
+        report.Check(portDockLoadoutPreviewUpdates,
+            portDockLoadoutPreviewUpdates
+                ? "Changing the Korshun main and auxiliary packages from the Dock screen replaces mounted ship visuals across all configured options."
+                : "Changing the Korshun main and auxiliary packages from the Dock screen must replace mounted ship visuals across all configured options. " + portDockLoadoutPreviewDetails);
         report.Check(emptyDockSlotOpensDevelopment,
             "Clicking an empty dock ship slot acts as the Buy route and opens the Development window instead of only selecting an empty slot.");
         report.Check(developmentPurchaseReturnsToDock,
             "Buying from the Development window places the ship into the selected dock slot and returns to the Dock screen so the result is visible.");
+        report.Check(developmentDockFreePurchaseWorks,
+            "Current dock prototype buys ships from the Development window without requiring or spending Freight.");
         report.Check(developmentTreeAllMouseButtonsPan,
             "Development tree panning captures the pointer and scrolls with left, middle and right mouse buttons.");
+        report.Check(dockLoadoutDefaultsWork,
+            "Development dock creates persistent fast-hull default loadout selections and can cycle the selected main weapon before launching core combat.");
         report.Check(quickRawRewardsVary,
-            "A mining starter ship returns concrete ore from randomized quick sorties instead of the same fixed reward every run.");
-        report.Check(dockResultWindowWorks,
-            "Dock sortie result window opens for quick and ordinary missions and refreshes its concrete FE/reward report: "
-            + quickDockResultWindowText + " / " + secondQuickDockResultWindowText + " / " + ordinaryDockResultWindowText + ".");
-        report.Check(ordinaryDockMissionWorks,
-            "Dock ordinary mission list can launch a selected generated mission and applies the material/intangible result: " + ordinaryDockRewardText + ".");
+            "The internal starter economy simulation still returns concrete randomized quick-sortie rewards instead of the same fixed reward every run.");
         report.Check(starterPortLoopWorks,
-            "Starter port loop works end-to-end: quick sorties bring raw ore, refinery turns it into processed minerals, courier delivery grants Freight/mastery XP, and a paid R2 ship can be bought from the earned economy path.");
+            "Starter port loop works end-to-end: quick sorties bring raw ore, refinery turns it into processed minerals, courier delivery grants Freight/mastery XP, and an R2 dock ship can be bought after the economy path.");
         report.Check(coreCombatDockLaunchWorks,
             "Dock battle launch starts a real Core Tactical sortie from the selected dock ship, enters Flight mode and consumes one dock sortie.");
+        report.Check(coreCombatRuntimeShipWorks,
+            coreCombatRuntimeShipWorks
+                    ? "Dock battle launch builds the actual active Korshun player ship from the selected fast hull, starts in full-speed 365 m/s slip toward the center fly-through, keeps live infinite package weapons, and has no phantom MSL group."
+                : "Dock battle launch built a broken active player ship: " + coreCombatRuntimeShipDetails);
+        report.Check(coreCombatMagnetLoadoutVisualsWork,
+            coreCombatMagnetLoadoutVisualsWork
+                ? "Dock battle launch applies the selected Korshun auxiliary visuals in combat: magnet loadout mounts two magnets and hides default torpedo launchers. " + coreCombatMagnetLoadoutVisualDetails
+                : "Dock battle launch must apply the selected Korshun auxiliary visuals in combat instead of leaving torpedo visuals on a magnet loadout. " + coreCombatMagnetLoadoutVisualDetails);
+        report.Check(coreCombatCommandProjectionWorks,
+            coreCombatCommandProjectionWorks
+                ? "Dock battle launch live Core Tactical camera projects simulated RMB clicks back onto the clicked screen pixels: " + coreCombatCommandProjectionDetails
+                : "Dock battle launch live Core Tactical camera must project simulated RMB clicks back onto the clicked screen pixels: " + coreCombatCommandProjectionDetails);
+        report.Check(coreCombatMagnetIdleBeamSuppressed,
+            coreCombatMagnetIdleBeamSuppressed
+                ? "Dock battle launch keeps magnet beams event-driven: no idle Magnet auxiliary beam emitter is installed before a fragment is actually being delivered."
+                : "Dock battle launch must not draw idle magnet beams when no ore fragment is being delivered: " + coreCombatMagnetIdleBeamDetails);
         bool cameraHomeButtonStartsBlend = island.OffsetCityCameraForTests(-3f, 2f, -11f, 3f, 1.2f)
             && baseHud != null
             && baseHud.PressMetaProjectCameraButtonForTests()
@@ -5214,48 +6512,58 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         bool knowledgeSpModelWorks = false;
         if (runtimeMeta != null && runtimeMeta.progress != null && runtimeMeta.SessionConfig != null)
         {
-            TechnologyConfig knowledge = runtimeMeta.SessionConfig.GetTechnology("tech_base_storehouse_ledgers");
-            PortStorageState knowledgeStorage = runtimeMeta.GetCapitalStorageState();
-            if (knowledge != null && knowledgeStorage != null)
+            PlayerProgress knowledgeSnapshot = runtimeMeta.CreateProgressSnapshot();
+            try
             {
-                for (int i = 0; i < knowledge.cycleCost.Count; i++)
+                runtimeMeta.ReplaceProgress(new PlayerProgress());
+                runtimeMeta.EnsureProgressInitialized();
+                TechnologyConfig knowledge = runtimeMeta.SessionConfig.GetTechnology("tech_base_storehouse_ledgers");
+                PortStorageState knowledgeStorage = runtimeMeta.GetCapitalStorageState();
+                if (knowledge != null && knowledgeStorage != null)
                 {
-                    TechnologyCostConfig cost = knowledge.cycleCost[i];
-                    if (cost == null || string.IsNullOrWhiteSpace(cost.itemId)) continue;
-                    knowledgeStorage.AddResource(cost.itemId, Mathf.Max(0, cost.amount));
+                    for (int i = 0; i < knowledge.cycleCost.Count; i++)
+                    {
+                        TechnologyCostConfig cost = knowledge.cycleCost[i];
+                        if (cost == null || string.IsNullOrWhiteSpace(cost.itemId)) continue;
+                        knowledgeStorage.AddResource(cost.itemId, Mathf.Max(0, cost.amount));
+                    }
+
+                    long knowledgeStartTicks = DateTime.UtcNow.Ticks;
+                    runtimeMeta.progress.lastProcessUtcTicks = knowledgeStartTicks;
+                    bool selectedKnowledge = runtimeMeta.TrySelectResearchTechnology(knowledge.id);
+                    TechnologyResearchProgress selectedState = runtimeMeta.GetTechnologyResearchProgress(knowledge.id);
+                    bool requirementsPaidOnSelect = selectedState != null && selectedState.currentLevelRequirementsPaid;
+                    int progressedEvents = runtimeMeta.AdvanceRealTimeProcesses(new DateTime(knowledgeStartTicks, DateTimeKind.Utc).AddMinutes(10));
+                    TechnologyResearchProgress progressedState = runtimeMeta.GetTechnologyResearchProgress(knowledge.id);
+                    float archiveSpProgress = progressedState != null ? progressedState.currentLevelSpProgress : 0f;
+                    runtimeMeta.GrantKnowledgeSpPackage("big_test_base_sp", "category", "base", 50000);
+                    bool packageApplied = runtimeMeta.TryApplyKnowledgeSpPackage(
+                        "big_test_base_sp",
+                        knowledge.id,
+                        out int appliedSp,
+                        out int burnedSp,
+                        out string packageReason);
+                    bool bookUnlocked = runtimeMeta.UnlockKnowledgeFromBook("tech_base_queue_dispatch", out string bookReason)
+                        && runtimeMeta.progress.IsKnowledgeUnlocked("tech_base_queue_dispatch");
+
+                    knowledgeSpModelWorks = selectedKnowledge
+                        && selectedState != null
+                        && requirementsPaidOnSelect
+                        && progressedEvents > 0
+                        && archiveSpProgress >= 29f
+                        && archiveSpProgress < runtimeMeta.GetTechnologyLevelSpCost(knowledge, 1)
+                        && packageApplied
+                        && appliedSp > 0
+                        && burnedSp > 40000
+                        && runtimeMeta.GetTechnologyCompletedLevel(knowledge) == 1
+                        && bookUnlocked
+                        && !string.IsNullOrWhiteSpace(packageReason)
+                        && !string.IsNullOrWhiteSpace(bookReason);
                 }
-
-                long knowledgeStartTicks = DateTime.UtcNow.Ticks;
-                runtimeMeta.progress.lastProcessUtcTicks = knowledgeStartTicks;
-                bool selectedKnowledge = runtimeMeta.TrySelectResearchTechnology(knowledge.id);
-                TechnologyResearchProgress selectedState = runtimeMeta.GetTechnologyResearchProgress(knowledge.id);
-                bool requirementsPaidOnSelect = selectedState != null && selectedState.currentLevelRequirementsPaid;
-                int progressedEvents = runtimeMeta.AdvanceRealTimeProcesses(new DateTime(knowledgeStartTicks, DateTimeKind.Utc).AddMinutes(10));
-                TechnologyResearchProgress progressedState = runtimeMeta.GetTechnologyResearchProgress(knowledge.id);
-                float archiveSpProgress = progressedState != null ? progressedState.currentLevelSpProgress : 0f;
-                runtimeMeta.GrantKnowledgeSpPackage("big_test_base_sp", "category", "base", 50000);
-                bool packageApplied = runtimeMeta.TryApplyKnowledgeSpPackage(
-                    "big_test_base_sp",
-                    knowledge.id,
-                    out int appliedSp,
-                    out int burnedSp,
-                    out string packageReason);
-                bool bookUnlocked = runtimeMeta.UnlockKnowledgeFromBook("tech_base_queue_dispatch", out string bookReason)
-                    && runtimeMeta.progress.IsKnowledgeUnlocked("tech_base_queue_dispatch");
-
-                knowledgeSpModelWorks = selectedKnowledge
-                    && selectedState != null
-                    && requirementsPaidOnSelect
-                    && progressedEvents > 0
-                    && archiveSpProgress >= 29f
-                    && archiveSpProgress < runtimeMeta.GetTechnologyLevelSpCost(knowledge, 1)
-                    && packageApplied
-                    && appliedSp > 0
-                    && burnedSp > 40000
-                    && runtimeMeta.GetTechnologyCompletedLevel(knowledge) == 1
-                    && bookUnlocked
-                    && !string.IsNullOrWhiteSpace(packageReason)
-                    && !string.IsNullOrWhiteSpace(bookReason);
+            }
+            finally
+            {
+                runtimeMeta.ReplaceProgress(knowledgeSnapshot);
             }
         }
 
@@ -5810,13 +7118,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             bool oreGateBelowThresholdOpen = runtimeMeta.CanPassFactionGateForUpgrade("processing:ore", 4, out _);
             IReadOnlyList<FactionMarketItemOffer> stoneMarketBefore = runtimeMeta.GetFactionMarketOffers("stone_vault");
             FactionMarketItemOffer lockedGrateBefore = FindFactionMarketOfferForBigTest(stoneMarketBefore, "stone_throat_grate");
-            FactionMarketItemOffer stoneLicenseBefore = FindFactionMarketOfferForBigTest(stoneMarketBefore, "stone_vault_flagship_license");
             bool factionMarketStartsLocked = lockedGrateBefore != null
                 && !lockedGrateBefore.unlocked
-                && string.Equals(lockedGrateBefore.currencyItemId, "gems", StringComparison.OrdinalIgnoreCase)
-                && stoneLicenseBefore != null
-                && string.Equals(stoneLicenseBefore.currencyItemId, "solid", StringComparison.OrdinalIgnoreCase)
-                && stoneLicenseBefore.priceAmount == 700;
+                && string.Equals(lockedGrateBefore.currencyItemId, "gems", StringComparison.OrdinalIgnoreCase);
 
             IReadOnlyList<FactionDailyTaskOffer> stoneDaily = runtimeMeta.GetFactionDailyTasks("stone_vault");
             bool stoneDailyReady = stoneDaily != null && stoneDaily.Count == 5;
@@ -5883,7 +7187,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             report.Check(initialBoardReady
                     && completedCount >= 19
                     && claimedCount >= 19,
-                "Quest runtime accepts the starter task board, retroactively completes owned-resource tasks and can finish every seed quest after Cruiser203 cleanup: completed="
+                "Quest runtime accepts the starter task board, retroactively completes owned-resource tasks and can finish every seed quest after ship-roster cleanup: completed="
                 + completedCount + ", claimed=" + claimedCount + ".");
             report.Check(fromAcceptBeforeComplete
                     && fromAcceptCompletesAtDelta
@@ -5907,7 +7211,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                     && oreGateBlockedInitially
                     && oreGateBelowThresholdOpen
                     && factionMarketStartsLocked,
-                "Faction runtime exposes six factions, five reputation thresholds, locked market offers, Solid-priced R10 licenses and building gates.");
+                "Faction runtime exposes six factions, five reputation thresholds, locked market offers and building gates.");
             report.Check(stoneDailyReady && dailyEconomyValid,
                 "Faction daily tasks generate five deterministic jobs per faction and completing one spends cargo, pays faction currency, mastery and +50 reputation once.");
             report.Check(stoneCampaignPrefixClaimed
@@ -6030,7 +7334,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             return false;
         }
 
-        return sceneText.Contains("m_Name: Session Scene Objects")
+        return !sceneText.Contains("m_Name: Session Data - Sortie Runtime")
             && !sceneText.Contains("Port -")
             && !sceneText.Contains("Resource Field -")
             && !sceneText.Contains("Capital Port Proxy - Greenhaven")
@@ -6444,19 +7748,19 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 "Core sortie preparation needs no coal or claudium refuel; built-in ship systems are ready: "
                 + noConsumableSortieMessage);
 
-            bool pioneerAssemblyBuilt = ShipAssemblyBuilder.TryBuild(loadedMeta.CurrentCatalog, progress, out ShipAssemblyResult pioneerAssembly);
-            float pioneerStarterPayloadKg = loadedMeta.startingFuelKg + loadedMeta.startingClaudiumKg + 25f;
-            string pioneerFlightEnvelope = "assembly did not build.";
-            bool pioneerFlightEnvelopeOk = pioneerAssemblyBuilt
-                && HasStablePioneerFlightEnvelope(
-                    pioneerAssembly,
-                    pioneerStarterPayloadKg,
+            bool baseShipAssemblyBuilt = ShipAssemblyBuilder.TryBuild(loadedMeta.CurrentCatalog, progress, out ShipAssemblyResult baseShipAssembly);
+            float baseShipStarterPayloadKg = loadedMeta.startingFuelKg + loadedMeta.startingClaudiumKg + 25f;
+            string baseShipFlightEnvelope = "assembly did not build.";
+            bool baseShipFlightEnvelopeOk = baseShipAssemblyBuilt
+                && HasStableBaseShipFlightEnvelope(
+                    baseShipAssembly,
+                    baseShipStarterPayloadKg,
                     0.5f,
                     12f,
-                    out pioneerFlightEnvelope);
-            report.Check(pioneerFlightEnvelopeOk,
-                "Starter Pioneer recovery has enough lift, hull thrust, and speed for a starter ore sortie: "
-                + pioneerFlightEnvelope);
+                    out baseShipFlightEnvelope);
+            report.Check(baseShipFlightEnvelopeOk,
+                "Base ship recovery has enough lift, hull thrust, and speed for an ore sortie: "
+                + baseShipFlightEnvelope);
         }
         else
         {
@@ -6724,21 +8028,33 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && Approximately(entryShip.ClaudiumSlipstreamCharge01, 1f, 0.001f)
             && entryControls != null
             && entryControls.ManualThrustNotch == 5
-            && !entryShip.headingHold
-            && !entryShip.altitudeHold;
+            && !entryShip.StrategicStopCommand;
+        string sortieEntryDetails =
+            "distance=" + entryDistance.ToString("0.###", CultureInfo.InvariantCulture)
+            + ", radius=" + zone.radiusMeters.ToString("0.###", CultureInfo.InvariantCulture)
+            + ", expectedOffset=" + expectedEntryOffset.ToString("0.###", CultureInfo.InvariantCulture)
+            + ", speed=" + entrySpeed.ToString("0.###", CultureInfo.InvariantCulture)
+            + ", expectedSpeed=" + expectedEntrySpeed.ToString("0.###", CultureInfo.InvariantCulture)
+            + ", inwardVelocityDot=" + inwardVelocityDot.ToString("0.###", CultureInfo.InvariantCulture)
+            + ", inwardFacingDot=" + inwardFacingDot.ToString("0.###", CultureInfo.InvariantCulture)
+            + ", slip=" + (entryShip != null && entryShip.claudiumSlipstreamEnabled).ToString()
+            + ", charge=" + (entryShip != null ? entryShip.ClaudiumSlipstreamCharge01.ToString("0.###", CultureInfo.InvariantCulture) : "n/a")
+            + ", notch=" + (entryControls != null ? entryControls.ManualThrustNotch.ToString(CultureInfo.InvariantCulture) : "n/a")
+            + ", stop=" + (entryShip != null && entryShip.StrategicStopCommand).ToString();
         report.Check(sortieEntryApproachReady,
-            "Sortie entry starts 20 seconds outside the zone edge at the sustainable full-slipstream max speed, full claudium slipstream, and no autopilot handoff.");
+            sortieEntryApproachReady
+                ? "Sortie entry starts 20 seconds outside the zone edge at the sustainable full-slipstream max speed, full claudium slipstream, and no autopilot handoff."
+                : "Sortie entry must start 20 seconds outside the zone edge at full-slipstream speed: " + sortieEntryDetails);
         report.Check(Mathf.Sqrt(HorizontalSqrDistance(entryPosition, baseDockPosition)) >= SessionExtractionConstants.DefaultSortiePocketMinimumDockSeparationMeters,
             "Started sortie ship is placed in the isolated session pocket, not under or near the port.");
 
         locationIsolation = SortieLocationIsolationController.EnsureForLoadedGameplayScene();
         locationIsolation?.RefreshNow();
         bool portPocketHiddenDuringSortie = locationIsolation != null
-            && locationIsolation.TargetCount > 0
             && locationIsolation.IsIsolationApplied
             && GameObject.Find(SortieLocationIsolationController.SessionSceneObjectsRootName) == null;
         report.Check(portPocketHiddenDuringSortie,
-            "Active sortie hides the port/open-world scene pocket so the sortie is surrounded only by empty session space.");
+            "Active sortie hides or omits the port/open-world scene pocket so the sortie is surrounded only by empty session space.");
 
         int wrongResourceBeforeRuntimeActiveSortie = progress.GetShipCargoAmount(SessionExtractionConstants.StarterAirframeKitItemId);
         bool runtimeWrongResourceDuringSortieBlocked = !loadedMeta.TryAddShipCargoFromRuntime(
@@ -6779,6 +8095,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         PortStorageState baseStorageBeforeExtraction = loadedMeta.GetCapitalStorageState();
         int baseOreBeforeExtraction = baseStorageBeforeExtraction != null ? baseStorageBeforeExtraction.GetResourceAmount("windshale_ore") : 0;
         int sortieOreBeforeExtraction = progress.GetShipCargoAmount("windshale_ore");
+        LowGradeOreStackState baseLowGradeBefore = baseStorageBeforeExtraction != null ? baseStorageBeforeExtraction.GetLowGradeOreStack("windshale_ore", false) : null;
+        float baseLowGradeRawBefore = baseLowGradeBefore != null ? baseLowGradeBefore.rawMassKg : 0f;
+        float baseLowGradeUsefulBefore = baseLowGradeBefore != null ? baseLowGradeBefore.usefulOreKg : 0f;
+        if (baseStorageBeforeExtraction != null)
+        {
+            baseStorageBeforeExtraction.AddLowGradeOre("windshale_ore", 1000f, 80f, "Windshale");
+        }
+
+        progress.AddShipLowGradeOreCargo("windshale_ore", 120f, 24f, "Windshale");
 
         progress.shipFuelTank.SetResource("charcoal");
         progress.shipClaudiumTank.SetResource("claudium");
@@ -6796,7 +8121,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && !extractedWithoutRunup
             && loadedMeta.HasActiveSortie
             && loadedMeta.CurrentMode == GameSessionMode.Flight,
-            "Boundary extraction ignores empty coal and claudium tanks, but still waits for the slip exit runup: " + noRunupMessage);
+            "Boundary extraction ignores empty coal and claudium tanks, but still waits for the 5-second outside-circle hold: " + noRunupMessage);
 
         Vector3 screenshotReserveOutward = new Vector3(
             boundaryPosition.x - zone.centerPosition.x,
@@ -6808,15 +8133,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             screenshotReserveOutward * 48f,
             screenshotReserveOutward,
             0.25f,
-            true);
+            false);
         bool screenshotReserveStartsTimer = progress.activeSortie.extractionRunupSeconds > 0f
-            && loadedMeta.ActiveSortieExtractionRunupStatus.Contains("Slip charging");
+            && loadedMeta.ActiveSortieExtractionRunupStatus.Contains("Exit holding");
         report.Check(screenshotReserveEstimate.hasEnoughCoal
             && screenshotReserveEstimate.hasEnoughClaudium
             && Approximately(screenshotReserveEstimate.requiredCoalKg, 0f, 0.001f)
             && Approximately(screenshotReserveEstimate.requiredClaudiumKg, 0f, 0.001f)
             && screenshotReserveStartsTimer,
-            "Safe ore extraction starts the slip timer at the boundary without coal or claudium reserves.");
+            "Safe ore extraction starts the outside-circle timer without coal, claudium, or slipstream.");
 
         progress.activeSortie.ResetExtractionRunup();
         progress.shipFuelTank.TrySpend("charcoal", progress.shipFuelTank.GetAmount("charcoal"));
@@ -6829,15 +8154,23 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         MoveSessionShip(loadedSession, progress, stormBoundaryPosition);
         SortieReturnEstimate estimateInStorm = loadedMeta.GetActiveSortieReturnEstimate();
         bool extractedFromStorm = loadedMeta.TryExtractActiveSortie(out string stormBlockMessage);
+        bool stormLayerStillCountsOutsideCircle = loadedMeta.RecordActiveSortieExtractionRunup(
+            stormBoundaryPosition,
+            Vector3.zero,
+            Vector3.left,
+            0.25f,
+            false);
         report.Check(!estimateInStorm.canExtract
             && estimateInStorm.isNearBoundary
             && !estimateInStorm.isAboveStorm
             && estimateInStorm.hasEnoughCoal
             && estimateInStorm.hasEnoughClaudium
             && !extractedFromStorm
+            && !stormLayerStillCountsOutsideCircle
+            && progress.activeSortie.extractionRunupSeconds > 0f
             && loadedMeta.HasActiveSortie
             && loadedMeta.CurrentMode == GameSessionMode.Flight,
-            "Boundary extraction is blocked inside the storm layer even though return costs are zero: " + stormBlockMessage);
+            "Boundary extraction does not care about the storm layer; outside-circle hold still starts there, but extraction waits for the full hold: " + stormBlockMessage);
 
         Vector3 centerPosition = new Vector3(
             zone.centerPosition.x,
@@ -6866,7 +8199,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && !extractedAwayFromBoundary
             && loadedMeta.HasActiveSortie
             && loadedMeta.CurrentMode == GameSessionMode.Flight,
-            "Extraction is blocked until the ship leaves the sortie cylinder: " + boundaryBlockMessage);
+            "Extraction is blocked until the ship leaves the mission circle: " + boundaryBlockMessage);
 
         bool legacyDockDuringSortie = loadedMeta.DockAt(capitalId);
         report.Check(!legacyDockDuringSortie
@@ -6899,7 +8232,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && !extractedBeforeRunup
             && loadedMeta.HasActiveSortie
             && loadedMeta.CurrentMode == GameSessionMode.Flight,
-            "Boundary extraction requires 12 seconds of claudium slipstream movement toward base before the march return: " + runupBlockMessage);
+            "Boundary extraction requires 5 seconds outside the mission circle before the instant home return: " + runupBlockMessage);
 
         Vector3 outwardForForwardRunup = new Vector3(
             boundaryPosition.x - zone.centerPosition.x,
@@ -6907,16 +8240,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             boundaryPosition.z - zone.centerPosition.z).normalized;
         bool forwardAimedRunup = loadedMeta.RecordActiveSortieExtractionRunup(
             boundaryPosition,
-            Vector3.Cross(Vector3.up, outwardForForwardRunup).normalized * 20f,
-            outwardForForwardRunup,
+            Vector3.zero,
+            Vector3.Cross(Vector3.up, outwardForForwardRunup).normalized,
             zone.extractionRunupRequiredSeconds + 0.25f,
-            true);
+            false);
         SortieReturnEstimate forwardAimedEstimate = loadedMeta.GetActiveSortieReturnEstimate();
         report.Check(forwardAimedRunup
             && forwardAimedEstimate.hasExtractionRunup
             && loadedMeta.HasActiveSortie
-            && loadedMeta.ActiveSortieExtractionRunupStatus.Contains("Slip ready"),
-            "Claudium slipstream exit timer accepts a ship aimed at the base marker, but waits for the Extract home button instead of auto-teleporting.");
+            && loadedMeta.ActiveSortieExtractionRunupStatus.Contains("Exit ready"),
+            "Outside-circle exit timer accepts a stationary non-slip ship; after 5 seconds it waits for the Extract home button instead of auto-teleporting.");
         progress.activeSortie.ResetExtractionRunup();
 
         if (loadedSession != null && loadedSession.PlayerShipRoot != null)
@@ -6937,7 +8270,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         ShipPhysics loadedShipForRunup = loadedMeta.shipLoader != null ? loadedMeta.shipLoader.targetShip : null;
         if (loadedShipForRunup != null)
         {
-            loadedShipForRunup.claudiumSlipstreamEnabled = true;
+            loadedShipForRunup.claudiumSlipstreamEnabled = false;
             loadedShipForRunup.claudiumSlipstreamCharge01 = 1f;
         }
 
@@ -6946,8 +8279,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         SortieReturnEstimate metaRunupTickerEstimate = loadedMeta.GetActiveSortieReturnEstimate();
         report.Check(metaRunupTickerInvoked
             && metaRunupTickerEstimate.extractionRunupSeconds > 0f
-            && loadedMeta.ActiveSortieExtractionRunupStatus.Contains("Slip charging"),
-            "MetaGameState owns the live claudium slipstream exit timer instead of relying on the visual boundary controller.");
+            && loadedMeta.ActiveSortieExtractionRunupStatus.Contains("Exit holding"),
+            "MetaGameState owns the live outside-circle exit timer instead of relying on slipstream or the visual boundary controller.");
         progress.activeSortie.ResetExtractionRunup();
 
         PrimeActiveSortieExtractionRunup(loadedMeta, progress);
@@ -6956,7 +8289,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && estimateReady.hasExtractionRunup
             && Approximately(estimateReady.requiredCoalKg, 0f, 0.001f)
             && Approximately(estimateReady.requiredClaudiumKg, 0f, 0.001f),
-            "Boundary extraction has zero coal and claudium return cost after the slip exit run.");
+            "Boundary extraction has zero coal and claudium return cost after the 5-second outside-circle hold.");
         float coalBeforeExtraction = progress.shipFuelTank.GetAmount("charcoal");
         float claudiumBeforeExtraction = progress.shipClaudiumTank.GetAmount("claudium");
 
@@ -6971,9 +8304,9 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         locationIsolation?.RefreshNow();
         bool portPocketRestoredAfterExtraction = locationIsolation != null
             && !locationIsolation.IsIsolationApplied
-            && GameObject.Find(SortieLocationIsolationController.SessionSceneObjectsRootName) != null;
+            && (locationIsolation.TargetCount == 0 || GameObject.Find(SortieLocationIsolationController.SessionSceneObjectsRootName) != null);
         report.Check(extracted && portPocketRestoredAfterExtraction,
-            "Returning from a sortie restores the port scene pocket only after the Extract home transition.");
+            "Returning from a sortie restores the port scene pocket only after the Extract home transition when that pocket exists.");
         report.Check(extracted
             && Approximately(
                 progress.shipFuelTank.GetAmount("charcoal"),
@@ -6986,6 +8319,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             "Boundary extraction returns home without consuming coal or claudium reserves.");
         report.Check(baseStorage != null && baseStorage.GetResourceAmount("windshale_ore") >= baseOreBeforeExtraction + sortieOreBeforeExtraction,
             "Extracted sortie ore is stored at the base.");
+        LowGradeOreStackState extractedLowGradeOre = baseStorage != null ? baseStorage.GetLowGradeOreStack("windshale_ore", false) : null;
+        float expectedLowGradeRaw = baseLowGradeRawBefore + 1120f;
+        float expectedLowGradeUseful = baseLowGradeUsefulBefore + 104f;
+        report.Check(extractedLowGradeOre != null
+            && Approximately(extractedLowGradeOre.rawMassKg, expectedLowGradeRaw, 0.001f)
+            && Approximately(extractedLowGradeOre.usefulOreKg, expectedLowGradeUseful, 0.001f)
+            && Approximately(extractedLowGradeOre.UsefulConcentration01, expectedLowGradeUseful / expectedLowGradeRaw, 0.0001f)
+            && (progress.shipLowGradeOreCargo == null || progress.shipLowGradeOreCargo.Count == 0),
+            "Extracted low-grade ore concentrate is stored at the base and blends by raw/useful mass.");
         if (baseStorage == null)
         {
             return;
@@ -7002,6 +8344,25 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && oreBatchFacility.totalProcessedUnits > 0f
             && oreBatchFacility.outputBuffers.Count > 0,
             "Base ore processing consumes a cycle and stores fractional mineral output buffers: " + processingMessage);
+
+        List<string> oreItemIdsForLowGradeProbe = GetOreItemIdsForBigTest(loadedMeta.SessionConfig);
+        for (int i = 0; i < oreItemIdsForLowGradeProbe.Count; i++)
+        {
+            baseStorage.SetResourceAmount(oreItemIdsForLowGradeProbe[i], 0);
+        }
+
+        baseStorage.AddLowGradeOre("windshale_ore", 100f, 22f, "Windshale");
+        LowGradeOreStackState lowGradeBeforeProcessing = baseStorage.GetLowGradeOreStack("windshale_ore", false);
+        float lowGradeRawBeforeProcessing = lowGradeBeforeProcessing != null ? lowGradeBeforeProcessing.rawMassKg : 0f;
+        float oreProcessedBeforeLowGrade = oreBatchFacility.totalProcessedUnits;
+        bool lowGradeOreProcessed = loadedMeta.TryProcessBaseBatch(BaseProcessingBranch.Ore, out string lowGradeProcessingMessage);
+        LowGradeOreStackState lowGradeAfterProcessing = baseStorage.GetLowGradeOreStack("windshale_ore", false);
+        float lowGradeRawAfterProcessing = lowGradeAfterProcessing != null ? lowGradeAfterProcessing.rawMassKg : 0f;
+        report.Check(lowGradeOreProcessed
+            && lowGradeRawAfterProcessing < lowGradeRawBeforeProcessing
+            && oreBatchFacility.totalProcessedUnits > oreProcessedBeforeLowGrade
+            && lowGradeProcessingMessage.Contains("low-grade"),
+            "Base ore processing can consume low-grade concentrate by raw mass while mineral output is limited by useful concentration: " + lowGradeProcessingMessage);
 
         bool gasProcessed = loadedMeta.TryProcessBaseBatch(BaseProcessingBranch.Gas, out string gasMessage);
         BaseProcessingFacilityState gasBatchFacility = loadedMeta.GetBaseProcessingFacilityState("legacy_batch_" + BaseProcessingBranch.Gas, BaseProcessingBranch.Gas, 1);
@@ -7031,10 +8392,11 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         bool leviathanLoaded = loadedMeta.TryLoadBaseProcessingInput("butchery", BaseProcessingBranch.LeviathanProcessing, 5, "windcalf_carcass", 45, out string leviathanLoadMessage);
         long processingStartTicks = Math.Max(DateTime.UtcNow.Ticks, progress.lastProcessUtcTicks);
         progress.lastProcessUtcTicks = processingStartTicks;
-        int advancedProcessingCycles = loadedMeta.AdvanceRealTimeProcesses(new DateTime(processingStartTicks, DateTimeKind.Utc).AddSeconds(31));
+        double leviathanProcessingSeconds = CalculateTimedProcessingSecondsToProcessUnits(butcheryFacility, 45);
+        int advancedProcessingCycles = loadedMeta.AdvanceRealTimeProcesses(new DateTime(processingStartTicks, DateTimeKind.Utc).AddSeconds(leviathanProcessingSeconds));
         BaseProcessingOutputBufferState fatBufferBeforeCollect = butcheryFacility.GetOutputBuffer(SessionExtractionConstants.LeviathanFatItemId, false);
         bool leviathanBuffered = leviathanLoaded
-            && advancedProcessingCycles >= 3
+            && advancedProcessingCycles >= 45
             && baseStorage.GetResourceAmount("windcalf_carcass") == carcassBeforeLoad - 45
             && butcheryFacility.BunkerLoadUnits == 0
             && baseStorage.GetResourceAmount(SessionExtractionConstants.LeviathanFatItemId) == leviathanFatBefore
@@ -7372,21 +8734,21 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && progress.GetInstalledModule(SessionExtractionConstants.StarterLowSlotId) == SessionExtractionConstants.StarterCargoRackModuleId,
             "The first fitting upgrade consumes the kit and installs into a Low slot: " + upgradeMessage);
 
-        bool fittedPioneerAssemblyBuilt = ShipAssemblyBuilder.TryBuild(loadedMeta.CurrentCatalog, progress, out ShipAssemblyResult fittedPioneerAssembly);
-        float fittedPioneerPayloadKg = loadedMeta.startingFuelKg + loadedMeta.startingClaudiumKg + 250f;
-        string fittedPioneerFlightEnvelope = "assembly did not build.";
-        bool fittedPioneerFlightEnvelopeOk = fittedPioneerAssemblyBuilt
-            && fittedPioneerAssembly.hull != null
-            && fittedPioneerAssembly.hull.partId == GameplaySessionAccountData.DefaultStarterHullId
-            && HasStablePioneerFlightEnvelope(
-                fittedPioneerAssembly,
-                fittedPioneerPayloadKg,
+        bool fittedBaseShipAssemblyBuilt = ShipAssemblyBuilder.TryBuild(loadedMeta.CurrentCatalog, progress, out ShipAssemblyResult fittedBaseShipAssembly);
+        float fittedBaseShipPayloadKg = loadedMeta.startingFuelKg + loadedMeta.startingClaudiumKg + 250f;
+        string fittedBaseShipFlightEnvelope = "assembly did not build.";
+        bool fittedBaseShipFlightEnvelopeOk = fittedBaseShipAssemblyBuilt
+            && fittedBaseShipAssembly.hull != null
+            && fittedBaseShipAssembly.hull.partId == GameplaySessionAccountData.DefaultStarterHullId
+            && HasStableBaseShipFlightEnvelope(
+                fittedBaseShipAssembly,
+                fittedBaseShipPayloadKg,
                 0.5f,
                 12f,
-                out fittedPioneerFlightEnvelope);
-        report.Check(fittedPioneerFlightEnvelopeOk,
-            "Fully fitted Pioneer still has enough lift and hull thrust to fly instead of falling: "
-            + fittedPioneerFlightEnvelope);
+                out fittedBaseShipFlightEnvelope);
+        report.Check(fittedBaseShipFlightEnvelopeOk,
+            "Fully fitted base ship still has enough lift and hull thrust to fly instead of falling: "
+            + fittedBaseShipFlightEnvelope);
 
         string fittingSummary = loadedMeta.GetCoreFittingSummaryText();
         string fittingCompact = loadedMeta.GetCoreFittingCompactText();
@@ -7439,7 +8801,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             && string.IsNullOrWhiteSpace(progress.GetInstalledModule(SessionExtractionConstants.StarterLowSlotId))
             && Approximately(progress.shipFuelTank.GetAmount("charcoal"), loadedMeta.startingFuelKg, 0.001f)
             && Approximately(progress.shipClaudiumTank.GetAmount("claudium"), loadedMeta.startingClaudiumKg, 0.001f),
-            "Sortie ship loss returns to base, deletes sortie loot, clears optional upgrades, restores Pioneer hull, and resets only internal recovery reserves.");
+            "Sortie ship loss returns to base, deletes sortie loot, clears optional upgrades, restores the base hull, and resets only internal recovery reserves.");
 
         baseStorage = loadedMeta.GetCapitalStorageState();
         if (baseStorage != null)
@@ -7452,17 +8814,17 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         progress.shipFuelTank.TrySpend("charcoal", progress.shipFuelTank.GetAmount("charcoal"));
         progress.shipClaudiumTank.TrySpend("claudium", progress.shipClaudiumTank.GetAmount("claudium"));
         SyncTestShipConsumables(loadedSession, progress);
-        bool pioneerRefuelReady = loadedMeta.CanRefuelBaseShip(out string pioneerRefuelReadyMessage);
-        bool pioneerRefueled = loadedMeta.TryRefuelBaseShip(out string pioneerRefuelMessage);
-        report.Check(!pioneerRefuelReady
-            && !pioneerRefueled
+        bool baseShipRefuelReady = loadedMeta.CanRefuelBaseShip(out string baseShipRefuelReadyMessage);
+        bool baseShipRefueled = loadedMeta.TryRefuelBaseShip(out string baseShipRefuelMessage);
+        report.Check(!baseShipRefuelReady
+            && !baseShipRefueled
             && baseStorage != null
             && baseStorage.GetResourceAmount("charcoal") == 0
             && baseStorage.GetResourceAmount("claudium") == 0
             && progress.shipFuelTank.GetAmount("charcoal") <= 0.001f
             && progress.shipClaudiumTank.GetAmount("claudium") <= 0.001f,
             "Base refuel is retired; missing coal and claudium never block or trigger a sortie preparation action: "
-            + pioneerRefuelReadyMessage + " / " + pioneerRefuelMessage);
+            + baseShipRefuelReadyMessage + " / " + baseShipRefuelMessage);
     }
 
     private static bool RunTimedProcessingFacilityForBigTest(
@@ -7495,8 +8857,8 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
         long startTicks = Math.Max(DateTime.UtcNow.Ticks, progress.lastProcessUtcTicks);
         progress.lastProcessUtcTicks = startTicks;
-        int expectedCycles = Mathf.CeilToInt(amount / (float)Mathf.Max(1, facility.cycleInputUnits));
-        double secondsToComplete = Math.Ceiling(Math.Max(1d, expectedCycles * facility.cycleDurationSeconds)) + 1d;
+        int expectedProcessedUnits = amount;
+        double secondsToComplete = CalculateTimedProcessingSecondsToProcessUnits(facility, amount);
         int completedEvents = loaded
             ? meta.AdvanceRealTimeProcesses(new DateTime(startTicks, DateTimeKind.Utc).AddSeconds(secondsToComplete))
             : 0;
@@ -7534,19 +8896,30 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         bool bunkerEmpty = facility.BunkerLoadUnits == 0;
         message = SessionExtractionIndustry.GetProcessingDisplayName(branch)
             + " loaded " + amount
-            + ", cycles " + expectedCycles
+            + ", expected processed units " + expectedProcessedUnits
             + ", completed events " + completedEvents
             + ", ready " + readyTotal
             + " / " + loadMessage + " / " + collectMessage;
 
         return loaded
             && inputSpent
-            && completedEvents >= expectedCycles
+            && completedEvents >= expectedProcessedUnits
             && bunkerEmpty
             && readyTotal > 0
             && collected
             && outputsExact
             && buffersCleared;
+    }
+
+    private static double CalculateTimedProcessingSecondsToProcessUnits(BaseProcessingFacilityState facility, int units)
+    {
+        if (facility == null || units <= 0)
+        {
+            return 1d;
+        }
+
+        float unitsPerMinute = Mathf.Max(0.1f, facility.processingUnitsPerMinute);
+        return Math.Ceiling(units * 60d / unitsPerMinute) + 2d;
     }
 
     private static bool QueueAndCompleteCascadeOrderForBigTest(
@@ -7851,7 +9224,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             outward * speed,
             outward,
             zone.extractionRunupRequiredSeconds + 0.25f,
-            true);
+            false);
     }
 
     private static void ValidateStarterResourceCacheSortie(
@@ -7951,7 +9324,7 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         return false;
     }
 
-    private static bool HasStablePioneerFlightEnvelope(
+    private static bool HasStableBaseShipFlightEnvelope(
         ShipAssemblyResult assembly,
         float payloadKg,
         float minHorizontalAccelerationMS2,
@@ -7972,35 +9345,21 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         float allowedTakeoffMassKg = Mathf.Min(claudiumMaxLiftKg, hullLimitKg);
         float hullForwardThrustKgf = stats.Get(ShipStatId.HullForwardThrustKgf, 0f);
         float hullCruiseSpeedMS = stats.Get(ShipStatId.HullCruiseReferenceSpeedMS, 0f);
-        float dragPerSpeedSquared = 0.5f
-            * Mathf.Max(0f, stats.Get(ShipStatId.AirDensity, 1.225f))
-            * Mathf.Max(0f, stats.Get(ShipStatId.DragCoefficient, 0f))
-            * Mathf.Max(0f, stats.Get(ShipStatId.FrontalArea, 0f));
         float thrustN = hullForwardThrustKgf * 9.81f;
         float horizontalAccelerationMS2 = totalMassKg > 0f ? thrustN / totalMassKg : 0f;
-        float terminalSpeedMS = 0f;
-        if (dragPerSpeedSquared > 0f && thrustN > 0f)
-        {
-            terminalSpeedMS = Mathf.Sqrt(thrustN / dragPerSpeedSquared);
-        }
-
-        terminalSpeedMS = hullCruiseSpeedMS > 0f
-            ? Mathf.Min(terminalSpeedMS, hullCruiseSpeedMS)
-            : terminalSpeedMS;
+        float strategicSpeedMS = Mathf.Max(0f, hullCruiseSpeedMS);
 
         summary = "mass " + totalMassKg.ToString("F0") + "/" + allowedTakeoffMassKg.ToString("F0") + " kg"
             + ", empty " + emptyMassKg.ToString("F0") + " kg"
             + ", thrust " + hullForwardThrustKgf.ToString("F0") + " kgf"
             + ", accel " + horizontalAccelerationMS2.ToString("F2") + " m/s2"
-            + ", cruise " + hullCruiseSpeedMS.ToString("F0") + " m/s"
-            + ", terminal " + terminalSpeedMS.ToString("F0") + " m/s.";
+            + ", strategic cruise " + strategicSpeedMS.ToString("F0") + " m/s.";
 
         return totalMassKg <= allowedTakeoffMassKg + 0.001f
             && hullForwardThrustKgf > 0f
-            && hullCruiseSpeedMS >= minSpeedMS
+            && strategicSpeedMS >= minSpeedMS
             && horizontalAccelerationMS2 >= minHorizontalAccelerationMS2
-            && IsFinite(terminalSpeedMS)
-            && terminalSpeedMS >= minSpeedMS;
+            && IsFinite(strategicSpeedMS);
     }
 
     private static Vector3 FindDockPositionOrConfigPosition(string dockId, Vector3 fallback)
@@ -8270,11 +9629,33 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 
     private static void ValidateCoreTacticalPrototypeTransfer(BigTestReport report)
     {
+        ValidateCoreTacticalMotorArrivalBraking(report);
+        ValidateCoreTacticalOreTargetingRules(report);
+        ValidateCoreTacticalLeviathanBehavior(report);
+        ValidateCoreTacticalMiningEquipmentGates(report);
+        ValidateLowGradeOreConcentrateCargo(report);
+        ValidateRawCloudCondensateCargo(report);
+        ValidateCoreTacticalAutomatonWreckSalvage(report);
+        ValidateCoreTacticalHarpoonBehavior(report);
+        ValidateCoreTacticalMissionObjectiveGate(report);
+
 #if UNITY_EDITOR
         string bootstrapText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalPrototypeBootstrap.cs");
         string sortieText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalCombatSortieController.cs");
+        string shipMotorText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalShipMotor.cs");
+        string fleetText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalFleetController.cs");
+        string cameraRigText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalCameraRig.cs");
         string hudText = ReadProjectText("Assets/Scripts/UI/WildWindGameplayHud.cs");
         string metaText = ReadProjectText("Assets/Scripts/Meta/MetaGameState.cs");
+        string playerProgressText = ReadProjectText("Assets/Scripts/Meta/PlayerProgress.cs");
+        string coreTacticalDamageText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalDamageModel.cs");
+        string coreTacticalOreMiningText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalOreMining.cs");
+        string leviathanText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalLeviathan.cs");
+        string coreTacticalUtilityBeamText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalUtilityBeamVisual.cs");
+        string coreTacticalSiphonIntakeText = coreTacticalUtilityBeamText;
+        string sessionConfigKorshunComponentsText = ReadProjectText("Assets/Scripts/Data/SessionConfigKorshunComponents.cs");
+        string sessionConfigDatabaseText = ReadProjectText("Assets/Scripts/Data/SessionConfigDatabase.cs");
+        string barbetAuxiliaryCsvText = ReadProjectText("Assets/Data/Config/Barbet_auxiliary_packages.csv");
 
         bool loadoutInstallersExposed =
             bootstrapText.Contains("ConfigureFrigateAutocannonLoadout") &&
@@ -8304,9 +9685,16 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             sortieText.Contains("SpawnEnemyCruisers");
 
         bool dockPrimaryBattleButtonStartsCoreCombat =
-            hudText.Contains("Dock Enter Core Combat") &&
-            hudText.Contains("HandleMetaDockCoreCombatSortie, out metaDockQuickBattleButton") &&
-            hudText.Contains("RunCoreCombatDockSortieForTests");
+            hudText.Contains("Dock Core Tactical Combat Sortie") &&
+            hudText.Contains("HandleMetaDockCoreCombatSortie, out metaDockCoreCombatButton") &&
+            hudText.Contains("RunCoreCombatDockSortieForTests") &&
+            !hudText.Contains("Dock Enter Core Combat") &&
+            !hudText.Contains("Dock Manual Quick Sortie") &&
+            !hudText.Contains("Dock Run Ordinary Mission") &&
+            !hudText.Contains("Dock Mission Panel") &&
+            !hudText.Contains("HandleMetaDockQuickBattle") &&
+            !hudText.Contains("HandleMetaDockManualSortie") &&
+            !hudText.Contains("HandleMetaDockRunSelectedMission");
 
         bool coreCombatConsumesDockSortie =
             metaText.Contains("Core combat blocked: buy or select a dock ship first.") &&
@@ -8327,26 +9715,3566 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
             transferReady
                 ? "Core Tactical prototype weapon loadouts are exposed and wired into the main combat sortie."
                 : "Core Tactical prototype weapon transfer is incomplete: missing loadout installers, selected-ship binding, main-sortie weapon install, battleship missile/machine-gun effects, enemy targeting, dock battle button binding, or dock sortie consumption.");
+
+        bool combatHudShowsCurrentAndMaxSpeed =
+            sortieText.Contains("FormatShipSpeedLine") &&
+            sortieText.Contains("ship.maxForwardSpeedMS") &&
+            sortieText.Contains("DrawSelectedShipStats") &&
+            sortieText.Contains("DrawMissionHud");
+        report.Check(combatHudShowsCurrentAndMaxSpeed,
+            combatHudShowsCurrentAndMaxSpeed
+                ? "Core Tactical HUD shows current/max ship speed so a maneuvering Korshun cannot look like a stale 34 m/s profile."
+                : "Core Tactical HUD must show current/max ship speed, not only current velocity.");
+
+        bool infiniteWeaponGroups =
+            bootstrapText.Contains("Torpedoes = 6") &&
+            bootstrapText.Contains("public CoreTacticalWeaponGroup weaponGroup = CoreTacticalWeaponGroup.Missiles;") &&
+            bootstrapText.Contains("CanFireWeapon(weaponGroup)") &&
+            bootstrapText.Contains("SetRuntimeWeaponGroupActive") &&
+            bootstrapText.Contains("ClearRuntimeWeaponGroups") &&
+            !bootstrapText.Contains("TryConsumeWeapon" + "Ammo") &&
+            !bootstrapText.Contains("GetRemaining(") &&
+            !bootstrapText.Contains("GetCapacity(") &&
+            sortieText.Contains("CoreTacticalWeaponGroup.Torpedoes => \"TRP\"") &&
+            sortieText.Contains("torpedoLike ? CoreTacticalWeaponGroup.Torpedoes : CoreTacticalWeaponGroup.Missiles") &&
+            sortieText.Contains("weaponControl.ClearRuntimeWeaponGroups();") &&
+            sortieText.Contains("weaponControl?.SetRuntimeWeaponGroupActive(weaponGroup)") &&
+            !sortieText.Contains("Ammo" + "Capacity") &&
+            !sortieText.Contains("ammo" + "Capacity") &&
+            bootstrapText.Contains("manualLaunchOnly") &&
+            bootstrapText.Contains("TryLaunchManualFan") &&
+            bootstrapText.Contains("ReloadCooldownRemainingSeconds") &&
+            bootstrapText.Contains("SetReloadCooldownRemainingSecondsForTests") &&
+            bootstrapText.Contains("manualAimSectorDegrees") &&
+            bootstrapText.Contains("IsDirectionInsideManualSector") &&
+            bootstrapText.Contains("automaticBurstUsesChaoticCloud") &&
+            bootstrapText.Contains("GetChaoticCloudShotDirection") &&
+            bootstrapText.Contains("GetAutomaticBurstTrackedCenterDirection") &&
+            bootstrapText.Contains("GetAutomaticBurstTrackedCenterDirectionForTests") &&
+            bootstrapText.Contains("GetUnguidedChaosDirection") &&
+            bootstrapText.Contains("unguidedChaosAmplitudeRad") &&
+            bootstrapText.Contains("ExplodeAt(transform.position)") &&
+            bootstrapText.Contains("DetonationSensitivityRadiusMeters") &&
+            bootstrapText.Contains("ResolveDetonationSensitivityRadiusForTests") &&
+            bootstrapText.Contains("ApplyExplosionDamageForTests") &&
+            sortieText.Contains("BeginTorpedoAim") &&
+            sortieText.Contains("DrawTorpedoAimSector") &&
+            sortieText.Contains("BuildWeaponCooldownText") &&
+            sortieText.Contains("FormatWeaponCooldownSeconds") &&
+            sortieText.Contains("GetWeaponCooldownTextForTests") &&
+            sortieText.Contains("automaticBurstUsesChaoticCloud = rocketSalvoLike") &&
+            sortieText.Contains("automaticBurstShotIntervalJitterSeconds") &&
+            sortieText.Contains("int launcherCount = Mathf.Clamp(requestedLauncherCount, 1, 4);") &&
+            sortieText.Contains("launcher.sideSign = i == 0 ? -1 : 1") &&
+            sortieText.Contains("Mathf.CeilToInt(Mathf.Max(1, projectilesPerSalvo) / (float)launcherCount)") &&
+            fleetText.Contains("TacticalPointerInputBlocked");
+        report.Check(infiniteWeaponGroups,
+            infiniteWeaponGroups
+                ? "Core Tactical weapons use active infinite weapon groups with reload/cooldown-only HUD countdowns; TRP keeps player-only side-sector aiming while NURS uses chaotic cloud salvos instead of a torpedo fan."
+                : "Core Tactical weapons must not keep runtime shot stock, capacity HUD checks, phantom MSL stock, old shot-consumption gates, or hidden reloads without HUD countdown text.");
+
+        bool coreTacticalCommandPointPrecise =
+            fleetText.Contains("BeginDraftCommand(point)") &&
+            fleetText.Contains("HandleCommandInput();") &&
+            fleetText.Contains("ProcessCommandPointer(") &&
+            fleetText.Contains("ProcessCommandPointerForTests") &&
+            fleetText.Contains("GetCommandPointMarkerCenterForTests") &&
+            fleetText.Contains("mouse.rightButton.wasPressedThisFrame") &&
+            fleetText.Contains("mouse.rightButton.isPressed") &&
+            fleetText.Contains("mouse.rightButton.wasReleasedThisFrame") &&
+            fleetText.Contains("TryReadInputSystemScreenPosition(out Vector2 screenPosition)") &&
+            fleetText.Contains("return TryReadInputSystemScreenPosition(out position);") &&
+            fleetText.Contains("rightMouseDownTracked = TryBeginScreenCommand(screenPosition)") &&
+            fleetText.Contains("CancelCommandDraft") &&
+            fleetText.Contains("TryBeginScreenCommand") &&
+            fleetText.Contains("UpdateDraftTargetFromScreenProjection") &&
+            fleetText.Contains("UpdateDraftPreview();") &&
+            fleetText.Contains("draftTarget = point") &&
+            fleetText.Contains("markerCenter = GetCommandPointMarkerCenterForTests();") &&
+            !fleetText.Contains("MaintainCommandInputState") &&
+            !fleetText.Contains("HandleCommandGuiEvent") &&
+            !fleetText.Contains("ResolveCommandEventScreenPosition") &&
+            !fleetText.Contains("EventType.MouseDown") &&
+            !fleetText.Contains("EventType.MouseDrag") &&
+            !fleetText.Contains("EventType.MouseUp") &&
+            !fleetText.Contains("currentEvent.Use") &&
+            !fleetText.Contains("Event.current") &&
+            !fleetText.Contains("GuiToScreenPosition") &&
+            !fleetText.Contains("TryReadGuiMousePosition") &&
+            !fleetText.Contains("CaptureGuiMousePosition") &&
+            !fleetText.Contains("lastGuiMouse") &&
+            !fleetText.Contains("TryBuildCommandDragBasis") &&
+            !fleetText.Contains("TryProjectCommandDragAxis") &&
+            !fleetText.Contains("UpdateDraftTargetFromScreenDelta") &&
+            !fleetText.Contains("commandPressTarget") &&
+            !fleetText.Contains("commandDragWorldPerPixelX") &&
+            !fleetText.Contains("commandDragWorldPerPixelY") &&
+            !fleetText.Contains("CommandDragBasisProbePixels") &&
+            !fleetText.Contains("CommandDragMaxMetersPerPixel") &&
+            fleetText.Contains("position = mouse.position.ReadValue();") &&
+            fleetText.Contains("return IsScreenPositionInsideGameView(position);") &&
+            fleetText.Contains("IsScreenPositionInsideGameView") &&
+            !fleetText.Contains("SyncInputCameraTransformForProjection") &&
+            !fleetText.Contains("inputCameraRig.ApplyCurrentTransformForInput()") &&
+            fleetText.Contains("TacticalPointerInputBlocked") &&
+            fleetText.Contains("|| !HasSelectedShips()") &&
+            fleetText.Contains("HasSelectedShipsForInput => HasSelectedShips()") &&
+            fleetText.Contains("IsCommandDraftActiveForInput") &&
+            fleetText.Contains("SetInputCamera(Camera camera)") &&
+            fleetText.Contains("InputCameraForTests") &&
+            fleetText.Contains("TryProjectScreenPointToCommandPlaneForTests") &&
+            fleetText.Contains("TryBuildCameraRayFromScreenPointForTests") &&
+            fleetText.Contains("TryProjectCameraScreenPointToCommandPlane") &&
+            fleetText.Contains("TryBuildCameraRayFromScreenPoint") &&
+            fleetText.Contains("float normalizedX = viewportX * 2f - 1f") &&
+            fleetText.Contains("camera.fieldOfView * 0.5f * Mathf.Deg2Rad") &&
+            fleetText.Contains("ray = new Ray(camera.transform.position, worldDirection.normalized)") &&
+            fleetText.Contains("IsScreenPointInsideCamera(mainCamera, screenPosition)") &&
+            fleetText.Contains("SetCommandGridWorldAnchor(Vector3 anchor)") &&
+            fleetText.Contains("commandGridWorldAnchorSet ? commandGridWorldAnchor : GetFleetCenter()") &&
+            fleetText.Contains("ScreenPointOutsideCameraTolerancePixels = 64f") &&
+            fleetText.Contains("GetCommandGridCenter") &&
+            fleetText.Contains("gridMeshFilter.transform.position = GetCommandGridCenter(safeStep)") &&
+            fleetText.Contains("CommandGridTargetScreenPixels = 1.6f") &&
+            fleetText.Contains("CommandGridMaxLineWidthStepFraction = 0.07f") &&
+            fleetText.Contains("ResolveGridLineWidth(safeStep)") &&
+            fleetText.Contains("EstimateCommandPlaneMetersPerPixel") &&
+            fleetText.Contains("RenderQueue.Transparent") &&
+            fleetText.Contains("Core Tactical Command Point Marker") &&
+            fleetText.Contains("Core Tactical Command Point Center") &&
+            fleetText.Contains("UpdateCommandPointMarker();") &&
+            fleetText.Contains("ship.SetCommand(") &&
+            !fleetText.Contains("rightMouseCommandGesture") &&
+            !fleetText.Contains("draftHoldFacingMode") &&
+            !fleetText.Contains("Core Tactical Command Ghost") &&
+            !fleetText.Contains("Shift+RMB") &&
+            !fleetText.Contains("draftTarget = currentPoint") &&
+            !fleetText.Contains("draftTarget = releasePoint") &&
+            sortieText.Contains("cameraRig.ApplyCurrentTransformForInput();") &&
+            sortieText.Contains("ApplyTacticalCameraAfterFleetSpawn();") &&
+            sortieText.Contains("fleet.SetCommandGridWorldAnchor(missionCenter)") &&
+            sortieText.Contains("CreateMissionBoundaryMarker();") &&
+            sortieText.Contains("Core Tactical Mission Boundary") &&
+            sortieText.Contains("camera.usePhysicalProperties = false") &&
+            sortieText.Contains("camera.lensShift = Vector2.zero") &&
+            sortieText.Contains("camera.clearFlags = CameraClearFlags.Skybox") &&
+            !sortieText.Contains("camera.clearFlags = CameraClearFlags.SolidColor") &&
+            sortieText.Contains("camera.ResetProjectionMatrix();") &&
+            sortieText.Contains("camera.ResetAspect();") &&
+            sortieText.Contains("fleet.SetInputCamera(camera);") &&
+            sortieText.Contains("CoreTacticalFleetController.TryProjectCameraScreenPointToCommandPlane") &&
+            bootstrapText.Contains("fleet.SetInputCamera(camera)") &&
+            bootstrapText.Contains("camera.clearFlags = CameraClearFlags.Skybox") &&
+            !bootstrapText.Contains("camera.clearFlags = CameraClearFlags.SolidColor") &&
+            cameraRigText.Contains("fleet.SetInputCamera(targetCamera)") &&
+            cameraRigText.Contains("ApplyCurrentTransformForInput") &&
+            cameraRigText.Contains("float scrollNotches = NormalizeScrollNotches(mouse.scroll.ReadValue().y)") &&
+            cameraRigText.Contains("ApplyWheelZoom(scrollNotches, mousePosition)") &&
+            cameraRigText.Contains("private static float NormalizeScrollNotches(float rawScroll)") &&
+            !cameraRigText.Contains("private void OnGUI") &&
+            !cameraRigText.Contains("EventType.ScrollWheel") &&
+            !cameraRigText.Contains("ResolveScrollEventScreenPosition") &&
+            !cameraRigText.Contains("NormalizeGuiScrollNotches") &&
+            !cameraRigText.Contains("GuiToScreenPosition") &&
+            !cameraRigText.Contains("currentEvent.Use") &&
+            cameraRigText.Contains("TryReadInputScreenPosition") &&
+            !cameraRigText.Contains("fleet.TryReadGameViewMousePositionForInput") &&
+            cameraRigText.Contains("ApplyWheelZoom(float scrollNotches, Vector2 mousePosition)") &&
+            cameraRigText.Contains("zoomSmoothTimeSeconds = 0.16f") &&
+            cameraRigText.Contains("targetCamera.ResetWorldToCameraMatrix();") &&
+            cameraRigText.Contains("targetCamera.ResetProjectionMatrix();") &&
+            cameraRigText.Contains("targetDistanceMeters") &&
+            cameraRigText.Contains("StopSmoothZoomForInput") &&
+            cameraRigText.Contains("zoomDistanceVelocity = 0f") &&
+            cameraRigText.Contains("UpdateSmoothZoom(Time.unscaledDeltaTime)") &&
+            cameraRigText.Contains("Mathf.SmoothDamp(") &&
+            cameraRigText.Contains("KeepSmoothZoomAnchorUnderMouse") &&
+            cameraRigText.Contains("TryProjectScreenPointToCommandPlane(") &&
+            cameraRigText.Contains("smoothZoomScreenAnchor") &&
+            cameraRigText.Contains("smoothZoomWorldAnchor") &&
+            cameraRigText.Contains("CalculateCameraPose(focusPoint, safeDistance") &&
+            cameraRigText.Contains("CancelSmoothZoomAnchor") &&
+            cameraRigText.Contains("Vector3 correction = smoothZoomWorldAnchor - anchorAfterZoom") &&
+            cameraRigText.Contains("focusPoint += correction") &&
+            cameraRigText.Contains("CoreTacticalFleetController.TryProjectCameraScreenPointToCommandPlane") &&
+            cameraRigText.Contains("!HasFleetCommandDraft()") &&
+            cameraRigText.Contains("!HasSelectedFleetShips()") &&
+            cameraRigText.Contains("fleet.HasSelectedShipsForInput");
+        report.Check(coreTacticalCommandPointPrecise,
+            coreTacticalCommandPointPrecise
+                ? "Core Tactical RMB movement commands are driven from Update/Input System screen coordinates, not IMGUI events, and project through the already-rendered tactical camera without mutating it during the click."
+                : "Core Tactical RMB movement commands must use Update/Input System screen coordinates with no IMGUI Event.current/EventType/GUIMouse fallback, and must not move/freeze the tactical camera while resolving a click.");
+
+        bool commandProjectionProbeOk = ValidateCoreTacticalCommandProjectionProbe(out string commandProjectionDetails);
+        report.Check(commandProjectionProbeOk,
+            commandProjectionProbeOk
+                ? "Core Tactical simulated RMB clicks place the command marker exactly on the camera ray/command-plane hit across zoom levels: " + commandProjectionDetails
+                : "Core Tactical simulated RMB clicks must keep screen click, projected command point and marker center aligned across zoom levels: " + commandProjectionDetails);
+
+        bool coreTacticalProjectileTypesSeparated =
+            bootstrapText.Contains("CoreTacticalProjectileDetonationMode.DirectImpact") &&
+            bootstrapText.Contains("DirectImpactMissRangeMultiplier = 1.5f") &&
+            bootstrapText.Contains("TryApplyDirectDamageAt") &&
+            sortieText.Contains("GetPackageDetonationMode") &&
+            sortieText.Contains("battery.detonationMode = detonationMode");
+        report.Check(coreTacticalProjectileTypesSeparated,
+            coreTacticalProjectileTypesSeparated
+                ? "Core Tactical AP shells use direct impact and quietly expire at 1.5x range while HE shells keep air-burst splash behavior."
+                : "Core Tactical AP/HE projectile behavior is not separated cleanly or AP miss lifetime is not capped at 1.5x range.");
+
+        bool coreTacticalStrategicDamageModel =
+            coreTacticalDamageText.Contains("CoreTacticalDamageProfile") &&
+            coreTacticalDamageText.Contains("CoreTacticalDamageType") &&
+            coreTacticalDamageText.Contains("CoreTacticalResistanceSet") &&
+            coreTacticalDamageText.Contains("Kinetic") &&
+            coreTacticalDamageText.Contains("Thermal") &&
+            coreTacticalDamageText.Contains("Chemical") &&
+            coreTacticalDamageText.Contains("Explosive") &&
+            coreTacticalDamageText.Contains("effectiveResistancePercent") &&
+            coreTacticalDamageText.Contains("fireDamagePerSecondMaxHealthFraction = 0.005f") &&
+            coreTacticalDamageText.Contains("fireDurationSeconds = 15f") &&
+            coreTacticalDamageText.Contains("emergencyTeamActivationDelaySeconds = 1f") &&
+            coreTacticalDamageText.Contains("emergencyTeamActiveSeconds = 8f") &&
+            coreTacticalDamageText.Contains("ResolveFireSectorCount") &&
+            coreTacticalDamageText.Contains("ScheduleEmergencyTeam") &&
+            coreTacticalDamageText.Contains("RepairAllMalfunctions") &&
+            bootstrapText.Contains("CoreTacticalDamageRequest.Create") &&
+            bootstrapText.Contains("CoreTacticalDamageRequest.Kinetic") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalDamageRequest.Chemical") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalDamageRequest.Thermal") &&
+            leviathanText.Contains("CoreTacticalDamageRequest.Kinetic") &&
+            bootstrapText.Contains("missileDamageType") &&
+            bootstrapText.Contains("shellDamageType") &&
+            sortieText.Contains("ConfigureRuntimeDamageProfile") &&
+            sortieText.Contains("profile.structureHp") &&
+            sortieText.Contains("profile.resistances") &&
+            sortieText.Contains("FormatDamageResistances") &&
+            shipMotorText.Contains("damageMobilityMultiplier") &&
+            bootstrapText.Contains("CoreTacticalWeaponVisualMaterialUtility") &&
+            bootstrapText.Contains("CreateVisibleMaterial") &&
+            bootstrapText.Contains("CreateTransparentMaterial") &&
+            bootstrapText.Contains("CreateVertexColorTransparentMaterial") &&
+            bootstrapText.Contains("ApplyVisibleColor") &&
+            bootstrapText.Contains("ResolveVisibleColor") &&
+            bootstrapText.Contains("ApplyMissileRendererColor") &&
+            bootstrapText.Contains("ResolveMaterialVisibleColor") &&
+            bootstrapText.Contains("ApplyMissileMaterialColor") &&
+            bootstrapText.Contains("ConfigureMissileTrailMaterial") &&
+            bootstrapText.Contains("MinTracerGlowWidthMeters") &&
+            bootstrapText.Contains("MinBurstVisualRadiusMeters") &&
+            bootstrapText.Contains("BurstVisualLifetimeSeconds") &&
+            sortieText.Contains("ExplosiveRadiusReferenceMassKg = 50f") &&
+            sortieText.Contains("ExplosiveRadiusReferenceMeters = 20f") &&
+            sortieText.Contains("ExplosiveRadiusMassExponent = 0.5f") &&
+            sortieText.Contains("ResolveExplosiveSplashRadiusMeters") &&
+            sessionConfigKorshunComponentsText.Contains("explosiveKg") &&
+            sessionConfigDatabaseText.Contains("LoadCoreTacticalBalance") &&
+            sessionConfigDatabaseText.Contains("explosiveRadiusReferenceMassKg") &&
+            sessionConfigDatabaseText.Contains("explosiveRadiusReferenceMeters") &&
+            sessionConfigDatabaseText.Contains("explosiveRadiusMassExponent") &&
+            bootstrapText.Contains("CreateVertexColorTransparentMaterial(color)") &&
+            bootstrapText.Contains("sharedBurstMaterial = CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial") &&
+            bootstrapText.Contains("EmissionColorPropertyId") &&
+            bootstrapText.Contains("RenderQueue.Transparent") &&
+            bootstrapText.Contains("_SURFACE_TYPE_TRANSPARENT");
+        report.Check(coreTacticalStrategicDamageModel,
+            coreTacticalStrategicDamageModel
+                ? "Core Tactical damage uses four damage types with percent resistances, resistance ignore, fire sectors, emergency team, engine mobility damage, glow-width projectile tracers and shared non-black burst/weapon visual materials."
+                : "Core Tactical damage must use kinetic/thermal/chemical/explosive resistances instead of old armor/penetration shortcuts, while preserving fire sectors, emergency team, engine mobility damage, tracer glow-width safeguards and shared non-black burst/weapon visual color safeguards.");
+
+        bool coreTacticalCombatLoadoutVisualBinding =
+            bootstrapText.Contains("visualLauncherRole") &&
+            bootstrapText.Contains("TryBindMissileLauncher(sideSign, visualLauncherRole") &&
+            bootstrapText.Contains("TryBindUtilityModule") &&
+            bootstrapText.Contains("Korshun_CombatAux_Magnet_Left") &&
+            bootstrapText.Contains("Korshun_CombatAux_Magnet_Right") &&
+            bootstrapText.Contains("Korshun_CombatAux_GasSiphon_Left") &&
+            bootstrapText.Contains("Korshun_CombatAux_GasSiphon_Right") &&
+            bootstrapText.Contains("Barbet_CombatSmall_GasSiphon_Left") &&
+            bootstrapText.Contains("Barbet_CombatSmall_GasSiphon_Right") &&
+            bootstrapText.Contains("Barbet_CombatSmall_Magnet_Left") &&
+            bootstrapText.Contains("Barbet_CombatSmall_Magnet_Right") &&
+            bootstrapText.Contains("Korshun_CombatAux_RepairBeam_Left") &&
+            bootstrapText.Contains("Korshun_CombatAux_RepairBeam_Right") &&
+            bootstrapText.Contains("Korshun_CombatAux_HackingDish_Left") &&
+            bootstrapText.Contains("Korshun_CombatAux_HackingDish_Right") &&
+            bootstrapText.Contains("CreateVertexColorTransparentMaterial(color)") &&
+            sortieText.Contains("ApplyImportedShipCombatLoadoutVisual") &&
+            sortieText.Contains("ApplyImportedKorshunCombatLoadoutVisual") &&
+            sortieText.Contains("ApplyImportedBarbetCombatSmallVisual") &&
+            sortieText.Contains("Korshun_CombatAux_Magnet_Left") &&
+            sortieText.Contains("Korshun_CombatAux_Magnet_Right") &&
+            sortieText.Contains("Korshun_CombatAux_GasSiphon_Left") &&
+            sortieText.Contains("Korshun_CombatAux_GasSiphon_Right") &&
+            sortieText.Contains("Barbet_CombatSmall_Magnet_Left") &&
+            sortieText.Contains("Barbet_CombatSmall_Magnet_Right") &&
+            sortieText.Contains("Barbet_CombatSmall_GasSiphon_Left") &&
+            sortieText.Contains("Barbet_CombatSmall_GasSiphon_Right") &&
+            barbetAuxiliaryCsvText.Contains("barbet_small_siphon") &&
+            barbetAuxiliaryCsvText.Contains(",small,siphon,") &&
+            sortieText.Contains("Korshun_CombatAux_RepairBeam_Left") &&
+            sortieText.Contains("Korshun_CombatAux_RepairBeam_Right") &&
+            sortieText.Contains("Korshun_CombatAux_HackingDish_Left") &&
+            sortieText.Contains("Korshun_CombatAux_HackingDish_Right") &&
+            sortieText.Contains("\"main_rocket\"") &&
+            sortieText.Contains("\"side_rocket\"") &&
+            sortieText.Contains("WW_Turret_Magnet_Single") &&
+            sortieText.Contains("WW_Turret_GasSiphon_Single") &&
+            sortieText.Contains("WW_Turret_RepairBeam_Single") &&
+            sortieText.Contains("WW_Turret_HackingDish_Single") &&
+            sortieText.Contains("int launcherCount = Mathf.Clamp(requestedLauncherCount, 1, 4);") &&
+            sortieText.Contains("launcher.sideSign = i == 0 ? -1 : 1") &&
+            sortieText.Contains("package.cycleSeconds") &&
+            sortieText.Contains("package.cooldownSeconds") &&
+            sortieText.Contains("package.repairHpPerCycle") &&
+            sortieText.Contains("SetDescendantActiveByNameContains(modelRoot, \"Korshun_TorpedoLauncher_3Tube\", false)") &&
+            coreTacticalOreMiningText.Contains("GetMagnetCatchPoint") &&
+            coreTacticalOreMiningText.Contains("IsInsideMagnetSideArc") &&
+            coreTacticalOreMiningText.Contains("magnetSideArcDegrees") &&
+            coreTacticalOreMiningText.Contains("GetUtilityModuleCatchPoint(\"magnet\"") &&
+            coreTacticalOreMiningText.Contains("GetUtilityModuleCatchPoint(\"salvage_magnet\"") &&
+            coreTacticalOreMiningText.Contains("TryBindUtilityModule(\"siphon\"") &&
+            coreTacticalOreMiningText.Contains("ApplyYawToward") &&
+            coreTacticalOreMiningText.Contains("GetVisualSideDirection") &&
+            coreTacticalUtilityBeamText.Contains("AuxiliaryBeamChannel") &&
+            coreTacticalUtilityBeamText.Contains("new AuxiliaryBeamChannel(-1)") &&
+            coreTacticalUtilityBeamText.Contains("new AuxiliaryBeamChannel(1)") &&
+            coreTacticalUtilityBeamText.Contains("IsInsideSideArc") &&
+            coreTacticalUtilityBeamText.Contains("sideArcDegrees") &&
+            coreTacticalUtilityBeamText.Contains("ApplyYawToward") &&
+            coreTacticalUtilityBeamText.Contains("GetVisualSideDirection") &&
+            coreTacticalUtilityBeamText.Contains("reservedTargets") &&
+            coreTacticalUtilityBeamText.Contains("GetBeamOrigin(int sideSign") &&
+            coreTacticalUtilityBeamText.Contains("TryBindUtilityModule(utilityKind, sideSign") &&
+            coreTacticalUtilityBeamText.Contains("\"scanner_hacker\"") &&
+            coreTacticalUtilityBeamText.Contains("\"repair\"") &&
+            coreTacticalUtilityBeamText.Contains("TickRepairChannel") &&
+            coreTacticalUtilityBeamText.Contains("TickScannerChannel") &&
+            coreTacticalUtilityBeamText.Contains("repairHpPerCycle") &&
+            coreTacticalUtilityBeamText.Contains("cooldownRemaining") &&
+            coreTacticalUtilityBeamText.Contains("completedCycles") &&
+            coreTacticalUtilityBeamText.Contains("health.currentHealth = Mathf.Min") &&
+            !coreTacticalUtilityBeamText.Contains("private CoreTacticalUtilityBeamVisual leftBeam") &&
+            !coreTacticalUtilityBeamText.Contains("private CoreTacticalUtilityBeamVisual rightBeam") &&
+            !coreTacticalUtilityBeamText.Contains("Mathf.Min(rangeMeters * 0.28f");
+        report.Check(coreTacticalCombatLoadoutVisualBinding,
+            coreTacticalCombatLoadoutVisualBinding
+                ? "Core Tactical combat loadout visuals bind selected Korshun utilities and Barbet small-slot magnet/siphon equipment to imported left/right module visuals, keep rocket trails color-safe, rotate utility modules toward their side-arc targets, and emit utility beams only from actual module visuals."
+                : "Core Tactical combat loadout visuals must bind selected Korshun utilities and Barbet small-slot gas siphons/magnets to left/right module visuals, hide default torpedoes on non-torpedo auxiliary loadouts, keep rocket trails color-safe, rotate utility modules toward side-arc targets, and avoid ship-center or idle utility beams.");
+
+        CoreTacticalWeaponVisualAuditResult weaponVisualAuditResult = AuditCoreTacticalWeaponVisualMaterials(report);
+        report.Check(weaponVisualAuditResult.AllClear,
+            weaponVisualAuditResult.AllClear
+                ? "Core Tactical weapon visual screenshot confirms colored shells, rockets, torpedoes, tracers, bursts and utility beams including repair/magnet/salvage/drill/scanner are visible. Audit image: " + weaponVisualAuditResult.ImagePath + ". " + weaponVisualAuditResult.Summary
+                : "Core Tactical weapon/utility beam visual screenshot failed or still looks too dark. " + weaponVisualAuditResult.Summary);
+
+        bool coreTacticalOreMiningPrototype =
+            coreTacticalOreMiningText.Contains("CoreTacticalOreBoulder") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalOreFragment") &&
+            coreTacticalOreMiningText.Contains("fragmentLifetimeSeconds = 20f") &&
+            coreTacticalOreMiningText.Contains("AdvanceLifetimeForTests") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalMiningRig") &&
+            coreTacticalOreMiningText.Contains("densityKgPerCubicMeter") &&
+            coreTacticalOreMiningText.Contains("healthPerDiameterMeter") &&
+            coreTacticalOreMiningText.Contains("fragmentMassPerIntegrityPointKg") &&
+            coreTacticalOreMiningText.Contains("ellipsoidVolume") &&
+            coreTacticalOreMiningText.Contains("usefulOreConcentration01") &&
+            coreTacticalOreMiningText.Contains("weaponRetention01") &&
+            coreTacticalOreMiningText.Contains("magnetMaxChunkMassKg") &&
+            coreTacticalOreMiningText.Contains("MagnetDeliveryChannel") &&
+            coreTacticalOreMiningText.Contains("magnetDeliveryChannels") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalOreTargetingRules") &&
+            coreTacticalOreMiningText.Contains("IsAutomaticCombatTarget") &&
+            coreTacticalOreMiningText.Contains("IsValidExplicitTarget") &&
+            coreTacticalOreMiningText.Contains("SetInstalledModules") &&
+            coreTacticalOreMiningText.Contains("IsModuleInstalled") &&
+            coreTacticalOreMiningText.Contains("GetModuleCooldownRemainingSeconds") &&
+            coreTacticalOreMiningText.Contains("GetModuleCooldown01") &&
+            coreTacticalOreMiningText.Contains("SetModuleCycleTimerForTests") &&
+            coreTacticalOreMiningText.Contains("AddDirtyOreForTests") &&
+            coreTacticalOreMiningText.Contains("HasAnyInstalledMiningModule") &&
+            !coreTacticalOreMiningText.Contains("FindObjectsByType<CoreTacticalOreBoulder>") &&
+            bootstrapText.Contains("CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(combatant, targetTeam)") &&
+            bootstrapText.Contains("CoreTacticalOreTargetingRules.IsValidExplicitTarget(candidate, targetTeam)") &&
+            fleetText.Contains("TryToggleOreBoulderPriorityTargetFromHit") &&
+            fleetText.Contains("ClearPriorityTargetForSelectedShips") &&
+            sortieText.Contains("ConfigurePlayerMiningModules") &&
+            sortieText.Contains("ApplyMiningModulePackage") &&
+            sortieText.Contains("!playerMiningRig.IsModuleInstalled(module)") &&
+            sortieText.Contains("GetMiningModuleCooldownTextForTests") &&
+            sortieText.Contains("GetMiningModuleCooldownShutterForTests") &&
+            coreTacticalOreMiningText.Contains("Core Tactical Mining Magnet Beam Left") &&
+            coreTacticalOreMiningText.Contains("Core Tactical Mining Magnet Beam Right") &&
+            !coreTacticalOreMiningText.Contains("activeMagnetDeliveryFragment") &&
+            coreTacticalOreMiningText.Contains("magnetRangeMeters = 500f") &&
+            coreTacticalOreMiningText.Contains("CalculateMagnetDeliveryEnergyCost") &&
+            coreTacticalOreMiningText.Contains("ContinuePaidMagnetDelivery") &&
+            coreTacticalOreMiningText.Contains("IsMagnetDeliveryInRange") &&
+            coreTacticalOreMiningText.Contains("ReleaseMagnetDelivery") &&
+            coreTacticalOreMiningText.Contains("Magnet released: fragment left beam range.") &&
+            coreTacticalOreMiningText.Contains("GetMagnetCatchPoint(int sideSign") &&
+            coreTacticalOreMiningText.Contains("IsInsideMagnetSideArc") &&
+            coreTacticalOreMiningText.Contains("magnetSideArcDegrees") &&
+            coreTacticalOreMiningText.Contains("GetUtilityModuleCatchPoint(\"magnet\"") &&
+            coreTacticalOreMiningText.Contains("GetUtilityModuleCatchPoint(\"salvage_magnet\"") &&
+            coreTacticalOreMiningText.Contains("ApplyYawToward") &&
+            coreTacticalOreMiningText.Contains("PullToward(catchPoint, magnetPullSpeedMS * deltaSeconds, true)") &&
+            coreTacticalOreMiningText.Contains("Magnet waiting: need ") &&
+            !coreTacticalOreMiningText.Contains("Magnet stopped: no energy.") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalUtilityBeamPalette.Magnet") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalUtilityBeamPalette.Drill") &&
+            coreTacticalOreMiningText.Contains("drillLossReduction01") &&
+            coreTacticalOreMiningText.Contains("crusherRawKgPerCycle") &&
+            coreTacticalOreMiningText.Contains("inventoryCapacityKg") &&
+            coreTacticalOreMiningText.Contains("InventoryFreeKg") &&
+            coreTacticalOreMiningText.Contains("BuildInventoryRows") &&
+            coreTacticalOreMiningText.Contains("SetStartingInventoryRows") &&
+            coreTacticalOreMiningText.Contains("SetCargoFull") &&
+            coreTacticalOreMiningText.Contains("magnetEnabled = false") &&
+            coreTacticalOreMiningText.Contains("drillEnabled = false") &&
+            coreTacticalOreMiningText.Contains("crusherEnabled = false") &&
+            coreTacticalOreMiningText.Contains("TryAddShipCargoFromRuntime") &&
+            coreTacticalOreMiningText.Contains("TryAddShipLowGradeOreFromRuntime") &&
+            coreTacticalOreMiningText.Contains("TryFlushDirtyOreToRuntimeCargo") &&
+            coreTacticalOreMiningText.Contains("TotalOreCollectedKg") &&
+            coreTacticalOreMiningText.Contains("countMissionProgress") &&
+            metaText.Contains("FindFirstStoredLowGradeOreType") &&
+            metaText.Contains("TrySpendLowGradeOre") &&
+            metaText.Contains("Processed \" + rawBatchKg + \" kg low-grade") &&
+            sortieText.Contains("SpawnCoreTacticalOreBoulders") &&
+            sortieText.Contains("ResolveOreBoulderNaturalIntegrityLossPerSecond") &&
+            sortieText.Contains("health.currentHealth = definition.maxHealth") &&
+            sortieText.Contains("ConfigurePlayerMiningRig") &&
+            sortieText.Contains("CoreTacticalMiningModule.Crusher") &&
+            sortieText.Contains("TacticalHudActionKind.Inventory") &&
+            sortieText.Contains("DrawShipInventoryWindow") &&
+            sortieText.Contains("HandleOreBoulderInspectionInput") &&
+            sortieText.Contains("DrawOreBoulderInfoPanel") &&
+            sortieText.Contains("SetInspectedOreBoulderAsPriorityTarget") &&
+            sortieText.Contains("CoreTacticalOreTargetingRules.IsValidExplicitTarget(targetShip, CoreTacticalCombatTeam.Enemy)") &&
+            sortieText.Contains("ClearSelectedShipPriorityTarget") &&
+            sortieText.Contains("autocannon.barrelsPerMount = Mathf.Max(1, package.barrelsOrProjectiles)") &&
+            !sortieText.Contains("autocannon.reloadSeconds = Mathf.Max(0.05f, reloadSeconds / Mathf.Max(1, package.barrelsOrProjectiles))") &&
+            bootstrapText.Contains("barrelsPerMount") &&
+            bootstrapText.Contains("PendingAutocannonShot") &&
+            bootstrapText.Contains("ScheduleMountSalvo") &&
+            bootstrapText.Contains("barrelShotSpacingSeconds") &&
+            metaText.Contains("TryAddShipLowGradeOreFromRuntime") &&
+            metaText.Contains("BuildShipCargoValidationMap") &&
+            metaText.Contains("capitalStorage.AddLowGradeOre") &&
+            playerProgressText.Contains("shipLowGradeOreCargo") &&
+            playerProgressText.Contains("LowGradeOreStackState") &&
+            playerProgressText.Contains("AddLowGradeOre") &&
+            sortieText.Contains("BuildStartingInventoryRows") &&
+            sortieText.Contains("TryFlushDirtyOreToRuntimeCargo") &&
+            sortieText.Contains("cargoCapacityTons") &&
+            sortieText.Contains("RequiredEnemyKillObjectiveCount = 4") &&
+            sortieText.Contains("RequiredOreObjectiveKg = 300f") &&
+            sortieText.Contains("AreCoreMissionObjectivesCompleteForTests") &&
+            sortieText.Contains("AreMissionObjectivesComplete()") &&
+            sortieText.Contains("Mine any ore") &&
+            fleetText.Contains("GetComponent<CoreTacticalOreBoulder>()") &&
+            bootstrapText.Contains("NotifyOreBoulderDamage") &&
+            !sortieText.Contains("SafeOreSortieController") &&
+            !sortieText.Contains("SortieResourceCacheController") &&
+            !sortieText.Contains("MiningFragment") &&
+            !sortieText.Contains("ShipPhysics") &&
+            !sortieText.Contains("ClearLegacySortieRuntimeObjects") &&
+            !coreTacticalOreMiningText.Contains("MiningFragment") &&
+            !coreTacticalOreMiningText.Contains("ShipPhysics");
+        report.Check(coreTacticalOreMiningPrototype,
+            coreTacticalOreMiningPrototype
+                ? "Core Tactical mining has its own dense HP-scaled ore boulders, damage-shed fragments, colored per-module side-arc rotating magnet/drill utility beams, prepaid per-channel player magnet delivery, drill laser, crusher cycle, low-grade concentrate cargo persistence, inventory window, cargo-capacity intake gate, drill/crusher energy shutoff, ore inspection target button, multi-barrel frigate salvos and sortie cargo deposit without legacy ShipPhysics mining fragments."
+                : "Core Tactical mining prototype is incomplete or still references legacy safe-ore/resource-cache/ShipPhysics mining fragments, or it lacks dense boulder math, colored per-module side-arc rotating magnet/drill utility beams, prepaid per-channel magnet delivery, drill laser, crusher cycle, low-grade concentrate persistence, inventory/cargo-capacity intake, energy shutoff, ore inspection target contracts, or multi-barrel frigate salvos.");
+
+        GameObject fragmentLifetimeProbe = null;
+        try
+        {
+            fragmentLifetimeProbe = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            fragmentLifetimeProbe.name = "Big Test Ore Fragment Dust Lifetime";
+            fragmentLifetimeProbe.transform.localScale = Vector3.one * 2f;
+            CoreTacticalOreFragment fragmentLifetime = fragmentLifetimeProbe.AddComponent<CoreTacticalOreFragment>();
+            fragmentLifetime.fragmentLifetimeSeconds = 20f;
+            fragmentLifetime.Initialize("windshale", "windshale_ore", "Windshale", 100f, 0.25f, 1f, -1000f, Color.gray);
+            Vector3 initialFragmentScale = fragmentLifetimeProbe.transform.localScale;
+            fragmentLifetime.AdvanceLifetimeForTests(10f);
+            bool fragmentShrinksMidlife = Approximately(fragmentLifetime.LifetimeSecondsForTests, 10f, 0.001f)
+                && fragmentLifetimeProbe.transform.localScale.x < initialFragmentScale.x
+                && fragmentLifetimeProbe.transform.localScale.x > initialFragmentScale.x * 0.04f;
+            fragmentLifetime.captured = true;
+            fragmentLifetime.AdvanceLifetimeForTests(50f);
+            bool fragmentLifetimePausesCaptured = Approximately(fragmentLifetime.LifetimeSecondsForTests, 10f, 0.001f);
+            fragmentLifetime.captured = false;
+            fragmentLifetime.AdvanceLifetimeForTests(10f);
+            bool fragmentDustExpiryOk = fragmentLifetime.LifetimeSecondsForTests >= 20f
+                && fragmentLifetimeProbe.transform.localScale.x <= initialFragmentScale.x * 0.05f;
+            bool oreFragmentLifetimeOk = fragmentShrinksMidlife && fragmentLifetimePausesCaptured && fragmentDustExpiryOk;
+            report.Check(oreFragmentLifetimeOk,
+                oreFragmentLifetimeOk
+                    ? "Core Tactical ore fragments visibly crumble toward dust over 20 seconds, and the lifetime pauses while a fragment is captured."
+                    : "Core Tactical ore fragment lifetime failed: verify 20 second dust shrink and captured pause. Parts: shrink="
+                        + fragmentShrinksMidlife
+                        + ", pause="
+                        + fragmentLifetimePausesCaptured
+                        + ", expiry="
+                        + fragmentDustExpiryOk
+                        + ".");
+        }
+        finally
+        {
+            DestroyBigTestObject(fragmentLifetimeProbe);
+        }
+
+        bool coreTacticalCloudCondensatePrototype =
+            coreTacticalOreMiningText.Contains("CoreTacticalGasCloudDefinition") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalGasCloud") &&
+            coreTacticalOreMiningText.Contains("rawVolumeLiters") &&
+            coreTacticalOreMiningText.Contains("usefulVolumeLiters") &&
+            coreTacticalOreMiningText.Contains("chemicalDamagePerMinute") &&
+            coreTacticalOreMiningText.Contains("driftVelocityMS") &&
+            coreTacticalOreMiningText.Contains("CanHarvest") &&
+            coreTacticalOreMiningText.Contains("ExtractRawCondensate") &&
+            coreTacticalOreMiningText.Contains("ApplyChemicalContactDamage") &&
+            coreTacticalOreMiningText.Contains("FindObjectsByType<CoreTacticalShipMotor>") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalDamageRequest.Chemical") &&
+            coreTacticalOreMiningText.Contains("UsesPlainTransparentCloudMaterialForTests") &&
+            coreTacticalOreMiningText.Contains("LobeRendererCountForTests") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalMiningModule.Siphon") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalMiningModule.CloudConcentrator") &&
+            coreTacticalOreMiningText.Contains("siphonChannelCount") &&
+            coreTacticalOreMiningText.Contains("siphonLitersPerSecond") &&
+            coreTacticalOreMiningText.Contains("siphonEnergyPerSecond") &&
+            coreTacticalOreMiningText.Contains("AddRawCloudCondensate") &&
+            coreTacticalOreMiningText.Contains("UpdateSiphonForTests") &&
+            coreTacticalOreMiningText.Contains("CoreTacticalSiphonIntakeVisual") &&
+            coreTacticalOreMiningText.Contains("ShowSiphonIntake") &&
+            coreTacticalOreMiningText.Contains("GetSiphonIntakeOrigin") &&
+            !coreTacticalOreMiningText.Contains("Core Tactical Cloud Siphon Beam") &&
+            coreTacticalOreMiningText.Contains("ProcessCloudConcentratorCycle") &&
+            coreTacticalOreMiningText.Contains("cloudConcentratorWaterLitersPerCycle * (1f - concentration)") &&
+            coreTacticalSiphonIntakeText.Contains("CoreTacticalSiphonIntakeVisual") &&
+            coreTacticalSiphonIntakeText.Contains("RingCount = 4") &&
+            coreTacticalSiphonIntakeText.Contains("SegmentCount = 48") &&
+            coreTacticalSiphonIntakeText.Contains("axisDistance = Mathf.Lerp(coneLength, 0.75f, easedTravel)") &&
+            coreTacticalSiphonIntakeText.Contains("radius = Mathf.Lerp(outerRadius, innerRadius, easedTravel)") &&
+            coreTacticalSiphonIntakeText.Contains("time * 0.62f") &&
+            coreTacticalSiphonIntakeText.Contains("radius * 0.075f") &&
+            !coreTacticalUtilityBeamText.Contains("CoreTacticalUtilityBeamPalette.Siphon") &&
+            sortieText.Contains("CoreTacticalGasCloudCount = 3") &&
+            sortieText.Contains("SpawnCoreTacticalGasClouds") &&
+            sortieText.Contains("BuildCoreTacticalGasCloudDefinition") &&
+            sortieText.Contains("SpawnCoreTacticalGasCloud") &&
+            sortieText.Contains("BuildCoreTacticalGasCloudDefinition(config, \"common_cloud\", true") &&
+            sortieText.Contains("BuildCoreTacticalGasCloudDefinition(config, \"wet_cloud\", true") &&
+            sortieText.Contains("BuildCoreTacticalGasCloudDefinition(config, \"common_cloud\", false") &&
+            sortieText.Contains("condensateItemId = harvestable && gasType != null ? gasType.condensateItemId : \"\"") &&
+            sortieText.Contains("usefulLiters = 0f") &&
+            sortieText.Contains("harvestable = harvestable") &&
+            sortieText.Contains("lobeOffsets = new[] { Vector3.zero }") &&
+            sortieText.Contains("lobeSizes = new[] { new Vector3(560f, 180f, 380f) }") &&
+            !sortieText.Contains("new Vector3(-90f, 0f, -35f)") &&
+            !sortieText.Contains("new Vector3(-130f, 0f, 0f)") &&
+            sortieText.Contains("CoreTacticalMiningModule.Siphon") &&
+            sortieText.Contains("CoreTacticalMiningModule.CloudConcentrator") &&
+            sortieText.Contains("keyboard.sKey.wasPressedThisFrame") &&
+            sortieText.Contains("keyboard.kKey.wasPressedThisFrame") &&
+            metaText.Contains("TryAddShipRawCloudCondensateFromRuntime") &&
+            metaText.Contains("FindFirstStoredRawCloudCondensateType") &&
+            metaText.Contains("TrySpendRawCloudCondensate") &&
+            metaText.Contains("capitalStorage.AddRawCloudCondensate") &&
+            playerProgressText.Contains("RawCloudCondensateStackState") &&
+            playerProgressText.Contains("shipRawCloudCondensateCargo") &&
+            playerProgressText.Contains("rawCloudCondensate");
+        report.Check(coreTacticalCloudCondensatePrototype,
+            coreTacticalCloudCondensatePrototype
+                ? "Core Tactical cloud condensate contract is wired: three drifting gas clouds include two harvestable raw condensates plus one empty water cloud, each cloud renders as one plain transparent ellipsoid, contact gas damage uses chemical resistance, siphon channels harvest only while installed/enabled/energized, cloud concentrator vents water without creating clean resources, and raw condensate persists through ship and port stacks."
+                : "Core Tactical cloud condensate contract is incomplete: it must spawn two harvestable clouds plus one empty water cloud, render each cloud as one plain transparent ellipsoid, apply contact gas damage through chemical resistance, gate harvesting behind siphon channels, keep concentrator output as water venting, and persist raw/useful condensate stacks through ship and port storage.");
+
+        bool claudianSlipContractKept =
+            sortieText.Contains("ship.maxForwardSpeedMS * 0.8f") &&
+            sortieText.Contains("EnterActiveSlipAtFullSpeed") &&
+            sortieText.Contains("playerSlipDrive.EnterActiveSlipAtFullSpeed(exitDirection)") &&
+            sortieText.Contains("playerShip.SetCommand(entryFlyThroughTarget, exitDirection)") &&
+            sortieText.Contains("PrimePlayerEntryVelocity(playerShip, exitDirection, ClaudianSlipTargetSpeedMS)") &&
+            sortieText.Contains("flatVelocity.magnitude >= speedFloor - 0.1f") &&
+            sortieText.Contains("ClaudianSlipTargetSpeedMS = 365f") &&
+            sortieText.Contains("ClaudianSlipOverspeedBrakeSeconds = 8f") &&
+            sortieText.Contains("targetForwardSpeedMS = ClaudianSlipTargetSpeedMS") &&
+            sortieText.Contains("overspeedBrakeSeconds = ClaudianSlipOverspeedBrakeSeconds") &&
+            sortieText.Contains("rampDownSeconds = 8.0f") &&
+            sortieText.Contains("Mathf.MoveTowards(") &&
+            sortieText.Contains("ApplyState(false, 1f)") &&
+            sortieText.Contains("ApplyOverspeedBrake(false, deltaSeconds)") &&
+            sortieText.Contains("ApplyOverspeedBrake(active, deltaSeconds)") &&
+            sortieText.Contains("direction * Mathf.Max(0f, targetForwardSpeedMS)") &&
+            sortieText.Contains("Mathf.Max(1f, Mathf.Max(0f, targetForwardSpeedMS) / baseSpeed)") &&
+            sortieText.Contains("ship.forwardAccelerationMultiplier = Mathf.Max(1f, speedMultiplier)") &&
+            sortieText.Contains("requireOutsideMissionZone = false") &&
+            sortieText.Contains("IsBlockedByMissionZone") &&
+            sortieText.Contains("HandleTacticalActionHotkeys") &&
+            sortieText.Contains("keyboard.fKey.wasPressedThisFrame") &&
+            sortieText.Contains("keyboard.yKey.wasPressedThisFrame") &&
+            !sortieText.Contains("TryArmClaudianSlipForExit") &&
+            sortieText.Contains("TrySetArmedWhenAllowed") &&
+            sortieText.Contains("HasClaudianSlipInterference") &&
+            sortieText.Contains("currentForwardSpeedMS + 0.05f < Mathf.Max(0f, minimumEngageSpeedMS)") &&
+            shipMotorText.Contains("forwardAccelerationMultiplier") &&
+            shipMotorText.Contains("maxYawRateDegPerSecond * Mathf.Deg2Rad");
+        report.Check(claudianSlipContractKept,
+            claudianSlipContractKept
+                ? "Core Tactical Claudian slip uses a shared 365 m/s speed, starts the sortie as a full-speed fly-through toward the map center, works anywhere once the ship is fast enough, is controlled by the slip hotkey instead of AUTO EXIT, and brakes overspeed back to normal max over 8s."
+                : "Core Tactical Claudian slip must use shared 365 m/s travel, start the sortie as a full-speed fly-through toward the map center, work anywhere with only speed/interference blockers, stay independent from AUTO EXIT, and explicitly brake overspeed to normal max over 8s.");
+
+        bool coreTacticalEnemyMovementScaled =
+            sortieText.Contains("ClassFrigateAverageSpeedMS = 60f") &&
+            sortieText.Contains("ClassCruiserAverageSpeedMS = 45f") &&
+            sortieText.Contains("ClassBattleshipAverageSpeedMS = 30f") &&
+            sortieText.Contains("ClassFrigateSpeedMultiplier = 2.25f") &&
+            sortieText.Contains("ClassCruiserSpeedMultiplier = 1.5f") &&
+            sortieText.Contains("ClassBattleshipSpeedMultiplier = 1f") &&
+            sortieText.Contains("ClassFrigateAverageYawDegPerSecond = 30f") &&
+            sortieText.Contains("ClassCruiserAverageYawDegPerSecond = 18f") &&
+            sortieText.Contains("ClassBattleshipAverageYawDegPerSecond = 12f") &&
+            sortieText.Contains("ClassFrigateAcceleration90PercentSeconds = 8f") &&
+            sortieText.Contains("ClassCruiserAcceleration90PercentSeconds = 12f") &&
+            sortieText.Contains("ClassBattleshipAcceleration90PercentSeconds = 20f") &&
+            sortieText.Contains("speed += powerPlant.speedDeltaMS") &&
+            sortieText.Contains("speed *= ResolveClassSpeedMultiplier(effectiveClassId)") &&
+            sortieText.Contains("CalculateClassAccelerationMS2") &&
+            sortieText.Contains("EnemyFrigateMaxSpeedMS = ClassFrigateAverageSpeedMS * ClassFrigateSpeedMultiplier") &&
+            sortieText.Contains("EnemyCruiserMaxSpeedMS = ClassCruiserAverageSpeedMS * ClassCruiserSpeedMultiplier") &&
+            sortieText.Contains("EnemyFrigateAccelerationMS2 = EnemyFrigateMaxSpeedMS * NaturalLogTen") &&
+            sortieText.Contains("EnemyCruiserAccelerationMS2 = EnemyCruiserMaxSpeedMS * NaturalLogTen") &&
+            sortieText.Contains("EnemyFrigateBrakingMS2 = EnemyFrigateAccelerationMS2") &&
+            sortieText.Contains("EnemyCruiserBrakingMS2 = EnemyCruiserAccelerationMS2") &&
+            metaText.Contains("DevelopmentFrigateSpeedMultiplier = 2.25f") &&
+            metaText.Contains("DevelopmentCruiserSpeedMultiplier = 1.5f") &&
+            metaText.Contains("speed += power.speedDeltaMS") &&
+            metaText.Contains("speed *= ResolveDevelopmentDockClassSpeedMultiplier(effectiveClassId)") &&
+            !sortieText.Contains("maxForwardSpeedMS = 190f") &&
+            !sortieText.Contains("maxForwardSpeedMS = 102f");
+        report.Check(coreTacticalEnemyMovementScaled,
+            coreTacticalEnemyMovementScaled
+                ? "Core Tactical player profiles, dock profiles and intro enemies multiply the whole configured package speed by class: frigates x2.25, cruisers x1.5, battleships x1."
+                : "Core Tactical class movement must multiply the whole configured package speed by class: frigates x2.25, cruisers x1.5, battleships x1.");
+
+        bool coreTacticalMotorDoesNotDragCapCruiseSpeed =
+            shipMotorText.Contains("body.linearDamping = 0f") &&
+            shipMotorText.Contains("Mathf.Exp") &&
+            shipMotorText.Contains("forwardAccelerationMS2") &&
+            !shipMotorText.Contains("body.linearDamping = 0.22f");
+        report.Check(coreTacticalMotorDoesNotDragCapCruiseSpeed,
+            coreTacticalMotorDoesNotDragCapCruiseSpeed
+                ? "Core Tactical ship motor disables Rigidbody linear damping so a scaled Korshun profile is not capped around 40 m/s."
+                : "Core Tactical ship motor must not use Rigidbody linear damping that caps a scaled Korshun profile around 40 m/s.");
+
+        bool coreTacticalMotorKeepsCruiseSpeedWhileTurning =
+            shipMotorText.Contains("noseFirstYawReadyDeg = 95f") &&
+            shipMotorText.Contains("noseFirstYawHardGateDeg = 170f") &&
+            shipMotorText.Contains("noseFirstYawReadyDeg = Mathf.Clamp(noseFirstYawReadyDeg, 1f, 140f)") &&
+            shipMotorText.Contains("noseFirstYawHardGateDeg = Mathf.Clamp(noseFirstYawHardGateDeg, noseFirstYawReadyDeg + 1f, 179f)") &&
+            bootstrapText.Contains("motor.noseFirstYawReadyDeg = 95f") &&
+            bootstrapText.Contains("motor.noseFirstYawHardGateDeg = 170f") &&
+            !bootstrapText.Contains("motor.noseFirstYawHardGateDeg = 110f");
+        report.Check(coreTacticalMotorKeepsCruiseSpeedWhileTurning,
+            coreTacticalMotorKeepsCruiseSpeedWhileTurning
+                ? "Core Tactical ship motor keeps cruise speed through normal turns instead of throttling Korshun back to the old low-speed behavior."
+                : "Core Tactical ship motor yaw-readiness can still throttle normal turns; do not allow the old low-speed Korshun behavior back.");
+
+        bool coreTacticalMotorArrivalStable =
+            shipMotorText.Contains("Mathf.Exp") &&
+            shipMotorText.Contains("CalculateDynamicSlowdownDistance") &&
+            shipMotorText.Contains("CalculateArrivalSpeedLimit") &&
+            shipMotorText.Contains("CalculateLateralDriftDampingVelocity") &&
+            shipMotorText.Contains("ArrivalHardBrakeMultiplier") &&
+            shipMotorText.Contains("currentClosingSpeed") &&
+            shipMotorText.Contains("lateralStopDistance") &&
+            shipMotorText.Contains("TryCompleteFlatArrival") &&
+            shipMotorText.Contains("targetPosition.x = body.position.x") &&
+            shipMotorText.Contains("targetPosition.z = body.position.z") &&
+            shipMotorText.Contains("arrivalLockSpeedMS") &&
+            !shipMotorText.Contains("body.MovePosition(settledPosition)") &&
+            bootstrapText.Contains("arrivalRadiusMeters = Mathf.Clamp(size.z * 0.14f, 8f, 42f)") &&
+            bootstrapText.Contains("arrivalLockSpeedMS = Mathf.Max(1.5f, maxForwardSpeedMS * 0.05f)");
+        report.Check(coreTacticalMotorArrivalStable,
+            coreTacticalMotorArrivalStable
+                ? "Core Tactical ship motor uses current-speed arrival braking, lateral drift damping, and a size-based arrival radius without snapping to the exact marker."
+                : "Core Tactical ship motor must brake from current/slip speed and damp lateral drift so ships stop inside the command radius without orbiting it.");
+
+        bool dockCoreLaunchUsesDevelopmentMotion =
+            metaText.Contains("BeginSessionExtractionSortie(CreateCoreTacticalIntroCombatSortieDefinition(), true)") &&
+            metaText.Contains("TryBuildDevelopmentDockShipMotionProfile") &&
+            metaText.Contains("ApplyDevelopmentDockShipMotionProfile") &&
+            metaText.Contains("ResolveDevelopmentDockClassSpeedMultiplier") &&
+            metaText.Contains("KorshunPreferredDefaultHullPackageId = \"korshun_hull_fast\"") &&
+            metaText.Contains("ShouldRefreshDevelopmentDockDefaultPackage") &&
+            metaText.Contains("slot.loadoutDefaultsVersion = DevelopmentDockLoadoutDefaultsVersion") &&
+            metaText.Contains("ship.baseMaxSpeedMS = speed") &&
+            metaText.Contains("ship.hullForwardThrustKgf") &&
+            !metaText.Contains("CreateQuickAdaptiveManualSortieDefinition") &&
+            !metaText.Contains("BeginQuickAdaptiveManualSessionSortie") &&
+            !metaText.Contains("GetDevelopmentDockOrdinaryMissionOffers") &&
+            !metaText.Contains("TryRunDevelopmentDockOrdinaryMission");
+        report.Check(dockCoreLaunchUsesDevelopmentMotion,
+            dockCoreLaunchUsesDevelopmentMotion
+                ? "Core Combat is the only dock combat launch route and applies selected development hull and power-plant motion to the live session ship."
+                : "Dock launch cleanup is incomplete: only Core Combat should remain, and it must still apply selected development hull and power-plant motion.");
 #else
         report.Check(true, "Core Tactical prototype transfer source scan is editor-only and skipped in player builds.");
 #endif
+    }
+
+    private static void ValidateCoreTacticalMotorArrivalBraking(BigTestReport report)
+    {
+        GameObject probe = null;
+        try
+        {
+            probe = new GameObject("Big Test Core Tactical Motor Arrival Brake Probe");
+            probe.transform.SetPositionAndRotation(new Vector3(0f, 80f, 0f), Quaternion.identity);
+            Rigidbody body = probe.AddComponent<Rigidbody>();
+            CoreTacticalShipMotor motor = probe.AddComponent<CoreTacticalShipMotor>();
+            motor.InitializePrototypeShip(
+                "arrival_brake_probe",
+                "Arrival Brake Probe",
+                new Vector3(10f, 4f, 32f),
+                Color.cyan);
+            motor.obstacleAvoidanceEnabled = false;
+            motor.maxForwardSpeedMS = 72f;
+            motor.maxReverseSpeedMS = 10f;
+            motor.maxLateralSpeedMS = 8f;
+            motor.forwardSpeedMultiplier = 1f;
+            motor.forwardAccelerationMultiplier = 1f;
+            motor.forwardAccelerationMS2 = 72f * 2.3025851f / 8f;
+            motor.brakingAccelerationMS2 = motor.forwardAccelerationMS2;
+            motor.lateralAccelerationMS2 = 12f;
+            motor.slowdownDistanceMeters = 46f;
+            motor.arrivalRadiusMeters = 8f;
+            motor.arrivalLockSpeedMS = 2f;
+            motor.maxYawRateDegPerSecond = 120f;
+            motor.finalFacingDistanceMeters = 24f;
+
+            body.useGravity = false;
+            body.linearDamping = 0f;
+            body.angularDamping = 0f;
+            body.position = probe.transform.position;
+            body.rotation = probe.transform.rotation;
+            body.linearVelocity = new Vector3(0f, 0f, 365f);
+
+            Vector3 commandPoint = new Vector3(0f, 80f, 3800f);
+            motor.SetCommand(commandPoint, Vector3.forward);
+
+            float deltaSeconds = Mathf.Max(0.001f, Time.fixedDeltaTime);
+            float minimumDistance = float.PositiveInfinity;
+            float lastDistance = float.PositiveInfinity;
+            float finalFlatSpeed = float.PositiveInfinity;
+            bool ticked = true;
+            for (int i = 0; i < 2400; i++)
+            {
+                ticked = TryInvokePrivateMethod(motor, "FixedUpdate", report);
+                if (!ticked)
+                {
+                    break;
+                }
+
+                Vector3 nextPosition = body.position + body.linearVelocity * deltaSeconds;
+                body.position = nextPosition;
+                probe.transform.position = nextPosition;
+
+                Vector3 flatDelta = commandPoint - body.position;
+                flatDelta.y = 0f;
+                lastDistance = flatDelta.magnitude;
+                minimumDistance = Mathf.Min(minimumDistance, lastDistance);
+                Vector3 flatVelocity = body.linearVelocity;
+                flatVelocity.y = 0f;
+                finalFlatSpeed = flatVelocity.magnitude;
+
+                if (lastDistance <= motor.arrivalRadiusMeters + 0.5f
+                    && finalFlatSpeed <= motor.arrivalLockSpeedMS + 0.5f)
+                {
+                    break;
+                }
+            }
+
+            bool straightArrivalBrakeStable = ticked
+                && minimumDistance <= motor.arrivalRadiusMeters + 1.5f
+                && lastDistance <= motor.arrivalRadiusMeters + 1.5f
+                && finalFlatSpeed <= motor.arrivalLockSpeedMS + 0.75f;
+
+            Vector3 lateralStartPosition = new Vector3(0f, 80f, 0f);
+            Quaternion lateralStartRotation = Quaternion.LookRotation(Vector3.right, Vector3.up);
+            probe.transform.SetPositionAndRotation(lateralStartPosition, lateralStartRotation);
+            body.position = lateralStartPosition;
+            body.rotation = lateralStartRotation;
+            body.angularVelocity = Vector3.zero;
+            body.linearVelocity = new Vector3(70f, 0f, 0f);
+            motor.SetCommand(new Vector3(0f, 80f, 800f), Vector3.forward);
+            float initialLateralSpeed = Mathf.Abs(body.linearVelocity.x);
+            ticked = ticked && TryInvokePrivateMethod(motor, "FixedUpdate", report);
+            float dampedLateralSpeed = Mathf.Abs(body.linearVelocity.x);
+            bool lateralDriftDamped = ticked && dampedLateralSpeed < initialLateralSpeed - 0.05f;
+
+            report.Check(straightArrivalBrakeStable && lateralDriftDamped,
+                straightArrivalBrakeStable && lateralDriftDamped
+                    ? "Core Tactical motor brakes an overspeed ship into the command point and damps tangential drift: distance "
+                        + lastDistance.ToString("0.###")
+                        + " m, speed "
+                        + finalFlatSpeed.ToString("0.###")
+                        + " m/s, lateral "
+                        + initialLateralSpeed.ToString("0.###")
+                        + " -> "
+                        + dampedLateralSpeed.ToString("0.###")
+                        + " m/s."
+                    : "Core Tactical motor must brake before the command point and damp side drift instead of overshooting/orbiting: straight min distance "
+                        + minimumDistance.ToString("0.###")
+                        + " m, final distance "
+                        + lastDistance.ToString("0.###")
+                        + " m, speed "
+                        + finalFlatSpeed.ToString("0.###")
+                        + " m/s, lateral "
+                        + initialLateralSpeed.ToString("0.###")
+                        + " -> "
+                        + dampedLateralSpeed.ToString("0.###")
+                        + " m/s.");
+        }
+        finally
+        {
+            DestroyBigTestObject(probe);
+        }
+    }
+
+    private static void ValidateCoreTacticalOreTargetingRules(BigTestReport report)
+    {
+        GameObject normalObject = null;
+        GameObject boulderObject = null;
+        try
+        {
+            normalObject = new GameObject("Big Test Core Tactical Enemy Target Probe");
+            Rigidbody normalBody = normalObject.AddComponent<Rigidbody>();
+            normalBody.useGravity = false;
+            CoreTacticalShipMotor normalMotor = normalObject.AddComponent<CoreTacticalShipMotor>();
+            CoreTacticalCombatant normalCombatant = normalObject.AddComponent<CoreTacticalCombatant>();
+            normalCombatant.team = CoreTacticalCombatTeam.Enemy;
+            normalCombatant.ship = normalMotor;
+
+            boulderObject = new GameObject("Big Test Core Tactical Ore Target Probe");
+            Rigidbody boulderBody = boulderObject.AddComponent<Rigidbody>();
+            boulderBody.useGravity = false;
+            CoreTacticalShipMotor boulderMotor = boulderObject.AddComponent<CoreTacticalShipMotor>();
+            CoreTacticalCombatant boulderCombatant = boulderObject.AddComponent<CoreTacticalCombatant>();
+            boulderCombatant.team = CoreTacticalCombatTeam.Enemy;
+            boulderCombatant.ship = boulderMotor;
+            boulderObject.AddComponent<CoreTacticalOreBoulder>();
+
+            bool normalAuto = CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(normalCombatant, CoreTacticalCombatTeam.Enemy);
+            bool boulderNotAuto = !CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(boulderCombatant, CoreTacticalCombatTeam.Enemy);
+            bool boulderExplicit = CoreTacticalOreTargetingRules.IsValidExplicitTarget(boulderMotor, CoreTacticalCombatTeam.Enemy);
+            CoreTacticalPriorityTargetControl priority = normalObject.AddComponent<CoreTacticalPriorityTargetControl>();
+            priority.SetPriorityTarget(boulderMotor);
+            bool priorityAcceptsBoulder = priority.TryGetPriorityTarget(CoreTacticalCombatTeam.Enemy, out CoreTacticalShipMotor resolved)
+                && resolved == boulderMotor;
+            bool oreTargetingRulesKept = normalAuto && boulderNotAuto && boulderExplicit && priorityAcceptsBoulder;
+
+            report.Check(oreTargetingRulesKept,
+                oreTargetingRulesKept
+                    ? "Core Tactical ore boulders are explicit-only targets: weapons skip them during automatic target search, but priority targeting accepts them."
+                    : "Core Tactical ore boulders must not be automatic weapon targets, but must remain valid explicit priority targets.");
+        }
+        finally
+        {
+            DestroyBigTestObject(normalObject);
+            DestroyBigTestObject(boulderObject);
+        }
+    }
+
+    private static void ValidateCoreTacticalLeviathanBehavior(BigTestReport report)
+    {
+#if UNITY_EDITOR
+        string leviathanText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalLeviathan.cs");
+        string sortieText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalCombatSortieController.cs");
+        string fleetText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalFleetController.cs");
+        string oreMiningText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalOreMining.cs");
+        string bootstrapText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalPrototypeBootstrap.cs");
+        string designText = ReadProjectText("Docs/SessionExtractionCore.md");
+        bool structuralOk =
+            leviathanText.Contains("BiteAllowedTargetLengthRatio = 0.35f") &&
+            leviathanText.Contains("LethalBiteTargetLengthRatio = 0.20f") &&
+            leviathanText.Contains("TooSmallLeviathanToTargetRatio = 0.30f") &&
+            leviathanText.Contains("EdibleBodyLengthRatio = 1f / 3f") &&
+            leviathanText.Contains("DefaultAttackCommitSeconds = 20f") &&
+            leviathanText.Contains("aggressionPerSecondNear = 0.095f") &&
+            leviathanText.Contains("aggressionPerSecondClose = 0.064f") &&
+            leviathanText.Contains("aggressionDecayPerSecond = 1f / 30f") &&
+            leviathanText.Contains("artilleryReportAggression = 0.02f") &&
+            leviathanText.Contains("directDamageAggression = 0.315f") &&
+            leviathanText.Contains("nearExplosionAggression = 0.06f") &&
+            leviathanText.Contains("CommandStalkTarget") &&
+            leviathanText.Contains("TryIdleWander") &&
+            leviathanText.Contains("CalculateProximityAggressionRateForTests") &&
+            leviathanText.Contains("CalculateNetProximityAggressionRateForTests") &&
+            leviathanText.Contains("DecayPreAttackAggression") &&
+            leviathanText.Contains("CoreTacticalShipMotor attackTarget = IsLiveTarget(currentTarget)") &&
+            leviathanText.Contains("CoreTacticalShipMotor aggressionTarget = target") &&
+            leviathanText.Contains("outer01 * outer01") &&
+            leviathanText.Contains("NotifyArtilleryReport") &&
+            leviathanText.Contains("NotifyProjectileImpact") &&
+            leviathanText.Contains("NotifyDirectDamageForTests") &&
+            leviathanText.Contains("TryEatOreFragmentForTests") &&
+            leviathanText.Contains("TryEatOreBoulderForTests") &&
+            leviathanText.Contains("TryEatAutomatonWreckForTests") &&
+            leviathanText.Contains("ApplyContactAttackDamageForTests") &&
+            leviathanText.Contains("ShouldAvoidCloudForTests") &&
+            leviathanText.Contains("passiveRegenerationPercentPerSecond") &&
+            sortieText.Contains("SpawnCoreTacticalLeviathans(center)") &&
+            sortieText.Contains("BuildLeviathanProfile") &&
+            sortieText.Contains("new Color(0.56f, 0.20f, 0.86f, 1f)") &&
+            sortieText.Contains("leviathan.Aggression01") &&
+            sortieText.Contains("inspectedLeviathan") &&
+            sortieText.Contains("DrawLeviathanInfoPanel") &&
+            sortieText.Contains("DrawInspectedShipInfoPanel") &&
+            sortieText.Contains("DrawGasCloudInfoPanel") &&
+            sortieText.Contains("SetInspectedLeviathanAsPriorityTarget") &&
+            sortieText.Contains("IsShipTargetingInspectedLeviathan") &&
+            sortieText.Contains("TryInspectScreenPointFromSelection") &&
+            sortieText.Contains("TryInspectScreenRectFromSelection") &&
+            sortieText.Contains("TryInspectHitFromSelection") &&
+            sortieText.Contains("TryGetWorldObjectScreenRect") &&
+            sortieText.Contains("InspectionPickMinimumHalfSizePixels") &&
+            sortieText.Contains("for (int i = 0; i < enemyShips.Count; i++)") &&
+            sortieText.Contains("for (int i = 0; i < gasClouds.Count; i++)") &&
+            sortieText.Contains("InspectShip(enemy)") &&
+            sortieText.Contains("InspectGasCloud(cloud)") &&
+            sortieText.Contains("IsInspectableCombatShip") &&
+            sortieText.Contains("ATTACK") &&
+            sortieText.Contains("CLEAR") &&
+            fleetText.Contains("TryInspectScreenRectFromSelection(selectionRect)") &&
+            fleetText.Contains("TryInspectScreenPointFromSelection(mousePosition)") &&
+            fleetText.Contains("TryInspectHitFromSelection(hit)") &&
+            fleetText.Contains("GetComponent<CoreTacticalLeviathanController>() != null") &&
+            oreMiningText.Contains("ConsumeByLeviathan") &&
+            oreMiningText.Contains("ApproximateLengthMeters") &&
+            oreMiningText.Contains("ChemicalDamagePerMinute") &&
+            oreMiningText.Contains("DriftVelocityMS") &&
+            oreMiningText.Contains("leviathan.IsAutomaticWeaponTarget") &&
+            bootstrapText.Contains("createDeathExplosionVisual") &&
+            leviathanText.Contains("health.createDeathExplosionVisual = false") &&
+            bootstrapText.Contains("NotifyArtilleryReport(muzzlePosition, maxRangeMeters, owner)") &&
+            bootstrapText.Contains("NotifyProjectileImpact(position, explosionRadiusMeters, 0.06f)") &&
+            designText.Contains("Leviathan Baseline Combat Contract");
+        report.Check(structuralOk,
+            structuralOk
+                ? "Core Tactical leviathan contract is documented and wired: purple predator spawns, aggression bar, inspection/attack panel, bite thresholds, too-large-prey retreat, direct-hit anger, stalking, wandering, boulder/wreck feeding and cloud avoidance are present in source."
+                : "Core Tactical leviathan source wiring is incomplete: verify docs, spawn, purple/aggression HUD, inspection/attack panel, bite thresholds, too-large-prey retreat, direct-hit anger, stalking, wandering, feeding and cloud avoidance.");
+#else
+        report.Check(true, "Core Tactical leviathan source scan is editor-only and skipped in player builds.");
+#endif
+
+        GameObject root = null;
+        CoreTacticalShipMotor leviathanShip = null;
+        CoreTacticalShipMotor tinyTarget = null;
+        CoreTacticalShipMotor mediumTarget = null;
+        CoreTacticalShipMotor hugeTarget = null;
+        CoreTacticalShipMotor smallLeviathanShip = null;
+        GameObject attackSnackObject = null;
+        GameObject fragmentObject = null;
+        GameObject boulderSnackObject = null;
+        GameObject wreckSnackObject = null;
+        CoreTacticalShipMotor idleLeviathanShip = null;
+        GameObject cloudObject = null;
+        GameObject inspectCameraObject = null;
+        RenderTexture inspectTexture = null;
+        GameObject tinyInspectObject = null;
+        try
+        {
+            root = new GameObject("Big Test Core Tactical Leviathan Contract Root");
+            Vector3 origin = new Vector3(980000f, 980000f, 980000f);
+            Color leviathanPurple = new Color(0.56f, 0.20f, 0.86f, 1f);
+
+            leviathanShip = CoreTacticalPrototypeBootstrap.CreatePrototypeShip(
+                null,
+                "big_test_leviathan_100m",
+                "Big Test 100m Leviathan",
+                origin,
+                Quaternion.identity,
+                new Vector3(24f, 15f, 100f),
+                90f,
+                32f,
+                42f,
+                26f,
+                12f,
+                12f,
+                1400000f,
+                false,
+                leviathanPurple);
+            leviathanShip.transform.SetParent(root.transform, true);
+            CoreTacticalCombatant leviathanCombatant = leviathanShip.GetComponent<CoreTacticalCombatant>();
+            if (leviathanCombatant != null)
+            {
+                leviathanCombatant.team = CoreTacticalCombatTeam.Enemy;
+                leviathanCombatant.ship = leviathanShip;
+            }
+
+            CoreTacticalPrototypeHealth leviathanHealth = leviathanShip.GetComponent<CoreTacticalPrototypeHealth>();
+            if (leviathanHealth != null)
+            {
+                leviathanHealth.maxHealth = 2000f;
+                leviathanHealth.ResetHealth();
+            }
+
+            CoreTacticalDamageProfile leviathanDamageProfile = leviathanShip.GetComponent<CoreTacticalDamageProfile>();
+            if (leviathanDamageProfile != null)
+            {
+                leviathanDamageProfile.ConfigureDefense(
+                    "leviathan",
+                    2000f,
+                    CoreTacticalDamageProfile.ResolveClassBaselineResistances("leviathan"),
+                    0f,
+                    0f);
+            }
+
+            CoreTacticalLeviathanController leviathan = leviathanShip.gameObject.AddComponent<CoreTacticalLeviathanController>();
+            leviathan.Configure(100f);
+            leviathan.aggressionRadiusMeters = 900f;
+            leviathan.closeAggressionRadiusMeters = 280f;
+            bool calmAggressionCurveOk =
+                Approximately(1f / Mathf.Max(0.001f, leviathan.aggressionDecayPerSecond), 30f, 0.01f) &&
+                Approximately(leviathan.CalculateNetProximityAggressionRateForTests(0f), 0.125f, 0.004f) &&
+                Approximately(1f / Mathf.Max(0.001f, leviathan.CalculateNetProximityAggressionRateForTests(0f)), 8f, 0.35f) &&
+                Approximately(leviathan.CalculateNetProximityAggressionRateForTests(140f), 0.05f, 0.006f) &&
+                Approximately(1f / Mathf.Max(0.001f, leviathan.CalculateNetProximityAggressionRateForTests(140f)), 20f, 2.5f) &&
+                Approximately(leviathan.CalculateNetProximityAggressionRateForTests(450f), 0f, 0.001f) &&
+                leviathan.artilleryReportAggression <= 0.021f &&
+                Approximately(leviathan.directDamageAggression, 0.315f, 0.001f) &&
+                leviathan.nearExplosionAggression <= 0.061f;
+            bool leviathanDeathBurstDisabledOk = leviathanHealth != null && !leviathanHealth.createDeathExplosionVisual;
+
+            tinyTarget = CreateLeviathanTestShip(
+                root.transform,
+                "big_test_tiny_bite_target",
+                "Big Test Tiny Bite Target",
+                origin + new Vector3(120f, 0f, 0f),
+                new Vector3(6f, 4f, 20f),
+                60000f,
+                1000f,
+                CoreTacticalCombatTeam.Friendly);
+            mediumTarget = CreateLeviathanTestShip(
+                root.transform,
+                "big_test_medium_ram_target",
+                "Big Test Medium Ram Target",
+                origin + new Vector3(360f, 0f, 0f),
+                new Vector3(12f, 7f, 60f),
+                520000f,
+                1800f,
+                CoreTacticalCombatTeam.Friendly);
+            hugeTarget = CreateLeviathanTestShip(
+                root.transform,
+                "big_test_huge_safe_target",
+                "Big Test Huge Safe Target",
+                origin + new Vector3(650f, 0f, 0f),
+                new Vector3(70f, 36f, 360f),
+                9000000f,
+                15000f,
+                CoreTacticalCombatTeam.Friendly);
+
+            smallLeviathanShip = CoreTacticalPrototypeBootstrap.CreatePrototypeShip(
+                null,
+                "big_test_small_leviathan_20m",
+                "Big Test 20m Leviathan",
+                origin + new Vector3(0f, 0f, 520f),
+                Quaternion.identity,
+                new Vector3(6f, 4f, 20f),
+                120f,
+                48f,
+                58f,
+                44f,
+                18f,
+                18f,
+                25000f,
+                false,
+                leviathanPurple);
+            smallLeviathanShip.transform.SetParent(root.transform, true);
+            CoreTacticalLeviathanController smallLeviathan = smallLeviathanShip.gameObject.AddComponent<CoreTacticalLeviathanController>();
+            smallLeviathan.Configure(20f);
+
+            bool thresholdsOk =
+                CoreTacticalLeviathanController.CanBiteTarget(100f, 34.9f) &&
+                !CoreTacticalLeviathanController.CanBiteTarget(100f, 35.1f) &&
+                CoreTacticalLeviathanController.IsLethalBiteTarget(100f, 19.9f) &&
+                !CoreTacticalLeviathanController.IsLethalBiteTarget(100f, 20.1f) &&
+                CoreTacticalLeviathanController.IsLeviathanTooSmallForTarget(29.9f, 100f) &&
+                !CoreTacticalLeviathanController.IsLeviathanTooSmallForTarget(30.1f, 100f) &&
+                CoreTacticalLeviathanController.CanEatBodyByLength(100f, 33.3f) &&
+                !CoreTacticalLeviathanController.CanEatBodyByLength(100f, 34f);
+
+            CoreTacticalPrototypeHealth tinyHealth = tinyTarget != null ? tinyTarget.GetComponent<CoreTacticalPrototypeHealth>() : null;
+            float biteDamage = leviathan.ApplyAttackDamageForTests(tinyTarget, 44f);
+            bool lethalBiteOk = biteDamage > 0f && tinyHealth != null && tinyHealth.currentHealth <= 0f;
+
+            CoreTacticalPrototypeHealth mediumHealth = mediumTarget != null ? mediumTarget.GetComponent<CoreTacticalPrototypeHealth>() : null;
+            float mediumBefore = mediumHealth != null ? mediumHealth.currentHealth : 0f;
+            float slowRamDamage = leviathan.ApplyContactAttackDamageForTests(mediumTarget, 12f);
+            float mediumAfterSlowRam = mediumHealth != null ? mediumHealth.currentHealth : 0f;
+            float fastRamDamage = leviathan.ApplyContactAttackDamageForTests(mediumTarget, 44f);
+            bool minimumRamSpeedOk = Approximately(slowRamDamage, 0f, 0.001f)
+                && mediumHealth != null
+                && Approximately(mediumAfterSlowRam, mediumBefore, 0.001f)
+                && fastRamDamage > 0f
+                && mediumHealth.currentHealth < mediumAfterSlowRam;
+            if (mediumHealth != null)
+            {
+                mediumHealth.ResetHealth();
+            }
+
+            bool tooLargeRetreatOk = smallLeviathan.ShouldRetreatFromTargetForTests(hugeTarget);
+            smallLeviathan.AddAggressionForTests(1f, hugeTarget);
+            bool tooLargeDoesNotAggroOk = Approximately(smallLeviathan.Aggression01, 0f, 0.001f);
+            bool calmNotAutomatic = !CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(leviathanCombatant, CoreTacticalCombatTeam.Enemy);
+            smallLeviathan.NotifyDirectDamageForTests(mediumTarget);
+            bool directDamageAggressionOk = smallLeviathan.CurrentTarget == mediumTarget
+                && Approximately(smallLeviathan.Aggression01, 0.315f, 0.002f);
+
+            Vector3 stalkCommandBefore = leviathanShip.TargetPosition;
+            leviathan.AddAggressionForTests(0.2f, mediumTarget);
+            leviathan.TickForTests(0.1f);
+            bool stalkWhileBuildingOk = !leviathan.IsAttackCommitted
+                && leviathan.CurrentTarget == mediumTarget
+                && Vector3.Distance(leviathanShip.TargetPosition, stalkCommandBefore) > 1f;
+
+            idleLeviathanShip = CoreTacticalPrototypeBootstrap.CreatePrototypeShip(
+                null,
+                "big_test_idle_leviathan_30m",
+                "Big Test Idle Leviathan",
+                origin + new Vector3(5000f, 0f, 5000f),
+                Quaternion.identity,
+                new Vector3(8f, 5f, 30f),
+                115f,
+                42f,
+                54f,
+                36f,
+                16f,
+                16f,
+                65000f,
+                false,
+                leviathanPurple);
+            idleLeviathanShip.transform.SetParent(root.transform, true);
+            CoreTacticalLeviathanController idleLeviathan = idleLeviathanShip.gameObject.AddComponent<CoreTacticalLeviathanController>();
+            idleLeviathan.Configure(30f);
+            Vector3 idleCommandBefore = idleLeviathanShip.TargetPosition;
+            idleLeviathan.ForceIdleWanderForTests();
+            idleLeviathan.TickForTests(0.1f);
+            bool idleWanderOk = Vector3.Distance(idleLeviathanShip.TargetPosition, idleCommandBefore) > 20f;
+
+            bool explicitTargetOk = CoreTacticalOreTargetingRules.IsValidExplicitTarget(leviathanShip, CoreTacticalCombatTeam.Enemy);
+            bool inspectableShipOk = CoreTacticalCombatSortieController.IsInspectableCombatShipForTests(leviathanShip)
+                && !CoreTacticalCombatSortieController.IsInspectableCombatShipForTests(mediumTarget);
+            attackSnackObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            attackSnackObject.name = "Big Test Leviathan Attack Priority Snack";
+            attackSnackObject.transform.SetParent(root.transform, false);
+            attackSnackObject.transform.position = leviathanShip.transform.position + new Vector3(10f, 0f, 10f);
+            CoreTacticalOreFragment attackSnack = attackSnackObject.AddComponent<CoreTacticalOreFragment>();
+            attackSnack.Initialize("windshale", "windshale_ore", "Windshale", 1000f, 0.10f, 3f, origin.y - 500f, Color.gray);
+            if (leviathanHealth != null)
+            {
+                leviathanHealth.currentHealth = leviathanHealth.maxHealth * 0.45f;
+            }
+
+            leviathan.AddAggressionForTests(1f, mediumTarget);
+            bool angryAutomatic = CoreTacticalOreTargetingRules.IsAutomaticCombatTarget(leviathanCombatant, CoreTacticalCombatTeam.Enemy);
+            leviathan.TickForTests(0.1f);
+            bool attackCommitOk = leviathan.IsAttackCommitted
+                && leviathan.CurrentTarget == mediumTarget
+                && attackSnack.rawMassKg > 0f;
+            DestroyBigTestObject(attackSnackObject);
+            attackSnackObject = null;
+            if (leviathanHealth != null)
+            {
+                leviathanHealth.ResetHealth();
+            }
+
+            CoreTacticalLeviathanController reportLeviathan = smallLeviathan;
+            int reportAffected = CoreTacticalLeviathanController.NotifyArtilleryReport(
+                smallLeviathanShip.transform.position + new Vector3(35f, 0f, 0f),
+                300f,
+                mediumTarget);
+            bool artilleryReportOk = reportAffected > 0 && reportLeviathan.Aggression01 > 0f;
+
+            int explosionAffected = CoreTacticalLeviathanController.NotifyProjectileImpact(leviathanShip.transform.position, 120f, 0.5f);
+            bool projectileImpactOk = explosionAffected > 0 && leviathan.Aggression01 > 0f;
+
+            fragmentObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            fragmentObject.name = "Big Test Leviathan Ore Snack";
+            fragmentObject.transform.SetParent(root.transform, false);
+            fragmentObject.transform.position = leviathanShip.transform.position + new Vector3(10f, 0f, 0f);
+            CoreTacticalOreFragment fragment = fragmentObject.AddComponent<CoreTacticalOreFragment>();
+            fragment.Initialize("windshale", "windshale_ore", "Windshale", 1000f, 0.10f, 3f, origin.y - 500f, Color.gray);
+            if (leviathanHealth != null)
+            {
+                leviathanHealth.currentHealth = 1000f;
+            }
+
+            float healthBeforeSnack = leviathanHealth != null ? leviathanHealth.currentHealth : 0f;
+            bool ateFragment = leviathan.TryEatOreFragmentForTests(fragment);
+            bool feedingOk = ateFragment
+                && fragment.rawMassKg <= 0f
+                && leviathanHealth != null
+                && leviathanHealth.currentHealth > healthBeforeSnack;
+
+            boulderSnackObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            boulderSnackObject.name = "Big Test Leviathan Boulder Snack";
+            boulderSnackObject.transform.SetParent(root.transform, false);
+            boulderSnackObject.transform.position = leviathanShip.transform.position + new Vector3(16f, 0f, 0f);
+            CoreTacticalPrototypeHealth boulderSnackHealth = boulderSnackObject.AddComponent<CoreTacticalPrototypeHealth>();
+            CoreTacticalOreBoulder boulderSnack = boulderSnackObject.AddComponent<CoreTacticalOreBoulder>();
+            boulderSnack.Initialize(new CoreTacticalOreBoulderDefinition
+            {
+                oreTypeId = "windshale",
+                oreItemId = "windshale_ore",
+                displayName = "Big Test Edible Boulder",
+                sizeMeters = new Vector3(20f, 20f, 20f),
+                densityKgPerCubicMeter = 3000f,
+                healthPerDiameterMeter = 10f
+            }, boulderSnackHealth, origin.y - 500f);
+            if (leviathanHealth != null)
+            {
+                leviathanHealth.currentHealth = 1000f;
+            }
+
+            float healthBeforeBoulderSnack = leviathanHealth != null ? leviathanHealth.currentHealth : 0f;
+            bool ateBoulder = leviathan.TryEatOreBoulderForTests(boulderSnack);
+            bool boulderFeedingOk = ateBoulder
+                && boulderSnack.PhysicalMassKg <= 0f
+                && leviathanHealth != null
+                && leviathanHealth.currentHealth > healthBeforeBoulderSnack;
+
+            wreckSnackObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wreckSnackObject.name = "Big Test Leviathan Wreck Snack";
+            wreckSnackObject.transform.SetParent(root.transform, false);
+            wreckSnackObject.transform.position = leviathanShip.transform.position + new Vector3(22f, 0f, 0f);
+            CoreTacticalAutomatonWreck wreckSnack = wreckSnackObject.AddComponent<CoreTacticalAutomatonWreck>();
+            wreckSnack.Initialize(
+                "Big Test Edible Wreck",
+                12000f,
+                140f,
+                -20f,
+                CoreTacticalAutomatonWreck.BuildDefaultManifest(20f),
+                20f * 0.38f);
+            if (leviathanHealth != null)
+            {
+                leviathanHealth.currentHealth = 1000f;
+            }
+
+            float healthBeforeWreckSnack = leviathanHealth != null ? leviathanHealth.currentHealth : 0f;
+            bool ateWreck = leviathan.TryEatAutomatonWreckForTests(wreckSnack);
+            bool wreckFeedingOk = ateWreck
+                && wreckSnack.currentHealth <= 0f
+                && leviathanHealth != null
+                && leviathanHealth.currentHealth > healthBeforeWreckSnack;
+
+            cloudObject = new GameObject("Big Test Leviathan Harmful Cloud");
+            cloudObject.transform.SetParent(root.transform, false);
+            cloudObject.transform.position = leviathanShip.transform.position;
+            CoreTacticalGasCloud cloud = cloudObject.AddComponent<CoreTacticalGasCloud>();
+            cloud.Initialize(new CoreTacticalGasCloudDefinition
+            {
+                condensateItemId = "cloud_condensate",
+                displayName = "Big Test Harmful Cloud",
+                rawVolumeLiters = 1000f,
+                usefulVolumeLiters = 120f,
+                chemicalDamagePerMinute = 60f,
+                harvestable = true,
+                lobeOffsets = new[] { Vector3.zero },
+                lobeSizes = new[] { new Vector3(180f, 120f, 180f) }
+            });
+            float healthBeforeCloud = leviathanHealth != null ? leviathanHealth.currentHealth : 0f;
+            cloud.ApplyChemicalContactDamageForTests(60f);
+            bool cloudOk = leviathan.ShouldAvoidCloudForTests(cloud)
+                && leviathanHealth != null
+                && leviathanHealth.currentHealth < healthBeforeCloud;
+
+            bool armorOk = leviathanDamageProfile != null
+                && leviathanDamageProfile.KineticResistancePercent >= 40f
+                && leviathanDamageProfile.ChemicalResistancePercent >= 90f
+                && leviathanDamageProfile.ThermalResistancePercent >= 80f;
+            bool purpleOk = Approximately(leviathanShip.normalColor.r, leviathanPurple.r, 0.001f)
+                && Approximately(leviathanShip.normalColor.g, leviathanPurple.g, 0.001f)
+                && Approximately(leviathanShip.normalColor.b, leviathanPurple.b, 0.001f);
+
+            inspectCameraObject = new GameObject("Big Test Leviathan Selection Camera");
+            inspectCameraObject.transform.SetParent(root.transform, false);
+            inspectCameraObject.transform.position = origin + new Vector3(0f, 0f, -220f);
+            inspectCameraObject.transform.rotation = Quaternion.identity;
+            Camera inspectCamera = inspectCameraObject.AddComponent<Camera>();
+            inspectCamera.orthographic = true;
+            inspectCamera.orthographicSize = 80f;
+            inspectCamera.nearClipPlane = 0.1f;
+            inspectCamera.farClipPlane = 1000f;
+            inspectTexture = new RenderTexture(800, 600, 16);
+            inspectCamera.targetTexture = inspectTexture;
+
+            tinyInspectObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            tinyInspectObject.name = "Big Test Tiny Screen Pick Target";
+            tinyInspectObject.transform.SetParent(root.transform, false);
+            tinyInspectObject.transform.position = origin + new Vector3(0f, 0f, 40f);
+            tinyInspectObject.transform.localScale = Vector3.one * 0.01f;
+            bool tinyScreenPickOk = CoreTacticalCombatSortieController.TryGetWorldObjectScreenRectForTests(inspectCamera, tinyInspectObject, out Rect tinyScreenRect)
+                && tinyScreenRect.width >= 24f
+                && tinyScreenRect.height >= 24f
+                && CoreTacticalCombatSortieController.BuildInspectionPickRectForTests(tinyScreenRect.center).Overlaps(tinyScreenRect, true);
+            inspectCamera.targetTexture = null;
+            inspectCamera.enabled = false;
+            inspectCameraObject.SetActive(false);
+            if (inspectTexture != null)
+            {
+                inspectTexture.Release();
+                DestroyBigTestUnityObject(inspectTexture);
+                inspectTexture = null;
+            }
+
+            bool behaviorOk = thresholdsOk
+                && lethalBiteOk
+                && calmAggressionCurveOk
+                && leviathanDeathBurstDisabledOk
+                && minimumRamSpeedOk
+                && tooLargeRetreatOk
+                && tooLargeDoesNotAggroOk
+                && directDamageAggressionOk
+                && stalkWhileBuildingOk
+                && idleWanderOk
+                && calmNotAutomatic
+                && explicitTargetOk
+                && inspectableShipOk
+                && angryAutomatic
+                && attackCommitOk
+                && artilleryReportOk
+                && projectileImpactOk
+                && feedingOk
+                && boulderFeedingOk
+                && wreckFeedingOk
+                && cloudOk
+                && armorOk
+                && purpleOk
+                && tinyScreenPickOk;
+            report.Check(behaviorOk,
+                behaviorOk
+                    ? "Core Tactical leviathan behavior works: bite/lethal thresholds, ram damage, death without ship burst, too-large-prey retreat, direct-hit anger, stalking while aggression builds, idle wandering, enemy click/box inspection pick area, hungry aggression commit, artillery/explosion wakeup, fragment/boulder/wreck feeding, cloud damage/avoidance, armor profile and purple identity are all covered."
+                    : "Core Tactical leviathan behavior contract is broken: thresholds="
+                        + thresholdsOk
+                        + ", lethalBite="
+                        + lethalBiteOk
+                        + ", calmAggressionCurve="
+                        + calmAggressionCurveOk
+                        + ", deathBurstDisabled="
+                        + leviathanDeathBurstDisabledOk
+                        + ", minimumRamSpeed="
+                        + minimumRamSpeedOk
+                        + ", tooLargeRetreat="
+                        + tooLargeRetreatOk
+                        + ", tooLargeNoAggro="
+                        + tooLargeDoesNotAggroOk
+                        + ", directDamageAggression="
+                        + directDamageAggressionOk
+                        + ", stalkWhileBuilding="
+                        + stalkWhileBuildingOk
+                        + ", idleWander="
+                        + idleWanderOk
+                        + ", calmNotAuto="
+                        + calmNotAutomatic
+                        + ", explicitTarget="
+                        + explicitTargetOk
+                        + ", inspectableShip="
+                        + inspectableShipOk
+                        + ", angryAuto="
+                        + angryAutomatic
+                        + ", attackCommit="
+                        + attackCommitOk
+                        + ", artilleryReport="
+                        + artilleryReportOk
+                        + ", projectileImpact="
+                        + projectileImpactOk
+                        + ", feeding="
+                        + feedingOk
+                        + ", boulderFeeding="
+                        + boulderFeedingOk
+                        + ", wreckFeeding="
+                        + wreckFeedingOk
+                        + ", cloud="
+                        + cloudOk
+                        + ", armor="
+                        + armorOk
+                        + ", purple="
+                        + purpleOk
+                        + ", tinyScreenPick="
+                        + tinyScreenPickOk
+                        + ".");
+        }
+        finally
+        {
+            if (inspectTexture != null)
+            {
+                inspectTexture.Release();
+                DestroyBigTestUnityObject(inspectTexture);
+            }
+
+            DestroyBigTestObject(root);
+            if (root == null)
+            {
+                if (leviathanShip != null) DestroyBigTestObject(leviathanShip.gameObject);
+                if (tinyTarget != null) DestroyBigTestObject(tinyTarget.gameObject);
+                if (mediumTarget != null) DestroyBigTestObject(mediumTarget.gameObject);
+                if (hugeTarget != null) DestroyBigTestObject(hugeTarget.gameObject);
+                if (smallLeviathanShip != null) DestroyBigTestObject(smallLeviathanShip.gameObject);
+                if (idleLeviathanShip != null) DestroyBigTestObject(idleLeviathanShip.gameObject);
+                DestroyBigTestObject(attackSnackObject);
+                DestroyBigTestObject(fragmentObject);
+                DestroyBigTestObject(boulderSnackObject);
+                DestroyBigTestObject(wreckSnackObject);
+                DestroyBigTestObject(cloudObject);
+                DestroyBigTestObject(inspectCameraObject);
+                DestroyBigTestObject(tinyInspectObject);
+            }
+        }
+    }
+
+    private static CoreTacticalShipMotor CreateLeviathanTestShip(
+        Transform parent,
+        string shipId,
+        string displayName,
+        Vector3 position,
+        Vector3 hullSizeMeters,
+        float massKg,
+        float healthHp,
+        CoreTacticalCombatTeam team)
+    {
+        CoreTacticalShipMotor ship = CoreTacticalPrototypeBootstrap.CreatePrototypeShip(
+            null,
+            shipId,
+            displayName,
+            position,
+            Quaternion.identity,
+            hullSizeMeters,
+            60f,
+            20f,
+            24f,
+            28f,
+            8f,
+            6f,
+            massKg,
+            false,
+            new Color(0.74f, 0.24f, 0.18f, 1f));
+        if (parent != null)
+        {
+            ship.transform.SetParent(parent, true);
+        }
+
+        CoreTacticalCombatant combatant = ship.GetComponent<CoreTacticalCombatant>();
+        if (combatant != null)
+        {
+            combatant.team = team;
+            combatant.ship = ship;
+        }
+
+        CoreTacticalPrototypeHealth health = ship.GetComponent<CoreTacticalPrototypeHealth>();
+        if (health != null)
+        {
+            health.maxHealth = Mathf.Max(1f, healthHp);
+            health.ResetHealth();
+        }
+
+        return ship;
+    }
+
+    private static void ValidateCoreTacticalMiningEquipmentGates(BigTestReport report)
+    {
+        GameObject probe = null;
+        GameObject cycleProbe = null;
+        try
+        {
+            probe = new GameObject("Big Test Core Tactical Mining Equipment Gate Probe");
+            CoreTacticalMiningRig rig = probe.AddComponent<CoreTacticalMiningRig>();
+            rig.Initialize(null, null, CoreTacticalCombatTeam.Enemy, 1000f, 0f);
+            rig.SetInstalledModules(true, false, false);
+
+            bool magnetOnlyInstalled =
+                rig.IsModuleInstalled(CoreTacticalMiningModule.Magnet) &&
+                rig.IsModuleEnabled(CoreTacticalMiningModule.Magnet) &&
+                !rig.IsModuleInstalled(CoreTacticalMiningModule.Drill) &&
+                !rig.IsModuleInstalled(CoreTacticalMiningModule.Crusher) &&
+                !rig.IsModuleInstalled(CoreTacticalMiningModule.Siphon) &&
+                !rig.IsModuleInstalled(CoreTacticalMiningModule.CloudConcentrator) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.Drill) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.Crusher) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.Siphon) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.CloudConcentrator);
+
+            rig.ToggleModule(CoreTacticalMiningModule.Drill);
+            rig.ToggleModule(CoreTacticalMiningModule.Crusher);
+            rig.ToggleModule(CoreTacticalMiningModule.Siphon);
+            rig.ToggleModule(CoreTacticalMiningModule.CloudConcentrator);
+            bool absentModulesStayOff =
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.Drill) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.Crusher) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.Siphon) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.CloudConcentrator);
+
+            string statusLine = rig.BuildInstalledModuleStatusLine();
+            bool statusShowsOnlyInstalledModule =
+                statusLine.Contains("M ") &&
+                !statusLine.Contains("L ") &&
+                !statusLine.Contains("C ") &&
+                !statusLine.Contains("S ") &&
+                !statusLine.Contains("K ");
+
+            rig.SetInstalledModules(false, false, false, true, true);
+            bool gasModulesInstalled =
+                !rig.IsModuleInstalled(CoreTacticalMiningModule.Magnet) &&
+                !rig.IsModuleInstalled(CoreTacticalMiningModule.Drill) &&
+                !rig.IsModuleInstalled(CoreTacticalMiningModule.Crusher) &&
+                rig.IsModuleInstalled(CoreTacticalMiningModule.Siphon) &&
+                rig.IsModuleInstalled(CoreTacticalMiningModule.CloudConcentrator) &&
+                rig.IsModuleEnabled(CoreTacticalMiningModule.Siphon) &&
+                rig.IsModuleEnabled(CoreTacticalMiningModule.CloudConcentrator);
+
+            rig.ToggleModule(CoreTacticalMiningModule.Siphon);
+            rig.ToggleModule(CoreTacticalMiningModule.CloudConcentrator);
+            bool gasModulesToggleOff =
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.Siphon) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.CloudConcentrator);
+
+            rig.SetInstalledModules(false, false, false, true, true);
+            bool gasModulesStayOffAfterLoadoutRefresh =
+                rig.IsModuleInstalled(CoreTacticalMiningModule.Siphon) &&
+                rig.IsModuleInstalled(CoreTacticalMiningModule.CloudConcentrator) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.Siphon) &&
+                !rig.IsModuleEnabled(CoreTacticalMiningModule.CloudConcentrator);
+
+            cycleProbe = new GameObject("Big Test Core Tactical Mining Module Cooldown Probe");
+            CoreTacticalMiningRig cycleRig = cycleProbe.AddComponent<CoreTacticalMiningRig>();
+            cycleRig.Initialize(null, null, CoreTacticalCombatTeam.Enemy, 1000f, 0f);
+            cycleRig.SetInstalledModules(false, false, true, false, true);
+            cycleRig.crusherCycleSeconds = 5f;
+            cycleRig.cloudConcentratorCycleSeconds = 5f;
+            bool addedDirtyOre = cycleRig.AddDirtyOreForTests("windshale_ore", 100f, 20f, "Windshale");
+            bool addedCloudCondensate = cycleRig.AddRawCloudCondensateForTests("cloud_condensate", 100f, 20f, "Common Cloud");
+            cycleRig.SetModuleCycleTimerForTests(CoreTacticalMiningModule.Crusher, 2.1f);
+            cycleRig.SetModuleCycleTimerForTests(CoreTacticalMiningModule.CloudConcentrator, 2.1f);
+            string crusherCooldownText = CoreTacticalCombatSortieController.GetMiningModuleCooldownTextForTests(cycleRig, CoreTacticalMiningModule.Crusher);
+            string concentratorCooldownText = CoreTacticalCombatSortieController.GetMiningModuleCooldownTextForTests(cycleRig, CoreTacticalMiningModule.CloudConcentrator);
+            float crusherShutter = CoreTacticalCombatSortieController.GetMiningModuleCooldownShutterForTests(cycleRig, CoreTacticalMiningModule.Crusher);
+            float concentratorShutter = CoreTacticalCombatSortieController.GetMiningModuleCooldownShutterForTests(cycleRig, CoreTacticalMiningModule.CloudConcentrator);
+            bool moduleCooldownsVisible =
+                addedDirtyOre
+                && addedCloudCondensate
+                && crusherCooldownText == "3"
+                && concentratorCooldownText == "3"
+                && Approximately(crusherShutter, 2.9f / 5f, 0.001f)
+                && Approximately(concentratorShutter, 2.9f / 5f, 0.001f);
+
+            bool equipmentGateWorks = magnetOnlyInstalled && absentModulesStayOff && statusShowsOnlyInstalledModule && gasModulesInstalled && gasModulesToggleOff && gasModulesStayOffAfterLoadoutRefresh && moduleCooldownsVisible;
+            report.Check(equipmentGateWorks,
+                equipmentGateWorks
+                    ? "Core Tactical mining equipment is loadout-gated: magnet, drill, crusher, siphon and cloud concentrator only exist when their loadout packages install them, installed gas modules can be toggled off, a repeated loadout refresh preserves the manual OFF state, and crusher/concentrator cycles surface a 5-second HUD cooldown."
+                    : "Core Tactical mining equipment must be loadout-gated, must not re-enable a manually disabled siphon/concentrator during a repeated loadout refresh, and crusher/concentrator cycles must show HUD cooldown. Status: " + statusLine + ", crusherCooldown=" + crusherCooldownText + ", concentratorCooldown=" + concentratorCooldownText);
+        }
+        finally
+        {
+            DestroyBigTestObject(probe);
+            DestroyBigTestObject(cycleProbe);
+        }
+    }
+
+    private static void ValidateCoreTacticalMissionObjectiveGate(BigTestReport report)
+    {
+        string sortieText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalCombatSortieController.cs");
+        string shipMotorText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalShipMotor.cs");
+        bool optionalMissionObjectivesWork =
+            !CoreTacticalCombatSortieController.AreCoreMissionObjectivesCompleteForTests(3, 300f) &&
+            !CoreTacticalCombatSortieController.AreCoreMissionObjectivesCompleteForTests(4, 299.9f) &&
+            CoreTacticalCombatSortieController.AreCoreMissionObjectivesCompleteForTests(4, 300f);
+        bool exitAlwaysWorks =
+            sortieText.Contains("EnsureExitAvailable(zone)") &&
+            sortieText.Contains("EnsureExitAvailable();") &&
+            sortieText.Contains("available = !extractionComplete") &&
+            sortieText.Contains("disabled = extractionComplete") &&
+            sortieText.Contains("GUI.enabled = wasEnabled && !extractionComplete") &&
+            sortieText.Contains("Optional bonus objectives: ") &&
+            sortieText.Contains("CancelAutoExit()") &&
+            sortieText.Contains("autoExitRequested = false;") &&
+            sortieText.Contains("playerSlipDrive.SetArmed(false)") &&
+            sortieText.Contains("playerShip.StopCommandAtCurrentPosition()") &&
+            sortieText.Contains("autoExitRequested && extractionUnlocked") &&
+            sortieText.Contains("ResolveCurrentExitDirection()") &&
+            sortieText.Contains("ResolveCurrentExitCommandPosition(forward)") &&
+            sortieText.Contains("ExitCommandBoundaryMarginMeters") &&
+            sortieText.Contains("ExitCommandOutwardStepMeters") &&
+            shipMotorText.Contains("StopCommandAtCurrentPosition") &&
+            !sortieText.Contains("available = extractionUnlocked && !extractionComplete") &&
+            !sortieText.Contains("disabled = !extractionUnlocked || extractionComplete") &&
+            !sortieText.Contains("GUI.enabled = wasEnabled && extractionUnlocked && !extractionComplete") &&
+            !sortieText.Contains("if (!extractionUnlocked || extractionComplete || playerShip == null)") &&
+            !sortieText.Contains("playerShip.transform.position + forward * 20000f") &&
+            !sortieText.Contains("Complete objectives: ");
+
+        report.Check(optionalMissionObjectivesWork && exitAlwaysWorks,
+            optionalMissionObjectivesWork && exitAlwaysWorks
+                ? "Core Tactical mission treats 4 enemy kills and 300 kg of any ore as optional bonus objectives while AUTO EXIT stays available at any time, uses the nearest mission-circle exit direction, keeps sortie-entry slip separate from AUTO EXIT, and toggles off to restore ship control."
+                : "Core Tactical mission exit must not be gated by optional enemy/ore objectives; keep AUTO EXIT available immediately, make it drive toward the nearest mission-circle exit instead of a stale map vector, keep sortie-entry slip separate from AUTO EXIT, and make repeated AUTO EXIT cancel the autopilot and restore ship control.");
+    }
+
+    private static void ValidateLowGradeOreConcentrateCargo(BigTestReport report)
+    {
+        PlayerProgress progress = new PlayerProgress();
+        progress.Normalize();
+        progress.AddShipLowGradeOreCargo("windshale_ore", 100f, 10f, "Windshale");
+        progress.AddShipLowGradeOreCargo("windshale_ore", 50f, 25f, "Windshale");
+        LowGradeOreStackState shipStack = progress.GetShipLowGradeOreStack("windshale_ore", false);
+        bool shipBlendOk = shipStack != null
+            && Approximately(shipStack.rawMassKg, 150f, 0.001f)
+            && Approximately(shipStack.usefulOreKg, 35f, 0.001f)
+            && Approximately(shipStack.UsefulConcentration01, 35f / 150f, 0.0001f)
+            && Approximately(progress.GetShipCargoMassKg(null), 150f, 0.001f);
+
+        PortStorageState storage = new PortStorageState { portId = "capital" };
+        storage.AddLowGradeOre("windshale_ore", 10000f, 800f, "Windshale");
+        storage.AddLowGradeOre("windshale_ore", 12f, 1.2f, "Windshale");
+        storage.AddLowGradeOre("windshale_ore", 20f, 4f, "Windshale");
+        if (shipStack != null)
+        {
+            storage.AddLowGradeOre(shipStack.oreItemId, shipStack.rawMassKg, shipStack.usefulOreKg, shipStack.displayName);
+        }
+
+        LowGradeOreStackState portStack = storage.GetLowGradeOreStack("windshale_ore", false);
+        float expectedRawKg = 10182f;
+        float expectedUsefulKg = 840.2f;
+        bool portBlendOk = portStack != null
+            && Approximately(portStack.rawMassKg, expectedRawKg, 0.001f)
+            && Approximately(portStack.usefulOreKg, expectedUsefulKg, 0.001f)
+            && Approximately(portStack.UsefulConcentration01, expectedUsefulKg / expectedRawKg, 0.0001f);
+
+        progress.ClearShipCargo();
+        bool clearOk = progress.shipLowGradeOreCargo != null
+            && progress.shipLowGradeOreCargo.Count == 0
+            && progress.shipCargo != null
+            && progress.shipCargo.Count == 0;
+
+        report.Check(shipBlendOk && portBlendOk && clearOk,
+            shipBlendOk && portBlendOk && clearOk
+                ? "Low-grade ore concentrate persists as raw mass plus useful ore, blends by ore type on ship and in port, contributes cargo mass, and is cleared with ship cargo after unloading."
+                : "Low-grade ore concentrate cargo must blend by raw/useful mass, count against ship cargo mass, persist into port stockpiles, and clear with ship cargo.");
+    }
+
+    private static void ValidateRawCloudCondensateCargo(BigTestReport report)
+    {
+        PlayerProgress progress = new PlayerProgress();
+        progress.Normalize();
+        progress.AddShipRawCloudCondensateCargo("cloud_condensate", 100f, 20f, "Common Cloud");
+        progress.AddShipRawCloudCondensateCargo("cloud_condensate", 50f, 25f, "Common Cloud");
+        progress.AddShipRawCloudCondensateCargo("wet_condensate", 10f, 5f, "Wet Cloud");
+        RawCloudCondensateStackState shipStack = progress.GetShipRawCloudCondensateStack("cloud_condensate", false);
+        RawCloudCondensateStackState wetShipStack = progress.GetShipRawCloudCondensateStack("wet_condensate", false);
+        bool shipBlendOk = shipStack != null
+            && wetShipStack != null
+            && Approximately(shipStack.rawLiters, 150f, 0.001f)
+            && Approximately(shipStack.usefulLiters, 45f, 0.001f)
+            && Approximately(shipStack.UsefulConcentration01, 45f / 150f, 0.0001f)
+            && Approximately(wetShipStack.rawLiters, 10f, 0.001f)
+            && Approximately(wetShipStack.usefulLiters, 5f, 0.001f)
+            && Approximately(progress.GetShipCargoMassKg(null), 160f, 0.001f);
+
+        PortStorageState storage = new PortStorageState { portId = "capital" };
+        storage.AddRawCloudCondensate("cloud_condensate", 10000f, 800f, "Common Cloud");
+        storage.AddRawCloudCondensate("cloud_condensate", 12f, 1.2f, "Common Cloud");
+        if (shipStack != null)
+        {
+            storage.AddRawCloudCondensate(shipStack.condensateItemId, shipStack.rawLiters, shipStack.usefulLiters, shipStack.displayName);
+        }
+
+        RawCloudCondensateStackState portStack = storage.GetRawCloudCondensateStack("cloud_condensate", false);
+        float expectedRawLiters = 10162f;
+        float expectedUsefulLiters = 846.2f;
+        bool portBlendOk = portStack != null
+            && Approximately(portStack.rawLiters, expectedRawLiters, 0.001f)
+            && Approximately(portStack.usefulLiters, expectedUsefulLiters, 0.001f)
+            && Approximately(portStack.UsefulConcentration01, expectedUsefulLiters / expectedRawLiters, 0.0001f);
+
+        float concentrationBeforeSpend = portStack != null ? portStack.UsefulConcentration01 : 0f;
+        bool spendOk = portStack != null
+            && storage.TrySpendRawCloudCondensate("cloud_condensate", 100f, out float spentUsefulLiters)
+            && Approximately(spentUsefulLiters, 100f * concentrationBeforeSpend, 0.001f)
+            && Approximately(portStack.rawLiters, expectedRawLiters - 100f, 0.001f);
+
+        bool concentratorOk = false;
+        bool capacityOk = false;
+        bool liveSiphonOk = false;
+        bool siphonIntakeVisualOk = false;
+        bool emptyWaterCloudOk = false;
+        bool gasDamageOk = false;
+        bool singleEllipsoidCloudRenderOk = false;
+        GameObject concentratorProbe = null;
+        GameObject capacityProbe = null;
+        GameObject liveSiphonRoot = null;
+        GameObject emptyCloudObject = null;
+        GameObject damageRoot = null;
+        GameObject singleEllipsoidCloudObject = null;
+        try
+        {
+            concentratorProbe = new GameObject("Big Test Raw Cloud Condensate Concentrator Probe");
+            CoreTacticalMiningRig concentratorRig = concentratorProbe.AddComponent<CoreTacticalMiningRig>();
+            concentratorRig.Initialize(null, null, CoreTacticalCombatTeam.Enemy, 1000f, 0f);
+            concentratorRig.SetInstalledModules(false, false, false, false, true);
+            concentratorRig.cloudConcentratorWaterLitersPerCycle = 20f;
+            bool addedForConcentrator = concentratorRig.AddRawCloudCondensateForTests("cloud_condensate", 100f, 20f, "Common Cloud");
+            float removedWaterLiters = concentratorRig.ProcessCloudConcentratorCycleForTests();
+            concentratorOk = addedForConcentrator
+                && Approximately(removedWaterLiters, 16f, 0.001f)
+                && Approximately(concentratorRig.GetRawCloudCondensateRawLitersForTests("cloud_condensate"), 84f, 0.001f)
+                && Approximately(concentratorRig.GetRawCloudCondensateConcentrationForTests("cloud_condensate"), 20f / 84f, 0.0001f);
+
+            capacityProbe = new GameObject("Big Test Raw Cloud Condensate Capacity Probe");
+            CoreTacticalMiningRig capacityRig = capacityProbe.AddComponent<CoreTacticalMiningRig>();
+            capacityRig.Initialize(null, null, CoreTacticalCombatTeam.Enemy, 100f, 0f);
+            capacityRig.SetInstalledModules(false, false, false, true, false);
+            bool firstCapacityAdd = capacityRig.AddRawCloudCondensateForTests("cloud_condensate", 100f, 10f, "Common Cloud");
+            bool rejectedCapacityAdd = !capacityRig.AddRawCloudCondensateForTests("cloud_condensate", 1f, 0.1f, "Common Cloud");
+            capacityOk = firstCapacityAdd
+                && rejectedCapacityAdd
+                && !capacityRig.IsModuleEnabled(CoreTacticalMiningModule.Siphon)
+                && capacityRig.GetModuleStatus(CoreTacticalMiningModule.Siphon) == "FULL";
+
+            liveSiphonRoot = new GameObject("Big Test Raw Cloud Condensate Live Siphon Probe");
+            Vector3 liveSiphonPosition = new Vector3(920000f, 920000f, 920000f);
+            GameObject liveShipObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            liveShipObject.name = "Big Test Cloud Siphon Ship";
+            liveShipObject.transform.SetParent(liveSiphonRoot.transform, false);
+            liveShipObject.transform.position = liveSiphonPosition;
+            Rigidbody liveShipBody = liveShipObject.GetComponent<Rigidbody>();
+            if (liveShipBody == null)
+            {
+                liveShipBody = liveShipObject.AddComponent<Rigidbody>();
+            }
+
+            liveShipBody.useGravity = false;
+            CoreTacticalShipMotor liveShip = liveShipObject.AddComponent<CoreTacticalShipMotor>();
+            liveShip.InitializePrototypeShip("big_test_cloud_siphon_ship", "Big Test Cloud Siphon Ship", new Vector3(10f, 8f, 60f), Color.cyan);
+            CoreTacticalMiningRig liveRig = liveShipObject.AddComponent<CoreTacticalMiningRig>();
+            liveRig.Initialize(liveShip, null, CoreTacticalCombatTeam.Enemy, 1000f, 0f);
+            liveRig.siphonLitersPerSecond = 40f;
+            liveRig.siphonEnergyPerSecond = 0f;
+            liveRig.siphonChannelCount = 2;
+            liveRig.SetInstalledModules(false, false, false, true, false);
+
+            GameObject liveCloudObject = new GameObject("Big Test Harvestable Cloud");
+            liveCloudObject.transform.SetParent(liveSiphonRoot.transform, false);
+            liveCloudObject.transform.position = liveSiphonPosition + Vector3.forward * 12f;
+            CoreTacticalGasCloud harvestCloud = liveCloudObject.AddComponent<CoreTacticalGasCloud>();
+            harvestCloud.Initialize(new CoreTacticalGasCloudDefinition
+            {
+                condensateItemId = "cloud_condensate",
+                displayName = "Common Cloud",
+                rawVolumeLiters = 500f,
+                usefulVolumeLiters = 125f,
+                chemicalDamagePerMinute = 0f,
+                harvestable = true,
+                lobeOffsets = new[] { Vector3.zero },
+                lobeSizes = new[] { new Vector3(80f, 80f, 80f) }
+            });
+
+            GameObject liveEmptyCloudObject = new GameObject("Big Test Nearby Empty Water Cloud");
+            liveEmptyCloudObject.transform.SetParent(liveSiphonRoot.transform, false);
+            liveEmptyCloudObject.transform.position = liveSiphonPosition;
+            CoreTacticalGasCloud liveEmptyCloud = liveEmptyCloudObject.AddComponent<CoreTacticalGasCloud>();
+            liveEmptyCloud.Initialize(new CoreTacticalGasCloudDefinition
+            {
+                condensateItemId = "",
+                displayName = "Nearby Empty Water Cloud",
+                rawVolumeLiters = 900f,
+                usefulVolumeLiters = 0f,
+                chemicalDamagePerMinute = 0f,
+                harvestable = false,
+                lobeOffsets = new[] { Vector3.zero },
+                lobeSizes = new[] { new Vector3(90f, 90f, 90f) }
+            });
+
+            liveRig.ToggleModule(CoreTacticalMiningModule.Siphon);
+            float rawBeforeDisabledSiphon = harvestCloud.RawVolumeLiters;
+            liveRig.SetInstalledModules(false, false, false, true, false);
+            liveRig.UpdateSiphonForTests(1f);
+            bool disabledSiphonDoesNotHarvest = Approximately(harvestCloud.RawVolumeLiters, rawBeforeDisabledSiphon, 0.001f)
+                && Approximately(liveRig.GetRawCloudCondensateRawLitersForTests("cloud_condensate"), 0f, 0.001f)
+                && !liveRig.IsModuleEnabled(CoreTacticalMiningModule.Siphon);
+            liveRig.ToggleModule(CoreTacticalMiningModule.Siphon);
+            liveRig.UpdateSiphonForTests(1f);
+            CoreTacticalSiphonIntakeVisual intakeVisual = liveShipObject.GetComponentInChildren<CoreTacticalSiphonIntakeVisual>(true);
+            LineRenderer[] intakeRings = intakeVisual != null ? intakeVisual.GetComponentsInChildren<LineRenderer>(true) : Array.Empty<LineRenderer>();
+            int activeIntakeRingCount = 0;
+            for (int i = 0; i < intakeRings.Length; i++)
+            {
+                if (intakeRings[i] != null && intakeRings[i].gameObject.activeSelf && intakeRings[i].positionCount >= 49)
+                {
+                    activeIntakeRingCount++;
+                }
+            }
+
+            siphonIntakeVisualOk = intakeVisual != null
+                && activeIntakeRingCount >= 4
+                && liveShipObject.GetComponentInChildren<CoreTacticalUtilityBeamVisual>(true) == null;
+            liveSiphonOk = disabledSiphonDoesNotHarvest
+                && Approximately(harvestCloud.RawVolumeLiters, 420f, 0.001f)
+                && Approximately(harvestCloud.UsefulVolumeLiters, 105f, 0.001f)
+                && Approximately(liveRig.GetRawCloudCondensateRawLitersForTests("cloud_condensate"), 80f, 0.001f)
+                && Approximately(liveRig.GetRawCloudCondensateConcentrationForTests("cloud_condensate"), 0.25f, 0.0001f)
+                && Approximately(liveRig.TotalCloudCondensateCollectedLiters, 80f, 0.001f)
+                && string.Equals(liveRig.activeSiphonTargetName, "Common Cloud", StringComparison.Ordinal)
+                && Approximately(liveEmptyCloud.RawVolumeLiters, 900f, 0.001f)
+                && siphonIntakeVisualOk;
+
+            CoreTacticalGasCloudDefinition emptyWaterDefinition = new CoreTacticalGasCloudDefinition
+            {
+                condensateItemId = "",
+                displayName = "Empty water cloud",
+                rawVolumeLiters = 11000f,
+                usefulVolumeLiters = 0f,
+                chemicalDamagePerMinute = 12f,
+                harvestable = false,
+                lobeOffsets = new[] { Vector3.zero },
+                lobeSizes = new[] { new Vector3(120f, 60f, 120f) }
+            };
+            emptyCloudObject = new GameObject("Big Test Empty Water Cloud");
+            CoreTacticalGasCloud emptyCloud = emptyCloudObject.AddComponent<CoreTacticalGasCloud>();
+            emptyCloud.Initialize(emptyWaterDefinition);
+            float extractedEmptyRaw = emptyCloud.ExtractRawCondensate(100f, out float extractedEmptyUseful);
+            emptyWaterCloudOk = !emptyCloud.CanHarvest
+                && Approximately(extractedEmptyRaw, 0f, 0.001f)
+                && Approximately(extractedEmptyUseful, 0f, 0.001f)
+                && Approximately(emptyCloud.RawVolumeLiters, 11000f, 0.001f);
+
+            singleEllipsoidCloudObject = new GameObject("Big Test Single Ellipsoid Transparent Cloud");
+            CoreTacticalGasCloud singleEllipsoidCloud = singleEllipsoidCloudObject.AddComponent<CoreTacticalGasCloud>();
+            singleEllipsoidCloud.Initialize(new CoreTacticalGasCloudDefinition
+            {
+                condensateItemId = "cloud_condensate",
+                displayName = "Single Ellipsoid Cloud",
+                rawVolumeLiters = 1000f,
+                usefulVolumeLiters = 150f,
+                chemicalDamagePerMinute = 0f,
+                harvestable = true,
+                lobeOffsets = new[] { Vector3.zero },
+                lobeSizes = new[] { new Vector3(80f, 44f, 72f) }
+            });
+            singleEllipsoidCloudRenderOk = singleEllipsoidCloud.LobeRendererCountForTests == 1
+                && singleEllipsoidCloud.UsesPlainTransparentCloudMaterialForTests;
+
+            damageRoot = new GameObject("Big Test Raw Cloud Condensate Damage Probe Root");
+            Vector3 isolatedPosition = new Vector3(900000f, 900000f, 900000f);
+            GameObject shipObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            shipObject.name = "Big Test Gas Contact Ship";
+            shipObject.transform.SetParent(damageRoot.transform, false);
+            shipObject.transform.position = isolatedPosition;
+            CoreTacticalShipMotor ship = shipObject.AddComponent<CoreTacticalShipMotor>();
+            ship.InitializePrototypeShip("big_test_gas_ship", "Big Test Gas Ship", new Vector3(10f, 8f, 60f), Color.gray);
+            shipObject.AddComponent<CoreTacticalMiningRig>().SetInstalledModules(false, false, false, false, false);
+            CoreTacticalPrototypeHealth health = shipObject.AddComponent<CoreTacticalPrototypeHealth>();
+            health.maxHealth = 1000f;
+            health.ResetHealth();
+            CoreTacticalDamageProfile profile = shipObject.AddComponent<CoreTacticalDamageProfile>();
+            profile.resistances = new CoreTacticalResistanceSet(0f, 0f, 50f, 0f);
+
+            GameObject cloudObject = new GameObject("Big Test Gas Contact Cloud");
+            cloudObject.transform.SetParent(damageRoot.transform, false);
+            cloudObject.transform.position = isolatedPosition;
+            CoreTacticalGasCloud cloud = cloudObject.AddComponent<CoreTacticalGasCloud>();
+            cloud.Initialize(new CoreTacticalGasCloudDefinition
+            {
+                condensateItemId = "cloud_condensate",
+                displayName = "Common Cloud",
+                rawVolumeLiters = 1000f,
+                usefulVolumeLiters = 100f,
+                chemicalDamagePerMinute = 60f,
+                harvestable = true,
+                lobeOffsets = new[] { Vector3.zero },
+                lobeSizes = new[] { new Vector3(100f, 100f, 100f) }
+            });
+            cloud.ApplyChemicalContactDamageForTests(60f);
+            gasDamageOk = Approximately(health.currentHealth, 970f, 0.01f)
+                && !ship.GetComponent<CoreTacticalMiningRig>().IsModuleInstalled(CoreTacticalMiningModule.Siphon);
+        }
+        finally
+        {
+            DestroyBigTestObject(concentratorProbe);
+            DestroyBigTestObject(capacityProbe);
+            DestroyBigTestObject(liveSiphonRoot);
+            DestroyBigTestObject(emptyCloudObject);
+            DestroyBigTestObject(damageRoot);
+            DestroyBigTestObject(singleEllipsoidCloudObject);
+        }
+
+        progress.ClearShipCargo();
+        bool clearOk = progress.shipRawCloudCondensateCargo != null
+            && progress.shipRawCloudCondensateCargo.Count == 0
+            && progress.shipCargo != null
+            && progress.shipCargo.Count == 0;
+
+        bool rawCloudCondensateOk = shipBlendOk
+            && portBlendOk
+            && spendOk
+            && concentratorOk
+            && capacityOk
+            && liveSiphonOk
+            && emptyWaterCloudOk
+            && singleEllipsoidCloudRenderOk
+            && gasDamageOk
+            && clearOk;
+        report.Check(rawCloudCondensateOk,
+            rawCloudCondensateOk
+                ? "Raw cloud condensate blends by condensate item as raw/useful liters, counts against ship cargo, unloads into port storage, can be spent by concentration, the cloud concentrator vents only water, full cargo disables siphon intake, a live enabled siphon drains harvestable clouds into ship inventory with visible inward intake rings instead of a beam, disabled siphons and empty water clouds do not harvest, clouds render as one plain transparent ellipsoid, and gas contact damage applies even without a siphon."
+                : "Raw cloud condensate contract is broken: shipBlend="
+                    + shipBlendOk
+                    + ", portBlend="
+                    + portBlendOk
+                    + ", spend="
+                    + spendOk
+                    + ", concentrator="
+                    + concentratorOk
+                    + ", capacity="
+                    + capacityOk
+                    + ", liveSiphon="
+                    + liveSiphonOk
+                    + ", emptyWater="
+                    + emptyWaterCloudOk
+                    + ", singleEllipsoid="
+                    + singleEllipsoidCloudRenderOk
+                    + ", gasDamage="
+                    + gasDamageOk
+                    + ", clear="
+                    + clearOk
+                    + ".");
+    }
+
+    private static void ValidateCoreTacticalAutomatonWreckSalvage(BigTestReport report)
+    {
+        string oreMiningText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalOreMining.cs");
+        string sortieText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalCombatSortieController.cs");
+        string bootstrapText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalPrototypeBootstrap.cs");
+        string metaText = ReadProjectText("Assets/Scripts/Meta/MetaGameState.cs");
+        string damageProjectileText = ReadProjectText("Assets/Scripts/Systems/DamageProjectile.cs");
+        string itemCsvText = ReadProjectText("Assets/Data/Config/Item.csv");
+        string resourceCategoryCsvText = ReadProjectText("Assets/Data/Config/Resource_category.csv");
+        string korshunAuxiliaryCsvText = ReadProjectText("Assets/Data/Config/Korshun_auxiliary_packages.csv");
+        string barbetAuxiliaryCsvText = ReadProjectText("Assets/Data/Config/Barbet_auxiliary_packages.csv");
+
+        bool structuralOk =
+            oreMiningText.Contains("CoreTacticalAutomatonWreck") &&
+            oreMiningText.Contains("CoreTacticalAutomatonWreckSpawner") &&
+            oreMiningText.Contains("salvageManifest") &&
+            oreMiningText.Contains("accessBuildupPercent") &&
+            oreMiningText.Contains("TryExtractSalvage") &&
+            oreMiningText.Contains("spawnDamageGraceSeconds") &&
+            oreMiningText.Contains("despawnAfterSeconds = 60f") &&
+            oreMiningText.Contains("uncapturedLifetimeSeconds") &&
+            oreMiningText.Contains("CoreTacticalFlakBurstVisual.Create") &&
+            oreMiningText.Contains("salvageWreckRangeMeters = 1000f") &&
+            oreMiningText.Contains("salvageHoldDistanceExtraMeters = 50f") &&
+            oreMiningText.Contains("salvageWreckTowForceKg = 200f") &&
+            oreMiningText.Contains("salvageWreckHoldForceMultiplier = 10f") &&
+            oreMiningText.Contains("Mathf.Min(0.1f") &&
+            oreMiningText.Contains("CoreTacticalUtilityBeamPalette.Salvage") &&
+            oreMiningText.Contains("- ownerShip.transform.forward * aftOffset") &&
+            oreMiningText.Contains("ReleaseWreckSalvage") &&
+            oreMiningText.Contains("salvageMagnetInstalled") &&
+            sortieText.Contains("SpawnSmallAutomatons") &&
+            sortieText.Contains("float[] sizesMeters = { 5f, 10f, 20f }") &&
+            sortieText.Contains("ConfigureAutomatonWreckSpawner") &&
+            sortieText.Contains("EstimateAutomatonWreckMassKg") &&
+            sortieText.Contains("size <= 5.5f ? -50f : size <= 180f ? -20f : 20f") &&
+            sortieText.Contains("RuntimeLoadoutKind.None") &&
+            sortieText.Contains("kind == \"salvage_magnet\"") &&
+            bootstrapText.Contains("normalizedKind.Contains(\"magnet\")") &&
+            bootstrapText.Contains("GetComponent<CoreTacticalAutomatonWreckSpawner>()") &&
+            bootstrapText.Contains("TrySphereCastWreck") &&
+            bootstrapText.Contains("ApplyExplosionDamageToWrecks") &&
+            damageProjectileText.Contains("CoreTacticalAutomatonWreck") &&
+            metaText.Contains("automaton_salvage") &&
+            itemCsvText.Contains("automaton_relay") &&
+            itemCsvText.Contains("automaton_servo_joint") &&
+            resourceCategoryCsvText.Contains("automaton_salvage") &&
+            korshunAuxiliaryCsvText.Contains("korshun_aux_salvage_magnet") &&
+            korshunAuxiliaryCsvText.Contains(",auxiliary,salvage_magnet,") &&
+            korshunAuxiliaryCsvText.Contains("1000,22") &&
+            korshunAuxiliaryCsvText.Contains("20,5") &&
+            barbetAuxiliaryCsvText.Contains("barbet_small_salvage_magnet");
+        report.Check(structuralOk,
+            structuralOk
+                ? "Core Tactical automaton wreck salvage is structurally wired: 5/10/20m automatons spawn, deaths create HP wrecks with fixed large-part salvage manifests, simple automatons have easy access difficulty, free wrecks have 60-second visual despawn, Korshun/Barbet salvage magnets expose selectable equipment slots with sane energy costs, salvage beams have a 1000m wreck range, stern-tow force physics, at least 10x captured fall slowdown, a separate salvage beam palette, access buildup cycles, projectile collisions, and automaton_salvage runtime cargo."
+                : "Automaton wreck salvage wiring is incomplete: verify small automaton spawn, death-to-wreck spawner, fixed large-part manifest extraction, easy current access difficulty, 60-second free-wreck despawn visual, Korshun/Barbet salvage_magnet equipment/energy, stern tow force, at least 10x captured fall slowdown, salvage beam color, projectile collision, and automaton_salvage cargo acceptance.");
+
+        bool manifestAndAccessOk = false;
+        bool liveSalvageOk = false;
+        bool cruiserWreckTowOk = false;
+        bool breakOk = false;
+        bool lifetimeDespawnOk = false;
+        bool projectileCollisionOk = false;
+        bool freshWreckGraceOk = false;
+        GameObject root = null;
+        GameObject accessObject = null;
+        GameObject fallbackObject = null;
+        GameObject deathObject = null;
+        GameObject freshWreckObject = null;
+        GameObject shipObject = null;
+        GameObject wreckObject = null;
+        GameObject cruiserWreckObject = null;
+        GameObject breakWreckObject = null;
+        GameObject lifetimeWreckObject = null;
+        GameObject lifetimeDamageProbeObject = null;
+        GameObject collisionWreckObject = null;
+        try
+        {
+            root = new GameObject("Big Test Automaton Wreck Salvage Root");
+            Vector3 basePosition = new Vector3(940000f, 940000f, 940000f);
+
+            accessObject = new GameObject("Big Test Automaton Access Wreck");
+            accessObject.transform.SetParent(root.transform, false);
+            accessObject.transform.position = basePosition + Vector3.up * 200f;
+            CoreTacticalAutomatonWreck accessWreck = accessObject.AddComponent<CoreTacticalAutomatonWreck>();
+            accessWreck.Initialize(
+                "Access Wreck",
+                100f,
+                50f,
+                50f,
+                new List<CoreTacticalInventoryRow>
+                {
+                    new CoreTacticalInventoryRow { itemId = "automaton_relay", displayName = "Automaton relay", amountKg = 0.8f }
+                },
+                2f);
+            bool failedWithoutConsuming = !accessWreck.TryExtractSalvage(
+                    20f,
+                    7f,
+                    out _,
+                    out bool failedEmpty,
+                    out float failChance)
+                && !failedEmpty
+                && Approximately(failChance, 0f, 0.001f)
+                && accessWreck.RemainingSalvageCount == 1
+                && Approximately(accessWreck.AccessBuildupPercent, 7f, 0.001f);
+            bool successConsumesOne = accessWreck.TryExtractSalvage(
+                    150f,
+                    7f,
+                    out CoreTacticalInventoryRow extracted,
+                    out bool emptied,
+                    out float successChance)
+                && emptied
+                && successChance >= 99.9f
+                && extracted.itemId == "automaton_relay"
+                && accessWreck.RemainingSalvageCount == 0
+                && Approximately(accessWreck.AccessBuildupPercent, 0f, 0.001f);
+            List<CoreTacticalInventoryRow> default5mManifest = CoreTacticalAutomatonWreck.BuildDefaultManifest(5f);
+            List<CoreTacticalInventoryRow> default20mManifest = CoreTacticalAutomatonWreck.BuildDefaultManifest(20f);
+            List<CoreTacticalInventoryRow> default150mManifest = CoreTacticalAutomatonWreck.BuildDefaultManifest(150f);
+            float default5mKg = SumInventoryRowsKg(default5mManifest);
+            float default20mKg = SumInventoryRowsKg(default20mManifest);
+            float default150mKg = SumInventoryRowsKg(default150mManifest);
+            bool defaultManifestOk = default20mManifest.Count >= 7
+                && default20mManifest.Exists(row => row.itemId == "automaton_relay")
+                && default20mManifest.Exists(row => row.itemId == "automaton_servo_joint")
+                && default20mManifest.Exists(row => row.itemId == "automaton_command_cylinder")
+                && default5mKg >= 80f
+                && default20mKg >= 2500f
+                && default150mKg >= 20000f;
+            fallbackObject = new GameObject("Big Test Empty Manifest Automaton Wreck");
+            fallbackObject.transform.SetParent(root.transform, false);
+            CoreTacticalAutomatonWreck fallbackWreck = fallbackObject.AddComponent<CoreTacticalAutomatonWreck>();
+            fallbackWreck.Initialize(
+                "Empty Manifest Wreck",
+                50f,
+                30f,
+                -50f,
+                Array.Empty<CoreTacticalInventoryRow>(),
+                1.5f);
+            bool fallbackManifestOk = fallbackWreck.RemainingSalvageCount == 1
+                && fallbackWreck.TryExtractSalvage(
+                    150f,
+                    0f,
+                    out CoreTacticalInventoryRow fallbackRow,
+                    out bool fallbackEmptied,
+                    out _)
+                && fallbackEmptied
+                && fallbackRow.itemId == "automaton_relay"
+                && fallbackRow.amountKg >= 35f;
+
+            deathObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            deathObject.name = "Big Test Fresh Death Automaton";
+            deathObject.transform.SetParent(root.transform, false);
+            deathObject.transform.position = basePosition + Vector3.up * 260f;
+            CoreTacticalPrototypeHealth deathHealth = deathObject.AddComponent<CoreTacticalPrototypeHealth>();
+            deathHealth.maxHealth = 10f;
+            deathHealth.ResetHealth();
+            CoreTacticalAutomatonWreckSpawner deathSpawner = deathObject.AddComponent<CoreTacticalAutomatonWreckSpawner>();
+            deathSpawner.Configure(
+                "Fresh Death Wreck",
+                50f,
+                30f,
+                -50f,
+                1.5f,
+                Array.Empty<CoreTacticalInventoryRow>());
+            deathHealth.ApplyDamage(50f, "Big Test lethal explosion");
+            Physics.SyncTransforms();
+            CoreTacticalAutomatonWreck[] spawnedWrecks = UnityEngine.Object.FindObjectsByType<CoreTacticalAutomatonWreck>(FindObjectsSortMode.None);
+            CoreTacticalAutomatonWreck freshWreck = null;
+            for (int i = 0; i < spawnedWrecks.Length; i++)
+            {
+                if (spawnedWrecks[i] != null && string.Equals(spawnedWrecks[i].displayName, "Fresh Death Wreck", StringComparison.Ordinal))
+                {
+                    freshWreck = spawnedWrecks[i];
+                    break;
+                }
+            }
+
+            float freshHealthBefore = freshWreck != null ? freshWreck.currentHealth : -1f;
+            int freshExplosionHits = CoreTacticalAutomatonWreck.ApplyExplosionDamageToWrecks(
+                deathObject.transform.position,
+                10f,
+                100f,
+                "Big Test same-frame explosion");
+            freshWreckGraceOk = freshWreck != null
+                && freshExplosionHits >= 1
+                && Approximately(freshWreck.currentHealth, freshHealthBefore, 0.001f)
+                && freshWreck.RemainingSalvageCount >= 1;
+            freshWreckObject = freshWreck != null ? freshWreck.gameObject : null;
+            if (freshWreckObject != null)
+            {
+                freshWreckObject.SetActive(false);
+            }
+
+            manifestAndAccessOk = failedWithoutConsuming && successConsumesOne && defaultManifestOk && fallbackManifestOk;
+
+            shipObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            shipObject.name = "Big Test Automaton Salvage Ship";
+            shipObject.transform.SetParent(root.transform, false);
+            shipObject.transform.SetPositionAndRotation(basePosition, Quaternion.identity);
+            Rigidbody shipBody = shipObject.GetComponent<Rigidbody>();
+            if (shipBody == null)
+            {
+                shipBody = shipObject.AddComponent<Rigidbody>();
+            }
+
+            shipBody.useGravity = false;
+            CoreTacticalShipMotor ship = shipObject.AddComponent<CoreTacticalShipMotor>();
+            ship.InitializePrototypeShip("big_test_salvage_ship", "Big Test Salvage Ship", new Vector3(12f, 8f, 80f), Color.cyan);
+            CoreTacticalMiningRig rig = shipObject.AddComponent<CoreTacticalMiningRig>();
+            rig.Initialize(ship, null, CoreTacticalCombatTeam.Enemy, 1000f, 0f);
+            rig.SetInstalledModules(true, false, false);
+            rig.salvageMagnetInstalled = true;
+            rig.magnetRangeMeters = 1000f;
+            rig.salvageWreckRangeMeters = 1000f;
+            rig.salvageWreckEnergyPerSecond = 0f;
+            rig.salvageWreckCycleSeconds = 0.1f;
+            rig.salvageAccessRatingPercent = 150f;
+            rig.salvageWreckTowForceKg = 200f;
+            rig.salvageWreckHoldForceMultiplier = 10f;
+
+            wreckObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wreckObject.name = "Big Test Live Automaton Salvage Wreck";
+            wreckObject.transform.SetParent(root.transform, false);
+            wreckObject.transform.position = basePosition + Vector3.right * 120f;
+            CoreTacticalAutomatonWreck liveWreck = wreckObject.AddComponent<CoreTacticalAutomatonWreck>();
+            liveWreck.Initialize(
+                "Live Salvage Wreck",
+                100f,
+                60f,
+                -10f,
+                new List<CoreTacticalInventoryRow>
+                {
+                    new CoreTacticalInventoryRow { itemId = "automaton_relay", displayName = "Automaton relay", amountKg = 0.8f }
+                },
+                2f);
+            Physics.SyncTransforms();
+            rig.UpdateMagnetForTests(0.05f);
+            bool capturedLiveWreck = liveWreck.captured && string.Equals(rig.activeSalvageTargetName, "Live Salvage Wreck", StringComparison.Ordinal);
+            bool liveTowStartsBehind = liveWreck.transform.position.z < basePosition.z - 0.01f;
+            for (int i = 0; i < 4; i++)
+            {
+                rig.UpdateMagnetForTests(0.11f);
+            }
+
+            liveSalvageOk = capturedLiveWreck
+                && liveTowStartsBehind
+                && rig.GetAutomatonSalvageUnitsForTests("automaton_relay") == 1
+                && Approximately(rig.GetAutomatonSalvageKgForTests("automaton_relay"), 0.8f, 0.001f)
+                && liveWreck.RemainingSalvageCount == 0;
+
+            cruiserWreckObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cruiserWreckObject.name = "Big Test Cruiser Automaton Salvage Wreck";
+            cruiserWreckObject.transform.SetParent(root.transform, false);
+            cruiserWreckObject.transform.position = basePosition + Vector3.right * 180f;
+            CoreTacticalAutomatonWreck cruiserWreck = cruiserWreckObject.AddComponent<CoreTacticalAutomatonWreck>();
+            cruiserWreck.Initialize(
+                "Cruiser Salvage Wreck",
+                45000f,
+                500f,
+                -20f,
+                CoreTacticalAutomatonWreck.BuildDefaultManifest(150f),
+                57f);
+            rig.salvageWreckCycleSeconds = 100f;
+            Physics.SyncTransforms();
+            Vector3 cruiserStart = cruiserWreck.transform.position;
+            rig.UpdateMagnetForTests(0.05f);
+            bool capturedCruiserWreck = cruiserWreck.captured && string.Equals(rig.activeSalvageTargetName, "Cruiser Salvage Wreck", StringComparison.Ordinal);
+            rig.UpdateMagnetForTests(1f);
+            float cruiserTowDistance = Vector3.Distance(cruiserStart, cruiserWreck.transform.position);
+            bool cruiserTowIsMassLimited = cruiserTowDistance > 0.05f && cruiserTowDistance < 2f;
+            bool cruiserHoldSlowsAtLeastTenfold = cruiserWreck.capturedFallSpeedMultiplier <= 0.1001f;
+            shipObject.transform.position = basePosition + Vector3.forward * 5000f;
+            Physics.SyncTransforms();
+            rig.UpdateMagnetForTests(0.05f);
+            shipObject.transform.position = basePosition;
+            Physics.SyncTransforms();
+            cruiserWreckTowOk = capturedCruiserWreck
+                && cruiserTowIsMassLimited
+                && cruiserHoldSlowsAtLeastTenfold
+                && !cruiserWreck.captured
+                && cruiserWreck.RemainingSalvageCount >= 7;
+
+            breakWreckObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            breakWreckObject.name = "Big Test Breakable Automaton Salvage Wreck";
+            breakWreckObject.transform.SetParent(root.transform, false);
+            breakWreckObject.transform.position = basePosition + Vector3.right * 140f;
+            CoreTacticalAutomatonWreck breakWreck = breakWreckObject.AddComponent<CoreTacticalAutomatonWreck>();
+            breakWreck.Initialize(
+                "Breakable Wreck",
+                100f,
+                60f,
+                -10f,
+                new List<CoreTacticalInventoryRow>
+                {
+                    new CoreTacticalInventoryRow { itemId = "automaton_coil", displayName = "Automaton coil", amountKg = 1.1f }
+                },
+                2f);
+            rig.salvageWreckCycleSeconds = 100f;
+            Physics.SyncTransforms();
+            rig.UpdateMagnetForTests(0.05f);
+            bool capturedBreakWreck = breakWreck.captured;
+            shipObject.transform.position = basePosition + Vector3.right * 5000f;
+            Physics.SyncTransforms();
+            rig.UpdateMagnetForTests(0.05f);
+            breakOk = capturedBreakWreck
+                && !breakWreck.captured
+                && breakWreck.RemainingSalvageCount == 1
+                && rig.LastInventoryMessage.Contains("left beam range");
+
+            lifetimeWreckObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            lifetimeWreckObject.name = "Big Test Lifetime Automaton Salvage Wreck";
+            lifetimeWreckObject.transform.SetParent(root.transform, false);
+            lifetimeWreckObject.transform.position = basePosition + Vector3.left * 140f;
+            CoreTacticalAutomatonWreck lifetimeWreck = lifetimeWreckObject.AddComponent<CoreTacticalAutomatonWreck>();
+            lifetimeWreck.Initialize(
+                "Lifetime Wreck",
+                100f,
+                60f,
+                -10f,
+                new List<CoreTacticalInventoryRow>
+                {
+                    new CoreTacticalInventoryRow { itemId = "automaton_relay", displayName = "Automaton relay", amountKg = 1.2f }
+                },
+                2f);
+            lifetimeWreck.despawnAfterSeconds = 1f;
+            lifetimeDamageProbeObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            lifetimeDamageProbeObject.name = "Big Test Lifetime Wreck No-Damage Probe";
+            lifetimeDamageProbeObject.transform.SetParent(root.transform, false);
+            lifetimeDamageProbeObject.transform.position = lifetimeWreckObject.transform.position + Vector3.right * 1.5f;
+            CoreTacticalPrototypeHealth lifetimeDamageProbe = lifetimeDamageProbeObject.AddComponent<CoreTacticalPrototypeHealth>();
+            lifetimeDamageProbe.maxHealth = 100f;
+            lifetimeDamageProbe.ResetHealth();
+            lifetimeWreck.AdvanceLifetimeForTests(0.45f);
+            bool lifetimeTicksWhileFree = lifetimeWreck.currentHealth > 0.001f
+                && Approximately(lifetimeWreck.UncapturedLifetimeSecondsForTests, 0.45f, 0.001f);
+            lifetimeWreck.SetCaptured(true, "Big Test beam", 0.1f);
+            lifetimeWreck.AdvanceLifetimeForTests(5f);
+            bool lifetimeStopsWhileCaptured = lifetimeWreck.currentHealth > 0.001f
+                && lifetimeWreck.captured
+                && Approximately(lifetimeWreck.UncapturedLifetimeSecondsForTests, 0f, 0.001f);
+            lifetimeWreck.SetCaptured(false);
+            lifetimeWreck.AdvanceLifetimeForTests(0.99f);
+            bool lifetimeRestartsAfterRelease = lifetimeWreck.currentHealth > 0.001f
+                && !lifetimeWreck.captured
+                && Approximately(lifetimeWreck.UncapturedLifetimeSecondsForTests, 0.99f, 0.001f);
+            lifetimeWreck.AdvanceLifetimeForTests(0.02f);
+            lifetimeDespawnOk = lifetimeTicksWhileFree
+                && lifetimeStopsWhileCaptured
+                && lifetimeRestartsAfterRelease
+                && lifetimeWreck.ExpiredByLifetimeForTests
+                && lifetimeWreck.currentHealth <= 0.001f
+                && Approximately(lifetimeDamageProbe.currentHealth, 100f, 0.001f);
+
+            collisionWreckObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            collisionWreckObject.name = "Big Test Projectile Collision Automaton Wreck";
+            collisionWreckObject.transform.SetParent(root.transform, false);
+            collisionWreckObject.transform.position = basePosition + Vector3.forward * 280f;
+            CoreTacticalAutomatonWreck collisionWreck = collisionWreckObject.AddComponent<CoreTacticalAutomatonWreck>();
+            collisionWreck.Initialize(
+                "Projectile Collision Wreck",
+                100f,
+                40f,
+                0f,
+                CoreTacticalAutomatonWreck.BuildDefaultManifest(5f),
+                2f);
+            collisionWreck.DisableSpawnDamageGraceForTests();
+            Physics.SyncTransforms();
+            bool sphereCastHitsWreck = CoreTacticalAutomatonWreck.TrySphereCastWreck(
+                collisionWreckObject.transform.position + Vector3.left * 20f,
+                collisionWreckObject.transform.position + Vector3.right * 20f,
+                1f,
+                out CoreTacticalAutomatonWreck hitWreck,
+                out _)
+                && hitWreck == collisionWreck;
+            int damagedWrecks = CoreTacticalAutomatonWreck.ApplyExplosionDamageToWrecks(
+                collisionWreckObject.transform.position,
+                12f,
+                25f,
+                "Big Test explosion");
+            bool explosionDamagesWreck = collisionWreck.currentHealth < 40f;
+            collisionWreck.ApplyProjectileDamage(100f, "Big Test direct hit", collisionWreckObject.transform.position);
+            projectileCollisionOk = sphereCastHitsWreck
+                && damagedWrecks >= 1
+                && explosionDamagesWreck
+                && collisionWreck.currentHealth <= 0.001f;
+        }
+        finally
+        {
+            DestroyBigTestObject(accessObject);
+            DestroyBigTestObject(fallbackObject);
+            DestroyBigTestObject(deathObject);
+            DestroyBigTestObject(freshWreckObject);
+            DestroyBigTestObject(wreckObject);
+            DestroyBigTestObject(cruiserWreckObject);
+            DestroyBigTestObject(breakWreckObject);
+            DestroyBigTestObject(lifetimeWreckObject);
+            DestroyBigTestObject(lifetimeDamageProbeObject);
+            DestroyBigTestObject(collisionWreckObject);
+            DestroyBigTestObject(shipObject);
+            DestroyBigTestObject(root);
+        }
+
+        bool functionalOk = manifestAndAccessOk && liveSalvageOk && cruiserWreckTowOk && breakOk && lifetimeDespawnOk && projectileCollisionOk && freshWreckGraceOk;
+        report.Check(functionalOk,
+            functionalOk
+                ? "Automaton wreck salvage functional contract holds: fixed manifests do not lose loot on failed access, empty manifests get a heavy fallback relay, failures add buildup, a salvage magnet captures and strips a small wreck into cargo from a stern tow point, cruiser wrecks can be caught, move slowly under 200 kg tow force, and fall at least 10x slower while held, the beam breaks when the ship outruns range, free wrecks visually expire after their lifetime while held wrecks pause and restart the timer after release, fresh death wrecks survive the same lethal explosion, and wreck HP intercepts later projectile/explosion damage."
+                : "Automaton wreck salvage functional contract failed: verify fixed-manifest access buildup, heavy fallback loot, live salvage capture/extraction, stern tow, cruiser wreck capture/slow tow and at least 10x held fall slowdown, beam range break/release, free-wreck lifetime despawn pause/restart, fresh death wreck grace, and projectile/explosion damage against wreck HP. Parts: manifest="
+                    + manifestAndAccessOk
+                    + ", live="
+                    + liveSalvageOk
+                    + ", cruiserTow="
+                    + cruiserWreckTowOk
+                    + ", break="
+                    + breakOk
+                    + ", lifetime="
+                    + lifetimeDespawnOk
+                    + ", freshGrace="
+                    + freshWreckGraceOk
+                    + ", projectile="
+                    + projectileCollisionOk
+                    + ".");
+    }
+
+    private static void ValidateCoreTacticalHarpoonBehavior(BigTestReport report)
+    {
+#if UNITY_EDITOR
+        string harpoonText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalHarpoon.cs");
+        string sortieText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalCombatSortieController.cs");
+        string bootstrapText = ReadProjectText("Assets/Scripts/Core/Tactical/CoreTacticalPrototypeBootstrap.cs");
+        string korshunAuxiliaryCsvText = ReadProjectText("Assets/Data/Config/Korshun_auxiliary_packages.csv");
+        string barbetAuxiliaryCsvText = ReadProjectText("Assets/Data/Config/Barbet_auxiliary_packages.csv");
+        bool structuralOk =
+            harpoonText.Contains("CoreTacticalHarpoonLauncher") &&
+            harpoonText.Contains("CoreTacticalHarpoonProjectile") &&
+            harpoonText.Contains("CoreTacticalHarpoonLink") &&
+            harpoonText.Contains("CoreTacticalDamageType.Kinetic") &&
+            harpoonText.Contains("DefaultProjectileRadiusMeters = 8f") &&
+            harpoonText.Contains("DefaultFlightCableMaxLengthMeters = 400f") &&
+            harpoonText.Contains("DefaultCableLifetimeSeconds = 10f") &&
+            harpoonText.Contains("DefaultCableMinimumLengthMeters = 50f") &&
+            harpoonText.Contains("DefaultCableWinchSpeedMS = 10f") &&
+            harpoonText.Contains("DefaultProjectileReturnSpeedMS = 100f") &&
+            harpoonText.Contains("DesignateTarget(") &&
+            harpoonText.Contains("TryLaunchAtDesignatedTarget") &&
+            harpoonText.Contains("CanLaunchAtTarget") &&
+            harpoonText.Contains("CreateTargeted") &&
+            harpoonText.Contains("flightCableLine") &&
+            harpoonText.Contains("flightCableMaxLengthMeters") &&
+            harpoonText.Contains("CableRangeMeters") &&
+            harpoonText.Contains("maximumCableLengthMeters") &&
+            harpoonText.Contains("EnforceMaximumCableLength") &&
+            harpoonText.Contains("FinishOrReturn(attached)") &&
+            harpoonText.Contains("BeginReturnToLauncher") &&
+            harpoonText.Contains("ManualAimSectorDegrees => Mathf.Clamp(manualAimSectorDegrees, 1f, 185f)") &&
+            harpoonText.Contains("ownerTransform.right * safeSide") &&
+            harpoonText.Contains("initialDistance > CableRangeMeters") &&
+            harpoonText.Contains("Mathf.MoveTowards(restLengthMeters, minimumRestLengthMeters, winchSpeedMS * deltaSeconds)") &&
+            harpoonText.Contains("remainingDurabilitySeconds = Mathf.Max(0f, remainingDurabilitySeconds - deltaSeconds)") &&
+            harpoonText.Contains("CalculateLeadTargetPoint") &&
+            harpoonText.Contains("targetBody.linearVelocity") &&
+            harpoonText.Contains("targetLocalAnchor") &&
+            harpoonText.Contains("launcher.GetCableAnchorPosition()") &&
+            harpoonText.Contains("distance * 0.06f") &&
+            !harpoonText.Contains("MaxWearMultiplier") &&
+            !harpoonText.Contains("TensionDamageTickSeconds") &&
+            !harpoonText.Contains("ApplyWearAndDamage") &&
+            !harpoonText.Contains("tensionDamagePerWearSecond") &&
+            !harpoonText.Contains("Mathf.Min(rangeMeters, flightCableMaxLengthMeters)") &&
+            !harpoonText.Contains("IsFlightCableOverextended") &&
+            !harpoonText.Contains("Vector3.Distance(launchPosition, targetPoint) > CableRangeMeters") &&
+            !harpoonText.Contains("targetPoint = intendedTargetTransform.position") &&
+            !harpoonText.Contains("TryAttachIntendedTarget") &&
+            sortieText.Contains("kind == \"harpoon\"") &&
+            sortieText.Contains("ConfigureHarpoonPackage") &&
+            sortieText.Contains("TryPickHarpoonTargetAtScreenPoint") &&
+            sortieText.Contains("TryDesignateHarpoonTarget") &&
+            sortieText.Contains("HarpoonTargetPickRadiusPixels") &&
+            sortieText.Contains("BuildHarpoonTargetPickRect") &&
+            sortieText.Contains("Harpoon Target Lock Ring") &&
+            sortieText.Contains("HandleHudActionRightClick") &&
+            sortieText.Contains("ToggleHarpoonAutoCatch") &&
+            sortieText.Contains("UpdateHarpoonAutoCatch") &&
+            sortieText.Contains("launcher.ClearDesignatedTarget();") &&
+            sortieText.Contains("launcher.CanLaunchAtTarget") &&
+            sortieText.Contains("DrawActionOrbit") &&
+            sortieText.Contains("launcher.ManualRangeMeters") &&
+            !sortieText.Contains("TryLaunchManualHarpoon(torpedoAimPoint)") &&
+            !sortieText.Contains("|| launcher.HasDesignatedTarget") &&
+            sortieText.Contains("ReleaseActiveLink(\"manual release\")") &&
+            sortieText.Contains("CoreTacticalHarpoonLink.HasActiveLinkForShip") &&
+            sortieText.Contains("Korshun_CombatAux_HarpoonCannon_Left") &&
+            sortieText.Contains("Barbet_CombatSmall_HarpoonCannon_Left") &&
+            bootstrapText.Contains("FindProjectedSide(\"Harpoon\"") &&
+            korshunAuxiliaryCsvText.Contains("korshun_aux_harpoon") &&
+            korshunAuxiliaryCsvText.Contains(",auxiliary,harpoon,") &&
+            barbetAuxiliaryCsvText.Contains("barbet_small_harpoon") &&
+            barbetAuxiliaryCsvText.Contains(",small,harpoon,");
+        report.Check(structuralOk,
+            structuralOk
+                ? "Core Tactical harpoons are structurally wired as selectable side-slot target-designation equipment with weapon flight range separated from a strict 400m cable, 185-degree side arcs, 8m projectile catch radius, 10-second cable lifetime, 10m/s retraction to 50m, 100m/s miss return, lead aiming, nearest-target auto-catch refresh, sticky cursor target acquisition with a lock ring, right-click auto-catch, non-homing ballistic shots, hit-point anchoring, kinetic pierce, cable release, slip interference, and Korshun/Barbet placeholder visuals."
+                : "Core Tactical harpoon wiring is incomplete: verify selectable target designation, separated flight range and strict 400m cable, 185-degree left/right side arcs, 8m projectile catch radius, 10-second lifetime, 10m/s retraction to 50m, 100m/s miss return, no cable wear/tension damage, lead aiming, nearest-target auto-catch refresh, sticky cursor target acquisition/ring, right-click auto-catch, non-homing projectile arc, launcher-to-hit-point anchoring, release button, slip blocking, and side-slot visuals.");
+#endif
+
+        GameObject root = null;
+        GameObject ownerObject = null;
+        GameObject targetObject = null;
+        GameObject wreckObject = null;
+        try
+        {
+            root = new GameObject("Big Test Harpoon Root");
+            ownerObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ownerObject.name = "Big Test Harpoon Owner";
+            ownerObject.transform.SetParent(root.transform, false);
+            ownerObject.transform.position = Vector3.zero;
+            CoreTacticalShipMotor owner = ownerObject.AddComponent<CoreTacticalShipMotor>();
+            owner.InitializePrototypeShip("big_test_harpoon_owner", "Big Test Harpoon Owner", new Vector3(12f, 8f, 80f), Color.cyan);
+            CoreTacticalWeaponControl weaponControl = ownerObject.AddComponent<CoreTacticalWeaponControl>();
+            weaponControl.SetRuntimeWeaponGroupActive(CoreTacticalWeaponGroup.Torpedoes);
+
+            targetObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            targetObject.name = "Big Test Harpoon Target";
+            targetObject.transform.SetParent(root.transform, false);
+            targetObject.transform.position = new Vector3(-160f, 0f, 0f);
+            CoreTacticalShipMotor target = targetObject.AddComponent<CoreTacticalShipMotor>();
+            target.InitializePrototypeShip("big_test_harpoon_target", "Big Test Harpoon Target", new Vector3(10f, 7f, 55f), Color.magenta);
+            CoreTacticalPrototypeHealth targetHealth = targetObject.AddComponent<CoreTacticalPrototypeHealth>();
+            targetHealth.maxHealth = 1000f;
+            targetHealth.destroyOnDeath = false;
+            targetHealth.ResetHealth();
+
+            CoreTacticalHarpoonLauncher launcher = ownerObject.AddComponent<CoreTacticalHarpoonLauncher>();
+            launcher.Configure(owner, -1, "Big Test Harpoon", 1800f, 55f, 360f, 5f, 280f);
+            CoreTacticalHarpoonLauncher rightLauncher = ownerObject.AddComponent<CoreTacticalHarpoonLauncher>();
+            rightLauncher.Configure(owner, 1, "Big Test Harpoon Right", 1800f, 55f, 360f, 5f, 280f);
+            bool sideArcOk = Approximately(launcher.ManualAimSectorDegrees, 185f, 0.01f)
+                && Approximately(rightLauncher.ManualAimSectorDegrees, 185f, 0.01f)
+                && launcher.IsDirectionInsideManualSector(Vector3.left)
+                && !launcher.IsDirectionInsideManualSector(Vector3.right)
+                && rightLauncher.IsDirectionInsideManualSector(Vector3.right)
+                && !rightLauncher.IsDirectionInsideManualSector(Vector3.left);
+
+            target.transform.position = new Vector3(160f, 0f, 0f);
+            bool wrongSideDesignationRejected = !launcher.DesignateTarget(target.transform, target.Body, targetHealth, null)
+                && !launcher.HasDesignatedTarget;
+            launcher.ClearDesignatedTarget();
+            launcher.SetReloadCooldownRemainingSecondsForTests(0f);
+            target.transform.position = new Vector3(-160f, 0f, 0f);
+            bool staleTargetDesignated = launcher.DesignateTarget(target.transform, target.Body, targetHealth, null);
+            target.transform.position = new Vector3(-2200f, 0f, 0f);
+            bool staleTargetLaunchBlocked = staleTargetDesignated
+                && !launcher.TryLaunchAtDesignatedTarget()
+                && !launcher.HasDesignatedTarget
+                && !launcher.HasFlyingProjectile;
+            launcher.ClearDesignatedTarget();
+
+            GameObject farAutoObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            farAutoObject.name = "Big Test Far Auto Harpoon Target";
+            farAutoObject.transform.SetParent(root.transform, false);
+            farAutoObject.transform.position = new Vector3(-420f, 0f, 120f);
+            CoreTacticalShipMotor farAutoShip = farAutoObject.AddComponent<CoreTacticalShipMotor>();
+            farAutoShip.InitializePrototypeShip("big_test_far_harpoon_auto", "Far Harpoon Auto Target", new Vector3(10f, 7f, 55f), Color.red);
+            GameObject nearAutoObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            nearAutoObject.name = "Big Test Near Auto Harpoon Target";
+            nearAutoObject.transform.SetParent(root.transform, false);
+            nearAutoObject.transform.position = new Vector3(-140f, 0f, -80f);
+            CoreTacticalShipMotor nearAutoShip = nearAutoObject.AddComponent<CoreTacticalShipMotor>();
+            nearAutoShip.InitializePrototypeShip("big_test_near_harpoon_auto", "Near Harpoon Auto Target", new Vector3(10f, 7f, 55f), Color.red);
+            bool nearestAutoTargetOk = CoreTacticalCombatSortieController.TrySelectNearestHarpoonTargetForTests(
+                    owner,
+                    launcher,
+                    new[] { farAutoShip, nearAutoShip },
+                    out Transform autoBestTarget)
+                && autoBestTarget == nearAutoShip.transform;
+
+            rightLauncher.SetReloadCooldownRemainingSecondsForTests(0f);
+            Vector3 missAimPoint = rightLauncher.GetManualLaunchPosition() + Vector3.right * 240f;
+            bool missLaunched = rightLauncher.TryLaunchManualHarpoon(missAimPoint);
+            CoreTacticalHarpoonProjectile missProjectile = rightLauncher.ActiveProjectileForTests;
+            bool missReturnOk = false;
+            if (missProjectile != null)
+            {
+                missProjectile.transform.position = rightLauncher.GetManualLaunchPosition() + Vector3.right * 300f;
+                Vector3 missReturnStart = missProjectile.transform.position;
+                missProjectile.BeginReturnForTests();
+                missProjectile.StepReturnForTests(1f);
+                float returnStepDistance = Vector3.Distance(missReturnStart, missProjectile.transform.position);
+                bool blockedDuringReturn = !rightLauncher.TryLaunchManualHarpoon(missAimPoint);
+                missProjectile.StepReturnForTests(5f);
+                missReturnOk = missLaunched
+                    && returnStepDistance >= 99f
+                    && returnStepDistance <= 101f
+                    && blockedDuringReturn
+                    && !rightLauncher.HasFlyingProjectile;
+            }
+
+            target.transform.position = new Vector3(-520f, 0f, 0f);
+            if (target.Body != null)
+            {
+                target.Body.linearVelocity = new Vector3(0f, 0f, 60f);
+            }
+
+            bool farTargetDesignated = launcher.DesignateTarget(target.transform, target.Body, targetHealth, null);
+            bool farTargetLaunchStarted = farTargetDesignated && launcher.TryLaunchAtDesignatedTarget();
+            CoreTacticalHarpoonProjectile farTargetProjectile = launcher.ActiveProjectileForTests;
+            bool farTargetLeadOk = farTargetProjectile != null
+                && farTargetProjectile.TargetPointForTests.z > target.transform.position.z + 20f
+                && Mathf.Abs(farTargetProjectile.TargetPointForTests.x - target.transform.position.x) <= 5f
+                && Vector3.Distance(launcher.GetManualLaunchPosition(), farTargetProjectile.TargetPointForTests) <= launcher.ManualRangeMeters + 1f;
+            bool farTargetLaunchOk = farTargetDesignated
+                && farTargetLaunchStarted
+                && launcher.HasFlyingProjectile
+                && farTargetProjectile != null
+                && farTargetProjectile.HasFlightCableForTests
+                && launcher.ManualRangeMeters >= 1799f
+                && Approximately(launcher.CableRangeMeters, 400f, 0.01f)
+                && farTargetLeadOk;
+            if (farTargetProjectile != null)
+            {
+                launcher.NotifyProjectileEnded(farTargetProjectile, false);
+                DestroyBigTestObject(farTargetProjectile.gameObject);
+            }
+
+            if (target.Body != null)
+            {
+                target.Body.linearVelocity = Vector3.zero;
+            }
+
+            launcher.SetReloadCooldownRemainingSecondsForTests(0f);
+            target.transform.position = new Vector3(-160f, 0f, 0f);
+            bool targetDesignated = launcher.DesignateTarget(target.transform, target.Body, targetHealth, null);
+            bool targetLaunchStarted = targetDesignated && launcher.TryLaunchAtDesignatedTarget();
+            CoreTacticalHarpoonProjectile designatedProjectile = launcher.ActiveProjectileForTests;
+            Vector3 lockedProjectileTarget = designatedProjectile != null ? designatedProjectile.TargetPointForTests : Vector3.zero;
+            bool ballisticNoHomingOk = false;
+            if (designatedProjectile != null)
+            {
+                target.transform.position += Vector3.forward * 120f;
+                bool updateOk = TryInvokePrivateMethod(designatedProjectile, "Update", report);
+                ballisticNoHomingOk = updateOk
+                    && Vector3.Distance(designatedProjectile.TargetPointForTests, lockedProjectileTarget) <= 0.001f
+                    && Vector3.Distance(designatedProjectile.TargetPointForTests, target.transform.position) > 10f;
+                target.transform.position -= Vector3.forward * 120f;
+            }
+
+            bool targetDesignationOk = launcher.ManualRangeMeters >= 1799f
+                && Approximately(launcher.CableRangeMeters, 400f, 0.01f)
+                && sideArcOk
+                && wrongSideDesignationRejected
+                && staleTargetLaunchBlocked
+                && nearestAutoTargetOk
+                && missReturnOk
+                && farTargetLaunchOk
+                && targetDesignated
+                && targetLaunchStarted
+                && launcher.HasFlyingProjectile
+                && designatedProjectile != null
+                && designatedProjectile.HasFlightCableForTests
+                && Approximately(designatedProjectile.MaxFlightCableLengthMetersForTests, 400f, 0.01f)
+                && ballisticNoHomingOk
+                && launcher.ReloadCooldownRemainingSeconds <= 5.05f;
+            if (designatedProjectile != null)
+            {
+                launcher.NotifyProjectileEnded(designatedProjectile, false);
+                DestroyBigTestObject(designatedProjectile.gameObject);
+            }
+
+            target.transform.position = new Vector3(-460f, 0f, 0f);
+            float healthBeforeTooFar = targetHealth.currentHealth;
+            bool tooFarAttached = launcher.TryAttachFromProjectile(
+                target.transform,
+                target.Body,
+                targetHealth,
+                null,
+                target.transform.position,
+                Vector3.right);
+            bool maxCableRejectOk = !tooFarAttached
+                && !launcher.HasActiveLink
+                && Approximately(targetHealth.currentHealth, healthBeforeTooFar, 0.001f);
+
+            target.transform.position = new Vector3(-160f, 0f, 0f);
+            float healthBeforePierce = targetHealth.currentHealth;
+            bool attached = launcher.TryAttachFromProjectile(
+                target.transform,
+                target.Body,
+                targetHealth,
+                null,
+                target.transform.position,
+                Vector3.right);
+            float pierceDamage = healthBeforePierce - targetHealth.currentHealth;
+            CoreTacticalHarpoonLink link = launcher.ActiveLink;
+            bool attachAndPierceOk = attached
+                && launcher.HasActiveLink
+                && link != null
+                && link.RestLengthMeters <= 400.01f
+                && link.MaximumCableLengthMeters <= 400.01f
+                && link.RestLengthMeters > 50f
+                && Approximately(link.RemainingDurabilitySeconds, 10f, 0.01f)
+                && targetHealth.currentHealth < healthBeforePierce
+                && pierceDamage > 0f
+                && pierceDamage <= 80f
+                && CoreTacticalHarpoonLink.HasActiveLinkForShip(owner)
+                && CoreTacticalHarpoonLink.HasActiveLinkForShip(target);
+
+            bool hardCableMaxOk = false;
+            if (link != null)
+            {
+                Vector3 overextendedPosition = launcher.GetCableAnchorPosition() + Vector3.left * 700f;
+                target.transform.position = overextendedPosition;
+                if (target.Body != null)
+                {
+                    target.Body.position = overextendedPosition;
+                    target.Body.linearVelocity = Vector3.zero;
+                }
+
+                link.ApplyTensionForTests(0.1f, 1000f);
+                Vector3 enforcedTargetPosition = target.Body != null ? target.Body.position : target.transform.position;
+                hardCableMaxOk = Vector3.Distance(launcher.GetCableAnchorPosition(), enforcedTargetPosition) <= 400.5f;
+                target.transform.position = new Vector3(-160f, 0f, 0f);
+                if (target.Body != null)
+                {
+                    target.Body.position = target.transform.position;
+                    target.Body.linearVelocity = Vector3.zero;
+                }
+            }
+
+            float restBeforeRetraction = link != null ? link.RestLengthMeters : -1f;
+            float durabilityBeforeRetraction = link != null ? link.RemainingDurabilitySeconds : -1f;
+            float healthBeforeRetraction = targetHealth.currentHealth;
+            if (link != null)
+            {
+                link.ApplyTensionForTests(1f, 1000f);
+            }
+
+            bool retractionOk = link != null
+                && link.RestLengthMeters <= restBeforeRetraction - 9.9f
+                && link.RestLengthMeters >= 49.99f
+                && Approximately(link.RemainingDurabilitySeconds, durabilityBeforeRetraction - 1f, 0.01f)
+                && Approximately(targetHealth.currentHealth, healthBeforeRetraction, 0.001f)
+                && link.Stress01 <= 0.001f;
+            launcher.ReleaseActiveLink("Big Test release");
+            bool releaseOk = !launcher.HasActiveLink;
+
+            float healthBeforeLifetimePierce = targetHealth.currentHealth;
+            bool lifetimeAttached = launcher.TryAttachFromProjectile(
+                target.transform,
+                target.Body,
+                targetHealth,
+                null,
+                target.transform.position,
+                Vector3.right);
+            CoreTacticalHarpoonLink lifetimeLink = launcher.ActiveLink;
+            bool lifetimeStartsAtTen = lifetimeAttached
+                && lifetimeLink != null
+                && Approximately(lifetimeLink.RemainingDurabilitySeconds, 10f, 0.01f)
+                && targetHealth.currentHealth < healthBeforeLifetimePierce;
+            if (lifetimeLink != null)
+            {
+                lifetimeLink.ApplyTensionForTests(10.5f, 1000f);
+            }
+
+            bool lifetimeReleaseOk = lifetimeStartsAtTen && !launcher.HasActiveLink;
+            launcher.SetReloadCooldownRemainingSecondsForTests(5f);
+            bool cooldownHudOk = string.Equals(
+                CoreTacticalCombatSortieController.GetWeaponCooldownTextForTests(owner, CoreTacticalWeaponGroup.Torpedoes),
+                "5",
+                StringComparison.Ordinal);
+
+            wreckObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wreckObject.name = "Big Test Harpoon Wreck";
+            wreckObject.transform.SetParent(root.transform, false);
+            wreckObject.transform.position = new Vector3(-180f, 0f, 0f);
+            CoreTacticalAutomatonWreck wreck = wreckObject.AddComponent<CoreTacticalAutomatonWreck>();
+            wreck.Initialize(
+                "Harpoon Wreck",
+                1800f,
+                500f,
+                -50f,
+                CoreTacticalAutomatonWreck.BuildDefaultManifest(20f),
+                6f);
+            wreck.DisableSpawnDamageGraceForTests();
+            bool wreckAttached = launcher.TryAttachFromProjectile(
+                wreck.transform,
+                wreck.GetComponent<Rigidbody>(),
+                null,
+                wreck,
+                wreck.transform.position,
+                Vector3.right);
+            float wreckStartDistance = Vector3.Distance(owner.transform.position, wreck.transform.position);
+            if (launcher.ActiveLink != null)
+            {
+                launcher.ActiveLink.ApplyTensionForTests(1f, 1000f);
+            }
+
+            bool wreckTetherOk = wreckAttached
+                && wreck.currentHealth < 500f
+                && CoreTacticalHarpoonLink.HasActiveLinkForShip(owner)
+                && Vector3.Distance(owner.transform.position, wreck.transform.position) <= wreckStartDistance;
+
+            bool functionalOk = targetDesignationOk
+                && maxCableRejectOk
+                && attachAndPierceOk
+                && hardCableMaxOk
+                && retractionOk
+                && releaseOk
+                && lifetimeReleaseOk
+                && cooldownHudOk
+                && wreckTetherOk;
+            report.Check(functionalOk,
+                functionalOk
+                    ? "Core Tactical harpoon live contract holds: left and right launchers fire only into their own 185-degree side arcs, stale/wrong-side targets are rejected, auto-catch picks the nearest valid target per launcher, missed bolts return at 100m/s before the launcher frees up, target designation auto-launches a faster flatter non-homing shot beyond 400m when inside 1800m ballistic range, leads moving targets, rejects cable attachment beyond strict 400m, kinetic pierce is modest, active cable links hold ships and wrecks from the launcher anchor to the hit point, hard-clamp active cable length to 400m, retract at 10m/s to 50m without tension damage or wear, expire after 10 seconds, manual release, HUD cooldown, slip blocker and wreck tethering all work."
+                    : "Core Tactical harpoon live contract failed: targetDesignation="
+                        + targetDesignationOk
+                        + " (side="
+                        + sideArcOk
+                        + ", wrongSide="
+                        + wrongSideDesignationRejected
+                        + ", stale="
+                        + staleTargetLaunchBlocked
+                        + ", nearest="
+                        + nearestAutoTargetOk
+                        + ", missReturn="
+                        + missReturnOk
+                        + ", farLaunch="
+                        + farTargetLaunchOk
+                        + ", targetLaunch="
+                        + targetLaunchStarted
+                        + ", ballistic="
+                        + ballisticNoHomingOk
+                        + ")"
+                        + ", maxCable="
+                        + maxCableRejectOk
+                        + ", attach="
+                        + attachAndPierceOk
+                        + ", hardCable="
+                        + hardCableMaxOk
+                        + ", retract="
+                        + retractionOk
+                        + ", release="
+                        + releaseOk
+                        + ", lifetime="
+                        + lifetimeReleaseOk
+                        + ", cooldown="
+                        + cooldownHudOk
+                        + ", wreck="
+                        + wreckTetherOk
+                        + ".");
+        }
+        finally
+        {
+            DestroyBigTestObject(wreckObject);
+            DestroyBigTestObject(targetObject);
+            DestroyBigTestObject(ownerObject);
+            DestroyBigTestObject(root);
+        }
+    }
+
+    private static float SumInventoryRowsKg(IReadOnlyList<CoreTacticalInventoryRow> rows)
+    {
+        if (rows == null)
+        {
+            return 0f;
+        }
+
+        float total = 0f;
+        for (int i = 0; i < rows.Count; i++)
+        {
+            total += Mathf.Max(0f, rows[i].amountKg);
+        }
+
+        return total;
+    }
+
+    private static bool ValidateCoreTacticalCommandProjectionProbe(out string details)
+    {
+        GameObject root = null;
+        int sampleCount = 0;
+        const float screenClickToleranceMeters = 0.08f;
+        const float fixedWorldRoundTripToleranceMeters = 1f;
+        const float screenReprojectionTolerancePixels = 2f;
+        float maxProjectionError = 0f;
+        float maxMarkerError = 0f;
+        float maxIssuedTargetError = 0f;
+        float maxScreenReprojectionErrorPixels = 0f;
+        try
+        {
+            int screenWidth = Mathf.Max(1, Screen.width);
+            int screenHeight = Mathf.Max(1, Screen.height);
+            root = new GameObject("Big Test Core Tactical Command Projection Probe");
+
+            GameObject fleetObject = new GameObject("Big Test Core Tactical Fleet");
+            fleetObject.transform.SetParent(root.transform, false);
+            CoreTacticalFleetController fleet = fleetObject.AddComponent<CoreTacticalFleetController>();
+            fleet.showPrototypeHud = false;
+            fleet.selectAllOnStart = false;
+            fleet.commandPlaneAltitudeMeters = 80f;
+
+            GameObject shipObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            shipObject.name = "Big Test Core Tactical Command Ship";
+            shipObject.transform.SetParent(root.transform, false);
+            shipObject.transform.position = new Vector3(0f, fleet.commandPlaneAltitudeMeters, 0f);
+            shipObject.transform.rotation = Quaternion.identity;
+            Rigidbody body = shipObject.GetComponent<Rigidbody>();
+            if (body == null)
+            {
+                body = shipObject.AddComponent<Rigidbody>();
+            }
+
+            body.useGravity = false;
+            CoreTacticalShipMotor ship = shipObject.AddComponent<CoreTacticalShipMotor>();
+            ship.InitializePrototypeShip(
+                "big_test_command_ship",
+                "Big Test Command Ship",
+                new Vector3(18f, 6f, 48f),
+                new Color(0.2f, 0.45f, 0.9f, 1f));
+            ship.SetSelected(true);
+            fleet.RegisterShip(ship);
+
+            GameObject cameraObject = new GameObject("Big Test Core Tactical Command Camera");
+            cameraObject.transform.SetParent(root.transform, false);
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.rect = new Rect(0f, 0f, 1f, 1f);
+            camera.aspect = screenWidth / Mathf.Max(1f, screenHeight);
+            camera.fieldOfView = 60f;
+            camera.nearClipPlane = 0.1f;
+            camera.farClipPlane = 20000f;
+
+            CoreTacticalCameraRig rig = cameraObject.AddComponent<CoreTacticalCameraRig>();
+            rig.fleet = fleet;
+            rig.targetCamera = camera;
+            rig.yawDegrees = -138f;
+            rig.elevationDegrees = 58f;
+            fleet.SetInputCamera(camera);
+
+            Rect[] cameraRects =
+            {
+                new Rect(0f, 0f, 1f, 1f),
+                new Rect(0.13f, 0.08f, 0.74f, 0.82f)
+            };
+            float[] zoomDistances = { 240f, 520f, 1200f };
+            Vector3 fixedWorldPoint = new Vector3(36f, fleet.commandPlaneAltitudeMeters, 44f);
+
+            for (int rectIndex = 0; rectIndex < cameraRects.Length; rectIndex++)
+            {
+                camera.rect = cameraRects[rectIndex];
+                Rect pixelRect = GetCameraPixelRectForBigTest(camera, screenWidth, screenHeight);
+                camera.aspect = pixelRect.width / Mathf.Max(1f, pixelRect.height);
+                Vector2[] screenSamples =
+                {
+                    pixelRect.center,
+                    new Vector2(Mathf.Lerp(pixelRect.xMin, pixelRect.xMax, 0.28f), Mathf.Lerp(pixelRect.yMin, pixelRect.yMax, 0.42f)),
+                    new Vector2(Mathf.Lerp(pixelRect.xMin, pixelRect.xMax, 0.72f), Mathf.Lerp(pixelRect.yMin, pixelRect.yMax, 0.64f))
+                };
+
+                for (int zoomIndex = 0; zoomIndex < zoomDistances.Length; zoomIndex++)
+                {
+                    rig.distanceMeters = zoomDistances[zoomIndex];
+                    rig.ApplyCurrentTransformForInput();
+
+                    for (int sampleIndex = 0; sampleIndex < screenSamples.Length; sampleIndex++)
+                    {
+                        if (!TryValidateCommandProjectionSample(
+                            fleet,
+                            ship,
+                            camera,
+                            screenSamples[sampleIndex],
+                            out float projectionError,
+                            out float markerError,
+                            out float issuedTargetError,
+                            out float screenReprojectionErrorPixels,
+                            null,
+                            screenClickToleranceMeters,
+                            screenReprojectionTolerancePixels))
+                        {
+                            details = "screen sample failed at cameraRect="
+                                + cameraRects[rectIndex].ToString("0.###")
+                                + ", zoom="
+                                + zoomDistances[zoomIndex].ToString("0.#")
+                                + ", point="
+                                + screenSamples[sampleIndex].ToString("0.#")
+                                + ", projectionError="
+                                + projectionError.ToString("0.###")
+                                + ", markerError="
+                                + markerError.ToString("0.###")
+                                + ", issuedError="
+                                + issuedTargetError.ToString("0.###")
+                                + ", screenReprojectionError="
+                                + screenReprojectionErrorPixels.ToString("0.###")
+                                + " px.";
+                            return false;
+                        }
+
+                        sampleCount++;
+                        maxProjectionError = Mathf.Max(maxProjectionError, projectionError);
+                        maxMarkerError = Mathf.Max(maxMarkerError, markerError);
+                        maxIssuedTargetError = Mathf.Max(maxIssuedTargetError, issuedTargetError);
+                        maxScreenReprojectionErrorPixels = Mathf.Max(maxScreenReprojectionErrorPixels, screenReprojectionErrorPixels);
+                    }
+
+                    Vector3 fixedScreen = camera.WorldToScreenPoint(fixedWorldPoint);
+                    Vector2 fixedScreenPoint = new Vector2(fixedScreen.x, fixedScreen.y);
+                    if (fixedScreen.z <= 0f || !IsScreenPointInsideForBigTest(fixedScreenPoint, pixelRect))
+                    {
+                        details = "fixed world point is not visible at cameraRect="
+                            + cameraRects[rectIndex].ToString("0.###")
+                            + ", zoom="
+                            + zoomDistances[zoomIndex].ToString("0.#")
+                            + ", screen="
+                            + fixedScreen.ToString("0.###")
+                            + ".";
+                        return false;
+                    }
+
+                    if (!TryValidateCommandProjectionSample(
+                        fleet,
+                        ship,
+                        camera,
+                        fixedScreenPoint,
+                        out float fixedProjectionError,
+                        out float fixedMarkerError,
+                        out float fixedIssuedTargetError,
+                        out float fixedScreenReprojectionErrorPixels,
+                        fixedWorldPoint,
+                        fixedWorldRoundTripToleranceMeters,
+                        screenReprojectionTolerancePixels))
+                    {
+                        details = "fixed world point failed at cameraRect="
+                            + cameraRects[rectIndex].ToString("0.###")
+                            + ", zoom="
+                            + zoomDistances[zoomIndex].ToString("0.#")
+                            + ", screen="
+                            + fixedScreenPoint.ToString("0.#")
+                            + ", projectionError="
+                            + fixedProjectionError.ToString("0.###")
+                            + ", markerError="
+                            + fixedMarkerError.ToString("0.###")
+                            + ", issuedError="
+                            + fixedIssuedTargetError.ToString("0.###")
+                            + ", screenReprojectionError="
+                            + fixedScreenReprojectionErrorPixels.ToString("0.###")
+                            + " px.";
+                        return false;
+                    }
+
+                    sampleCount++;
+                    maxProjectionError = Mathf.Max(maxProjectionError, fixedProjectionError);
+                    maxMarkerError = Mathf.Max(maxMarkerError, fixedMarkerError);
+                    maxIssuedTargetError = Mathf.Max(maxIssuedTargetError, fixedIssuedTargetError);
+                    maxScreenReprojectionErrorPixels = Mathf.Max(maxScreenReprojectionErrorPixels, fixedScreenReprojectionErrorPixels);
+                }
+            }
+
+            details = "samples="
+                + sampleCount
+                + ", maxProjectionError="
+                + maxProjectionError.ToString("0.###")
+                + " m, maxMarkerError="
+                + maxMarkerError.ToString("0.###")
+                + " m, maxIssuedTargetError="
+                + maxIssuedTargetError.ToString("0.###")
+                + " m, maxScreenReprojectionError="
+                + maxScreenReprojectionErrorPixels.ToString("0.###")
+                + " px, screenClickTolerance="
+                + screenClickToleranceMeters.ToString("0.###")
+                + " m, fixedWorldRoundTripTolerance="
+                + fixedWorldRoundTripToleranceMeters.ToString("0.###")
+                + " m, screenReprojectionTolerance="
+                + screenReprojectionTolerancePixels.ToString("0.###")
+                + " px.";
+            return sampleCount > 0;
+        }
+        finally
+        {
+            DestroyBigTestObject(root);
+        }
+    }
+
+    private static bool ValidateNoIdleMagnetAuxiliaryBeamEmitters(out string details)
+    {
+        CoreTacticalAuxiliaryBeamEmitter[] emitters =
+            UnityEngine.Object.FindObjectsByType<CoreTacticalAuxiliaryBeamEmitter>(FindObjectsSortMode.None);
+        int total = emitters != null ? emitters.Length : 0;
+        int magnetCount = 0;
+        for (int i = 0; emitters != null && i < emitters.Length; i++)
+        {
+            CoreTacticalAuxiliaryBeamEmitter emitter = emitters[i];
+            if (emitter != null && emitter.palette == CoreTacticalUtilityBeamPalette.Magnet)
+            {
+                magnetCount++;
+            }
+        }
+
+        details = "emitters=" + total + ", magnetEmitters=" + magnetCount + ".";
+        return magnetCount == 0;
+    }
+
+    private static bool ValidateKorshunCombatMagnetLoadoutVisuals(out string details)
+    {
+        CoreTacticalShipMotor[] ships = UnityEngine.Object.FindObjectsByType<CoreTacticalShipMotor>(FindObjectsSortMode.None);
+        CoreTacticalShipMotor playerShip = null;
+        for (int i = 0; ships != null && i < ships.Length; i++)
+        {
+            CoreTacticalShipMotor ship = ships[i];
+            if (ship == null || IsBigTestProbeShip(ship))
+            {
+                continue;
+            }
+
+            CoreTacticalCombatant combatant = ship.GetComponent<CoreTacticalCombatant>();
+            if (ship.IsSelected && (combatant == null || combatant.team == CoreTacticalCombatTeam.Friendly))
+            {
+                playerShip = ship;
+                break;
+            }
+        }
+
+        for (int i = 0; playerShip == null && ships != null && i < ships.Length; i++)
+        {
+            CoreTacticalShipMotor ship = ships[i];
+            if (ship == null || IsBigTestProbeShip(ship))
+            {
+                continue;
+            }
+
+            CoreTacticalCombatant combatant = ship.GetComponent<CoreTacticalCombatant>();
+            if (combatant != null && combatant.team == CoreTacticalCombatTeam.Friendly)
+            {
+                playerShip = ship;
+                break;
+            }
+        }
+
+        if (playerShip == null)
+        {
+            details = "player ship is missing.";
+            return false;
+        }
+
+        Transform root = playerShip.transform;
+        int leftMagnets = CountActiveDescendantsByNameContains(root, "Korshun_CombatAux_Magnet_Left");
+        int rightMagnets = CountActiveDescendantsByNameContains(root, "Korshun_CombatAux_Magnet_Right");
+        int magnets = CountActiveDescendantsByNameContains(root, "Korshun_CombatAux_Magnet");
+        int defaultTorpedoes = CountActiveDescendantsByNameContains(root, "Korshun_TorpedoLauncher_3Tube");
+        Bounds leftMagnetBounds = default;
+        Bounds rightMagnetBounds = default;
+        bool leftMagnetPlaced = TryFindActiveDescendantByExactName(root, "Korshun_CombatAux_Magnet_Left", out Transform leftMagnet)
+            && TryCalculateRendererBoundsInSpace(leftMagnet, root, out leftMagnetBounds);
+        bool rightMagnetPlaced = TryFindActiveDescendantByExactName(root, "Korshun_CombatAux_Magnet_Right", out Transform rightMagnet)
+            && TryCalculateRendererBoundsInSpace(rightMagnet, root, out rightMagnetBounds);
+        bool shipBoundsReady = TryCalculateRendererBoundsInSpace(root, root, out Bounds shipVisualBounds);
+        float sideThreshold = Mathf.Max(0.08f, shipBoundsReady ? shipVisualBounds.size.x * 0.12f : 0.25f);
+        float leftX = leftMagnetPlaced ? leftMagnetBounds.center.x : 0f;
+        float rightX = rightMagnetPlaced ? rightMagnetBounds.center.x : 0f;
+        bool magnetsSitOnOppositeSideMounts = leftMagnetPlaced
+            && rightMagnetPlaced
+            && Mathf.Abs(leftX) > sideThreshold
+            && Mathf.Abs(rightX) > sideThreshold
+            && leftX * rightX < 0f
+            && Mathf.Abs(rightX - leftX) > sideThreshold * 2f;
+
+        details = "ship="
+            + playerShip.name
+            + ", magnets="
+            + magnets
+            + ", leftMagnets="
+            + leftMagnets
+            + ", rightMagnets="
+            + rightMagnets
+            + ", activeDefaultTorpedoes="
+            + defaultTorpedoes
+            + ", leftCenter="
+            + (leftMagnetPlaced ? FormatVector3ForTests(leftMagnetBounds.center) : "<missing>")
+            + ", rightCenter="
+            + (rightMagnetPlaced ? FormatVector3ForTests(rightMagnetBounds.center) : "<missing>")
+            + ", sideThreshold="
+            + sideThreshold.ToString("0.###", CultureInfo.InvariantCulture)
+            + ", shipVisualWidth="
+            + (shipBoundsReady ? shipVisualBounds.size.x.ToString("0.###", CultureInfo.InvariantCulture) : "<missing>")
+            + ".";
+        return magnets >= 2
+            && leftMagnets >= 1
+            && rightMagnets >= 1
+            && defaultTorpedoes == 0
+            && magnetsSitOnOppositeSideMounts;
+    }
+
+    private static bool IsBigTestProbeShip(CoreTacticalShipMotor ship)
+    {
+        if (ship == null)
+        {
+            return true;
+        }
+
+        for (Transform current = ship.transform; current != null; current = current.parent)
+        {
+            string name = current.name ?? "";
+            if (name.StartsWith("Big Test ", StringComparison.OrdinalIgnoreCase)
+                || name.IndexOf(" Probe", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryFindActiveDescendantByExactName(Transform root, string objectName, out Transform match)
+    {
+        match = null;
+        if (root == null || string.IsNullOrWhiteSpace(objectName))
+        {
+            return false;
+        }
+
+        Transform[] descendants = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; descendants != null && i < descendants.Length; i++)
+        {
+            Transform descendant = descendants[i];
+            if (descendant == null || descendant == root || !descendant.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            string descendantName = descendant.name ?? "";
+            if (string.Equals(descendantName, objectName, StringComparison.OrdinalIgnoreCase)
+                || descendantName.StartsWith(objectName + ".", StringComparison.OrdinalIgnoreCase))
+            {
+                match = descendant;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryCalculateRendererBoundsInSpace(Transform root, Transform reference, out Bounds bounds)
+    {
+        bounds = default;
+        if (root == null || reference == null)
+        {
+            return false;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool initialized = false;
+        for (int i = 0; renderers != null && i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            Bounds worldBounds = renderer.bounds;
+            Vector3 min = worldBounds.min;
+            Vector3 max = worldBounds.max;
+            for (int x = 0; x <= 1; x++)
+            {
+                for (int y = 0; y <= 1; y++)
+                {
+                    for (int z = 0; z <= 1; z++)
+                    {
+                        Vector3 worldCorner = new Vector3(
+                            x == 0 ? min.x : max.x,
+                            y == 0 ? min.y : max.y,
+                            z == 0 ? min.z : max.z);
+                        Vector3 localCorner = reference.InverseTransformPoint(worldCorner);
+                        if (!initialized)
+                        {
+                            bounds = new Bounds(localCorner, Vector3.zero);
+                            initialized = true;
+                        }
+                        else
+                        {
+                            bounds.Encapsulate(localCorner);
+                        }
+                    }
+                }
+            }
+        }
+
+        return initialized;
+    }
+
+    private static string FormatVector3ForTests(Vector3 value)
+    {
+        return "("
+            + value.x.ToString("0.##", CultureInfo.InvariantCulture)
+            + ","
+            + value.y.ToString("0.##", CultureInfo.InvariantCulture)
+            + ","
+            + value.z.ToString("0.##", CultureInfo.InvariantCulture)
+            + ")";
+    }
+
+    private static int CountActiveDescendantsByNameContains(Transform root, string token)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(token))
+        {
+            return 0;
+        }
+
+        int count = 0;
+        Transform[] descendants = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; descendants != null && i < descendants.Length; i++)
+        {
+            Transform descendant = descendants[i];
+            if (descendant == null || descendant == root || !descendant.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            if (descendant.name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool ValidateCoreTacticalLiveCommandProjection(CoreTacticalFleetController fleet, out string details)
+    {
+        const float screenClickToleranceMeters = 0.08f;
+        const float screenReprojectionTolerancePixels = 2f;
+        details = "";
+        if (fleet == null)
+        {
+            details = "fleet is missing.";
+            return false;
+        }
+
+        Camera camera = fleet.InputCameraForTests;
+        if (camera == null || !camera.enabled)
+        {
+            details = "active tactical camera is missing or disabled.";
+            return false;
+        }
+
+        CoreTacticalShipMotor selectedShip = null;
+        IReadOnlyList<CoreTacticalShipMotor> ships = fleet.Ships;
+        for (int i = 0; ships != null && i < ships.Count; i++)
+        {
+            CoreTacticalShipMotor ship = ships[i];
+            if (ship != null && ship.IsSelected)
+            {
+                selectedShip = ship;
+                break;
+            }
+        }
+
+        if (selectedShip == null && ships != null && ships.Count > 0)
+        {
+            selectedShip = ships[0];
+            selectedShip.SetSelected(true);
+        }
+
+        if (selectedShip == null)
+        {
+            details = "selected ship is missing.";
+            return false;
+        }
+
+        CoreTacticalCameraRig rig = camera.GetComponent<CoreTacticalCameraRig>();
+        int screenWidth = Mathf.Max(1, Screen.width);
+        int screenHeight = Mathf.Max(1, Screen.height);
+        Rect pixelRect = GetCameraPixelRectForBigTest(camera, screenWidth, screenHeight);
+        if (pixelRect.width <= 1f || pixelRect.height <= 1f)
+        {
+            details = "camera pixelRect is invalid: " + pixelRect.ToString("0.###") + ".";
+            return false;
+        }
+
+        Vector2[] screenSamples =
+        {
+            pixelRect.center,
+            new Vector2(Mathf.Lerp(pixelRect.xMin, pixelRect.xMax, 0.33f), Mathf.Lerp(pixelRect.yMin, pixelRect.yMax, 0.45f)),
+            new Vector2(Mathf.Lerp(pixelRect.xMin, pixelRect.xMax, 0.68f), Mathf.Lerp(pixelRect.yMin, pixelRect.yMax, 0.62f))
+        };
+        float[] zoomDistances = rig != null
+            ? new[] { 520f, Mathf.Clamp(rig.distanceMeters, rig.minDistanceMeters, rig.maxDistanceMeters), 12000f }
+            : new[] { 0f };
+        int sampleCount = 0;
+        float maxMarkerError = 0f;
+        float maxIssuedTargetError = 0f;
+        float maxScreenReprojectionErrorPixels = 0f;
+        for (int zoomIndex = 0; zoomIndex < zoomDistances.Length; zoomIndex++)
+        {
+            if (rig != null)
+            {
+                rig.distanceMeters = Mathf.Clamp(zoomDistances[zoomIndex], rig.minDistanceMeters, rig.maxDistanceMeters);
+                rig.ApplyCurrentTransformForInput();
+            }
+
+            for (int sampleIndex = 0; sampleIndex < screenSamples.Length; sampleIndex++)
+            {
+                if (!TryValidateCommandProjectionSample(
+                    fleet,
+                    selectedShip,
+                    camera,
+                    screenSamples[sampleIndex],
+                    out float projectionError,
+                    out float markerError,
+                    out float issuedTargetError,
+                    out float screenReprojectionErrorPixels,
+                    null,
+                    screenClickToleranceMeters,
+                    screenReprojectionTolerancePixels))
+                {
+                    Vector3 markerCenter = fleet.GetCommandPointMarkerCenterForTests();
+                    Vector3 reprojected = camera.WorldToScreenPoint(markerCenter);
+                    Vector2 reprojected2 = new Vector2(reprojected.x, reprojected.y);
+                    Vector2 reprojectionDelta = reprojected2 - screenSamples[sampleIndex];
+                    details = "sample failed at zoom="
+                        + zoomDistances[zoomIndex].ToString("0.#")
+                        + ", point="
+                        + screenSamples[sampleIndex].ToString("0.#")
+                        + ", reprojected="
+                        + reprojected2.ToString("0.###")
+                        + ", delta="
+                        + reprojectionDelta.ToString("0.###")
+                        + ", screen="
+                        + screenWidth.ToString()
+                        + "x"
+                        + screenHeight.ToString()
+                        + ", cameraPixelRect="
+                        + pixelRect.ToString("0.###")
+                        + ", cameraRect="
+                        + camera.rect.ToString("0.###")
+                        + ", cameraPixels="
+                        + camera.pixelWidth.ToString()
+                        + "x"
+                        + camera.pixelHeight.ToString()
+                        + ", aspect="
+                        + camera.aspect.ToString("0.###")
+                        + ", projectionError="
+                        + projectionError.ToString("0.###")
+                        + ", markerError="
+                        + markerError.ToString("0.###")
+                        + ", issuedError="
+                        + issuedTargetError.ToString("0.###")
+                        + ", screenReprojectionError="
+                        + screenReprojectionErrorPixels.ToString("0.###")
+                        + " px.";
+                    return false;
+                }
+
+                sampleCount++;
+                maxMarkerError = Mathf.Max(maxMarkerError, markerError);
+                maxIssuedTargetError = Mathf.Max(maxIssuedTargetError, issuedTargetError);
+                maxScreenReprojectionErrorPixels = Mathf.Max(maxScreenReprojectionErrorPixels, screenReprojectionErrorPixels);
+            }
+        }
+
+        details = "samples="
+            + sampleCount
+            + ", pixelRect="
+            + pixelRect.ToString("0.###")
+            + ", maxMarkerError="
+            + maxMarkerError.ToString("0.###")
+            + " m, maxIssuedTargetError="
+            + maxIssuedTargetError.ToString("0.###")
+            + " m, maxScreenReprojectionError="
+            + maxScreenReprojectionErrorPixels.ToString("0.###")
+            + " px.";
+        return sampleCount > 0;
+    }
+
+    private static bool TryValidateCommandProjectionSample(
+        CoreTacticalFleetController fleet,
+        CoreTacticalShipMotor ship,
+        Camera camera,
+        Vector2 screenPoint,
+        out float projectionError,
+        out float markerError,
+        out float issuedTargetError,
+        out float screenReprojectionErrorPixels,
+        Vector3? expectedWorldPointOverride = null,
+        float toleranceMeters = 0.08f,
+        float screenTolerancePixels = 1.5f)
+    {
+        projectionError = float.PositiveInfinity;
+        markerError = float.PositiveInfinity;
+        issuedTargetError = float.PositiveInfinity;
+        screenReprojectionErrorPixels = float.PositiveInfinity;
+        if (fleet == null || ship == null || camera == null)
+        {
+            return false;
+        }
+
+        if (!CoreTacticalFleetController.TryBuildCameraRayFromScreenPointForTests(camera, screenPoint, out Ray _))
+        {
+            return false;
+        }
+
+        if (!fleet.TryProjectScreenPointToCommandPlaneForTests(screenPoint, out Vector3 projectedPoint))
+        {
+            return false;
+        }
+
+        Vector3 expectedWorldPoint = expectedWorldPointOverride ?? projectedPoint;
+        projectionError = Vector3.Distance(projectedPoint, expectedWorldPoint);
+        if (!fleet.ProcessCommandPointerForTests(
+            screenPoint,
+            true,
+            true,
+            false,
+            out Vector3 commandTarget,
+            out Vector3 markerCenter))
+        {
+            return false;
+        }
+
+        markerError = Vector3.Distance(markerCenter, expectedWorldPoint);
+        float commandTargetError = Vector3.Distance(commandTarget, expectedWorldPoint);
+        screenReprojectionErrorPixels = CalculateScreenReprojectionErrorPixels(camera, markerCenter, screenPoint);
+        if (!fleet.ProcessCommandPointerForTests(
+            screenPoint,
+            false,
+            true,
+            false,
+            out commandTarget,
+            out markerCenter))
+        {
+            return false;
+        }
+
+        markerError = Mathf.Max(markerError, Vector3.Distance(markerCenter, expectedWorldPoint));
+        commandTargetError = Mathf.Max(commandTargetError, Vector3.Distance(commandTarget, expectedWorldPoint));
+        screenReprojectionErrorPixels = Mathf.Max(
+            screenReprojectionErrorPixels,
+            CalculateScreenReprojectionErrorPixels(camera, markerCenter, screenPoint));
+        if (!fleet.ProcessCommandPointerForTests(
+            screenPoint,
+            false,
+            false,
+            true,
+            out commandTarget,
+            out markerCenter))
+        {
+            return false;
+        }
+
+        commandTargetError = Mathf.Max(commandTargetError, Vector3.Distance(commandTarget, expectedWorldPoint));
+        issuedTargetError = Mathf.Max(commandTargetError, Vector3.Distance(ship.TargetPosition, expectedWorldPoint));
+        screenReprojectionErrorPixels = Mathf.Max(
+            screenReprojectionErrorPixels,
+            CalculateScreenReprojectionErrorPixels(camera, ship.TargetPosition, screenPoint));
+        float safeToleranceMeters = Mathf.Max(0.001f, toleranceMeters);
+        float safeScreenTolerancePixels = Mathf.Max(0.001f, screenTolerancePixels);
+        return projectionError <= safeToleranceMeters
+            && markerError <= safeToleranceMeters
+            && issuedTargetError <= safeToleranceMeters
+            && screenReprojectionErrorPixels <= safeScreenTolerancePixels;
+    }
+
+    private static Rect GetCameraPixelRectForBigTest(Camera camera, int screenWidth, int screenHeight)
+    {
+        if (camera == null)
+        {
+            return new Rect(0f, 0f, screenWidth, screenHeight);
+        }
+
+        Rect pixelRect = camera.pixelRect;
+        if (pixelRect.width > 0.01f && pixelRect.height > 0.01f)
+        {
+            return pixelRect;
+        }
+
+        Rect normalized = camera.rect;
+        return new Rect(
+            normalized.xMin * screenWidth,
+            normalized.yMin * screenHeight,
+            normalized.width * screenWidth,
+            normalized.height * screenHeight);
+    }
+
+    private static float CalculateScreenReprojectionErrorPixels(Camera camera, Vector3 worldPoint, Vector2 expectedScreenPoint)
+    {
+        if (camera == null)
+        {
+            return float.PositiveInfinity;
+        }
+
+        Vector3 reprojected = camera.WorldToScreenPoint(worldPoint);
+        if (reprojected.z <= 0f)
+        {
+            return float.PositiveInfinity;
+        }
+
+        return Vector2.Distance(new Vector2(reprojected.x, reprojected.y), expectedScreenPoint);
+    }
+
+    private static bool IsScreenPointInsideForBigTest(Vector2 screenPoint, Rect pixelRect)
+    {
+        const float tolerancePixels = 1.5f;
+        return screenPoint.x >= pixelRect.xMin - tolerancePixels
+            && screenPoint.x <= pixelRect.xMax + tolerancePixels
+            && screenPoint.y >= pixelRect.yMin - tolerancePixels
+            && screenPoint.y <= pixelRect.yMax + tolerancePixels;
     }
 
     private static void ValidateNoUnauthorizedEditorTools(BigTestReport report)
     {
 #if UNITY_EDITOR
         string projectRoot = Directory.GetCurrentDirectory();
-        string editorDir = Path.Combine(projectRoot, "Assets", "Scripts", "Editor");
+        string[] editorDirs =
+        {
+            Path.Combine(projectRoot, "Assets", "Scripts", "Editor"),
+            Path.Combine(projectRoot, "Assets", "Editor")
+        };
         List<string> violations = new List<string>();
 
-        string forbiddenReimporter = Path.Combine(editorDir, "StarterHullBlenderReimporter.cs");
+        string forbiddenReimporter = Path.Combine(projectRoot, "Assets", "Scripts", "Editor", "StarterHullBlenderReimporter.cs");
         if (File.Exists(forbiddenReimporter))
         {
             violations.Add("StarterHullBlenderReimporter.cs");
         }
 
-        if (Directory.Exists(editorDir))
+        for (int editorDirIndex = 0; editorDirIndex < editorDirs.Length; editorDirIndex++)
         {
+            string editorDir = editorDirs[editorDirIndex];
+            if (!Directory.Exists(editorDir))
+            {
+                continue;
+            }
+
             string[] files = Directory.GetFiles(editorDir, "*.cs", SearchOption.AllDirectories);
             for (int i = 0; i < files.Length; i++)
             {
@@ -8363,13 +13291,17 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 string[] lines = text.Split('\n');
                 for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
                 {
-                    string trimmed = lines[lineIndex].TrimStart();
-                    if (!trimmed.StartsWith("[MenuItem(\"Wild Wind/", StringComparison.Ordinal))
+                    string trimmed = lines[lineIndex].Trim();
+                    if (!trimmed.StartsWith("[MenuItem(", StringComparison.Ordinal))
                     {
                         continue;
                     }
 
-                    if (!allowedEditorToolFile)
+                    bool allowedBigTestMenuItem =
+                        allowedEditorToolFile &&
+                        (string.Equals(trimmed, "[MenuItem(\"Wild Wind/Провести большой тест\")]", StringComparison.Ordinal)
+                            || string.Equals(trimmed, "[MenuItem(\"Wild Wind/Провести большой тест\", true)]", StringComparison.Ordinal));
+                    if (!allowedBigTestMenuItem)
                     {
                         violations.Add(relativePath + ":" + (lineIndex + 1).ToString());
                     }
@@ -8455,20 +13387,35 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
 #endif
     }
 
+    private string GetReportFolderPath()
+    {
+        string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+        return Path.Combine(projectRoot, string.IsNullOrWhiteSpace(reportFolder) ? "TestReports" : reportFolder);
+    }
+
+    private string GetTextReportPath()
+    {
+        return Path.Combine(GetReportFolderPath(), "WildWindBigTestReport.txt");
+    }
+
+    private string GetJsonReportPath()
+    {
+        return Path.Combine(GetReportFolderPath(), "WildWindBigTestReport.json");
+    }
+
     private void TryWriteReport(string text, WildWindBigTestResult result, BigTestReport report)
     {
         try
         {
-            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string folder = Path.Combine(projectRoot, string.IsNullOrWhiteSpace(reportFolder) ? "TestReports" : reportFolder);
+            string folder = GetReportFolderPath();
             Directory.CreateDirectory(folder);
-            string path = Path.Combine(folder, "WildWindBigTestReport.txt");
+            string path = GetTextReportPath();
             File.WriteAllText(path, text, Encoding.UTF8);
             Debug.Log(LogPrefix + "РўРµРєСЃС‚РѕРІС‹Р№ РїСЂРѕС‚РѕРєРѕР» СЃРѕС…СЂР°РЅС‘РЅ: " + path, this);
 
             if (result != null)
             {
-                string jsonPath = Path.Combine(folder, "WildWindBigTestReport.json");
+                string jsonPath = GetJsonReportPath();
                 string json = JsonUtility.ToJson(BigTestJsonSummary.FromResult(result, path), true);
                 File.WriteAllText(jsonPath, json, Encoding.UTF8);
                 Debug.Log(LogPrefix + "JSON summary СЃРѕС…СЂР°РЅС‘РЅ: " + jsonPath, this);
@@ -8484,14 +13431,15 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
     {
         try
         {
-            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string folder = Path.Combine(projectRoot, string.IsNullOrWhiteSpace(reportFolder) ? "TestReports" : reportFolder);
+            string folder = GetReportFolderPath();
             Directory.CreateDirectory(folder);
 
             StringBuilder builder = new StringBuilder();
             builder.AppendLine("state: " + (string.IsNullOrWhiteSpace(state) ? "unknown" : state));
             builder.AppendLine("generatedAtUtc: " + DateTime.UtcNow.ToString("O"));
             builder.AppendLine("scene: " + SceneManager.GetActiveScene().name);
+            builder.AppendLine("reportTxt: " + GetTextReportPath());
+            builder.AppendLine("reportJson: " + GetJsonReportPath());
             if (result != null)
             {
                 builder.AppendLine("succeeded: " + result.Succeeded);
@@ -8572,6 +13520,104 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
 
         report.Check(notEmpty && unique, "ID " + label + " Р·Р°РїРѕР»РЅРµРЅС‹ Рё СѓРЅРёРєР°Р»СЊРЅС‹.");
+    }
+
+    private static bool ComponentPackageTextIsEncodingClean(SessionConfigDatabase config)
+    {
+        if (config == null)
+        {
+            return false;
+        }
+
+        return PackageTextIsEncodingClean(config.korshunHullPackages, package => package.localNameRu, package => package.roleRu, package => package.notesRu)
+            && PackageTextIsEncodingClean(config.korshunPowerPlants, powerPlant => powerPlant.localNameRu, powerPlant => powerPlant.notesRu)
+            && PackageTextIsEncodingClean(config.korshunWeaponPackages, weapon => weapon.localNameRu, weapon => weapon.notesRu)
+            && PackageTextIsEncodingClean(config.korshunAuxiliaryPackages, auxiliary => auxiliary.localNameRu, auxiliary => auxiliary.notesRu)
+            && PackageTextIsEncodingClean(config.shipCitadelPackages, citadel => citadel.localNameRu, citadel => citadel.notesRu);
+    }
+
+    private static bool PackageTextIsEncodingClean<T>(IReadOnlyList<T> records, params Func<T, string>[] textSelectors)
+    {
+        if (records == null)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < records.Count; i++)
+        {
+            T record = records[i];
+            if (record == null)
+            {
+                continue;
+            }
+
+            for (int selectorIndex = 0; selectorIndex < textSelectors.Length; selectorIndex++)
+            {
+                Func<T, string> selector = textSelectors[selectorIndex];
+                if (selector != null && ContainsMojibakeMarker(selector(record)))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool ContainsMojibakeMarker(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            char current = text[i];
+            if (current == '\u00D0' || current == '\u00D1')
+            {
+                return true;
+            }
+
+            if (i + 1 >= text.Length || (current != '\u0420' && current != '\u0421'))
+            {
+                continue;
+            }
+
+            if (IsWindows1251MojibakeTail(text[i + 1]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWindows1251MojibakeTail(char value)
+    {
+        return (value >= '\u0400' && value <= '\u040F')
+            || (value >= '\u0450' && value <= '\u045F')
+            || (value >= '\u00A0' && value <= '\u00BF')
+            || value == '\u0490'
+            || value == '\u0491'
+            || value == '\u2013'
+            || value == '\u2014'
+            || value == '\u2018'
+            || value == '\u2019'
+            || value == '\u201A'
+            || value == '\u201C'
+            || value == '\u201D'
+            || value == '\u201E'
+            || value == '\u2020'
+            || value == '\u2021'
+            || value == '\u2022'
+            || value == '\u2026'
+            || value == '\u2030'
+            || value == '\u2039'
+            || value == '\u203A'
+            || value == '\u20AC'
+            || value == '\u2116'
+            || value == '\u2122';
     }
 
     private static bool ItemAmountsReferenceExistingItems<T>(IReadOnlyList<T> records, Func<T, string> itemSelector, Func<T, float> amountSelector, SessionConfigDatabase config)
@@ -8798,6 +13844,731 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
     }
 
+#if UNITY_EDITOR
+    private static CoreTacticalWeaponVisualAuditResult AuditCoreTacticalWeaponVisualMaterials(BigTestReport report)
+    {
+        CoreTacticalWeaponVisualAuditResult result = new CoreTacticalWeaponVisualAuditResult
+        {
+            AllClear = true,
+            ImagePath = "TestReports/CoreTacticalWeaponVisualAudit.png"
+        };
+
+        GameObject auditRoot = null;
+        List<UnityEngine.Object> ownedObjects = new List<UnityEngine.Object>();
+        try
+        {
+            auditRoot = new GameObject("Big Test Core Tactical Weapon Visual Audit");
+
+            Material shellMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(new Color(1f, 0.76f, 0.22f, 1f), 2.2f));
+            Material heavyShellMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(new Color(1f, 0.94f, 0.48f, 1f), 2.4f));
+            Material rocketMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(new Color(1f, 0.46f, 0.12f, 1f), 2.2f));
+            Material rocketTrailMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateTransparentMaterial(new Color(1f, 0.62f, 0.20f, 0.92f), 1.35f));
+            Material torpedoMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateVisibleMaterial(new Color(0.70f, 0.94f, 1f, 1f), 2.1f));
+            Material torpedoTrailMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateTransparentMaterial(new Color(0.32f, 0.74f, 1f, 0.86f), 1.2f));
+            Material tracerVertexMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(new Color(0.72f, 0.48f, 0.24f, 0.78f)));
+            Material burstMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateTransparentMaterial(new Color(1f, 0.78f, 0.18f, 0.75f), 1.6f));
+            Material utilityBeamMaterial = TrackBigTestObject(ownedObjects, CoreTacticalWeaponVisualMaterialUtility.CreateVertexColorTransparentMaterial(new Color(0.22f, 0.92f, 1f, 0.92f)));
+
+            AddWeaponVisualAuditPrimitive(auditRoot.transform, "30 mm shell", PrimitiveType.Sphere, new Vector3(-8f, 1.25f, 0f), new Vector3(2.4f, 0.45f, 0.45f), shellMaterial);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "30 mm shell", new Vector3(-9.2f, 2.15f, -0.4f), true);
+            AddWeaponVisualAuditPrimitive(auditRoot.transform, "PMK shell", PrimitiveType.Sphere, new Vector3(-4.6f, 1.25f, 0f), new Vector3(2.7f, 0.55f, 0.55f), heavyShellMaterial);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "PMK shell", new Vector3(-5.8f, 2.15f, -0.4f), true);
+
+            AddWeaponVisualAuditLine(auditRoot.transform, "MG tracer line", new Vector3(-2.6f, 1.15f, 0f), new Vector3(0.4f, 1.65f, 0f), tracerVertexMaterial, new Color(1f, 0.72f, 0.22f, 0.86f), new Color(1f, 0.30f, 0.10f, 0.14f), 0.26f, 0.08f);
+            AddWeaponVisualAuditTracerQuad(auditRoot.transform, "MG tracer mesh", new Vector3(-2.5f, 0.72f, 0.02f), new Vector3(0.35f, 0.95f, 0.02f), 0.22f, new Color(1f, 0.62f, 0.16f, 0.78f), tracerVertexMaterial, ownedObjects);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "MG tracer", new Vector3(-2.75f, 2.15f, -0.4f), true);
+
+            AddWeaponVisualAuditLine(auditRoot.transform, "Rocket trail", new Vector3(1.0f, 1.25f, 0f), new Vector3(3.9f, 1.25f, 0f), rocketTrailMaterial, new Color(1f, 0.62f, 0.20f, 0.92f), new Color(1f, 0.26f, 0.08f, 0.12f), 0.44f, 0.08f);
+            AddWeaponVisualAuditPrimitive(auditRoot.transform, "Rocket body", PrimitiveType.Capsule, new Vector3(4.3f, 1.25f, 0f), new Vector3(0.52f, 1.55f, 0.52f), rocketMaterial, Quaternion.Euler(0f, 0f, 90f));
+            AddWeaponVisualAuditLabel(auditRoot.transform, "rocket + trail", new Vector3(2.0f, 2.15f, -0.4f), true);
+
+            AddWeaponVisualAuditLine(auditRoot.transform, "Torpedo trail", new Vector3(5.6f, 1.25f, 0f), new Vector3(8.5f, 1.25f, 0f), torpedoTrailMaterial, new Color(0.32f, 0.74f, 1f, 0.86f), new Color(0.12f, 0.32f, 1f, 0.12f), 0.42f, 0.08f);
+            AddWeaponVisualAuditPrimitive(auditRoot.transform, "Torpedo body", PrimitiveType.Capsule, new Vector3(8.9f, 1.25f, 0f), new Vector3(0.55f, 1.75f, 0.55f), torpedoMaterial, Quaternion.Euler(0f, 0f, 90f));
+            AddWeaponVisualAuditLabel(auditRoot.transform, "torpedo + trail", new Vector3(6.45f, 2.15f, -0.4f), true);
+
+            AddWeaponVisualAuditDisk(auditRoot.transform, "HE burst", new Vector3(11.0f, 1.28f, 0f), 1.25f, burstMaterial, ownedObjects);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "HE burst", new Vector3(10.15f, 2.75f, -0.4f), true);
+
+            AddUtilityBeamVisualAuditLine(auditRoot.transform, "Repair beam", CoreTacticalUtilityBeamPalette.Repair, utilityBeamMaterial, new Vector3(-8.6f, -1.15f, 0f), new Vector3(-5.7f, -0.85f, 0f), 0.34f);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "repair beam", new Vector3(-7.35f, -0.22f, -0.4f), true);
+            AddUtilityBeamVisualAuditLine(auditRoot.transform, "Magnet beam", CoreTacticalUtilityBeamPalette.Magnet, utilityBeamMaterial, new Vector3(-4.5f, -1.15f, 0f), new Vector3(-1.6f, -0.85f, 0f), 0.34f);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "magnet beam", new Vector3(-3.2f, -0.22f, -0.4f), true);
+            AddUtilityBeamVisualAuditLine(auditRoot.transform, "Salvage beam", CoreTacticalUtilityBeamPalette.Salvage, utilityBeamMaterial, new Vector3(-4.5f, -2.35f, 0f), new Vector3(-1.6f, -2.05f, 0f), 0.30f);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "salvage beam", new Vector3(-3.2f, -1.42f, -0.4f), true);
+            AddUtilityBeamVisualAuditLine(auditRoot.transform, "Drill beam", CoreTacticalUtilityBeamPalette.Drill, utilityBeamMaterial, new Vector3(-0.4f, -1.15f, 0f), new Vector3(2.5f, -0.85f, 0f), 0.32f);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "drill beam", new Vector3(0.85f, -0.22f, -0.4f), true);
+            AddUtilityBeamVisualAuditLine(auditRoot.transform, "Scanner beam", CoreTacticalUtilityBeamPalette.Scanner, utilityBeamMaterial, new Vector3(3.7f, -1.15f, 0f), new Vector3(6.6f, -0.85f, 0f), 0.34f);
+            AddWeaponVisualAuditLabel(auditRoot.transform, "scanner beam", new Vector3(5.0f, -0.22f, -0.4f), true);
+
+            if (TryCaptureCoreTacticalWeaponVisualAuditImage(auditRoot.transform, result.ImagePath, out string imageError, out string imageSummary, out bool pixelAuditOk))
+            {
+                result.AllClear = pixelAuditOk;
+                result.Summary = imageSummary;
+                report.Info("Core Tactical weapon visual audit image saved: " + result.ImagePath + ". " + imageSummary);
+            }
+            else
+            {
+                result.AllClear = false;
+                result.Summary = "Image capture failed: " + imageError;
+            }
+        }
+        catch (Exception exception)
+        {
+            result.AllClear = false;
+            result.Summary = "Weapon visual audit exception: " + exception.Message;
+        }
+        finally
+        {
+            DestroyBigTestObject(auditRoot);
+            for (int i = 0; i < ownedObjects.Count; i++)
+            {
+                DestroyBigTestUnityObject(ownedObjects[i]);
+            }
+        }
+
+        return result;
+    }
+
+    private static T TrackBigTestObject<T>(List<UnityEngine.Object> ownedObjects, T unityObject)
+        where T : UnityEngine.Object
+    {
+        if (unityObject != null)
+        {
+            ownedObjects.Add(unityObject);
+        }
+
+        return unityObject;
+    }
+
+    private static void AddWeaponVisualAuditPrimitive(Transform parent, string name, PrimitiveType primitiveType, Vector3 position, Vector3 scale, Material material, Quaternion? rotation = null)
+    {
+        GameObject primitive = GameObject.CreatePrimitive(primitiveType);
+        primitive.name = "Weapon Visual Audit " + name;
+        primitive.transform.SetParent(parent, false);
+        primitive.transform.localPosition = position;
+        primitive.transform.localRotation = rotation ?? Quaternion.identity;
+        primitive.transform.localScale = scale;
+        Renderer renderer = primitive.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+
+        DisableBigTestColliders(primitive.transform);
+    }
+
+    private static void AddWeaponVisualAuditLine(Transform parent, string name, Vector3 start, Vector3 end, Material material, Color startColor, Color endColor, float startWidth, float endWidth)
+    {
+        GameObject lineObject = new GameObject("Weapon Visual Audit " + name);
+        lineObject.transform.SetParent(parent, false);
+        LineRenderer line = lineObject.AddComponent<LineRenderer>();
+        line.sharedMaterial = material;
+        line.useWorldSpace = false;
+        line.positionCount = 2;
+        line.SetPosition(0, start);
+        line.SetPosition(1, end);
+        line.startColor = startColor;
+        line.endColor = endColor;
+        line.startWidth = startWidth;
+        line.endWidth = endWidth;
+        line.numCapVertices = 3;
+        line.numCornerVertices = 2;
+        line.shadowCastingMode = ShadowCastingMode.Off;
+        line.receiveShadows = false;
+    }
+
+    private static void AddUtilityBeamVisualAuditLine(
+        Transform parent,
+        string name,
+        CoreTacticalUtilityBeamPalette palette,
+        Material material,
+        Vector3 start,
+        Vector3 end,
+        float width)
+    {
+        CoreTacticalUtilityBeamVisual.ResolvePalette(palette, out Color startColor, out Color middleColor, out Color endColor);
+        GameObject lineObject = new GameObject("Weapon Visual Audit " + name);
+        lineObject.transform.SetParent(parent, false);
+        LineRenderer line = lineObject.AddComponent<LineRenderer>();
+        line.sharedMaterial = material;
+        line.useWorldSpace = false;
+        line.positionCount = 4;
+        Vector3 bend = Vector3.up * width * 1.4f;
+        line.SetPosition(0, start);
+        line.SetPosition(1, Vector3.Lerp(start, end, 0.33f) + bend);
+        line.SetPosition(2, Vector3.Lerp(start, end, 0.68f) - bend * 0.55f);
+        line.SetPosition(3, end);
+        line.startWidth = width;
+        line.endWidth = width * 0.30f;
+        line.numCapVertices = 4;
+        line.numCornerVertices = 3;
+        line.colorGradient = BuildUtilityBeamVisualAuditGradient(startColor, middleColor, endColor);
+        line.shadowCastingMode = ShadowCastingMode.Off;
+        line.receiveShadows = false;
+    }
+
+    private static Gradient BuildUtilityBeamVisualAuditGradient(Color startColor, Color middleColor, Color endColor)
+    {
+        Gradient gradient = new Gradient();
+        gradient.SetKeys(
+            new[]
+            {
+                new GradientColorKey(startColor, 0f),
+                new GradientColorKey(middleColor, 0.52f),
+                new GradientColorKey(endColor, 1f)
+            },
+            new[]
+            {
+                new GradientAlphaKey(Mathf.Clamp01(startColor.a), 0f),
+                new GradientAlphaKey(Mathf.Clamp01(middleColor.a), 0.52f),
+                new GradientAlphaKey(Mathf.Clamp01(endColor.a), 1f)
+            });
+        return gradient;
+    }
+
+    private static void AddWeaponVisualAuditTracerQuad(Transform parent, string name, Vector3 tail, Vector3 head, float width, Color color, Material material, List<UnityEngine.Object> ownedObjects)
+    {
+        GameObject quadObject = new GameObject("Weapon Visual Audit " + name);
+        quadObject.transform.SetParent(parent, false);
+        MeshFilter meshFilter = quadObject.AddComponent<MeshFilter>();
+        MeshRenderer meshRenderer = quadObject.AddComponent<MeshRenderer>();
+        Mesh mesh = TrackBigTestObject(ownedObjects, new Mesh { name = name + " Mesh" });
+        Vector3 up = Vector3.up * (width * 0.5f);
+        Color headColor = new Color(color.r, color.g, color.b, Mathf.Min(1f, color.a + 0.12f));
+        mesh.vertices = new[] { tail - up, tail + up, head + up, head - up };
+        mesh.colors = new[] { color, color, headColor, headColor };
+        mesh.SetIndices(new[] { 0, 1, 2, 0, 2, 3 }, MeshTopology.Triangles, 0, true);
+        mesh.RecalculateBounds();
+        meshFilter.sharedMesh = mesh;
+        meshRenderer.sharedMaterial = material;
+        meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+        meshRenderer.receiveShadows = false;
+    }
+
+    private static void AddWeaponVisualAuditDisk(Transform parent, string name, Vector3 position, float radius, Material material, List<UnityEngine.Object> ownedObjects)
+    {
+        const int SegmentCount = 32;
+        GameObject diskObject = new GameObject("Weapon Visual Audit " + name);
+        diskObject.transform.SetParent(parent, false);
+        diskObject.transform.localPosition = position;
+        MeshFilter meshFilter = diskObject.AddComponent<MeshFilter>();
+        MeshRenderer meshRenderer = diskObject.AddComponent<MeshRenderer>();
+        Mesh mesh = TrackBigTestObject(ownedObjects, new Mesh { name = name + " Mesh" });
+        Vector3[] vertices = new Vector3[SegmentCount + 1];
+        int[] indices = new int[SegmentCount * 3];
+        vertices[0] = Vector3.zero;
+        for (int i = 0; i < SegmentCount; i++)
+        {
+            float angle = i / (float)SegmentCount * Mathf.PI * 2f;
+            vertices[i + 1] = new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, 0f);
+        }
+
+        for (int i = 0; i < SegmentCount; i++)
+        {
+            int index = i * 3;
+            indices[index] = 0;
+            indices[index + 1] = i + 1;
+            indices[index + 2] = i == SegmentCount - 1 ? 1 : i + 2;
+        }
+
+        mesh.vertices = vertices;
+        mesh.SetIndices(indices, MeshTopology.Triangles, 0, true);
+        mesh.RecalculateBounds();
+        meshFilter.sharedMesh = mesh;
+        meshRenderer.sharedMaterial = material;
+        meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+        meshRenderer.receiveShadows = false;
+    }
+
+    private static void AddWeaponVisualAuditLabel(Transform parent, string text, Vector3 position, bool ok)
+    {
+        GameObject label = new GameObject("Weapon Visual Audit Label " + text);
+        label.transform.SetParent(parent, false);
+        label.transform.localPosition = position;
+        label.transform.localRotation = Quaternion.identity;
+        TextMesh textMesh = label.AddComponent<TextMesh>();
+        textMesh.text = text;
+        textMesh.color = ok ? new Color(0.78f, 1f, 0.78f, 1f) : new Color(1f, 0.35f, 0.35f, 1f);
+        textMesh.anchor = TextAnchor.MiddleCenter;
+        textMesh.alignment = TextAlignment.Center;
+        textMesh.characterSize = 0.18f;
+        textMesh.fontSize = 24;
+    }
+
+    private static bool TryCaptureCoreTacticalWeaponVisualAuditImage(Transform auditRoot, string relativePath, out string error, out string pixelSummary, out bool pixelAuditOk)
+    {
+        error = "";
+        pixelSummary = "";
+        pixelAuditOk = false;
+        if (auditRoot == null)
+        {
+            error = "audit root missing";
+            return false;
+        }
+
+        if (!TryCalculateWorldRendererBounds(auditRoot, out Bounds sceneBounds))
+        {
+            error = "audit bounds missing";
+            return false;
+        }
+
+        GameObject lightObject = new GameObject("Big Test Core Tactical Weapon Visual Audit Light");
+        GameObject cameraObject = new GameObject("Big Test Core Tactical Weapon Visual Audit Camera");
+        RenderTexture renderTexture = null;
+        Texture2D capture = null;
+        try
+        {
+            Light light = lightObject.AddComponent<Light>();
+            light.type = LightType.Directional;
+            light.intensity = 0.85f;
+            lightObject.transform.rotation = Quaternion.Euler(40f, -25f, 0f);
+
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.01f, 0.014f, 0.020f, 1f);
+            camera.orthographic = true;
+            camera.orthographicSize = Mathf.Max(4.2f, sceneBounds.size.x * 0.25f);
+            camera.transform.position = sceneBounds.center + new Vector3(0f, 0f, -18f);
+            camera.transform.LookAt(sceneBounds.center);
+
+            renderTexture = new RenderTexture(1500, 820, 24, RenderTextureFormat.ARGB32);
+            camera.targetTexture = renderTexture;
+            camera.Render();
+
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = renderTexture;
+            capture = new Texture2D(renderTexture.width, renderTexture.height, TextureFormat.RGBA32, false);
+            capture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+            capture.Apply();
+            RenderTexture.active = previous;
+
+            pixelAuditOk = AnalyzeCoreTacticalWeaponVisualAuditPixels(capture, out pixelSummary);
+
+            string fullPath = ProjectPath(relativePath);
+            string directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllBytes(fullPath, capture.EncodeToPNG());
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            return false;
+        }
+        finally
+        {
+            if (renderTexture != null)
+            {
+                renderTexture.Release();
+                DestroyBigTestUnityObject(renderTexture);
+            }
+
+            if (capture != null)
+            {
+                DestroyBigTestUnityObject(capture);
+            }
+
+            DestroyBigTestObject(cameraObject);
+            DestroyBigTestObject(lightObject);
+        }
+    }
+
+    private static bool AnalyzeCoreTacticalWeaponVisualAuditPixels(Texture2D capture, out string summary)
+    {
+        summary = "no capture";
+        if (capture == null)
+        {
+            return false;
+        }
+
+        Color32[] pixels = capture.GetPixels32();
+        int coloredPixels = 0;
+        int orangePixels = 0;
+        int cyanPixels = 0;
+        int greenPixels = 0;
+        int purplePixels = 0;
+        int brightPixels = 0;
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            Color32 pixel = pixels[i];
+            float r = pixel.r / 255f;
+            float g = pixel.g / 255f;
+            float b = pixel.b / 255f;
+            float max = Mathf.Max(r, Mathf.Max(g, b));
+            float min = Mathf.Min(r, Mathf.Min(g, b));
+            float chroma = max - min;
+            float luminance = r * 0.2126f + g * 0.7152f + b * 0.0722f;
+            if (luminance > 0.12f && chroma > 0.08f)
+            {
+                coloredPixels++;
+            }
+
+            if (r > 0.58f && g > 0.20f && g < 0.88f && b < 0.38f)
+            {
+                orangePixels++;
+            }
+
+            if (b > 0.50f && g > 0.38f && r < 0.78f)
+            {
+                cyanPixels++;
+            }
+
+            if (g > 0.52f && r < 0.62f && b < 0.78f)
+            {
+                greenPixels++;
+            }
+
+            if (b > 0.52f && r > 0.30f && g < 0.70f)
+            {
+                purplePixels++;
+            }
+
+            if (luminance > 0.48f)
+            {
+                brightPixels++;
+            }
+        }
+
+        bool ok = coloredPixels > 1600
+            && orangePixels > 420
+            && cyanPixels > 260
+            && greenPixels > 260
+            && purplePixels > 140
+            && brightPixels > 500;
+        summary = "pixels colored=" + coloredPixels
+            + ", orange=" + orangePixels
+            + ", cyan=" + cyanPixels
+            + ", green=" + greenPixels
+            + ", purple=" + purplePixels
+            + ", bright=" + brightPixels
+            + ".";
+        return ok;
+    }
+
+    private static PortDockTurretImportAuditResult AuditPortDockTurretImports(BigTestReport report)
+    {
+        PortDockTurretImportAuditResult result = new PortDockTurretImportAuditResult
+        {
+            AllClear = true,
+            ImagePath = "TestReports/PortDockTurretImportAudit.png"
+        };
+
+        PortDockTurretImportSpec[] specs =
+        {
+            new PortDockTurretImportSpec("WW_Turret_30mm_Single", 1.7f, 0.65f),
+            new PortDockTurretImportSpec("WW_Turret_76mm_Twin", 2.1f, 0.55f),
+            new PortDockTurretImportSpec("WW_Turret_100mm_Single", 3.2f, 0.45f),
+            new PortDockTurretImportSpec("WW_Turret_100mm_Twin_PMK", 4.3f, 0.65f),
+            new PortDockTurretImportSpec("WW_Turret_200mm_Mortar", 3.0f, 0.75f),
+            new PortDockTurretImportSpec("WW_Turret_TorpedoLauncher_3Tube", 2.2f, 0.55f),
+            new PortDockTurretImportSpec("WW_Turret_RocketLauncher_Pod", 2.2f, 0.80f),
+            new PortDockTurretImportSpec("WW_Turret_Magnet_Single", 2.7f, 0.70f),
+            new PortDockTurretImportSpec("WW_Turret_GasSiphon_Single", 2.8f, 0.75f),
+            new PortDockTurretImportSpec("WW_Turret_RepairBeam_Single", 2.1f, 0.45f),
+            new PortDockTurretImportSpec("WW_Turret_HackingDish_Single", 5.2f, 0.85f)
+        };
+
+        GameObject auditRoot = null;
+        StringBuilder summary = new StringBuilder();
+        try
+        {
+            const string baseAssetPath = "Assets/ShipImports/Models/Turrets/WW_Base_Small_W_D7m.fbx";
+            GameObject basePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(baseAssetPath);
+            if (basePrefab == null)
+            {
+                result.AllClear = false;
+                result.Summary = "Port turret import audit could not load WW_Base_Small_W_D7m.fbx.";
+                return result;
+            }
+
+            auditRoot = new GameObject("Big Test Port Dock Turret Import Audit");
+            int columns = 3;
+            float cellX = 15f;
+            float cellZ = 15f;
+
+            for (int i = 0; i < specs.Length; i++)
+            {
+                PortDockTurretImportSpec spec = specs[i];
+                int column = i % columns;
+                int row = i / columns;
+                Vector3 cellCenter = new Vector3((column - 1) * cellX, 0f, row * cellZ);
+
+                GameObject stand = new GameObject(spec.ModelId + "_AuditStand");
+                stand.transform.SetParent(auditRoot.transform, false);
+
+                GameObject baseInstance = Instantiate(basePrefab, stand.transform);
+                baseInstance.name = spec.ModelId + "_AuditBase";
+                baseInstance.transform.localPosition = Vector3.zero;
+                baseInstance.transform.localRotation = Quaternion.identity;
+                baseInstance.transform.localScale = Vector3.one;
+                DisableBigTestColliders(baseInstance.transform);
+
+                if (!TryCalculateWorldRendererBounds(baseInstance.transform, out Bounds baseBounds))
+                {
+                    result.AllClear = false;
+                    summary.Append(spec.ModelId).Append(": base bounds missing; ");
+                    continue;
+                }
+
+                baseInstance.transform.position += new Vector3(
+                    cellCenter.x - baseBounds.center.x,
+                    -baseBounds.min.y,
+                    cellCenter.z - baseBounds.center.z);
+                TryCalculateWorldRendererBounds(baseInstance.transform, out baseBounds);
+
+                string assetPath = "Assets/ShipImports/Models/Turrets/" + spec.ModelId + ".fbx";
+                GameObject modulePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+                if (modulePrefab == null)
+                {
+                    result.AllClear = false;
+                    summary.Append(spec.ModelId).Append(": missing; ");
+                    continue;
+                }
+
+                GameObject moduleInstance = Instantiate(modulePrefab, stand.transform);
+                moduleInstance.name = spec.ModelId + "_AuditModule";
+                moduleInstance.transform.localPosition = Vector3.zero;
+                moduleInstance.transform.localRotation = Quaternion.identity;
+                moduleInstance.transform.localScale = Vector3.one;
+                DisableBigTestColliders(moduleInstance.transform);
+
+                if (!TryCalculateWorldRendererBounds(moduleInstance.transform, out Bounds moduleBounds))
+                {
+                    result.AllClear = false;
+                    summary.Append(spec.ModelId).Append(": module bounds missing; ");
+                    continue;
+                }
+
+                moduleInstance.transform.position += new Vector3(
+                    baseBounds.center.x - moduleBounds.center.x,
+                    baseBounds.max.y - moduleBounds.min.y,
+                    baseBounds.center.z - moduleBounds.center.z);
+                TryCalculateWorldRendererBounds(moduleInstance.transform, out moduleBounds);
+
+                float horizontalSpan = Mathf.Max(moduleBounds.size.x, moduleBounds.size.z);
+                bool heightOk = moduleBounds.size.y <= spec.MaxUnityHeightMeters + 0.05f;
+                bool majorAxisNotVertical = horizontalSpan > 0.001f
+                    && moduleBounds.size.y <= horizontalSpan * spec.MaxHeightToHorizontalRatio + 0.05f;
+                bool ok = heightOk && majorAxisNotVertical;
+                result.AllClear &= ok;
+
+                summary.Append(spec.ModelId)
+                    .Append(": xyz=")
+                    .Append(FormatVector3(moduleBounds.size))
+                    .Append(ok ? " OK; " : " FAIL; ");
+
+                AddBigTestAuditLabel(stand.transform, spec.ModelId, cellCenter + new Vector3(-6f, baseBounds.max.y + 0.15f, -5.2f), ok);
+            }
+
+            result.Summary = summary.ToString();
+            if (TryCapturePortDockTurretAuditImage(auditRoot.transform, result.ImagePath, out string imageError))
+            {
+                report.Info("Port turret import audit image saved: " + result.ImagePath);
+            }
+            else
+            {
+                result.AllClear = false;
+                result.Summary += " Image capture failed: " + imageError;
+            }
+        }
+        catch (Exception exception)
+        {
+            result.AllClear = false;
+            result.Summary = "Port turret import audit exception: " + exception.Message;
+        }
+        finally
+        {
+            DestroyBigTestObject(auditRoot);
+        }
+
+        return result;
+    }
+
+    private static bool TryCapturePortDockTurretAuditImage(Transform auditRoot, string relativePath, out string error)
+    {
+        error = "";
+        if (auditRoot == null)
+        {
+            error = "audit root missing";
+            return false;
+        }
+
+        if (!TryCalculateWorldRendererBounds(auditRoot, out Bounds sceneBounds))
+        {
+            error = "audit bounds missing";
+            return false;
+        }
+
+        GameObject lightObject = new GameObject("Big Test Port Dock Turret Audit Light");
+        GameObject cameraObject = new GameObject("Big Test Port Dock Turret Audit Camera");
+        RenderTexture renderTexture = null;
+        Texture2D capture = null;
+        try
+        {
+            Light light = lightObject.AddComponent<Light>();
+            light.type = LightType.Directional;
+            light.intensity = 1.25f;
+            lightObject.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
+
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.025f, 0.035f, 0.045f, 1f);
+            camera.orthographic = true;
+            camera.orthographicSize = Mathf.Max(8f, Mathf.Max(sceneBounds.size.x * 0.45f, sceneBounds.size.z * 0.45f));
+            camera.transform.position = sceneBounds.center + new Vector3(22f, 20f, -30f);
+            camera.transform.LookAt(sceneBounds.center + Vector3.up * 1.25f);
+
+            renderTexture = new RenderTexture(1600, 1000, 24, RenderTextureFormat.ARGB32);
+            camera.targetTexture = renderTexture;
+            camera.Render();
+
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = renderTexture;
+            capture = new Texture2D(renderTexture.width, renderTexture.height, TextureFormat.RGBA32, false);
+            capture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+            capture.Apply();
+            RenderTexture.active = previous;
+
+            string fullPath = ProjectPath(relativePath);
+            string directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllBytes(fullPath, capture.EncodeToPNG());
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            return false;
+        }
+        finally
+        {
+            if (renderTexture != null)
+            {
+                renderTexture.Release();
+                DestroyBigTestUnityObject(renderTexture);
+            }
+
+            if (capture != null)
+            {
+                DestroyBigTestUnityObject(capture);
+            }
+
+            DestroyBigTestObject(cameraObject);
+            DestroyBigTestObject(lightObject);
+        }
+    }
+
+    private static bool TryCalculateWorldRendererBounds(Transform root, out Bounds bounds)
+    {
+        bounds = default;
+        if (root == null)
+        {
+            return false;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool initialized = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            if (!initialized)
+            {
+                bounds = renderer.bounds;
+                initialized = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        return initialized;
+    }
+
+    private static void DisableBigTestColliders(Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+            {
+                colliders[i].enabled = false;
+            }
+        }
+    }
+
+    private static void AddBigTestAuditLabel(Transform parent, string text, Vector3 position, bool ok)
+    {
+        GameObject label = new GameObject("Label_" + text);
+        label.transform.SetParent(parent, true);
+        label.transform.position = position;
+        label.transform.rotation = Quaternion.Euler(65f, 0f, 0f);
+        TextMesh textMesh = label.AddComponent<TextMesh>();
+        textMesh.text = text.Replace("WW_Turret_", "").Replace("_", " ");
+        textMesh.color = ok ? new Color(0.75f, 1f, 0.75f, 1f) : new Color(1f, 0.35f, 0.35f, 1f);
+        textMesh.anchor = TextAnchor.UpperLeft;
+        textMesh.characterSize = 0.55f;
+        textMesh.fontSize = 34;
+    }
+
+    private static string FormatVector3(Vector3 value)
+    {
+        return value.x.ToString("0.###", CultureInfo.InvariantCulture)
+            + "/"
+            + value.y.ToString("0.###", CultureInfo.InvariantCulture)
+            + "/"
+            + value.z.ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
+    private sealed class PortDockTurretImportSpec
+    {
+        public readonly string ModelId;
+        public readonly float MaxUnityHeightMeters;
+        public readonly float MaxHeightToHorizontalRatio;
+
+        public PortDockTurretImportSpec(string modelId, float maxUnityHeightMeters, float maxHeightToHorizontalRatio)
+        {
+            ModelId = modelId;
+            MaxUnityHeightMeters = maxUnityHeightMeters;
+            MaxHeightToHorizontalRatio = maxHeightToHorizontalRatio;
+        }
+    }
+
+    private sealed class PortDockTurretImportAuditResult
+    {
+        public bool AllClear;
+        public string ImagePath = "";
+        public string Summary = "";
+    }
+
+    private sealed class CoreTacticalWeaponVisualAuditResult
+    {
+        public bool AllClear;
+        public string ImagePath = "";
+        public string Summary = "";
+    }
+#endif
+
     private static void DestroyBigTestObject(GameObject target)
     {
         if (target == null) return;
@@ -8819,186 +14590,61 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         }
     }
 
-    private static void ConfigureFlightProbeShip(ShipPhysics ship, Rigidbody body)
-    {
-        if (ship == null || body == null) return;
-
-        ship.baseMass = 1000f;
-        ship.cargoMassKg = 200f;
-        ship.hullMaxTakeoffMassKg = 1600f;
-        ship.hullForwardThrustKgf = 1200f;
-        ship.fuelConsumptionKgPerMinute = 1.2f;
-        ship.fuelStockKg = 20f;
-        ship.hullThrustOutput = 0f;
-        ship.hullThrustResponseRate01PerSecond = 0f;
-        ship.neutralStopBrakeEnabled = false;
-        ship.neutralStopBrakeMaxDecelerationMS2 = 8f;
-        ship.neutralStopBrakeStopTimeSeconds = 0.75f;
-        ship.neutralStopBrakeDeadzoneMS = 0.05f;
-        ship.neutralStopBrakeAccelerationMS2 = 0f;
-        ship.claudiumStock = 20f;
-        ship.claudiumMaxLiftKg = 1500f;
-        ship.claudiumLoopResponseRate01PerSecond = 0f;
-        ship.claudiumCurrentLiftN = 0f;
-        ship.claudiumRequestedLiftKg = 0f;
-        ship.miningImpactDamageTakenMultiplier = 1f;
-        ship.airDensity = 1.225f;
-        ship.dragCoefficient = 0.7f;
-        ship.frontalArea = 6f;
-        ship.sideResistance = 1f;
-        ship.verticalAreaFactor = 4f;
-        ship.windVelocity = Vector3.zero;
-        ship.baseMaxSpeedMS = 0f;
-        ship.loadSpeedMultiplier = 1f;
-        ship.damageSpeedMultiplier = 1f;
-        ship.nearMaxThrustFadeStartRatio = 0.72f;
-        ship.nearMaxThrustFadeEndRatio = 1f;
-        ship.slipstreamMaxSpeedMultiplier = 5f;
-        ship.slipstreamActivationSpeedRatio = 0.8f;
-        ship.slipstreamMaxRampSeconds = ShipPhysics.ClaudiumSlipstreamActivationSeconds;
-        ship.slipstreamFuelConsumptionMultiplier = 2f;
-        ship.claudiumSlipstreamEnabled = false;
-        ship.claudiumSlipstreamCharge01 = 0f;
-        ship.autoStabilizeAtStart = false;
-        ship.altitudeHold = false;
-        ship.cruiseControl = false;
-        ship.headingHold = false;
-        ship.targetSpeedMS = 0f;
-        ship.targetHeading = 0f;
-        ship.thrustInput = 0f;
-        ship.sideInput = 0f;
-        ship.turnInput = 0f;
-        ship.liftInput = 0f;
-        ship.lateralOmniThrustKgf = 260f;
-        ship.hullCruiseReferenceSpeedMS = 30f;
-        ship.baseMaxSpeedMS = 30f;
-        ship.gyroTurnTorque = 12000f;
-        ship.gyroTurnDamping = 0.8f;
-        ship.RefreshRuntimeShipSettings();
-        ship.StabilizeForFlightStart(false);
-        body.useGravity = true;
-        body.linearDamping = 0f;
-        body.angularDamping = 2f;
-    }
-
-    private static void ConfigureForwardSpeedProbeShip(ShipPhysics ship, Rigidbody body)
-    {
-        ConfigureFlightProbeShip(ship, body);
-        if (ship == null || body == null) return;
-
-        ship.baseMass = 800f;
-        ship.cargoMassKg = 0f;
-        ship.hullForwardThrustKgf = 1200f;
-        ship.fuelConsumptionKgPerMinute = 1.2f;
-        ship.fuelStockKg = 20f;
-        ship.hullThrustOutput = 1f;
-        ship.claudiumStock = 0f;
-        ship.claudiumCurrentLiftN = 0f;
-        ship.airDensity = 1.225f;
-        ship.dragCoefficient = 1f;
-        ship.frontalArea = 10f;
-        ship.sideResistance = 0f;
-        ship.hullCruiseReferenceSpeedMS = 12f;
-        ship.baseMaxSpeedMS = 12f;
-        ship.windVelocity = Vector3.zero;
-        ship.RefreshRuntimeShipSettings();
-        ship.StabilizeForFlightStart(false);
-        ship.thrustInput = 1f;
-        ship.hullThrustOutput = 1f;
-        body.useGravity = false;
-    }
-
-    private static void ValidateArmorDamageModel(BigTestReport report)
+    private static void ValidateCoreTacticalDamageResistanceModel(BigTestReport report)
     {
         GameObject target = null;
         try
         {
-            target = new GameObject("Big Test Armor Damage Model");
-            DamageableShip damageable = target.AddComponent<DamageableShip>();
-            damageable.debugLogging = false;
-            damageable.maxStructureHp = 1000f;
-            damageable.ResetDamageState();
+            GameObject tacticalDamageObject = new GameObject("Big Test Core Tactical Damage Model");
+            CoreTacticalPrototypeHealth tacticalHealth = tacticalDamageObject.AddComponent<CoreTacticalPrototypeHealth>();
+            CoreTacticalDamageProfile tacticalProfile = tacticalDamageObject.AddComponent<CoreTacticalDamageProfile>();
+            tacticalHealth.maxHealth = 1000f;
+            tacticalProfile.ConfigureDefense("frigate", 1000f, new CoreTacticalResistanceSet(40f, 0f, 0f, 20f), 400f, 200f);
+            tacticalHealth.ResetHealth();
+            CoreTacticalDamageRequest tacticalKineticRequest = CoreTacticalDamageRequest.Kinetic(100f, "Kinetic resistance test", 10f);
+            tacticalKineticRequest.damageSpread = 0f;
+            tacticalHealth.ApplyDamage(tacticalKineticRequest);
+            bool kineticResistanceOk = Approximately(tacticalHealth.currentHealth, 930f, 0.01f);
+            tacticalHealth.ResetHealth();
+            CoreTacticalDamageRequest tacticalIgnoreRequest = CoreTacticalDamageRequest.Kinetic(100f, "Kinetic ignore test", 100f);
+            tacticalIgnoreRequest.damageSpread = 0f;
+            tacticalHealth.ApplyDamage(tacticalIgnoreRequest);
+            bool tacticalIgnoreOk = Approximately(tacticalHealth.currentHealth, 900f, 0.01f);
+            tacticalHealth.ResetHealth();
+            CoreTacticalDamageRequest tacticalFireRequest = CoreTacticalDamageRequest.Thermal(100f, "Thermal fire tactical test", 0f, 100f);
+            tacticalFireRequest.damageSpread = 0f;
+            tacticalHealth.ApplyDamage(tacticalFireRequest);
+            bool tacticalFireOk = tacticalProfile.activeFireCount == 1 && tacticalProfile.fireSectorCount == 2;
+            report.Check(kineticResistanceOk && tacticalIgnoreOk && tacticalFireOk,
+                "Core Tactical strategic damage profile resolves typed resistances, resistance ignore, thermal fire, and class fire sectors.");
+            DestroyBigTestObject(tacticalDamageObject);
 
-            ArmorSurface surface = new ArmorSurface
+            target = new GameObject("Big Test Legacy Typed Damage Bridge");
+            DamageableShip legacyDamage = target.AddComponent<DamageableShip>();
+            legacyDamage.maxStructureHp = 1000f;
+            legacyDamage.ResetDamageState();
+            ArmorZone legacyZone = target.AddComponent<ArmorZone>();
+            legacyZone.SetResistances(new CoreTacticalResistanceSet(50f, 0f, 0f, 40f));
+            DamageHitContext legacyContext = new DamageHitContext
             {
-                zoneId = "test_plate",
-                displayNameRu = "Test plate",
-                armorMm = 100f,
-                ricochetAngleDeg = 89f,
-                structureDamageMultiplier = 1f,
-                highExplosiveSurfaceDamageMultiplier = 1f,
-                ramDamageMultiplier = 1f
-            };
-
-            GameObject meshArmorObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            meshArmorObject.name = "Big Test Mesh Armor Coverage";
-            meshArmorObject.transform.SetParent(target.transform, false);
-            MeshFilter meshFilter = meshArmorObject.GetComponent<MeshFilter>();
-            MeshArmorBody meshArmor = meshArmorObject.AddComponent<MeshArmorBody>();
-            meshArmor.owner = damageable;
-            meshArmor.defaultArmorMm = 20f;
-            meshArmor.EnsureMeshCollider();
-            meshArmor.RebuildPlatesFromMesh();
-            int meshTriangleCount = meshFilter != null && meshFilter.sharedMesh != null
-                ? meshFilter.sharedMesh.triangles.Length / 3
-                : 0;
-            HashSet<int> coveredTriangles = new HashSet<int>();
-            if (meshArmor.plates != null)
-            {
-                for (int plateIndex = 0; plateIndex < meshArmor.plates.Count; plateIndex++)
-                {
-                    MeshArmorPlate plate = meshArmor.plates[plateIndex];
-                    if (plate == null || plate.triangleIndices == null) continue;
-
-                    for (int triangleIndex = 0; triangleIndex < plate.triangleIndices.Count; triangleIndex++)
-                    {
-                        coveredTriangles.Add(plate.triangleIndices[triangleIndex]);
-                    }
-                }
-            }
-
-            bool meshArmorCoverageOk = meshTriangleCount > 0
-                && coveredTriangles.Count == meshTriangleCount
-                && meshArmor.plates != null
-                && meshArmor.plates.Count > 0;
-            report.Check(meshArmorCoverageOk,
-                "MeshArmorBody rebuild assigns every non-degenerate mesh triangle to an armor plate: "
-                + coveredTriangles.Count
-                + "/"
-                + meshTriangleCount
-                + " triangles.");
-
-            DamageHitContext partialHe = new DamageHitContext
-            {
-                shellType = DamageShellType.HighExplosive,
-                shellName = "50 mm HE test",
-                hullDamageOnPenetration = 200f,
-                damagePoints = 200f,
-                penetrationMm = 50f,
+                shellType = DamageShellType.ArmorPiercing,
+                damageType = CoreTacticalDamageType.Kinetic,
+                shellName = "Legacy kinetic bridge probe",
+                damagePoints = 100f,
+                hullDamageOnPenetration = 100f,
+                resistanceIgnorePercent = 20f,
                 hitNormal = Vector3.back,
                 incomingDirection = Vector3.forward
             };
-            DamageHitResult partialResult = damageable.ApplyHit(surface, partialHe);
-            bool partialHeDamageOk = partialResult.outcome == DamageHitOutcome.ExplosiveSplash
-                && Approximately(partialResult.structureDamage, 50f, 0.01f)
-                && Approximately(damageable.structureHp, 950f, 0.01f)
-                && damageable.explosiveSplashCount == 1
-                && damageable.penetrationCount == 0;
-            report.Check(partialHeDamageOk,
-                "High explosive shells deal quadratic hull damage when HE penetration is below effective armor: "
-                + partialResult.structureDamage.ToString("0.###")
-                + " damage against 100 mm armor with 50 mm HE penetration.");
-
-            DamageHitContext fullHe = partialHe;
-            fullHe.shellName = "100 mm HE test";
-            fullHe.penetrationMm = 100f;
-            DamageHitResult fullResult = damageable.ApplyHit(surface, fullHe);
-            bool fullHeDamageOk = fullResult.outcome == DamageHitOutcome.Penetration
-                && Approximately(fullResult.structureDamage, 200f, 0.01f)
-                && Approximately(damageable.structureHp, 750f, 0.01f)
-                && damageable.penetrationCount == 1;
-            report.Check(fullHeDamageOk,
-                "High explosive shells deal full hull damage when HE penetration reaches effective armor.");
+            DamageHitResult legacyResult = legacyZone.ReceiveHit(legacyContext);
+            bool legacyBridgeOk = Approximately(legacyDamage.structureHp, 930f, 0.01f)
+                && legacyResult.damageType == CoreTacticalDamageType.Kinetic
+                && Approximately(legacyResult.effectiveResistancePercent, 30f, 0.01f)
+                && legacyResult.outcome == DamageHitOutcome.Penetration;
+            report.Check(legacyBridgeOk,
+                "Legacy DamageableShip/ArmorZone bridge resolves the same typed resistance and resistance-ignore contract as Core Tactical.");
+            DestroyBigTestObject(target);
+            target = null;
 
 #if UNITY_EDITOR
             string projectileText = ReadProjectText("Assets/Scripts/Systems/DamageProjectile.cs");
@@ -9007,32 +14653,116 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 && !projectileText.Contains("ForceMode.Impulse");
             report.Check(shellImpulseRemoved,
                 shellImpulseRemoved
-                    ? "Gun projectiles no longer apply physical push impulse; they only resolve armor damage."
+                    ? "Gun projectiles no longer apply physical push impulse; they resolve typed resistance damage."
                     : "DamageProjectile still contains explosive impulse code.");
 
             string shipLoaderText = ReadProjectText("Assets/Scripts/Meta/ShipLoader.cs");
             bool meshArmorLoaderFallback = shipLoaderText.Contains("AddComponent<MeshArmorBody>()")
                 && shipLoaderText.Contains("RebuildPlatesFromMesh()")
                 && shipLoaderText.Contains("DefaultFallbackMeshArmorMm")
+                && shipLoaderText.Contains("defaultResistances")
+                && shipLoaderText.Contains("SetResistances")
                 && shipLoaderText.Contains("AddComponent<ArmorZone>()");
             report.Check(meshArmorLoaderFallback,
                 meshArmorLoaderFallback
-                    ? "ShipLoader creates MeshArmorBody fallback for mesh hulls and keeps ArmorZone only as a no-mesh fallback."
-                    : "ShipLoader armor fallback is not wired to MeshArmorBody.");
+                    ? "ShipLoader creates MeshArmorBody/ArmorZone fallback hit surfaces with typed resistance defaults."
+                    : "ShipLoader typed resistance fallback is not wired to MeshArmorBody/ArmorZone.");
 
             string meshArmorBodyText = ReadProjectText("Assets/Scripts/Systems/MeshArmorBody.cs");
-            string mediumFbxMetaText = ReadProjectText("Assets/ShipImports/Models/BlenderShips/WW_Frigate_Medium_Blockout.fbx.meta");
+            string blenderShipsFolder = ProjectPath("Assets/ShipImports/Models/BlenderShips");
+            string[] expectedShipFbxNames =
+            {
+                "WW_Imperial_PatrolFrigate_R02_Korshun.fbx",
+                "WW_Imperial_PatrolFrigate_R02_Korshun_76mm_Twin.fbx",
+                "WW_Imperial_CargoFrigate_Vozchik.fbx",
+                "WW_Imperial_ArtilleryCruiser_R02_Barbet.fbx",
+                "WW_Imperial_Battleship_Val.fbx"
+            };
+            HashSet<string> expectedShipFbxSet = new HashSet<string>(expectedShipFbxNames, StringComparer.OrdinalIgnoreCase);
+            string[] importedShipFbxPaths = Directory.Exists(blenderShipsFolder)
+                ? Directory.GetFiles(blenderShipsFolder, "*.fbx", SearchOption.TopDirectoryOnly)
+                : Array.Empty<string>();
+            bool blenderShipFbxImported = importedShipFbxPaths.Length >= expectedShipFbxNames.Length;
+            for (int i = 0; i < expectedShipFbxNames.Length; i++)
+            {
+                string expectedName = expectedShipFbxNames[i];
+                blenderShipFbxImported &= File.Exists(Path.Combine(blenderShipsFolder, expectedName));
+            }
+            for (int i = 0; i < importedShipFbxPaths.Length; i++)
+            {
+                string importedName = Path.GetFileName(importedShipFbxPaths[i]);
+                blenderShipFbxImported &= !string.IsNullOrWhiteSpace(importedName)
+                    && (expectedShipFbxSet.Contains(importedName)
+                        || importedName.StartsWith("WW_Imperial_", StringComparison.OrdinalIgnoreCase));
+            }
             string korshunFbxMetaText = ReadProjectText("Assets/ShipImports/Models/BlenderShips/WW_Imperial_PatrolFrigate_R02_Korshun.fbx.meta");
             string barbetFbxMetaText = ReadProjectText("Assets/ShipImports/Models/BlenderShips/WW_Imperial_ArtilleryCruiser_R02_Barbet.fbx.meta");
             string valFbxMetaText = ReadProjectText("Assets/ShipImports/Models/BlenderShips/WW_Imperial_Battleship_Val.fbx.meta");
-            bool blenderShipFbxImported = File.Exists(ProjectPath("Assets/ShipImports/Models/BlenderShips/WW_Frigate_Medium_Blockout.fbx"))
-                && File.Exists(ProjectPath("Assets/ShipImports/Models/BlenderShips/WW_Imperial_PatrolFrigate_R02_Korshun.fbx"))
-                && File.Exists(ProjectPath("Assets/ShipImports/Models/BlenderShips/WW_Imperial_ArtilleryCruiser_R02_Barbet.fbx"))
-                && File.Exists(ProjectPath("Assets/ShipImports/Models/BlenderShips/WW_Imperial_Battleship_Val.fbx"));
-            bool blenderShipFbxReadable = mediumFbxMetaText.Contains("isReadable: 1")
-                && korshunFbxMetaText.Contains("isReadable: 1")
+            bool blenderShipFbxReadable = korshunFbxMetaText.Contains("isReadable: 1")
                 && barbetFbxMetaText.Contains("isReadable: 1")
                 && valFbxMetaText.Contains("isReadable: 1");
+            string turretImportsFolder = ProjectPath("Assets/ShipImports/Models/Turrets");
+            string[] turretImportPaths = Directory.Exists(turretImportsFolder)
+                ? Directory.GetFiles(turretImportsFolder, "*.fbx", SearchOption.TopDirectoryOnly)
+                : Array.Empty<string>();
+            bool separateTurretImportsReady = turretImportPaths.Length >= 20
+                && !File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_WeaponModules.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Base_Small_W.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Base_Cone_Small.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Base_Cross_Small.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_30mm_Single.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_76mm_Twin.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_100mm_Single.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_100mm_Twin_PMK.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_200mm_Mortar.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_TorpedoLauncher_3Tube.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_RocketLauncher_Pod.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_Magnet_Single.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_GasSiphon_Single.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_RepairBeam_Single.fbx"))
+                && File.Exists(ProjectPath("Assets/ShipImports/Models/Turrets/WW_Turret_HackingDish_Single.fbx"));
+            string baseIslandViewText = ReadProjectText("Assets/Scripts/City/WildWindBaseIslandView.cs");
+            string blenderTurretExporterText = ReadProjectText("Docs/BlenderAssets/export_blender_asset_to_fbx.py");
+            bool portPreviewUsesAuthoredShipsWithMappedLoadoutVisuals = baseIslandViewText.Contains("ApplyPortDockImportedModelLoadoutVisibility")
+                && baseIslandViewText.Contains("ApplyPortDockKorshunMainLoadoutVisual")
+                && baseIslandViewText.Contains("ApplyPortDockKorshunAuxiliaryLoadoutVisual")
+                && baseIslandViewText.Contains("Korshun_PortPreview_Turret_30mm_Single_Fore")
+                && baseIslandViewText.Contains("Korshun_PortPreview_Autocannon_57mm_Triple_Fore")
+                && baseIslandViewText.Contains("WW_Turret_30mm_Single")
+                && baseIslandViewText.Contains("WW_Turret_RocketLauncher_Pod")
+                && baseIslandViewText.Contains("WW_Turret_TorpedoLauncher_3Tube")
+                && baseIslandViewText.Contains("WW_Turret_76mm_Twin")
+                && baseIslandViewText.Contains("WW_Turret_100mm_Single")
+                && baseIslandViewText.Contains("WW_Turret_200mm_Mortar")
+                && baseIslandViewText.Contains("WW_Turret_Magnet_Single")
+                && baseIslandViewText.Contains("WW_Turret_GasSiphon_Single")
+                && baseIslandViewText.Contains("WW_Turret_RepairBeam_Single")
+                && baseIslandViewText.Contains("WW_Turret_HackingDish_Single")
+                && baseIslandViewText.Contains("Korshun_PortAuxPreview_")
+                && baseIslandViewText.Contains("37mm_mg_aura")
+                && baseIslandViewText.Contains("57mm_triple_autocannon")
+                && baseIslandViewText.Contains("korshun_main_76mm_twin")
+                && baseIslandViewText.Contains("100mm_single")
+                && baseIslandViewText.Contains("nurs_turret")
+                && baseIslandViewText.Contains("200mm_mortar")
+                && baseIslandViewText.Contains("torpedo_triple_side")
+                && baseIslandViewText.Contains("side_nurs")
+                && baseIslandViewText.Contains("siphon")
+                && baseIslandViewText.Contains("repair_beam")
+                && baseIslandViewText.Contains("scanner_hacker")
+                && baseIslandViewText.Contains("Quaternion.Euler(0f, yawDegrees, 0f)")
+                && !baseIslandViewText.Contains("pitchDegrees")
+                && blenderTurretExporterText.Contains("force_bake_missing_x_mirror")
+                && blenderTurretExporterText.Contains("source_name = (source.name or \"\").lower()")
+                && blenderTurretExporterText.Contains("\"_left\" in source_name")
+                && blenderTurretExporterText.Contains("\"_right\" in source_name")
+                && blenderTurretExporterText.Contains("abs(source.matrix_world.translation.x) > 0.0001")
+                && blenderTurretExporterText.Contains("unity-module-y-up")
+                && !baseIslandViewText.Contains("LoadPortDockTurretModelPrefab")
+                && !baseIslandViewText.Contains("BuildPortDockKorshunLoadoutOverlay")
+                && !baseIslandViewText.Contains("CreateKorshunPreviewImportedMountPair")
+                && !baseIslandViewText.Contains("CreateKorshunPreviewMortarPair");
+            PortDockTurretImportAuditResult turretImportAuditResult = AuditPortDockTurretImports(report);
             bool materialArmorImportReady = meshArmorBodyText.Contains("useMaterialArmorNames")
                 && meshArmorBodyText.Contains("TryRebuildPlatesFromMaterials")
                 && meshArmorBodyText.Contains("TryParseArmorMaterialName")
@@ -9049,8 +14779,12 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
                 && materialArmorImportReady;
             report.Check(blenderMaterialArmorReady,
                 blenderMaterialArmorReady
-                    ? "Unity armor painting setup is removed; Blender ship FBX models remain readable and MeshArmorBody parses armor from Armor_XX material names."
-                    : "Blender material armor import is not clean: old Unity armor painting setup remains, FBX sources are missing/unreadable, or material-name parsing is absent.");
+                    ? "Unity armor painting setup is removed; Blender ship FBX models remain readable and MeshArmorBody treats legacy Armor_XX material names as resistance hints."
+                    : "Blender resistance-hint import is not clean: old Unity armor painting setup remains, FBX sources are missing/unreadable, or material-name parsing is absent.");
+            report.Check(separateTurretImportsReady && portPreviewUsesAuthoredShipsWithMappedLoadoutVisuals && turretImportAuditResult.AllClear,
+                separateTurretImportsReady && portPreviewUsesAuthoredShipsWithMappedLoadoutVisuals && turretImportAuditResult.AllClear
+                    ? "Reusable Blender bases, turrets, rocket pods, utility mounts, and torpedo launchers remain exported as separate Unity FBX imports, lie upright in Unity, keep side-authored Left/Right meshes from being mirrored across the ship centerline, and dock preview maps Korshun main and auxiliary packages onto mounted ship visuals. Audit image: " + turretImportAuditResult.ImagePath
+                    : "Separate turret/base import contract is broken, at least one Unity-imported module is standing on its nose, a side-authored Left/Right mesh may be mirrored across the ship centerline, or the dock preview is not mapping Korshun main and auxiliary packages onto mounted ship visuals cleanly. " + turretImportAuditResult.Summary);
 #else
             report.Check(true, "DamageProjectile impulse source scan is editor-only and skipped in player builds.");
 #endif
@@ -9059,256 +14793,6 @@ public sealed class WildWindBigTestRunner : MonoBehaviour
         {
             DestroyBigTestObject(target);
         }
-    }
-
-    private static float CalculateExpectedForwardMaxSpeed(ShipPhysics ship)
-    {
-        if (ship == null) return 0f;
-
-        return ship.CurrentMaxSpeedMS;
-    }
-
-    private static void ValidateShipPhysicsPushPreservesExternalImpulse(Scene probeScene, PhysicsScene physicsScene, BigTestReport report)
-    {
-        if (!probeScene.IsValid() || !physicsScene.IsValid())
-        {
-            report.Fail("Ship push physics probe did not receive a valid isolated scene.");
-            return;
-        }
-
-        GameObject overspeedObject = null;
-        GameObject strongObject = null;
-        GameObject weakObject = null;
-        try
-        {
-            overspeedObject = CreateShipPushProbeObject(
-                "Big Test External Overspeed Probe",
-                probeScene,
-                Vector3.zero,
-                Quaternion.identity,
-                1000f,
-                0f,
-                5f);
-            ShipPhysics overspeedShip = overspeedObject.GetComponent<ShipPhysics>();
-            Rigidbody overspeedBody = overspeedObject.GetComponent<Rigidbody>();
-            overspeedShip.thrustInput = 0f;
-            overspeedShip.hullThrustOutput = 0f;
-            overspeedBody.linearVelocity = new Vector3(0f, 0f, 20f);
-
-            if (StepShipPhysicsProbes(physicsScene, 10, report, overspeedShip))
-            {
-                Vector3 overspeedVelocity = overspeedBody.linearVelocity;
-                overspeedVelocity.y = 0f;
-                report.Check(overspeedVelocity.magnitude > 19f && overspeedShip.CurrentMaxSpeedMS <= 5.1f,
-                    "Ship max ход limits only own thrust: external overspeed "
-                    + overspeedVelocity.magnitude.ToString("0.###")
-                    + " m/s remains above max "
-                    + overspeedShip.CurrentMaxSpeedMS.ToString("0.###")
-                    + " m/s without Rigidbody velocity clamp.");
-            }
-
-            DestroyBigTestObject(overspeedObject);
-            overspeedObject = null;
-
-            strongObject = CreateShipPushProbeObject(
-                "Big Test Strong Push Ship",
-                probeScene,
-                new Vector3(0f, 0f, -1.02f),
-                Quaternion.identity,
-                2000f,
-                40f,
-                18f);
-            weakObject = CreateShipPushProbeObject(
-                "Big Test Weak Push Ship",
-                probeScene,
-                new Vector3(0f, 0f, 1.02f),
-                Quaternion.Euler(0f, 180f, 0f),
-                1000f,
-                10f,
-                18f);
-
-            ShipPhysics strongShip = strongObject.GetComponent<ShipPhysics>();
-            ShipPhysics weakShip = weakObject.GetComponent<ShipPhysics>();
-            Rigidbody strongBody = strongObject.GetComponent<Rigidbody>();
-            Rigidbody weakBody = weakObject.GetComponent<Rigidbody>();
-            float weakStartZ = weakBody.position.z;
-
-            strongShip.thrustInput = 1f;
-            strongShip.hullThrustOutput = 1f;
-            weakShip.thrustInput = 1f;
-            weakShip.hullThrustOutput = 1f;
-
-            if (StepShipPhysicsProbes(physicsScene, 160, report, strongShip, weakShip))
-            {
-                bool weakPushedBack = weakBody.position.z > weakStartZ + 0.25f
-                    && weakBody.linearVelocity.z > 0.25f;
-                bool strongStillPushing = strongShip.hullForwardThrustKgfCurrent > weakShip.hullForwardThrustKgfCurrent;
-                report.Check(weakPushedBack && strongStillPushing,
-                    "More powerful Rigidbody ship can push a weaker ship in contact: weak z "
-                    + weakStartZ.ToString("0.###")
-                    + " -> "
-                    + weakBody.position.z.ToString("0.###")
-                    + ", weak vz "
-                    + weakBody.linearVelocity.z.ToString("0.###")
-                    + " m/s, thrust "
-                    + strongShip.hullForwardThrustKgfCurrent.ToString("0.#")
-                    + " vs "
-                    + weakShip.hullForwardThrustKgfCurrent.ToString("0.#")
-                    + " kgf.");
-            }
-        }
-        finally
-        {
-            DestroyBigTestObject(overspeedObject);
-            DestroyBigTestObject(strongObject);
-            DestroyBigTestObject(weakObject);
-        }
-    }
-
-    private static GameObject CreateShipPushProbeObject(
-        string name,
-        Scene scene,
-        Vector3 position,
-        Quaternion rotation,
-        float massKg,
-        float hullForwardThrustKgf,
-        float maxSpeedMS)
-    {
-        GameObject probe = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        probe.name = name;
-        probe.transform.SetPositionAndRotation(position, rotation);
-        probe.transform.localScale = new Vector3(2f, 1f, 2f);
-        SceneManager.MoveGameObjectToScene(probe, scene);
-
-        Rigidbody body = probe.AddComponent<Rigidbody>();
-        body.mass = Mathf.Max(1f, massKg);
-        body.useGravity = false;
-        body.linearDamping = 0f;
-        body.angularDamping = 0f;
-        body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-
-        ShipPhysics ship = probe.AddComponent<ShipPhysics>();
-        ship.enabled = false;
-        ship.baseMass = Mathf.Max(1f, massKg);
-        ship.cargoMassKg = 0f;
-        ship.hullForwardThrustKgf = Mathf.Max(0f, hullForwardThrustKgf);
-        ship.fuelConsumptionKgPerMinute = 1.2f;
-        ship.fuelStockKg = 1000f;
-        ship.hullThrustOutput = hullForwardThrustKgf > 0f ? 1f : 0f;
-        ship.hullThrustResponseRate01PerSecond = 0f;
-        ship.baseMaxSpeedMS = Mathf.Max(1f, maxSpeedMS);
-        ship.hullCruiseReferenceSpeedMS = Mathf.Max(1f, maxSpeedMS);
-        ship.airDensity = 0f;
-        ship.dragCoefficient = 0f;
-        ship.frontalArea = 0f;
-        ship.sideResistance = 0f;
-        ship.claudiumStock = 0f;
-        ship.claudiumMaxLiftKg = 0f;
-        ship.loadSpeedMultiplier = 1f;
-        ship.damageSpeedMultiplier = 1f;
-        ship.nearMaxThrustFadeStartRatio = 0.85f;
-        ship.nearMaxThrustFadeEndRatio = 1f;
-        ship.slipstreamMaxSpeedMultiplier = 5f;
-        ship.slipstreamActivationSpeedRatio = 0.8f;
-        ship.slipstreamFuelConsumptionMultiplier = 2f;
-        ship.RefreshRuntimeShipSettings();
-        ship.StabilizeForFlightStart(false);
-        body.useGravity = false;
-        body.linearDamping = 0f;
-        body.angularDamping = 0f;
-        body.mass = Mathf.Max(1f, massKg);
-        return probe;
-    }
-
-    private static bool StepShipPhysicsProbes(PhysicsScene physicsScene, int steps, BigTestReport report, params ShipPhysics[] ships)
-    {
-        if (ships == null || ships.Length == 0)
-        {
-            report.Fail("Ship physics probe step did not receive ships.");
-            return false;
-        }
-
-        if (!physicsScene.IsValid())
-        {
-            report.Fail("Ship physics probe step did not receive a valid PhysicsScene.");
-            return false;
-        }
-
-        int stepCount = Mathf.Max(0, steps);
-        float deltaTime = Mathf.Max(Time.fixedDeltaTime, 0.001f);
-        for (int i = 0; i < stepCount; i++)
-        {
-            for (int shipIndex = 0; shipIndex < ships.Length; shipIndex++)
-            {
-                if (!TryInvokePrivateMethod(ships[shipIndex], "FixedUpdate", report))
-                {
-                    return false;
-                }
-            }
-
-            try
-            {
-                physicsScene.Simulate(deltaTime);
-            }
-            catch (Exception exception)
-            {
-                report.Fail("Ship physics probe could not simulate a multi-ship physics step: " + exception.Message);
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static void ResetFlightProbeBody(Rigidbody body, Vector3 position, Quaternion rotation, bool useGravity)
-    {
-        if (body == null) return;
-
-        body.useGravity = useGravity;
-        body.linearVelocity = Vector3.zero;
-        body.angularVelocity = Vector3.zero;
-        body.position = position;
-        body.rotation = rotation;
-        body.transform.SetPositionAndRotation(position, rotation);
-        body.Sleep();
-        body.WakeUp();
-    }
-
-    private static bool StepShipPhysicsProbe(ShipPhysics ship, PhysicsScene physicsScene, int steps, BigTestReport report)
-    {
-        if (ship == null)
-        {
-            report.Fail("РџСЂРѕР±Р° Р»С‘С‚РЅРѕР№ С„РёР·РёРєРё РЅРµ РїРѕР»СѓС‡РёР»Р° ShipPhysics.");
-            return false;
-        }
-
-        if (!physicsScene.IsValid())
-        {
-            report.Fail("РџСЂРѕР±Р° Р»С‘С‚РЅРѕР№ С„РёР·РёРєРё РЅРµ РїРѕР»СѓС‡РёР»Р° РІР°Р»РёРґРЅСѓСЋ PhysicsScene.");
-            return false;
-        }
-
-        int stepCount = Mathf.Max(0, steps);
-        float deltaTime = Mathf.Max(Time.fixedDeltaTime, 0.001f);
-        for (int i = 0; i < stepCount; i++)
-        {
-            if (!TryInvokePrivateMethod(ship, "FixedUpdate", report))
-            {
-                return false;
-            }
-
-            try
-            {
-                physicsScene.Simulate(deltaTime);
-            }
-            catch (Exception exception)
-            {
-                report.Fail("РџСЂРѕР±Р° Р»С‘С‚РЅРѕР№ С„РёР·РёРєРё РЅРµ СЃРјРѕРіР»Р° РїСЂРѕСЃРёРјСѓР»РёСЂРѕРІР°С‚СЊ physics-С€Р°Рі: " + exception.Message);
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private static bool TryInvokePrivateMethod(object target, string methodName, BigTestReport report)

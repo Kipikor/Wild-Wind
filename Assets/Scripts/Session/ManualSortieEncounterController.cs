@@ -242,6 +242,7 @@ public sealed class ManualSortieEncounterController : MonoBehaviour
         armor.zoneId = "resource_body";
         armor.displayNameRu = "Resource body";
         armor.armorMm = 0f;
+        armor.SetResistances(DamageResistanceUtility.DefaultOreResistances);
         armor.ricochetAngleDeg = 88f;
         armor.structureDamageMultiplier = 1f;
         armor.receiveRamDamage = false;
@@ -320,6 +321,7 @@ public sealed class ManualSortieEncounterController : MonoBehaviour
         armor.zoneId = "drone_hull";
         armor.displayNameRu = "Drone hull";
         armor.armorMm = Mathf.Clamp(5f + rank * 1.5f, 5f, 24f);
+        armor.SetResistances(DamageResistanceUtility.DefaultAutomatonResistances);
         armor.ricochetAngleDeg = 82f;
         armor.structureDamageMultiplier = 1f;
         armor.receiveRamDamage = true;
@@ -734,6 +736,8 @@ public sealed class ManualSortieEnemyDrone : MonoBehaviour
         {
             displayNameRu = "Drone bolt",
             shellType = DamageShellType.ArmorPiercing,
+            damageType = CoreTacticalDamageType.Kinetic,
+            resistanceIgnorePercent = Mathf.Clamp(3f + warfareRating * 0.08f, 3f, 11f),
             caliberMm = 18f,
             damagePoints = Mathf.Clamp(11f + warfareRating * 0.12f, 10f, 24f),
             hullDamageOnPenetration = Mathf.Clamp(11f + warfareRating * 0.12f, 10f, 24f),

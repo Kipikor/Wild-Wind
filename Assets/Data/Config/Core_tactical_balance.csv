@@ -1,0 +1,4 @@
+id,value,notes_ru
+explosive_radius_reference_mass_kg,50,Mass anchor for derived explosive blast radius.
+explosive_radius_reference_m,20,Combat HE effect radius at the reference explosive mass.
+explosive_radius_mass_exponent,0.5,Power exponent for radius scaling by explosive mass.

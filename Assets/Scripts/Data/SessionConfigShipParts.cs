@@ -33,6 +33,11 @@ public partial class SessionConfigDatabase
         return entry;
     }
 
+    public ShipTreeEntryConfig GetShipCatalogEntry(string shipId)
+    {
+        return GetShipTreeEntry(shipId);
+    }
+
     private void ClearShipPartConfigs()
     {
         hulls.Clear();
@@ -55,24 +60,10 @@ public partial class SessionConfigDatabase
                 completedTechId = Get(row, "complited_tech"),
                 baseMassKg = Mathf.Max(0f, ParseFloat(Get(row, "base_mass_kg"))),
                 hullMaxTakeoffMassKg = Mathf.Max(0f, ParseFloat(Get(row, "hull_max_takeoff_mass_kg"))),
-                airDensity = Mathf.Max(0f, ParseFloat(Get(row, "air_density"), 1.225f)),
-                dragCoefficient = Mathf.Max(0f, ParseFloat(Get(row, "drag_coefficient"))),
-                frontalAreaM2 = Mathf.Max(0f, ParseFloat(Get(row, "frontal_area_m2"))),
-                sideResistance = Mathf.Max(0f, ParseFloat(Get(row, "side_resistance"))),
-                verticalAreaFactor = Mathf.Max(0f, ParseFloat(Get(row, "vertical_area_factor"))),
-                gyroTurnTorqueNm = Mathf.Max(0f, ParseFloat(Get(row, "gyro_turn_torque_nm"))),
-                gyroTurnDamping = Mathf.Max(0f, ParseFloat(Get(row, "gyro_turn_damping"))),
-                maxAutoTurnRateDeg = Mathf.Max(0f, ParseFloat(Get(row, "max_auto_turn_rate_deg"))),
-                maxStructuralTurnRateDeg = Mathf.Max(0f, ParseFloat(Get(row, "max_structural_turn_rate_deg"))),
-                maxStructuralVerticalSpeedMS = Mathf.Max(0f, ParseFloat(Get(row, "max_structural_vertical_speed_ms"))),
-                maxAutoVerticalSpeedMS = Mathf.Max(0f, ParseFloat(Get(row, "max_auto_vertical_speed_ms"))),
-                altitudeStiffness = Mathf.Max(0f, ParseFloat(Get(row, "altitude_stiffness"))),
-                altitudeDamping = Mathf.Max(0f, ParseFloat(Get(row, "altitude_damping"))),
-                altitudeDriftToleranceM = Mathf.Max(0f, ParseFloat(Get(row, "altitude_drift_tolerance_m"))),
-                headingStiffness = Mathf.Max(0f, ParseFloat(Get(row, "heading_stiffness"))),
-                headingDamping = Mathf.Max(0f, ParseFloat(Get(row, "heading_damping"))),
-                speedStiffness = Mathf.Max(0f, ParseFloat(Get(row, "speed_stiffness"))),
-                speedDamping = Mathf.Max(0f, ParseFloat(Get(row, "speed_damping"))),
+                strategicYawRateDegPerSecond = Mathf.Max(0f, ParseFloat(Get(row, "strategic_yaw_rate_deg_per_second"), 24f)),
+                strategicYawAccelerationDegPerSecond2 = Mathf.Max(0f, ParseFloat(Get(row, "strategic_yaw_acceleration_deg_per_second2"), 84f)),
+                strategicVerticalSpeedMS = Mathf.Max(0f, ParseFloat(Get(row, "strategic_vertical_speed_ms"), 8f)),
+                strategicVerticalAccelerationMS2 = Mathf.Max(0f, ParseFloat(Get(row, "strategic_vertical_acceleration_ms2"), 8f)),
                 structureHp = Mathf.Max(0f, ParseFloat(Get(row, "structure_hp"))),
                 hullForwardThrustKgf = Mathf.Max(0f, ParseFloat(Get(row, "hull_forward_thrust_kgf"), 1200f)),
                 hullCruiseReferenceSpeedMS = Mathf.Max(1f, ParseFloat(Get(row, "hull_cruise_reference_speed_ms"), 30f)),
@@ -106,7 +97,7 @@ public partial class SessionConfigDatabase
         }
     }
 
-    private void LoadShipTree(string path)
+    private void LoadShipCatalog(string path)
     {
         foreach (Dictionary<string, string> row in ReadCsv(path))
         {
@@ -176,11 +167,6 @@ public partial class SessionConfigDatabase
                 entry.visualShapeId = "square";
             }
 
-            if (string.IsNullOrWhiteSpace(entry.branchId) && entry.IsDevelopmentRosterShip)
-            {
-                entry.branchId = string.IsNullOrWhiteSpace(entry.shipClassId) ? "ship_line" : entry.shipClassId + "_line";
-            }
-
             if (string.IsNullOrWhiteSpace(entry.branchNameRu))
             {
                 entry.branchNameRu = entry.ClassDisplayNameRu;
@@ -211,24 +197,10 @@ public class HullConfig
     public string completedTechId = "";
     public float baseMassKg;
     public float hullMaxTakeoffMassKg;
-    public float airDensity = 1.225f;
-    public float dragCoefficient;
-    public float frontalAreaM2;
-    public float sideResistance;
-    public float verticalAreaFactor;
-    public float gyroTurnTorqueNm;
-    public float gyroTurnDamping;
-    public float maxAutoTurnRateDeg;
-    public float maxStructuralTurnRateDeg;
-    public float maxStructuralVerticalSpeedMS;
-    public float maxAutoVerticalSpeedMS;
-    public float altitudeStiffness;
-    public float altitudeDamping;
-    public float altitudeDriftToleranceM;
-    public float headingStiffness;
-    public float headingDamping;
-    public float speedStiffness;
-    public float speedDamping;
+    public float strategicYawRateDegPerSecond = 24f;
+    public float strategicYawAccelerationDegPerSecond2 = 84f;
+    public float strategicVerticalSpeedMS = 8f;
+    public float strategicVerticalAccelerationMS2 = 8f;
     public float structureHp;
     public float hullForwardThrustKgf = 1200f;
     public float hullCruiseReferenceSpeedMS = 30f;
@@ -309,7 +281,8 @@ public class ShipTreeEntryConfig
     public string ClassDisplayNameRu => string.IsNullOrWhiteSpace(shipClassNameRu) ? classNameRu : shipClassNameRu;
     public string BranchDisplayNameRu => string.IsNullOrWhiteSpace(branchNameRu) ? ClassDisplayNameRu : branchNameRu;
     public string LoreDisplayRu => string.IsNullOrWhiteSpace(loreRu) ? summaryRu : loreRu;
-    public bool IsDevelopmentRosterShip => !string.IsNullOrWhiteSpace(factionId) || catalogScope == "development";
-    public bool HasRuntimeHull => !string.IsNullOrWhiteSpace(hullId);
+    public bool IsDevelopmentRosterShip => !string.IsNullOrWhiteSpace(factionId) || catalogScope == "development" || catalogScope == "catalog";
+    public bool HasRuntimeHull => !string.IsNullOrWhiteSpace(hullId)
+        || (!string.IsNullOrWhiteSpace(visualModelId) && visualModelId != "placeholder_square");
     public int TotalStatScore => firepower + armor + durability + speed + maneuverability + cargo + utility;
 }

@@ -1,0 +1,4 @@
+id_citadel,base_package_id,upgrade_level,ship_id,local_name_ru,power_multiplier,upgrade_cost_multiplier,citadel_hp,kinetic_resistance_bonus_percent,thermal_resistance_bonus_percent,chemical_resistance_bonus_percent,explosive_resistance_bonus_percent,speed_delta_ms,acceleration_delta_ms2,turn_rate_delta_deg_per_second,reload_rate_multiplier,notes_ru
+barbet_citadel_standard,,base,capital_artillery_cruiser_r02,Стандартная цитадель,1.00,1.00,22000,0,0,0,0,0,0,0,1.00,Базовая уязвимая зона без бонусов
+barbet_citadel_armored,,base,capital_artillery_cruiser_r02,Бронезащищенная цитадель,1.00,1.00,30000,8,2,0,4,-4,-0.4,-1,1.00,Тяжелее но дает больше процентной защиты
+barbet_citadel_magazine,,base,capital_artillery_cruiser_r02,Увеличенный погреб,1.00,1.00,25000,2,0,0,1,-3,-0.3,-0.8,1.60,Быстрее подача и перезарядка ценой подвижности

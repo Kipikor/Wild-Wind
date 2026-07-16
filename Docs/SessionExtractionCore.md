@@ -34,6 +34,20 @@ Density reference: `Helldivers 2`. The relevant lesson is not shooter controls o
 
 Resource motive rule: like in `EVE Online`, almost every conflict exists because someone is extracting, protecting, scouting, claiming, denying, or preparing to extract resources. A mission can ask the player to mine directly, escort an allied extractor, defend a survey team, clear enemies before a later industrial operation, recover wreckage, hunt leviathans for materials, or raid automatons for parts. Pure combat missions are allowed, but their narrative reason should still be resource pressure: after the fight, someone can mine, salvage, process, occupy, or trade because the area was secured. Fighting for no material reason should be rare and intentional.
 
+## Leviathan Baseline Combat Contract
+
+Leviathans are armored living hazards, not ordinary red enemy ships. They use the same armor and damage model as ships, but their tactical loop is animal: notice prey, build aggression, commit to a short attack run, ram or bite, then pull away.
+
+- A leviathan is purple in tactical view and has a yellow aggression bar under its health bar.
+- Proximity fills aggression, but pre-attack aggression also leaks down. A baseline average leviathan calms from full to zero in roughly 30 seconds if nothing meaningful keeps provoking it. When aggression reaches 100%, the leviathan commits to roughly 20 seconds of pursuit. If it fails to attack in time, aggression resets. A successful ram or bite also resets aggression and starts an escape/reposition beat.
+- Ramming only counts above the minimum ram speed; below that it is just a bump. The leviathan AI should accelerate and make repeated attack passes instead of sitting on the target.
+- Bite is allowed only against sufficiently small targets. If the target is at most 35% of leviathan length, the attack becomes a bite; if the target is at most 20% of leviathan length, the bite is treated as lethal-scale damage.
+- If the leviathan is less than 30% of the target length, that target is too large: aggression toward it does not build and the leviathan retreats instead of attacking.
+- Calm leviathans are not automatic weapon targets. Artillery gun reports within weapon range add some aggression, but rockets do not scare them by launch sound. Direct hits are a strong provocation, roughly three times the baseline direct-damage aggression, and nearby explosions add a smaller wake-up pulse.
+- Before a full attack commit, a provoked leviathan should stalk the target while aggression builds. If it has no threat, food, or cloud to avoid, it should still wander instead of hanging motionless.
+- Leviathans regenerate quickly, take gas-cloud damage through the normal damage model, retreat from harmful clouds, and can heal by eating falling ore fragments, ore boulders, and automaton wrecks. Whole boulders and wrecks are edible only when their length is at most roughly one third of the leviathan length. Low-health leviathans prioritize nearby food; otherwise they may feed opportunistically.
+- Leviathans do not use ship death visuals: when killed they should not produce the ordinary ship explosion burst.
+
 Pirate reuse rule: pirates are a hostile content layer, not a separate shipbuilding school. They reuse hulls from the existing factions, with enemy paint, decals, rough add-ons, contraband cargo, and more reckless AI/loadouts. This lets the game field many pirate opponents without creating a full extra pirate tech tree. The readable promise is simple: the silhouette tells the player which faction hull this originally was, while the color/markings make it clear that this specific ship is hostile.
 
 The main loop is:
@@ -294,6 +308,34 @@ The Mist Synod is the baseline specialist for this system:
 - their cloud consumables support concealment, retreat, approach, hacking setup, and area denial;
 - early Synod clouds are mostly stationary, while later/recon-focused ships can lay repeated clouds and move under their own cover.
 
+## Explosive Radius Baseline
+
+Explosive weapons should not get hand-authored blast radii as isolated magic numbers. The preferred balance input is the charge mass in `explosive_kg`; the combat blast radius is derived from the shared anchor:
+
+```text
+50 kg TNT-equivalent explosive -> 20 m combat HE effect radius
+radius_m = 20 * sqrt(explosive_kg / 50)
+```
+
+The anchor is a balance convention, not immutable physics. Balance can move the reference mass, reference radius, or exponent in `Assets/Data/Config/Core_tactical_balance.csv`, but the project should keep those values explicit and shared. The current config values are:
+
+- reference explosive mass: `50 kg`;
+- reference combat effect radius: `20 m`;
+- mass exponent: `0.5`.
+
+The radius means practical combat HE effect against ships, drones, light armor, exposed systems, and external modules. It is not only clean air-blast overpressure. Fragments, casing, fire, and nearby surface damage are folded into the combat radius.
+
+Current reference examples:
+
+- small NURS: `5 kg` explosive, about `6.3 m` combat radius;
+- upgraded NURS: `6.25 kg` explosive, about `7.1 m` combat radius;
+- 200 mm bomb mortar: `12.5 kg` explosive, about `10 m` combat radius;
+- heavy 200 mm bomb mortar upgrade: `21.125 kg` explosive, about `13 m` combat radius;
+- Korshun side torpedo: `120 kg` explosive, about `31 m` combat radius;
+- upgraded Korshun side torpedo: `180 kg` explosive, about `38 m` combat radius.
+
+`splash_radius_m` remains as a readable fallback for old rows and nonstandard prototypes. For new explosive weapons, fill `explosive_kg` first and let runtime derive the blast radius from the shared anchor.
+
 ## Fire And Repair Baseline
 
 Fire is a common damage-over-time status caused mostly by explosive, HE, rocket, bomb, chemical, and similar weapons. Exact chances are configured per weapon, but the baseline rules are:
@@ -302,21 +344,21 @@ Fire is a common damage-over-time status caused mostly by explosive, HE, rocket,
 - a cruiser-sized ship can have up to `3` simultaneous fires;
 - a battleship-sized ship can have up to `4` simultaneous fires;
 - similar-size special ships use roughly the same limits;
-- one fire lasts about `40 s`;
-- one full-duration fire deals about `15%` of the target's maximum health as damage over time.
+- one fire lasts about `15 s`;
+- one fire deals `0.5%` of the target's maximum health per second, or about `7.5%` over its full duration.
 
-Damage control works similarly to the familiar Warships-style consumable:
+Emergency damage control works similarly to the familiar Warships-style damage-control consumable:
 
 - it has an active duration and a cooldown;
 - activating it clears negative effects such as fire;
-- while it is active, new negative effects of the cleared type cannot be applied;
+- while it is active, new fires, module HP damage, module disables, and similar malfunctions cannot be applied;
 - after the active window ends, the ship can be set on fire again, and the consumable enters its longer cooldown.
 
 This makes fire dangerous but readable: the player can save damage control for a bad moment, but spending it too early opens a window where the next fire wave matters.
 
 Terminology note:
 
-- damage control / repair of defects clears fires, disables, broken weapons, jammed launchers, damaged catapults and similar malfunctions;
+- emergency damage control clears fires, disables, broken weapons, jammed launchers, damaged catapults and similar malfunctions;
 - hull restoration / combat healing restores lost health;
 - a ship can have damage control without having combat healing;
 - some faction schools, such as the Stone Vault, rely on armor and health and do not restore hull health in combat.
@@ -478,19 +520,10 @@ If the ship is defeated or disabled during a sortie:
 
 Failure means the player spent an effective sortie as an inefficient sortie. It should hurt, but it should not delete the ship.
 
-The fallback ship is the Pioneer only when the player has no usable ship because all available ships are worn out, invalid, or otherwise unavailable.
-
-## Pioneer Fallback
-
-Pioneer is the reserve airfield of the game economy.
-
-- It is weak.
-- It is free.
-- It is always available when the player has no usable ship.
-- It does not need a free fuel/refuel step.
-- In core mode, if a save points at a missing or invalid hull, the base treats it as a Pioneer fallback case and restores the starter hull.
-- It can always attempt safe starter sorties.
-The Pioneer keeps failure meaningful without forcing a full restart.
+There is no separate fallback player ship in the current roster. If a save points
+at a missing or invalid old hull, the game must recover into a valid dock state
+using the current docked ships and the current `Ship_catalog.csv` roster:
+Korshun, Barbet, and Val.
 
 ## Starter Resource Loop
 
@@ -549,7 +582,7 @@ Current design rule:
 - activity capability should come from ship type, rigs, perks, and maybe later dedicated systems, not from High/Mid/Low module bands;
 - legacy `utility`, High, Mid, and Low slot data may remain in old catalog/setup assets for non-core compatibility, but active dock UI ignores those slots;
 - the active player-facing slot UI is rigs, economic consumables, field consumables, and perks.
-- the old free hull selector is blocked in core mode; ship replacement belongs to Pioneer fallback and base assembly/cascade systems instead of legacy catalog picking.
+- the old free hull selector is blocked in core mode; ship replacement belongs to the current dock roster and base assembly/cascade systems instead of legacy catalog picking.
 
 ## Removed From Core Loop
 
@@ -749,7 +782,7 @@ Current verification rule:
 The verification list should keep the useful vertical-slice coverage, but update any old fuel/refuel reserve checks and legacy fitting-band checks to the active design.
 
 - the big test contains a `Session extraction core` section;
-- it verifies base start, fresh core seed cleanup, legacy-mode blocking, save/job cleanup, dock interaction blocking during active sorties, base home overview for all five processing branches, cascade production outputs, sortie catalog coverage, HUD sortie cycling, launch gating, ship-cargo collection, cargo return, processing branches, sortie-loss recovery through the Pioneer fallback, missing-hull restoration through the Pioneer fallback, and starter rig/loadout upgrades from cascade output;
+- it verifies base start, fresh core seed cleanup, legacy-mode blocking, save/job cleanup, dock interaction blocking during active sorties, base home overview for all five processing branches, cascade production outputs, sortie catalog coverage, HUD sortie cycling, launch gating, ship-cargo collection, cargo return, processing branches, sortie-loss recovery through the current dock roster, missing-hull restoration through the current roster, and starter rig/loadout upgrades from cascade output;
 - it must not require external coal, claudium, fuel, refuel, or reserve spending to start or finish a sortie;
 - it should gate sorties through ship wear, ship role, range/autonomy stats, rigs, economic consumables, field consumables, perks, activity ratings, and mission rules;
 - it should not verify legacy utility slots or wrong-band module installs as the active player-facing model.

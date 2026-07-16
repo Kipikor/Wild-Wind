@@ -34,8 +34,8 @@ public class ShipPartDefinitionSO : ScriptableObject
     public Vector3 visualLocalEulerAngles = Vector3.zero;
     [InspectorName("Visual local scale")]
     public Vector3 visualLocalScale = Vector3.one;
-    [InspectorName("Runtime Ship_tree id")]
-    [Tooltip("Ship_tree.csv id used when this hull needs quick-mission balance.")]
+    [InspectorName("Runtime ship catalog id")]
+    [Tooltip("Ship_catalog.csv id used when this hull needs quick-mission balance.")]
     public string runtimeShipTreeId = "";
     [InspectorName("Fuel resource")]
     [Tooltip("Resource burned by the hull at its fixed fuel consumption rate.")]
@@ -166,11 +166,11 @@ public enum ShipStatOperation
 
 public enum ShipStatId
 {
-    [InspectorName("Масса корпуса/корабля")]
+    [InspectorName("Base mass")]
     BaseMass = 0,
-    [InspectorName("Масса триммирования")]
-    TargetTrimMass = 1,
-    [InspectorName("Hull cruise reference speed")]
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused1 = 1,
+    [InspectorName("Hull cruise reference speed, m/s")]
     HullCruiseReferenceSpeedMS = 2,
     [InspectorName("Legacy unused")]
     HullLegacyUnused3 = 3,
@@ -182,64 +182,64 @@ public enum ShipStatId
     HullLegacyUnused9 = 9,
     [InspectorName("Legacy unused")]
     HullLegacyUnused10 = 10,
-    [InspectorName("Плотность воздуха")]
-    AirDensity = 11,
-    [InspectorName("Коэффициент сопротивления")]
-    DragCoefficient = 12,
-    [InspectorName("Лобовая площадь")]
-    FrontalArea = 13,
-    [InspectorName("Боковое сопротивление")]
-    SideResistance = 14,
-    [InspectorName("Множитель вертикальной площади")]
-    VerticalAreaFactor = 15,
-    [InspectorName("Лимит поворота автопилота")]
-    MaxAutoTurnRateDeg = 21,
-    [InspectorName("Конструкционный лимит поворота")]
-    MaxStructuralTurnRateDeg = 22,
-    [InspectorName("Конструкционный лимит вертикальной скорости")]
-    MaxStructuralVerticalSpeed = 23,
-    [InspectorName("Лимит вертикальной скорости автопилота")]
-    MaxAutoVerticalSpeed = 24,
-    [InspectorName("Жесткость высоты")]
-    AltitudeStiffness = 27,
-    [InspectorName("Демпфирование высоты")]
-    AltitudeDamping = 28,
-    [InspectorName("Допуск дрейфа высоты")]
-    AltitudeDriftTolerance = 29,
-    [InspectorName("Жесткость курса")]
-    HeadingStiffness = 30,
-    [InspectorName("Демпфирование курса")]
-    HeadingDamping = 31,
-    [InspectorName("Жесткость скорости")]
-    SpeedStiffness = 34,
-    [InspectorName("Демпфирование скорости")]
-    SpeedDamping = 35,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused11 = 11,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused12 = 12,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused13 = 13,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused14 = 14,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused15 = 15,
+    [InspectorName("Strategic yaw rate, deg/s")]
+    StrategicYawRateDegPerSecond = 21,
+    [InspectorName("Strategic yaw acceleration, deg/s2")]
+    StrategicYawAccelerationDegPerSecond2 = 22,
+    [InspectorName("Strategic vertical speed, m/s")]
+    StrategicVerticalSpeedMS = 23,
+    [InspectorName("Strategic vertical acceleration, m/s2")]
+    StrategicVerticalAccelerationMS2 = 24,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused27 = 27,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused28 = 28,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused29 = 29,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused30 = 30,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused31 = 31,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused34 = 34,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused35 = 35,
     [InspectorName("Legacy unused")]
     ClaudiumLegacyUnused37 = 37,
     [InspectorName("Legacy unused")]
     ClaudiumLegacyUnused38 = 38,
-    [InspectorName("Максимальная подъемная сила контура")]
+    [InspectorName("Claudium max lift, kg")]
     ClaudiumMaxLiftKg = 39,
     [InspectorName("Legacy unused")]
     ClaudiumLegacyUnused40 = 40,
-    [InspectorName("Макс. усилие поворота корпуса (Н*м)")]
-    GyroTurnTorque = 43,
-    [InspectorName("Демпфирование гироповорота")]
-    GyroTurnDamping = 44,
-    [InspectorName("Максимальная взлетная масса корпуса, кг")]
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused43 = 43,
+    [InspectorName("Legacy unused")]
+    HullLegacyUnused44 = 44,
+    [InspectorName("Hull max takeoff mass, kg")]
     HullMaxTakeoffMassKg = 45,
-    [InspectorName("Майнинг: вместимость противоударного кузова, кг")]
+    [InspectorName("Mining impact hold capacity, kg")]
     MiningImpactHoldCapacityKg = 60,
-    [InspectorName("Майнинг: множитель урона от глыб")]
+    [InspectorName("Mining impact damage multiplier")]
     MiningImpactDamageTakenMultiplier = 61,
-    [InspectorName("Груз: общий лимит, кг")]
+    [InspectorName("Cargo van capacity, kg")]
     CargoVanCapacityKg = 100,
-    [InspectorName("Груз: кузов, кг")]
+    [InspectorName("Bulk hold capacity, kg")]
     BulkHoldCapacityKg = 102,
-    [InspectorName("Груз: цистерна, кг")]
+    [InspectorName("Liquid tank capacity, kg")]
     LiquidTankCapacityKg = 103,
-    [InspectorName("Груз: баллоны, кг")]
+    [InspectorName("Gas cylinder capacity, kg")]
     GasCylinderCapacityKg = 104,
-    [InspectorName("РџСЂРѕС‡РЅРѕСЃС‚СЊ РєРѕСЂРїСѓСЃР°")]
+    [InspectorName("Structure HP")]
     StructureHp = 111
 }

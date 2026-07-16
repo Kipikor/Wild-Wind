@@ -178,7 +178,10 @@ public class DamageProjectile : MonoBehaviour
             if (hitCollider.GetComponentInParent<MeshArmorBody>() == null
                 && hitCollider.GetComponentInParent<ArmorZone>() == null)
             {
-                continue;
+                if (hitCollider.GetComponentInParent<CoreTacticalAutomatonWreck>() == null)
+                {
+                    continue;
+                }
             }
 
             if (hits[i].distance < bestDistance)
@@ -222,14 +225,18 @@ public class DamageProjectile : MonoBehaviour
         DamageHitContext context = new DamageHitContext
         {
             shellType = shell.shellType,
+            damageType = shell.damageType,
             shellName = shell.displayNameRu,
             sourceName = sourceName,
             caliberMm = shell.caliberMm,
             damagePoints = shell.damagePoints,
-            hullDamageOnPenetration = shell.hullDamageOnPenetration > 0.001f ? shell.hullDamageOnPenetration : shell.damagePoints,
-            penetrationMm = RollPenetration(shell) * penetrationMultiplier,
+            hullDamageOnPenetration = RollDamage(shell),
+            armingArmorMm = shell.armingArmorMm,
+            resistanceIgnorePercent = Mathf.Clamp(shell.resistanceIgnorePercent * penetrationMultiplier, 0f, 100f),
+            penetrationMm = Mathf.Clamp(shell.resistanceIgnorePercent * penetrationMultiplier, 0f, 100f),
             explosiveRadiusMeters = shell.explosiveRadiusMeters,
             normalizationDegrees = shell.normalizationDegrees,
+            damageRollSpread = shell.damageRollSpread,
             hitPoint = hitPoint,
             hitNormal = hitNormal,
             incomingDirection = direction,
@@ -240,6 +247,17 @@ public class DamageProjectile : MonoBehaviour
         if (meshArmor != null)
         {
             meshArmor.ReceiveHit(context, triangleIndex);
+            hasHit = true;
+            return true;
+        }
+
+        CoreTacticalAutomatonWreck wreck = hitCollider.GetComponentInParent<CoreTacticalAutomatonWreck>();
+        if (wreck != null)
+        {
+            wreck.ApplyProjectileDamage(
+                Mathf.Max(context.damagePoints, context.hullDamageOnPenetration),
+                sourceName,
+                hitPoint);
             hasHit = true;
             return true;
         }
@@ -264,6 +282,17 @@ public class DamageProjectile : MonoBehaviour
         if (spread <= 0.001f) return preset.penetrationMm;
 
         return preset.penetrationMm * Random.Range(1f - spread, 1f + spread);
+    }
+
+    private static float RollDamage(DamageShellPreset preset)
+    {
+        float baseDamage = preset.hullDamageOnPenetration > 0.001f
+            ? preset.hullDamageOnPenetration
+            : preset.damagePoints;
+        float spread = Mathf.Clamp01(preset.damageRollSpread);
+        if (spread <= 0.001f) return Mathf.Max(0f, baseDamage);
+
+        return Mathf.Max(0f, baseDamage) * Random.Range(1f - spread, 1f + spread);
     }
 
     private void ApplyBallisticForces()
@@ -310,8 +339,12 @@ public class DamageProjectile : MonoBehaviour
             shellType = preset.shellType,
             caliberMm = preset.caliberMm,
             damagePoints = preset.damagePoints,
+            damageType = preset.damageType,
+            resistanceIgnorePercent = preset.resistanceIgnorePercent,
             hullDamageOnPenetration = preset.hullDamageOnPenetration,
+            damageRollSpread = preset.damageRollSpread,
             penetrationMm = preset.penetrationMm,
+            armingArmorMm = preset.armingArmorMm,
             penetrationAtMaxRangeMultiplier = preset.penetrationAtMaxRangeMultiplier,
             velocityRetentionAtMaxRange = preset.velocityRetentionAtMaxRange,
             explosiveRadiusMeters = preset.explosiveRadiusMeters,

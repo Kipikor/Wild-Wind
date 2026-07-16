@@ -86,12 +86,12 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private const float MetaLeftSideButtonSize = 110f;
     private const float MetaLeftSideButtonGap = 21f;
     private const float MetaDockButtonSize = 156f;
+    private const int MetaDockLoadoutSlotButtonCount = 7;
     private const int MetaQuestMaxCount = 3;
     private const int MetaProjectMaxCount = 5;
     private const float MetaProjectCardWidth = 252f;
     private const float MetaProjectCardHeight = 124f;
     private const float MetaProjectCardGap = 17f;
-    private const int DevelopmentTreeTierCount = 10;
     private const float DevelopmentFactionListWidth = 250f;
     private const float DevelopmentTreePanelWidth = 1220f;
     private const float DevelopmentTreeViewportWidth = 1220f;
@@ -101,8 +101,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private const float DevelopmentDetailsWidth = 340f;
     private const float DevelopmentTileWidth = 150f;
     private const float DevelopmentTileHeight = 80f;
-    private const float DevelopmentRankStep = 118f;
-    private const float DevelopmentBranchStep = 176f;
     private static readonly Color EngineForwardThrustColor = new Color(0.14f, 0.78f, 0.28f, 0.96f);
     private static readonly Color EngineReverseThrustColor = new Color(0.96f, 0.72f, 0.12f, 0.96f);
     private static readonly int[] EngineThrottleGearNotches = { 5, 4, 3, 2, 1, 0, -1, -2, -3 };
@@ -148,11 +146,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     };
     private static readonly MetaProjectSpec[] MetaProjectSpecs =
     {
-        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f),
-        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f),
-        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f),
-        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f),
-        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "1д 23ч 54м", 0.24f)
+        new MetaProjectSpec("Рецепт: Сталь", "100%", "\u2699", "Готово", 1f),
+        new MetaProjectSpec("Рецепт: Сталь", "64%", "\u2699", "2ч 10м", 0.64f),
+        new MetaProjectSpec("Рецепт: Сталь", "24%", "\u2699", "46м", 0.24f),
+        new MetaProjectSpec("Рецепт: Сталь", "12%", "\u2699", "1ч 18м", 0.12f),
+        new MetaProjectSpec("Рецепт: Сталь", "8%", "\u2699", "3ч 40м", 0.08f)
     };
     private static readonly string[] MainHudRequiredIconResourceNames =
     {
@@ -230,32 +228,24 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private Text metaDockScreenPortButtonText;
     private RectTransform metaDockShipSlotRoot;
     private RectTransform metaDockSelectedShipRoot;
-    private RectTransform metaDockMissionRoot;
     private RectTransform metaDockRewardRoot;
     private RectTransform metaDockResultModalRoot;
     private Text metaDockHeaderText;
     private Text metaDockSelectedShipText;
     private Text metaDockSelectedStatsText;
-    private Text metaDockMissionHeaderText;
-    private Text metaDockMissionDetailText;
+    private Text metaDockLoadoutHeaderText;
     private Text metaDockRewardText;
     private Text metaDockResultTitleText;
     private Text metaDockResultSubtitleText;
     private Text metaDockResultBodyText;
     private Text metaDockResultCloseText;
-    private Text metaDockManualSortieText;
     private Text metaDockCoreCombatText;
-    private Text metaDockQuickBattleText;
-    private Text metaDockRunMissionText;
     private Text metaDockSellText;
     private Text[] metaDockSlotTexts;
-    private Text[] metaDockMissionTexts;
+    private Text[] metaDockLoadoutSlotTexts;
     private Button[] metaDockSlotButtons;
-    private Button[] metaDockMissionButtons;
-    private Button metaDockManualSortieButton;
+    private Button[] metaDockLoadoutSlotButtons;
     private Button metaDockCoreCombatButton;
-    private Button metaDockQuickBattleButton;
-    private Button metaDockRunMissionButton;
     private Button metaDockSellButton;
     private Button metaDockResultCloseButton;
     private RectTransform metaQuestPanel;
@@ -311,7 +301,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private string selectedDevelopmentSupplierId = "";
     private string selectedDevelopmentShipId = "";
     private string hoveredDevelopmentShipId = "";
-    private string selectedMetaDockMissionOfferId = "";
     private string developmentDetailsShipId = "";
     private string developmentWindowLayoutKey = "";
     private int developmentWindowSupplierCount;
@@ -502,28 +491,18 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     public bool IsMetaDockGameplayReadyForTests => IsMetaDockScreenReadyForTests
         && metaDockShipSlotRoot != null
         && metaDockSelectedShipRoot != null
-        && metaDockMissionRoot != null
         && metaDockRewardRoot != null
         && metaDockHeaderText != null
         && metaDockSelectedShipText != null
         && metaDockSelectedStatsText != null
-        && metaDockMissionHeaderText != null
-        && metaDockMissionDetailText != null
         && metaDockRewardText != null
         && metaDockResultModalRoot != null
         && metaDockResultTitleText != null
         && metaDockResultSubtitleText != null
         && metaDockResultBodyText != null
         && metaDockResultCloseButton != null
-        && metaDockQuickBattleButton != null
-        && metaDockRunMissionButton != null
-        && metaDockManualSortieButton != null
         && metaDockCoreCombatButton != null
         && metaDockSellButton != null
-        && metaDockMissionTexts != null
-        && metaDockMissionTexts.Length == 15
-        && metaDockMissionButtons != null
-        && metaDockMissionButtons.Length == 15
         && metaDockSlotTexts != null
         && metaDockSlotTexts.Length == MetaGameState.DevelopmentDockSlotCount
         && metaDockSlotButtons != null
@@ -532,7 +511,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     public string MetaDockRewardTextForTests => metaDockRewardText != null ? metaDockRewardText.text : "";
     public bool IsMetaDockResultWindowVisibleForTests => metaDockResultModalRoot != null && metaDockResultModalRoot.gameObject.activeInHierarchy;
     public string MetaDockResultWindowTextForTests => metaDockResultBodyText != null ? metaDockResultBodyText.text : "";
-    public int MetaDockMissionOfferCountForTests => metaDockMissionTexts != null ? metaDockMissionTexts.Length : 0;
+    public int MetaDockMissionOfferCountForTests => 0;
     public string MetaDockSelectedShipTextForTests => metaDockSelectedShipText != null ? metaDockSelectedShipText.text : "";
     public bool CloseAllHudWindowsForTests()
     {
@@ -689,14 +668,14 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         && developmentSupplierTabRoot != null
         && developmentTreeRoot != null
         && !string.IsNullOrWhiteSpace(developmentWindowText.text)
-        && developmentWindowText.text.Contains("Корабли развития")
-        && developmentWindowSupplierCount >= 6
-        && developmentWindowTileCount >= 15
-        && developmentWindowConnectionCount >= 14;
+        && developmentWindowText.text.Contains("Корабли:")
+        && developmentWindowSupplierCount >= 1
+        && developmentWindowTileCount >= 1
+        && developmentWindowConnectionCount == 0;
     public string DevelopmentWindowTextForTests => CollectWindowTextForTests(developmentWindow);
     public int DevelopmentWindowSupplierCountForTests => developmentWindowSupplierCount;
     public int DevelopmentWindowTileCountForTests => developmentWindowTileCount;
-    public int DevelopmentWindowTierColumnCountForTests => DevelopmentTreeTierCount;
+    public int DevelopmentWindowTierColumnCountForTests => 0;
     public int DevelopmentWindowConnectionCountForTests => developmentWindowConnectionCount;
 
     private static string CollectWindowTextForTests(HudWindow window)
@@ -1196,9 +1175,25 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return OpenMetaDockScreen();
     }
 
+    public bool PressMetaDockButtonForTests()
+    {
+        if (metaDockButton == null || !metaDockButton.gameObject.activeInHierarchy || !metaDockButton.interactable)
+        {
+            return false;
+        }
+
+        metaDockButton.onClick.Invoke();
+        return IsMetaDockScreenVisibleForTests;
+    }
+
     public bool PressMetaDockShipSlotForTests(int slotIndex)
     {
         return HandleMetaDockSlotSelected(slotIndex);
+    }
+
+    public bool PressMetaDockLoadoutSlotForTests(int loadoutIndex)
+    {
+        return HandleMetaDockLoadoutSlotSelected(loadoutIndex);
     }
 
     public bool OpenMetaDockScreenForRuntime()
@@ -1221,11 +1216,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         return HandleDevelopmentBuyShip(selectedDevelopmentShipId);
     }
 
-    public bool RunQuickDockSortieForTests()
-    {
-        return HandleMetaDockQuickBattle();
-    }
-
     public bool RunCoreCombatDockSortieForTests()
     {
         return HandleMetaDockCoreCombatSortie();
@@ -1235,21 +1225,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     {
         HideMetaDockSortieResultWindow();
         return metaDockResultModalRoot == null || !metaDockResultModalRoot.gameObject.activeSelf;
-    }
-
-    public bool SelectDockMissionForTests(int offerIndex)
-    {
-        return HandleMetaDockMissionSelected(offerIndex);
-    }
-
-    public bool RunSelectedOrdinaryDockMissionForTests()
-    {
-        return HandleMetaDockRunSelectedMission();
-    }
-
-    public bool RunFirstOrdinaryDockMissionForTests()
-    {
-        return HandleMetaDockMissionSelected(0) && HandleMetaDockRunSelectedMission();
     }
 
     public bool SellSelectedDockShipForTests()
@@ -1781,7 +1756,12 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private void BuildMetaDockScreen(RectTransform parent)
     {
-        metaDockScreenLayer = CreatePanel("Meta Dock Screen", parent, StretchFull(), new Color(0.014f, 0.020f, 0.026f, 1f));
+        metaDockScreenLayer = CreatePanel("Meta Dock Screen", parent, StretchFull(), new Color(0.014f, 0.020f, 0.026f, 0f));
+        Image dockScreenBackground = metaDockScreenLayer.GetComponent<Image>();
+        if (dockScreenBackground != null)
+        {
+            dockScreenBackground.raycastTarget = false;
+        }
 
         RectTransform topBand = CreatePanel("Dock Screen Top Band", metaDockScreenLayer, new RectTransformSpec
         {
@@ -1796,11 +1776,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         title.fontStyle = FontStyle.Bold;
         title.raycastTarget = false;
 
-        metaDockHeaderText = CreateText(metaDockScreenLayer, "Купи корабль в развитии, поставь его в слот и нажми быстрый вылет.", 18, new Vector2(42f, -104f), new Vector2(1120f, 32f), TextAnchor.MiddleLeft, new Color(0.78f, 0.88f, 0.86f, 0.94f));
-        metaDockManualSortieText = CreateButton(metaDockScreenLayer, "Dock Manual Quick Sortie", new Vector2(1180f, -92f), new Vector2(312f, 44f), HandleMetaDockManualSortie, out metaDockManualSortieButton);
-        SetText(metaDockManualSortieText, "РУЧНОЙ ВЫЛЕТ");
-        metaDockManualSortieText.fontSize = 19;
-        metaDockManualSortieText.fontStyle = FontStyle.Bold;
+        metaDockHeaderText = CreateText(metaDockScreenLayer, "Core Tactical вылетает только выбранным кораблем дока.", 18, new Vector2(42f, -104f), new Vector2(1120f, 32f), TextAnchor.MiddleLeft, new Color(0.78f, 0.88f, 0.86f, 0.94f));
 
         metaDockCoreCombatText = CreateButton(metaDockScreenLayer, "Dock Core Tactical Combat Sortie", new Vector2(1510f, -92f), new Vector2(312f, 44f), HandleMetaDockCoreCombatSortie, out metaDockCoreCombatButton);
         SetText(metaDockCoreCombatText, "CORE COMBAT");
@@ -1818,48 +1794,28 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         metaDockSelectedShipText = CreateText(metaDockSelectedShipRoot, "", 24, new Vector2(24f, -22f), new Vector2(590f, 40f), TextAnchor.MiddleLeft, new Color(0.95f, 0.86f, 0.64f, 1f));
         metaDockSelectedShipText.fontStyle = FontStyle.Bold;
-        metaDockSelectedStatsText = CreateText(metaDockSelectedShipRoot, "", 17, new Vector2(24f, -76f), new Vector2(596f, 300f), TextAnchor.UpperLeft, new Color(0.84f, 0.90f, 0.86f, 0.96f));
+        metaDockSelectedStatsText = CreateText(metaDockSelectedShipRoot, "", 17, new Vector2(24f, -76f), new Vector2(596f, 138f), TextAnchor.UpperLeft, new Color(0.84f, 0.90f, 0.86f, 0.96f));
 
-        metaDockQuickBattleText = CreateButton(metaDockSelectedShipRoot, "Dock Enter Core Combat", new Vector2(24f, -402f), new Vector2(284f, 56f), HandleMetaDockCoreCombatSortie, out metaDockQuickBattleButton);
-        SetText(metaDockQuickBattleText, "В БОЙ");
-        metaDockQuickBattleText.fontSize = 28;
-        metaDockQuickBattleText.fontStyle = FontStyle.Bold;
+        metaDockLoadoutHeaderText = CreateText(metaDockSelectedShipRoot, "КОМПЛЕКТАЦИЯ", 17, new Vector2(24f, -220f), new Vector2(596f, 28f), TextAnchor.MiddleLeft, new Color(0.95f, 0.84f, 0.62f, 1f));
+        metaDockLoadoutHeaderText.fontStyle = FontStyle.Bold;
+        metaDockLoadoutSlotTexts = new Text[MetaDockLoadoutSlotButtonCount];
+        metaDockLoadoutSlotButtons = new Button[MetaDockLoadoutSlotButtonCount];
+        for (int i = 0; i < MetaDockLoadoutSlotButtonCount; i++)
+        {
+            int loadoutIndex = i;
+            float x = i % 2 == 0 ? 24f : 324f;
+            float y = -254f - (i / 2) * 40f;
+            Text loadoutText = CreateButton(metaDockSelectedShipRoot, "Dock Loadout Slot " + i, new Vector2(x, y), new Vector2(284f, 34f), () => HandleMetaDockLoadoutSlotSelected(loadoutIndex), out Button loadoutButton);
+            loadoutText.fontSize = 13;
+            loadoutText.alignment = TextAnchor.MiddleLeft;
+            metaDockLoadoutSlotTexts[i] = loadoutText;
+            metaDockLoadoutSlotButtons[i] = loadoutButton;
+        }
 
-        metaDockSellText = CreateButton(metaDockSelectedShipRoot, "Dock Sell Ship", new Vector2(324f, -402f), new Vector2(284f, 56f), HandleMetaDockSellShip, out metaDockSellButton);
+        metaDockSellText = CreateButton(metaDockSelectedShipRoot, "Dock Sell Ship", new Vector2(24f, -454f), new Vector2(284f, 56f), HandleMetaDockSellShip, out metaDockSellButton);
         SetText(metaDockSellText, "ПРОДАТЬ");
         metaDockSellText.fontSize = 22;
         metaDockSellText.fontStyle = FontStyle.Bold;
-
-        metaDockMissionRoot = CreatePanel("Dock Mission Panel", metaDockScreenLayer, new RectTransformSpec
-        {
-            anchorMin = new Vector2(0f, 1f),
-            anchorMax = new Vector2(0f, 1f),
-            pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(720f, -154f),
-            sizeDelta = new Vector2(552f, 540f)
-        }, new Color(0.025f, 0.052f, 0.066f, 0.90f));
-
-        metaDockMissionHeaderText = CreateText(metaDockMissionRoot, "ОБЫЧНЫЕ МИССИИ", 20, new Vector2(20f, -18f), new Vector2(330f, 30f), TextAnchor.MiddleLeft, new Color(0.95f, 0.84f, 0.62f, 1f));
-        metaDockMissionHeaderText.fontStyle = FontStyle.Bold;
-        metaDockMissionDetailText = CreateText(metaDockMissionRoot, "", 14, new Vector2(260f, -16f), new Vector2(270f, 46f), TextAnchor.UpperRight, new Color(0.80f, 0.88f, 0.86f, 0.95f));
-        metaDockMissionTexts = new Text[15];
-        metaDockMissionButtons = new Button[15];
-        for (int i = 0; i < metaDockMissionTexts.Length; i++)
-        {
-            int offerIndex = i;
-            float x = i < 8 ? 20f : 284f;
-            float y = -64f - (i % 8) * 44f;
-            Text missionText = CreateButton(metaDockMissionRoot, "Dock Mission Offer " + i, new Vector2(x, y), new Vector2(248f, 38f), () => HandleMetaDockMissionSelected(offerIndex), out Button missionButton);
-            missionText.fontSize = 13;
-            missionText.alignment = TextAnchor.MiddleLeft;
-            metaDockMissionTexts[i] = missionText;
-            metaDockMissionButtons[i] = missionButton;
-        }
-
-        metaDockRunMissionText = CreateButton(metaDockMissionRoot, "Dock Run Ordinary Mission", new Vector2(20f, -468f), new Vector2(512f, 46f), HandleMetaDockRunSelectedMission, out metaDockRunMissionButton);
-        SetText(metaDockRunMissionText, "ВЫЛЕТ ПО ВЫБРАННОЙ МИССИИ");
-        metaDockRunMissionText.fontSize = 19;
-        metaDockRunMissionText.fontStyle = FontStyle.Bold;
 
         metaDockRewardRoot = CreatePanel("Dock Reward Panel", metaDockScreenLayer, new RectTransformSpec
         {
@@ -2377,7 +2333,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             ? "РЕЗУЛЬТАТ: " + ShortenButtonLabel(ship.DisplayNameRu, 34)
             : "РЕЗУЛЬТАТ ВЫЛЕТА";
         string subtitle = ship != null
-            ? FormatRomanTier(Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount)) + " ранг"
+            ? GetDevelopmentRoleText(ship)
             : "";
         if (slot != null)
         {
@@ -2405,14 +2361,13 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private void RefreshMetaDockGameplayPanel(bool visible)
     {
-        if (metaDockShipSlotRoot == null || metaDockSelectedShipRoot == null || metaDockMissionRoot == null || metaDockRewardRoot == null)
+        if (metaDockShipSlotRoot == null || metaDockSelectedShipRoot == null || metaDockRewardRoot == null)
         {
             return;
         }
 
         metaDockShipSlotRoot.gameObject.SetActive(visible);
         metaDockSelectedShipRoot.gameObject.SetActive(visible);
-        metaDockMissionRoot.gameObject.SetActive(visible);
         metaDockRewardRoot.gameObject.SetActive(visible);
         if (!visible)
         {
@@ -2428,10 +2383,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             && selectedSlot != null
             && selectedSlot.HasShip
             && selectedSlot.sortiesRemaining > 0;
-        SetInteractable(metaDockManualSortieButton, canLaunchSelectedDockShip);
         SetInteractable(metaDockCoreCombatButton, canLaunchSelectedDockShip);
 
-        SetText(metaDockHeaderText, "Быстрые миссии подстраиваются под корабль: высокий рейтинг привозит более дорогой конкретный ресурс.");
+        SetText(metaDockHeaderText, "Core Tactical вылетает только выбранным кораблем дока.");
         if (metaDockSlotTexts != null)
         {
             for (int i = 0; i < metaDockSlotTexts.Length; i++)
@@ -2461,12 +2415,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         if (selectedSlot == null || !selectedSlot.HasShip || config == null)
         {
             SetText(metaDockSelectedShipText, "Слот пуст");
-            SetText(metaDockSelectedStatsText, "Купи корабль в окне развития. Он встанет сюда, после чего можно нажимать быстрый вылет и смотреть конкретный вывоз ресурсов.");
-            RefreshMetaDockMissionPanel(null, null, null);
+            SetText(metaDockSelectedStatsText, "Купи корабль в окне развития. Он встанет сюда, после чего можно запускать Core Combat.");
+            RefreshMetaDockLoadoutPanel(null, -1);
             SetText(metaDockRewardText, string.IsNullOrWhiteSpace(currentMeta != null ? currentMeta.LastQuickSortieReport : "") ? "Пока вылетов не было." : currentMeta.LastQuickSortieReport);
-            SetInteractable(metaDockQuickBattleButton, false);
-            SetInteractable(metaDockRunMissionButton, false);
-            SetInteractable(metaDockManualSortieButton, false);
             SetInteractable(metaDockCoreCombatButton, false);
             SetInteractable(metaDockSellButton, false);
             return;
@@ -2476,150 +2427,93 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         if (selectedShip == null)
         {
             SetText(metaDockSelectedShipText, selectedSlot.shipId);
-            SetText(metaDockSelectedStatsText, "Корабль не найден в Ship_tree.csv.");
-            RefreshMetaDockMissionPanel(null, null, null);
-            SetInteractable(metaDockQuickBattleButton, false);
-            SetInteractable(metaDockRunMissionButton, false);
-            SetInteractable(metaDockManualSortieButton, false);
+            SetText(metaDockSelectedStatsText, "Корабль не найден в каталоге кораблей.");
+            RefreshMetaDockLoadoutPanel(null, -1);
             SetInteractable(metaDockCoreCombatButton, false);
             SetInteractable(metaDockSellButton, true);
             return;
         }
 
-        SetText(metaDockSelectedShipText, FormatRomanTier(Mathf.Clamp(selectedShip.treeTier, 1, DevelopmentTreeTierCount)) + " " + selectedShip.DisplayNameRu);
+        SetText(metaDockSelectedShipText, selectedShip.DisplayNameRu);
         SetText(metaDockSelectedStatsText, BuildMetaDockShipStatsText(selectedShip, selectedSlot));
-        RefreshMetaDockMissionPanel(currentMeta, selectedSlot, selectedShip);
+        RefreshMetaDockLoadoutPanel(currentMeta, selectedSlot.slotIndex);
         string reward = !string.IsNullOrWhiteSpace(selectedSlot.lastRewardSummary)
             ? selectedSlot.lastRewardSummary
             : currentMeta.LastQuickSortieReport;
         SetText(metaDockRewardText, string.IsNullOrWhiteSpace(reward) ? "Пока этот корабль не летал." : reward);
-        SetInteractable(metaDockQuickBattleButton, canLaunchSelectedDockShip);
-        SetInteractable(metaDockRunMissionButton, selectedSlot.sortiesRemaining > 0 && !string.IsNullOrWhiteSpace(selectedMetaDockMissionOfferId));
+        SetInteractable(metaDockCoreCombatButton, canLaunchSelectedDockShip);
         SetInteractable(metaDockSellButton, true);
     }
 
-    private void RefreshMetaDockMissionPanel(MetaGameState currentMeta, DockedDevelopmentShipState selectedSlot, ShipTreeEntryConfig selectedShip)
+    private void RefreshMetaDockLoadoutPanel(MetaGameState currentMeta, int slotIndex)
     {
-        if (metaDockMissionTexts == null || metaDockMissionButtons == null)
+        if (metaDockLoadoutSlotTexts == null || metaDockLoadoutSlotButtons == null)
         {
             return;
         }
 
-        List<SortieMissionOffer> offers = currentMeta != null && selectedSlot != null && selectedSlot.HasShip
-            ? currentMeta.GetDevelopmentDockOrdinaryMissionOffers(selectedSlot.slotIndex)
+        List<DockedShipLoadoutSlotView> loadoutSlots = currentMeta != null && slotIndex >= 0
+            ? currentMeta.GetDevelopmentDockLoadoutSlotsForUi(slotIndex)
             : null;
-        if (offers == null || offers.Count == 0)
+
+        bool hasLoadout = loadoutSlots != null && loadoutSlots.Count > 0;
+        SetText(metaDockLoadoutHeaderText, hasLoadout ? "КОМПЛЕКТАЦИЯ" : "КОМПЛЕКТАЦИЯ НЕ НАЙДЕНА");
+
+        for (int i = 0; i < metaDockLoadoutSlotTexts.Length; i++)
         {
-            selectedMetaDockMissionOfferId = "";
-            SetText(metaDockMissionDetailText, "Нет корабля");
-            for (int i = 0; i < metaDockMissionTexts.Length; i++)
+            DockedShipLoadoutSlotView loadout = hasLoadout && i < loadoutSlots.Count ? loadoutSlots[i] : null;
+            bool hasButton = loadout != null;
+            if (hasButton)
             {
-                SetText(metaDockMissionTexts[i], "");
-                SetInteractable(metaDockMissionButtons[i], false);
-            }
-
-            SetInteractable(metaDockRunMissionButton, false);
-            return;
-        }
-
-        bool selectedStillExists = false;
-        for (int i = 0; i < offers.Count; i++)
-        {
-            if (string.Equals(offers[i].offerId, selectedMetaDockMissionOfferId, StringComparison.OrdinalIgnoreCase))
-            {
-                selectedStillExists = true;
-                break;
-            }
-        }
-
-        if (!selectedStillExists)
-        {
-            selectedMetaDockMissionOfferId = offers[0].offerId;
-        }
-
-        SortieMissionOffer selectedOffer = null;
-        for (int i = 0; i < metaDockMissionTexts.Length; i++)
-        {
-            SortieMissionOffer offer = i < offers.Count ? offers[i] : null;
-            bool hasOffer = offer != null;
-            bool selected = hasOffer && string.Equals(offer.offerId, selectedMetaDockMissionOfferId, StringComparison.OrdinalIgnoreCase);
-            SetInteractable(metaDockMissionButtons[i], hasOffer);
-            SetText(metaDockMissionTexts[i], hasOffer
-                ? ShortenButtonLabel(offer.titleRu, 28) + "\n" + offer.BuildRequirementSummary(selectedShip)
-                : "");
-            if (metaDockMissionButtons[i] != null)
-            {
-                Image image = metaDockMissionButtons[i].GetComponent<Image>();
-                if (image != null)
+                string label = ShortenButtonLabel(loadout.displayNameRu, 16)
+                    + ": "
+                    + ShortenButtonLabel(loadout.selectedPackageNameRu, 28);
+                if (loadout.optionCount > 1)
                 {
-                    image.color = selected
-                        ? new Color(0.23f, 0.16f, 0.06f, 0.98f)
-                        : new Color(0.065f, 0.074f, 0.080f, 0.94f);
+                    label += " (" + loadout.optionCount.ToString(CultureInfo.InvariantCulture) + ")";
                 }
-            }
 
-            if (selected)
+                SetText(metaDockLoadoutSlotTexts[i], label);
+            }
+            else
             {
-                selectedOffer = offer;
+                SetText(metaDockLoadoutSlotTexts[i], "");
+            }
+
+            SetInteractable(metaDockLoadoutSlotButtons[i], hasButton && loadout.optionCount > 1);
+            Image image = metaDockLoadoutSlotButtons[i] != null ? metaDockLoadoutSlotButtons[i].GetComponent<Image>() : null;
+            if (image != null)
+            {
+                image.color = hasButton
+                    ? new Color(0.070f, 0.085f, 0.074f, 0.95f)
+                    : new Color(0.020f, 0.030f, 0.032f, 0.35f);
             }
         }
-
-        if (selectedOffer != null)
-        {
-            SetText(metaDockMissionDetailText,
-                "Шанс выхода " + Mathf.RoundToInt(selectedOffer.estimatedSuccessFactor * 100f).ToString(CultureInfo.InvariantCulture) + "%\n"
-                + selectedOffer.primaryActivityRu);
-        }
-        else
-        {
-            SetText(metaDockMissionDetailText, "Выбери миссию");
-        }
-
-        SetInteractable(metaDockRunMissionButton, selectedSlot != null && selectedSlot.sortiesRemaining > 0 && selectedOffer != null);
     }
 
-    private bool HandleMetaDockMissionSelected(int offerIndex)
+    private bool HandleMetaDockLoadoutSlotSelected(int loadoutIndex)
     {
         MetaGameState currentMeta = ResolveMeta();
         DockedDevelopmentShipState slot = currentMeta != null ? currentMeta.GetSelectedDevelopmentDockShipSlot() : null;
-        List<SortieMissionOffer> offers = currentMeta != null && slot != null && slot.HasShip
-            ? currentMeta.GetDevelopmentDockOrdinaryMissionOffers(slot.slotIndex)
+        List<DockedShipLoadoutSlotView> loadoutSlots = currentMeta != null && slot != null && slot.HasShip
+            ? currentMeta.GetDevelopmentDockLoadoutSlotsForUi(slot.slotIndex)
             : null;
-        if (offers == null || offerIndex < 0 || offerIndex >= offers.Count || offers[offerIndex] == null)
+        if (loadoutSlots == null || loadoutIndex < 0 || loadoutIndex >= loadoutSlots.Count || loadoutSlots[loadoutIndex] == null)
         {
             return false;
         }
 
-        selectedMetaDockMissionOfferId = offers[offerIndex].offerId;
-        RefreshState(true);
-        return true;
-    }
-
-    private bool HandleMetaDockRunSelectedMission()
-    {
-        MetaGameState currentMeta = ResolveMeta();
-        if (currentMeta == null)
-        {
-            return false;
-        }
-
-        DockedDevelopmentShipState slot = currentMeta.GetSelectedDevelopmentDockShipSlot();
-        bool success = currentMeta.TryRunDevelopmentDockOrdinaryMission(
-            slot != null ? slot.slotIndex : 0,
-            selectedMetaDockMissionOfferId,
+        bool changed = currentMeta.TryCycleDevelopmentDockLoadoutPackage(
+            slot.slotIndex,
+            loadoutSlots[loadoutIndex].slotId,
             out statusMessage);
-        RefreshState(true);
-        if (success)
+        if (changed)
         {
-            DockedDevelopmentShipState updatedSlot = currentMeta.GetSelectedDevelopmentDockShipSlot();
-            SessionConfigDatabase config = currentMeta.SessionConfig;
-            ShipTreeEntryConfig ship = updatedSlot != null && updatedSlot.HasShip && config != null
-                ? config.GetShipTreeEntry(updatedSlot.shipId)
-                : null;
-            ShowMetaDockSortieResultWindow(statusMessage, ship, updatedSlot);
+            WildWindBaseIslandView.EnsureForCurrentSessionScene()?.RefreshDevelopmentDockShipPreviewsForRuntime();
         }
 
-        return success;
+        RefreshState(true);
+        return changed;
     }
 
     private bool HandleMetaDockSlotSelected(int slotIndex)
@@ -2631,6 +2525,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
 
         bool selected = currentMeta.SelectDevelopmentDockSlot(slotIndex);
+        if (selected)
+        {
+            WildWindBaseIslandView.EnsureForCurrentSessionScene()?.FocusDevelopmentDockSlotForRuntime(slotIndex);
+        }
+
         DockedDevelopmentShipState selectedSlot = currentMeta.GetSelectedDevelopmentDockShipSlot();
         if (selected && (selectedSlot == null || !selectedSlot.HasShip))
         {
@@ -2639,50 +2538,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         RefreshState(true);
         return selected;
-    }
-
-    private bool HandleMetaDockQuickBattle()
-    {
-        MetaGameState currentMeta = ResolveMeta();
-        if (currentMeta == null)
-        {
-            return false;
-        }
-
-        DockedDevelopmentShipState slot = currentMeta.GetSelectedDevelopmentDockShipSlot();
-        bool success = currentMeta.TryRunQuickDevelopmentSortie(slot != null ? slot.slotIndex : 0, out statusMessage);
-        RefreshState(true);
-        if (success)
-        {
-            DockedDevelopmentShipState updatedSlot = currentMeta.GetSelectedDevelopmentDockShipSlot();
-            SessionConfigDatabase config = currentMeta.SessionConfig;
-            ShipTreeEntryConfig ship = updatedSlot != null && updatedSlot.HasShip && config != null
-                ? config.GetShipTreeEntry(updatedSlot.shipId)
-                : null;
-            ShowMetaDockSortieResultWindow(statusMessage, ship, updatedSlot);
-        }
-
-        return success;
-    }
-
-    private bool HandleMetaDockManualSortie()
-    {
-        MetaGameState currentMeta = ResolveMeta();
-        if (currentMeta == null)
-        {
-            return false;
-        }
-
-        bool success = currentMeta.BeginQuickAdaptiveManualSessionSortie();
-        statusMessage = currentMeta.LastAccountMessage;
-        if (success)
-        {
-            metaScreenMode = MetaScreenMode.Port;
-            HideMetaDockSortieResultWindow();
-        }
-
-        RefreshState(true);
-        return success;
     }
 
     private bool HandleMetaDockCoreCombatSortie()
@@ -2782,15 +2637,24 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
 
         CloseAllHudWindows();
+        WildWindBaseIslandView island = WildWindBaseIslandView.EnsureForCurrentSessionScene();
+        island?.PreserveCityCameraForDockReturnForRuntime();
         if (knowledgeScreen != null)
         {
             knowledgeScreen.SetVisible(false);
         }
 
+        baseBuildingFocusActive = false;
         metaScreenMode = MetaScreenMode.Dock;
         statusMessage = "Dock screen opened.";
         RefreshState(true);
-        return metaDockScreenLayer != null && metaDockScreenLayer.gameObject.activeInHierarchy;
+        bool opened = metaDockScreenLayer != null && metaDockScreenLayer.gameObject.activeInHierarchy;
+        if (opened)
+        {
+            island?.FocusSelectedDevelopmentDockShipForRuntime();
+        }
+
+        return opened;
     }
 
     private bool ReturnFromMetaDockScreenToPort()
@@ -2798,7 +2662,13 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         metaScreenMode = MetaScreenMode.Port;
         statusMessage = "Port screen opened.";
         RefreshState(true);
-        return metaDockScreenLayer == null || !metaDockScreenLayer.gameObject.activeInHierarchy;
+        bool returned = metaDockScreenLayer == null || !metaDockScreenLayer.gameObject.activeInHierarchy;
+        if (returned)
+        {
+            WildWindBaseIslandView.EnsureForCurrentSessionScene()?.FlyCityCameraHomeForRuntime();
+        }
+
+        return returned;
     }
 
     private void CloseAllHudWindows()
@@ -3851,7 +3721,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return false;
         }
 
-        window.ToggleOpen();
+        bool shouldOpen = !window.IsOpen;
+        CloseAllHudWindows();
+        window.SetOpen(shouldOpen);
         RefreshState(true);
         return true;
     }
@@ -4063,11 +3935,11 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
 
         int developmentShipCount = CountDevelopmentSupplierShips(suppliers);
-        SetText(developmentWindowText, "Корабли развития: "
+        SetText(developmentWindowText, "Корабли: "
             + developmentShipCount
             + " | Фракции: "
             + developmentWindowSupplierCount
-            + " | Ранги I-X");
+            + " | каталог без дерева");
     }
 
     private List<DevelopmentSupplierView> BuildDevelopmentSupplierViews(IReadOnlyList<ShipTreeEntryConfig> entries)
@@ -4097,12 +3969,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 };
                 byFaction[entry.factionId] = supplier;
                 suppliers.Add(supplier);
-            }
-
-            if (IsDevelopmentStarterEntry(entry))
-            {
-                supplier.starterShip = entry;
-                continue;
             }
 
             supplier.ships.Add(entry);
@@ -4137,7 +4003,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return;
         }
 
-        BuildDevelopmentTreeGrid(selectedSupplier);
+        BuildDevelopmentShipCatalogGrid(selectedSupplier);
         BuildDevelopmentShipDetails(selectedSupplier);
         RefreshDevelopmentTileVisuals();
 
@@ -4176,163 +4042,53 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
     }
 
-    private void BuildDevelopmentTreeGrid(DevelopmentSupplierView supplier)
+    private void BuildDevelopmentShipCatalogGrid(DevelopmentSupplierView supplier)
     {
-        const float rankLabelX = 18f;
-        const float rankOneY = -104f;
-        const float branchHeaderY = -48f;
+        developmentWindowConnectionCount = 0;
+        List<ShipTreeEntryConfig> ships = new List<ShipTreeEntryConfig>();
+        if (supplier != null)
+        {
+            for (int i = 0; i < supplier.ships.Count; i++)
+            {
+                if (supplier.ships[i] != null)
+                {
+                    ships.Add(supplier.ships[i]);
+                }
+            }
+        }
 
-        List<DevelopmentBranchView> branches = BuildDevelopmentBranchViews(supplier);
-        float branchAreaWidth = branches.Count > 0
-            ? (branches.Count - 1) * DevelopmentBranchStep + DevelopmentTileWidth
-            : DevelopmentTileWidth;
+        ships.Sort(CompareDevelopmentShips);
+
+        const float tileGapX = 24f;
+        const float tileGapY = 24f;
+        const int columnCount = 4;
+        float gridX = DevelopmentTreeContentPaddingX;
+        float gridY = -DevelopmentTreeContentPaddingY;
+        int rowCount = Mathf.Max(1, Mathf.CeilToInt(ships.Count / (float)columnCount));
         float contentWidth = Mathf.Max(
-            DevelopmentTreeViewportWidth,
-            branchAreaWidth + DevelopmentTreeContentPaddingX * 2f + 48f);
+            DevelopmentTreeViewportWidth + 240f,
+            DevelopmentTreeContentPaddingX * 2f + columnCount * DevelopmentTileWidth + (columnCount - 1) * tileGapX);
         float contentHeight = Mathf.Max(
-            DevelopmentTreeViewportHeight,
-            DevelopmentTreeContentPaddingY * 2f + DevelopmentTileHeight + (DevelopmentTreeTierCount - 1) * DevelopmentRankStep + 96f);
-
+            DevelopmentTreeViewportHeight + 180f,
+            DevelopmentTreeContentPaddingY * 2f + rowCount * DevelopmentTileHeight + Mathf.Max(0, rowCount - 1) * tileGapY);
         developmentTreeRoot.sizeDelta = new Vector2(contentWidth, contentHeight);
 
-        float gridX = Mathf.Max(DevelopmentTreeContentPaddingX, (contentWidth - branchAreaWidth) * 0.5f);
-        float railX = DevelopmentTreeContentPaddingX * 0.55f;
-        float railWidth = Mathf.Max(DevelopmentTileWidth, contentWidth - railX - DevelopmentTreeContentPaddingX * 0.65f);
-
-        for (int rank = 1; rank <= DevelopmentTreeTierCount; rank++)
+        if (ships.Count == 0)
         {
-            float y = GetDevelopmentRankY(rankOneY, rank);
-            Text rankText = CreateText(developmentTreeRoot, FormatRomanTier(rank), 16, new Vector2(rankLabelX, y - 2f), new Vector2(38f, 24f), TextAnchor.MiddleCenter, new Color(0.76f, 0.84f, 0.88f, 0.82f));
-            rankText.fontStyle = FontStyle.Bold;
-            CreateDecorativePanel("Development Rank Rail " + rank, developmentTreeRoot, new RectTransformSpec
-            {
-                anchorMin = new Vector2(0f, 1f),
-                anchorMax = new Vector2(0f, 1f),
-                pivot = new Vector2(0f, 1f),
-                anchoredPosition = new Vector2(railX, y - DevelopmentTileHeight * 0.5f),
-                sizeDelta = new Vector2(railWidth, 1.5f)
-            }, new Color(0.32f, 0.44f, 0.50f, rank == 1 ? 0.22f : 0.11f));
+            CreateText(developmentTreeRoot, "Кораблей пока нет.", 18, new Vector2(gridX, gridY), new Vector2(420f, 34f), TextAnchor.MiddleLeft, new Color(0.82f, 0.86f, 0.82f, 1f));
+            return;
         }
 
-        for (int i = 0; i < branches.Count; i++)
+        for (int i = 0; i < ships.Count; i++)
         {
-            DevelopmentBranchView branch = branches[i];
-            float x = gridX + i * DevelopmentBranchStep;
-            Text branchText = CreateText(developmentTreeRoot, ShortenButtonLabel(branch.displayName, 17), 14, new Vector2(x, branchHeaderY), new Vector2(DevelopmentTileWidth, 30f), TextAnchor.MiddleCenter, new Color(0.90f, 0.78f, 0.56f, 0.86f));
-            branchText.fontStyle = FontStyle.Bold;
+            int column = i % columnCount;
+            int row = i / columnCount;
+            Vector2 topLeft = new Vector2(
+                gridX + column * (DevelopmentTileWidth + tileGapX),
+                gridY - row * (DevelopmentTileHeight + tileGapY));
+            CreateDevelopmentShipTile(topLeft, ships[i]);
+            developmentWindowTileCount++;
         }
-
-        Dictionary<string, Vector2> centersByShip = new Dictionary<string, Vector2>(StringComparer.OrdinalIgnoreCase);
-        float starterX = gridX + Mathf.Max(0f, (branches.Count - 1) * DevelopmentBranchStep) * 0.5f;
-        Vector2 starterTopLeft = new Vector2(starterX, rankOneY);
-        string starterShipId = supplier.starterShip != null ? supplier.starterShip.shipId : "pioneer";
-        centersByShip[starterShipId] = GetDevelopmentTileCenter(starterTopLeft);
-        centersByShip["pioneer"] = GetDevelopmentTileCenter(starterTopLeft);
-
-        for (int i = 0; i < branches.Count; i++)
-        {
-            DevelopmentBranchView branch = branches[i];
-            for (int j = 0; j < branch.ships.Count; j++)
-            {
-                ShipTreeEntryConfig ship = branch.ships[j];
-                int rank = Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount);
-                Vector2 topLeft = new Vector2(gridX + i * DevelopmentBranchStep, GetDevelopmentRankY(rankOneY, rank));
-                centersByShip[ship.shipId] = GetDevelopmentTileCenter(topLeft);
-            }
-        }
-
-        for (int i = 0; i < branches.Count; i++)
-        {
-            DevelopmentBranchView branch = branches[i];
-            for (int j = 0; j < branch.ships.Count; j++)
-            {
-                ShipTreeEntryConfig ship = branch.ships[j];
-                if (ship.parentShipIds == null || ship.parentShipIds.Count == 0)
-                {
-                    continue;
-                }
-
-                for (int parentIndex = 0; parentIndex < ship.parentShipIds.Count; parentIndex++)
-                {
-                    string parentId = ship.parentShipIds[parentIndex];
-                    if (!centersByShip.TryGetValue(parentId, out Vector2 parentCenter) || !centersByShip.TryGetValue(ship.shipId, out Vector2 childCenter))
-                    {
-                        continue;
-                    }
-
-                    DrawDevelopmentConnection(parentCenter, childCenter, supplier.color);
-                    developmentWindowConnectionCount++;
-                }
-            }
-        }
-
-        CreateDevelopmentStarterTile(starterTopLeft, supplier);
-        developmentWindowTileCount++;
-
-        for (int i = 0; i < branches.Count; i++)
-        {
-            DevelopmentBranchView branch = branches[i];
-            for (int j = 0; j < branch.ships.Count; j++)
-            {
-                ShipTreeEntryConfig ship = branch.ships[j];
-                int rank = Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount);
-                Vector2 topLeft = new Vector2(gridX + i * DevelopmentBranchStep, GetDevelopmentRankY(rankOneY, rank));
-                CreateDevelopmentShipTile(topLeft, ship);
-                developmentWindowTileCount++;
-            }
-        }
-    }
-
-    private List<DevelopmentBranchView> BuildDevelopmentBranchViews(DevelopmentSupplierView supplier)
-    {
-        List<DevelopmentBranchView> branches = new List<DevelopmentBranchView>();
-        Dictionary<string, DevelopmentBranchView> byBranch = new Dictionary<string, DevelopmentBranchView>(StringComparer.OrdinalIgnoreCase);
-        if (supplier == null)
-        {
-            return branches;
-        }
-
-        for (int i = 0; i < supplier.ships.Count; i++)
-        {
-            ShipTreeEntryConfig ship = supplier.ships[i];
-            if (ship == null)
-            {
-                continue;
-            }
-
-            string branchId = string.IsNullOrWhiteSpace(ship.branchId) ? ship.shipClassId + "_line" : ship.branchId;
-            if (!byBranch.TryGetValue(branchId, out DevelopmentBranchView branch))
-            {
-                branch = new DevelopmentBranchView
-                {
-                    branchId = branchId,
-                    displayName = string.IsNullOrWhiteSpace(ship.BranchDisplayNameRu) ? ship.ClassDisplayNameRu : ship.BranchDisplayNameRu,
-                    treeRow = Mathf.Max(0, ship.treeRow)
-                };
-                byBranch[branchId] = branch;
-                branches.Add(branch);
-            }
-
-            branch.treeRow = Mathf.Min(branch.treeRow, Mathf.Max(0, ship.treeRow));
-            branch.ships.Add(ship);
-        }
-
-        branches.Sort(CompareDevelopmentBranches);
-        for (int i = 0; i < branches.Count; i++)
-        {
-            branches[i].ships.Sort(CompareDevelopmentShips);
-        }
-
-        return branches;
-    }
-
-    private static int CompareDevelopmentBranches(DevelopmentBranchView left, DevelopmentBranchView right)
-    {
-        if (left == null && right == null) return 0;
-        if (left == null) return -1;
-        if (right == null) return 1;
-        int rowComparison = left.treeRow.CompareTo(right.treeRow);
-        return rowComparison != 0 ? rowComparison : string.Compare(left.branchId, right.branchId, StringComparison.OrdinalIgnoreCase);
     }
 
     private static int CompareDevelopmentShips(ShipTreeEntryConfig left, ShipTreeEntryConfig right)
@@ -4340,8 +4096,27 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         if (left == null && right == null) return 0;
         if (left == null) return -1;
         if (right == null) return 1;
-        int tierComparison = left.treeTier.CompareTo(right.treeTier);
-        return tierComparison != 0 ? tierComparison : string.Compare(left.shipId, right.shipId, StringComparison.OrdinalIgnoreCase);
+        int classComparison = GetDevelopmentShipClassOrder(left.shipClassId).CompareTo(GetDevelopmentShipClassOrder(right.shipClassId));
+        if (classComparison != 0) return classComparison;
+        int rankComparison = left.rank.CompareTo(right.rank);
+        if (rankComparison != 0) return rankComparison;
+        return string.Compare(left.shipId, right.shipId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int GetDevelopmentShipClassOrder(string classId)
+    {
+        switch ((classId ?? "").Trim().ToLowerInvariant())
+        {
+            case "destroyer":
+            case "frigate":
+                return 0;
+            case "cruiser":
+                return 1;
+            case "battleship":
+                return 2;
+            default:
+                return 10;
+        }
     }
 
     private static int CompareDevelopmentSuppliers(DevelopmentSupplierView left, DevelopmentSupplierView right)
@@ -4352,56 +4127,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         int orderComparison = GetDevelopmentFactionOrder(left.factionId).CompareTo(GetDevelopmentFactionOrder(right.factionId));
         return orderComparison != 0 ? orderComparison : string.Compare(left.displayName, right.displayName, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void CreateDevelopmentStarterTile(Vector2 topLeft, DevelopmentSupplierView supplier)
-    {
-        ShipTreeEntryConfig starter = supplier != null ? supplier.starterShip : null;
-        bool selected = starter != null && string.Equals(starter.shipId, selectedDevelopmentShipId, StringComparison.OrdinalIgnoreCase);
-        Color normalColor = new Color(0.085f, 0.105f, 0.120f, 0.98f);
-        Color selectedColor = new Color(0.145f, 0.160f, 0.172f, 1f);
-        RectTransform tile = CreatePanel("Development Starter Tile", developmentTreeRoot, new RectTransformSpec
-        {
-            anchorMin = new Vector2(0f, 1f),
-            anchorMax = new Vector2(0f, 1f),
-            pivot = new Vector2(0f, 1f),
-            anchoredPosition = topLeft,
-            sizeDelta = new Vector2(DevelopmentTileWidth, DevelopmentTileHeight)
-        }, selected ? selectedColor : normalColor);
-
-        Image tileImage = tile.GetComponent<Image>();
-        string starterId = starter != null ? starter.shipId : "pioneer";
-        InstallDevelopmentTreePanHandler(tile);
-
-        if (starter != null)
-        {
-            Button button = tile.gameObject.AddComponent<Button>();
-            button.targetGraphic = tileImage;
-            button.transition = Selectable.Transition.None;
-            button.onClick.AddListener(() => SelectDevelopmentShip(starterId));
-            AddDevelopmentTilePointerEvents(tile, starterId);
-        }
-
-        Outline outline = tile.gameObject.AddComponent<Outline>();
-        outline.effectColor = selected ? Color.white : new Color(0.92f, 0.74f, 0.36f, 0.65f);
-        outline.effectDistance = selected ? new Vector2(2f, -2f) : new Vector2(1f, -1f);
-        RegisterDevelopmentTile(starterId, tileImage, outline, normalColor, selectedColor, new Color(0.92f, 0.74f, 0.36f, 0.65f));
-
-        CreateDecorativePanel("Starter Empty Image", tile, new RectTransformSpec
-        {
-            anchorMin = new Vector2(0f, 1f),
-            anchorMax = new Vector2(0f, 1f),
-            pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(12f, -28f),
-            sizeDelta = new Vector2(126f, 32f)
-        }, new Color(0.10f, 0.13f, 0.15f, 0.92f));
-
-        Text rank = CreateText(tile, "I", 15, new Vector2(12f, -4f), new Vector2(42f, 22f), TextAnchor.MiddleLeft, new Color(0.92f, 0.92f, 0.86f, 1f));
-        rank.fontStyle = FontStyle.Bold;
-
-        string starterName = starter != null ? starter.DisplayNameRu : "ПИОНЕР";
-        Text label = CreateText(tile, ShortenButtonLabel(starterName, 18).ToUpperInvariant(), 14, new Vector2(12f, -54f), new Vector2(126f, 22f), TextAnchor.MiddleRight, supplier != null ? supplier.color : new Color(0.96f, 0.90f, 0.72f, 1f));
-        label.fontStyle = FontStyle.Bold;
     }
 
     private void CreateDevelopmentShipTile(Vector2 topLeft, ShipTreeEntryConfig ship)
@@ -4449,9 +4174,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             sizeDelta = new Vector2(126f, 32f)
         }, new Color(baseColor.r * 0.25f, baseColor.g * 0.25f, baseColor.b * 0.25f, 0.92f));
 
-        string tierText = ship != null ? FormatRomanTier(Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount)) : "";
-        Text tier = CreateText(tile, tierText, 15, new Vector2(12f, -4f), new Vector2(42f, 22f), TextAnchor.MiddleLeft, new Color(0.92f, 0.92f, 0.86f, 1f));
-        tier.fontStyle = FontStyle.Bold;
+        string classText = ship != null ? GetDevelopmentClassShortName(ship.shipClassId) : "";
+        Text classLabel = CreateText(tile, classText, 15, new Vector2(12f, -4f), new Vector2(58f, 22f), TextAnchor.MiddleLeft, new Color(0.92f, 0.92f, 0.86f, 1f));
+        classLabel.fontStyle = FontStyle.Bold;
 
         string name = ship != null ? ShortenButtonLabel(ship.DisplayNameRu, 18).ToUpperInvariant() : "";
         Text nameText = CreateText(tile, name, 14, new Vector2(12f, -54f), new Vector2(126f, 22f), TextAnchor.MiddleRight, new Color(0.91f, 0.94f, 0.90f, 1f));
@@ -4591,55 +4316,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }
     }
 
-    private void DrawDevelopmentConnection(Vector2 parentCenter, Vector2 childCenter, Color supplierColor)
-    {
-        float midY = Mathf.Lerp(parentCenter.y, childCenter.y, 0.5f);
-        Color color = new Color(supplierColor.r, supplierColor.g, supplierColor.b, 0.54f);
-        DrawDevelopmentLine(parentCenter, new Vector2(parentCenter.x, midY), color);
-        DrawDevelopmentLine(new Vector2(parentCenter.x, midY), new Vector2(childCenter.x, midY), color);
-        DrawDevelopmentLine(new Vector2(childCenter.x, midY), childCenter, color);
-    }
-
-    private void DrawDevelopmentLine(Vector2 start, Vector2 end, Color color)
-    {
-        const float thickness = 3f;
-        if (Mathf.Abs(start.x - end.x) >= Mathf.Abs(start.y - end.y))
-        {
-            float minX = Mathf.Min(start.x, end.x);
-            float width = Mathf.Max(thickness, Mathf.Abs(start.x - end.x));
-            CreateDecorativePanel("Development Connection H", developmentTreeRoot, new RectTransformSpec
-            {
-                anchorMin = new Vector2(0f, 1f),
-                anchorMax = new Vector2(0f, 1f),
-                pivot = new Vector2(0f, 1f),
-                anchoredPosition = new Vector2(minX, start.y + thickness * 0.5f),
-                sizeDelta = new Vector2(width, thickness)
-            }, color);
-            return;
-        }
-
-        float topY = Mathf.Max(start.y, end.y);
-        float height = Mathf.Max(thickness, Mathf.Abs(start.y - end.y));
-        CreateDecorativePanel("Development Connection V", developmentTreeRoot, new RectTransformSpec
-        {
-            anchorMin = new Vector2(0f, 1f),
-            anchorMax = new Vector2(0f, 1f),
-            pivot = new Vector2(0f, 1f),
-            anchoredPosition = new Vector2(start.x - thickness * 0.5f, topY),
-            sizeDelta = new Vector2(thickness, height)
-        }, color);
-    }
-
-    private static Vector2 GetDevelopmentTileCenter(Vector2 topLeft)
-    {
-        return new Vector2(topLeft.x + DevelopmentTileWidth * 0.5f, topLeft.y - DevelopmentTileHeight * 0.5f);
-    }
-
-    private static float GetDevelopmentRankY(float rankOneY, int rank)
-    {
-        return rankOneY - (Mathf.Clamp(rank, 1, DevelopmentTreeTierCount) - 1) * DevelopmentRankStep;
-    }
-
     private bool SelectDevelopmentSupplier(string factionId)
     {
         if (string.IsNullOrWhiteSpace(factionId))
@@ -4743,11 +4419,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return null;
         }
 
-        if (supplier.starterShip != null && string.Equals(supplier.starterShip.shipId, shipId, StringComparison.OrdinalIgnoreCase))
-        {
-            return supplier.starterShip;
-        }
-
         for (int i = 0; i < supplier.ships.Count; i++)
         {
             ShipTreeEntryConfig ship = supplier.ships[i];
@@ -4762,11 +4433,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
     private ShipTreeEntryConfig FindFirstDevelopmentShip(DevelopmentSupplierView supplier)
     {
-        if (supplier != null && supplier.starterShip != null)
-        {
-            return supplier.starterShip;
-        }
-
         if (supplier == null || supplier.ships.Count == 0)
         {
             return null;
@@ -4817,7 +4483,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         }, new Color(color.r, color.g, color.b, 0.85f));
 
         Text title = CreateText(developmentDetailsRoot,
-            FormatRomanTier(Mathf.Clamp(ship.treeTier, 1, DevelopmentTreeTierCount)) + " " + ShortenButtonLabel(ship.DisplayNameRu, 22).ToUpperInvariant(),
+            ShortenButtonLabel(ship.DisplayNameRu, 22).ToUpperInvariant(),
             22,
             new Vector2(18f, -18f),
             new Vector2(300f, 32f),
@@ -4870,7 +4536,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         CreateText(developmentDetailsRoot, FormatMetaResourceAmount(GetDevelopmentResearchCost(ship)) + " опыта", 16, new Vector2(164f, y), new Vector2(150f, 24f), TextAnchor.MiddleRight, new Color(0.95f, 0.90f, 0.74f, 1f));
         y -= 32f;
         CreateText(developmentDetailsRoot, "Покупка:", 16, new Vector2(20f, y), new Vector2(150f, 24f), TextAnchor.MiddleLeft, new Color(0.82f, 0.86f, 0.82f, 1f));
-        CreateText(developmentDetailsRoot, FormatMetaResourceAmount(ship.costAmount) + " фрахтов", 16, new Vector2(164f, y), new Vector2(150f, 24f), TextAnchor.MiddleRight, new Color(0.95f, 0.90f, 0.74f, 1f));
+        int purchaseCost = MetaGameState.GetDevelopmentDockShipPurchaseCost(ship);
+        CreateText(developmentDetailsRoot, purchaseCost > 0 ? FormatMetaResourceAmount(purchaseCost) + " фрахтов" : "без цены", 16, new Vector2(164f, y), new Vector2(150f, 24f), TextAnchor.MiddleRight, new Color(0.95f, 0.90f, 0.74f, 1f));
 
         y -= 42f;
         Text buyText = CreateButton(developmentDetailsRoot, "Development Buy Ship To Dock", new Vector2(20f, y), new Vector2(296f, 38f), () => HandleDevelopmentBuyShip(ship.shipId), out _);
@@ -5026,6 +4693,22 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 return "Линкор";
             default:
                 return string.IsNullOrWhiteSpace(fallback) ? classId : fallback;
+        }
+    }
+
+    private static string GetDevelopmentClassShortName(string classId)
+    {
+        switch ((classId ?? "").Trim().ToLowerInvariant())
+        {
+            case "destroyer":
+            case "frigate":
+                return "FRG";
+            case "cruiser":
+                return "CR";
+            case "battleship":
+                return "BB";
+            default:
+                return "SHIP";
         }
     }
 
@@ -5204,7 +4887,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                     continue;
                 }
 
-                shipCount += suppliers[i].ships.Count + (suppliers[i].starterShip != null ? 1 : 0);
+                shipCount += suppliers[i].ships.Count;
             }
         }
 
@@ -5226,7 +4909,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
                 continue;
             }
 
-            count += suppliers[i].ships.Count + (suppliers[i].starterShip != null ? 1 : 0);
+            count += suppliers[i].ships.Count;
         }
 
         return count;
@@ -5708,9 +5391,9 @@ public sealed class WildWindGameplayHud : MonoBehaviour
 
         float maxThrustKgf = Mathf.Max(0.001f, ship.HullThrustCapacityKgf);
         float liftRatio = ship.claudiumMaxLiftKg > 0f
-            ? Mathf.Clamp01((ship.claudiumCurrentLiftN / 9.81f) / ship.claudiumMaxLiftKg)
+            ? Mathf.Clamp01(ship.CurrentStrategicLiftOrderKg / ship.claudiumMaxLiftKg)
             : 0f;
-        float thrustKgf = Mathf.Abs(ship.hullForwardThrustKgfCurrent);
+        float thrustKgf = Mathf.Abs(ship.CurrentStrategicThrustOrderKgf);
         float thrustRatio = Mathf.Clamp01(thrustKgf / maxThrustKgf);
         float liftHeight = EnginePowerBarHeight * liftRatio;
         float moduleHeight = 0f;
@@ -5719,7 +5402,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         SetPowerFill(engineLiftPowerFill, 0f, liftHeight);
         SetPowerFill(engineModulePowerFill, liftHeight, moduleHeight);
         SetPowerFillColor(engineThrustPowerFill,
-            ship.hullThrustOutput < -0.001f
+            ship.StrategicForwardInput < -0.001f
                 ? EngineReverseThrustColor
                 : EngineForwardThrustColor);
         SetPowerFill(engineThrustPowerFill, liftHeight + moduleHeight, thrustHeight);
@@ -5780,7 +5463,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return false;
         }
 
-        ship.thrustInput = GetThrottleForGearNotch(notch);
+        ship.SetStrategicManualInput(GetThrottleForGearNotch(notch), 0f, 0f, 0f, notch == 0);
         statusMessage = "Manual thrust notch selected.";
         RefreshState(true);
         return true;
@@ -6332,9 +6015,8 @@ public sealed class WildWindGameplayHud : MonoBehaviour
     private static string FormatExtractionBlocker(SortieReturnEstimate estimate)
     {
         if (!estimate.hasActiveSortie) return "no sortie";
-        if (!estimate.isAboveStorm) return "storm layer";
-        if (estimate.isInsideCylinder) return "leave cylinder";
-        if (!estimate.hasExtractionRunup) return "hold slip " + estimate.missingExtractionRunupSeconds.ToString("0.0") + "s";
+        if (estimate.isInsideCylinder) return "leave circle";
+        if (!estimate.hasExtractionRunup) return "hold outside " + estimate.missingExtractionRunupSeconds.ToString("0.0") + "s";
         return "blocked";
     }
 
@@ -6464,7 +6146,7 @@ public sealed class WildWindGameplayHud : MonoBehaviour
             return "hull thrust -";
         }
 
-        return "hull thrust " + (ship.thrustInput * 100f).ToString("0") + "%";
+        return "strategic thrust " + (ship.StrategicForwardInput * 100f).ToString("0") + "%";
     }
 
     private static string ShortenButtonLabel(string value, int maxLength)
@@ -7554,15 +7236,6 @@ public sealed class WildWindGameplayHud : MonoBehaviour
         public string factionId = "";
         public string displayName = "";
         public Color color = Color.white;
-        public ShipTreeEntryConfig starterShip;
-        public readonly List<ShipTreeEntryConfig> ships = new List<ShipTreeEntryConfig>();
-    }
-
-    private sealed class DevelopmentBranchView
-    {
-        public string branchId = "";
-        public string displayName = "";
-        public int treeRow;
         public readonly List<ShipTreeEntryConfig> ships = new List<ShipTreeEntryConfig>();
     }
 

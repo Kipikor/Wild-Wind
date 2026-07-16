@@ -418,24 +418,10 @@ public static class ShipAssemblyBuilder
         AddStat(modifiers, ShipStatId.HullForwardThrustKgf, ShipStatOperation.Set, hullConfig.hullForwardThrustKgf);
         AddStat(modifiers, ShipStatId.HullCruiseReferenceSpeedMS, ShipStatOperation.Set, hullConfig.hullCruiseReferenceSpeedMS);
         AddStat(modifiers, ShipStatId.FuelConsumptionKgPerMinute, ShipStatOperation.Set, hullConfig.fuelConsumptionKgPerMinute);
-        AddStat(modifiers, ShipStatId.AirDensity, ShipStatOperation.Set, hullConfig.airDensity);
-        AddStat(modifiers, ShipStatId.DragCoefficient, ShipStatOperation.Set, hullConfig.dragCoefficient);
-        AddStat(modifiers, ShipStatId.FrontalArea, ShipStatOperation.Set, hullConfig.frontalAreaM2);
-        AddStat(modifiers, ShipStatId.SideResistance, ShipStatOperation.Set, hullConfig.sideResistance);
-        AddStat(modifiers, ShipStatId.VerticalAreaFactor, ShipStatOperation.Set, hullConfig.verticalAreaFactor);
-        AddStat(modifiers, ShipStatId.GyroTurnTorque, ShipStatOperation.Set, hullConfig.gyroTurnTorqueNm);
-        AddStat(modifiers, ShipStatId.GyroTurnDamping, ShipStatOperation.Set, hullConfig.gyroTurnDamping);
-        AddStat(modifiers, ShipStatId.MaxAutoTurnRateDeg, ShipStatOperation.Set, hullConfig.maxAutoTurnRateDeg);
-        AddStat(modifiers, ShipStatId.MaxStructuralTurnRateDeg, ShipStatOperation.Set, hullConfig.maxStructuralTurnRateDeg);
-        AddStat(modifiers, ShipStatId.MaxStructuralVerticalSpeed, ShipStatOperation.Set, hullConfig.maxStructuralVerticalSpeedMS);
-        AddStat(modifiers, ShipStatId.MaxAutoVerticalSpeed, ShipStatOperation.Set, hullConfig.maxAutoVerticalSpeedMS);
-        AddStat(modifiers, ShipStatId.AltitudeStiffness, ShipStatOperation.Set, hullConfig.altitudeStiffness);
-        AddStat(modifiers, ShipStatId.AltitudeDamping, ShipStatOperation.Set, hullConfig.altitudeDamping);
-        AddStat(modifiers, ShipStatId.AltitudeDriftTolerance, ShipStatOperation.Set, hullConfig.altitudeDriftToleranceM);
-        AddStat(modifiers, ShipStatId.HeadingStiffness, ShipStatOperation.Set, hullConfig.headingStiffness);
-        AddStat(modifiers, ShipStatId.HeadingDamping, ShipStatOperation.Set, hullConfig.headingDamping);
-        AddStat(modifiers, ShipStatId.SpeedStiffness, ShipStatOperation.Set, hullConfig.speedStiffness);
-        AddStat(modifiers, ShipStatId.SpeedDamping, ShipStatOperation.Set, hullConfig.speedDamping);
+        AddStat(modifiers, ShipStatId.StrategicYawRateDegPerSecond, ShipStatOperation.Set, hullConfig.strategicYawRateDegPerSecond);
+        AddStat(modifiers, ShipStatId.StrategicYawAccelerationDegPerSecond2, ShipStatOperation.Set, hullConfig.strategicYawAccelerationDegPerSecond2);
+        AddStat(modifiers, ShipStatId.StrategicVerticalSpeedMS, ShipStatOperation.Set, hullConfig.strategicVerticalSpeedMS);
+        AddStat(modifiers, ShipStatId.StrategicVerticalAccelerationMS2, ShipStatOperation.Set, hullConfig.strategicVerticalAccelerationMS2);
         AddStat(modifiers, ShipStatId.StructureHp, ShipStatOperation.Set, hullConfig.structureHp);
         return modifiers;
     }
@@ -610,27 +596,12 @@ public class ShipStatBlock
 
         ship.baseMass = Mathf.Max(1f, Get(ShipStatId.BaseMass, ship.baseMass));
         ship.hullMaxTakeoffMassKg = Mathf.Max(1f, Get(ShipStatId.HullMaxTakeoffMassKg, ship.hullMaxTakeoffMassKg));
-        ship.targetTrimMass = Mathf.Max(1f, Get(ShipStatId.TargetTrimMass, ship.baseMass));
         ship.hullCruiseReferenceSpeedMS = Mathf.Max(1f, Get(ShipStatId.HullCruiseReferenceSpeedMS, ship.hullCruiseReferenceSpeedMS));
         ship.baseMaxSpeedMS = ship.hullCruiseReferenceSpeedMS;
-        ship.airDensity = Mathf.Max(0.01f, Get(ShipStatId.AirDensity, 1.225f));
-        ship.dragCoefficient = Mathf.Max(0f, Get(ShipStatId.DragCoefficient, 0f));
-        ship.frontalArea = Mathf.Max(0f, Get(ShipStatId.FrontalArea, 0f));
-        ship.sideResistance = Mathf.Max(0f, Get(ShipStatId.SideResistance, 0f));
-        ship.verticalAreaFactor = Mathf.Max(0f, Get(ShipStatId.VerticalAreaFactor, 0f));
-        ship.gyroTurnTorque = Mathf.Max(0f, Get(ShipStatId.GyroTurnTorque, ship.gyroTurnTorque));
-        ship.gyroTurnDamping = Mathf.Max(0f, Get(ShipStatId.GyroTurnDamping, ship.gyroTurnDamping));
-        ship.maxAutoTurnRateDeg = Mathf.Max(0f, Get(ShipStatId.MaxAutoTurnRateDeg, 0f));
-        ship.maxStructuralTurnRateDeg = Mathf.Max(0f, Get(ShipStatId.MaxStructuralTurnRateDeg, 0f));
-        ship.maxStructuralVerticalSpeed = Mathf.Max(0.1f, Get(ShipStatId.MaxStructuralVerticalSpeed, 1f));
-        ship.maxAutoVerticalSpeed = Mathf.Max(0.1f, Get(ShipStatId.MaxAutoVerticalSpeed, 1f));
-        ship.altStiffness = Mathf.Max(0f, Get(ShipStatId.AltitudeStiffness, ship.altStiffness));
-        ship.altDamping = Mathf.Max(0f, Get(ShipStatId.AltitudeDamping, ship.altDamping));
-        ship.altDriftTolerance = Mathf.Max(0f, Get(ShipStatId.AltitudeDriftTolerance, ship.altDriftTolerance));
-        ship.headingStiffness = Mathf.Max(0f, Get(ShipStatId.HeadingStiffness, ship.headingStiffness));
-        ship.headingDamping = Mathf.Max(0f, Get(ShipStatId.HeadingDamping, ship.headingDamping));
-        ship.speedStiffness = Mathf.Max(0f, Get(ShipStatId.SpeedStiffness, ship.speedStiffness));
-        ship.speedDamping = Mathf.Max(0f, Get(ShipStatId.SpeedDamping, ship.speedDamping));
+        ship.strategicYawRateDegPerSecond = Mathf.Max(0.1f, Get(ShipStatId.StrategicYawRateDegPerSecond, ship.strategicYawRateDegPerSecond));
+        ship.strategicYawAccelerationDegPerSecond2 = Mathf.Max(0.1f, Get(ShipStatId.StrategicYawAccelerationDegPerSecond2, ship.strategicYawAccelerationDegPerSecond2));
+        ship.strategicVerticalSpeedMS = Mathf.Max(0.1f, Get(ShipStatId.StrategicVerticalSpeedMS, ship.strategicVerticalSpeedMS));
+        ship.strategicVerticalAccelerationMS2 = Mathf.Max(0.1f, Get(ShipStatId.StrategicVerticalAccelerationMS2, ship.strategicVerticalAccelerationMS2));
         ship.claudiumMaxLiftKg = Mathf.Max(0f, Get(ShipStatId.ClaudiumMaxLiftKg, 0f));
 
         if (!string.IsNullOrWhiteSpace(fuelResourceId))
